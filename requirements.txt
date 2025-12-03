@@ -1,6 +1,6 @@
-flask
-flask_sqlalchemy
-reportlab
-openai>=1.6.0
-python-dotenv
-openai>=1.40.0
+Flask==3.0.0
+Flask-SQLAlchemy==3.0.5
+Werkzeug==3.0.1
+reportlab==4.0.8
+gunicorn==21.2.0
+python-dotenv==1.0.1
