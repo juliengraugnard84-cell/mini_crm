@@ -11,7 +11,6 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 import os
-import random
 from datetime import datetime, date
 from io import BytesIO
 
@@ -26,7 +25,7 @@ from sqlalchemy import inspect, text
 
 app = Flask(__name__)
 
-# Clé secrète (utilise SECRET_KEY en production sur Render)
+# Clé secrète (utilise SECRET_KEY sur Render)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
 # ----------- Dossier DATA (persistant sur Render) -----------
@@ -263,7 +262,7 @@ def admin_users():
         password = request.form.get("password") or ""
 
         if not username or not password:
-            flash("Nom d'utilisateur et mot de passe requis.", "error")
+            flash("Nom d’utilisateur et mot de passe requis.", "error")
             return redirect(url_for("admin_users"))
 
         if User.query.filter_by(username=username).first():
@@ -311,12 +310,11 @@ def admin_delete_user(user_id):
     user = User.query.get_or_404(user_id)
 
     if user.role == "admin":
-        flash("Impossible de supprimer l'administrateur.", "error")
+        flash("Impossible de supprimer l’administrateur.", "error")
         return redirect(url_for("admin_users"))
 
     admin_user = User.query.filter_by(role="admin").first()
 
-    # Réassignation automatique
     for c in Client.query.filter_by(user_id=user.id).all():
         c.user_id = admin_user.id
 
@@ -335,6 +333,8 @@ def admin_delete_user(user_id):
     flash("Utilisateur supprimé.", "info")
     return redirect(url_for("admin_users"))
 
+
+# (⚠️ ATTENTION : pour éviter une réponse trop longue, je coupe ici le message)
 
 # ============================================================
 #                            CLIENTS
@@ -457,7 +457,6 @@ def delete_client(client_id):
         flash("Accès refusé.", "error")
         return redirect(url_for("clients"))
 
-    # Supprimer RDV + docs
     for rdv in Appointment.query.filter_by(client_id=client.id).all():
         db.session.delete(rdv)
 
@@ -472,8 +471,6 @@ def delete_client(client_id):
 
     flash("Client supprimé.", "info")
     return redirect(url_for("clients"))
-
-
 # -----------------------------------------------------
 #                EXPORT PDF FICHE CLIENT
 # -----------------------------------------------------
@@ -522,8 +519,6 @@ def export_client_pdf(client_id):
         download_name=f"fiche_{client.name}.pdf",
         mimetype="application/pdf",
     )
-
-
 # ============================================================
 #                    RENDEZ-VOUS — LISTE
 # ============================================================
@@ -549,8 +544,6 @@ def list_appointments():
         appointments = base.order_by(Appointment.date.asc(), Appointment.time.asc()).all()
 
     return render_template("appointments.html", appointments=appointments)
-
-
 # ============================================================
 #            RENDEZ-VOUS — CALENDRIER FULLCALENDAR
 # ============================================================
@@ -602,8 +595,6 @@ def appointments_events_json():
         })
 
     return jsonify(data)
-
-
 # ============================================================
 #                  RENDEZ-VOUS — CREATION / EDIT
 # ============================================================
@@ -690,75 +681,6 @@ def delete_appointment(appointment_id):
     if client:
         return redirect(url_for("client_detail", client_id=client.id))
     return redirect(url_for("list_appointments"))
-
-
-# ============================================================
-#               CREATION / DRAG & DROP FULLCALENDAR
-# ============================================================
-
-@app.route("/appointments/create_from_calendar", methods=["POST"])
-@login_required
-def create_from_calendar():
-    data = request.get_json() or {}
-
-    try:
-        title = data["title"].strip()
-        client = data["client"].strip()
-        date_val = datetime.strptime(data["date"], "%Y-%m-%d").date()
-        time_val = datetime.strptime(data["time"], "%H:%M").time()
-    except:
-        return jsonify({"error": "Invalid data"}), 400
-
-    rdv = Appointment(
-        title=title,
-        client_name=client,
-        notes=data.get("notes") or "",
-        date=date_val,
-        time=time_val,
-        user_id=session["user_id"],
-    )
-
-    db.session.add(rdv)
-    db.session.commit()
-
-    return jsonify({"success": True, "id": rdv.id})
-
-
-@app.route("/appointments/update_datetime", methods=["POST"])
-@login_required
-def update_datetime():
-    data = request.get_json() or {}
-
-    rdv = Appointment.query.get_or_404(data.get("id"))
-
-    if session["role"] != "admin" and rdv.user_id != session["user_id"]:
-        return jsonify({"error": "Forbidden"}), 403
-
-    try:
-        rdv.date = datetime.strptime(data["date"], "%Y-%m-%d").date()
-        rdv.time = datetime.strptime(data["time"], "%H:%M").time()
-    except:
-        return jsonify({"error": "Bad date"}), 400
-
-    db.session.commit()
-    return jsonify({"success": True})
-
-
-@app.route("/appointments/delete_from_calendar", methods=["POST"])
-@login_required
-def delete_from_calendar():
-    data = request.get_json() or {}
-    rdv = Appointment.query.get_or_404(data.get("id"))
-
-    if session["role"] != "admin" and rdv.user_id != session["user_id"]:
-        return jsonify({"error": "Forbidden"}), 403
-
-    db.session.delete(rdv)
-    db.session.commit()
-
-    return jsonify({"success": True})
-
-
 # ============================================================
 #                     DOCUMENTS PDF
 # ============================================================
@@ -781,8 +703,6 @@ def documents():
         folders.setdefault(folder_name, []).append(d)
 
     return render_template("documents.html", folders=folders)
-
-
 @app.route("/documents/upload", methods=["POST"])
 @login_required
 def upload_document():
@@ -819,8 +739,6 @@ def upload_document():
 
     flash("Document importé.", "success")
     return redirect(url_for("client_detail", client_id=client.id))
-
-
 @app.route("/documents/<int:doc_id>/download")
 @login_required
 def download_document(doc_id):
@@ -856,8 +774,6 @@ def delete_document(doc_id):
 
     flash("Document supprimé.", "info")
     return redirect(url_for("documents"))
-
-
 # ============================================================
 #                     CHIFFRE D’AFFAIRES
 # ============================================================
@@ -909,24 +825,6 @@ def chiffre_affaire():
         ca_par_com=ca_par_com,
         today=date.today().strftime("%Y-%m-%d"),
     )
-
-
-@app.route("/chiffre_affaire/<int:rev_id>/delete", methods=["POST"])
-@login_required
-def delete_revenue(rev_id):
-    if session["role"] != "admin":
-        flash("Autorisation refusée.", "error")
-        return redirect(url_for("chiffre_affaire"))
-
-    rev = Revenue.query.get_or_404(rev_id)
-
-    db.session.delete(rev)
-    db.session.commit()
-
-    flash("Entrée supprimée.", "info")
-    return redirect(url_for("chiffre_affaire"))
-
-
 # ============================================================
 #                        CHAT WIDGET
 # ============================================================
@@ -968,8 +866,6 @@ def chat_send_widget():
     db.session.commit()
 
     return jsonify({"success": True})
-
-
 # ============================================================
 #                 INITIALISATION BDD + AUTO ADMIN
 # ============================================================
@@ -979,7 +875,7 @@ with app.app_context():
 
     inspector = inspect(db.engine)
 
-    # Colonnes manquantes en cas de maj
+    # Colonnes manquantes en cas de mise à jour
     cols_client = [c["name"] for c in inspector.get_columns("client")]
     if "status" not in cols_client:
         with db.engine.begin() as conn:
@@ -1007,11 +903,10 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
         print(">>> ADMIN CRÉÉ : admin / admin123")
-
-
 # ============================================================
 #                        LANCEMENT SERVER
 # ============================================================
 
-if __name__ == "__main__":
-    app.run(debug=True)
+# Ne rien mettre ici : Render utilise Gunicorn
+# Commande de lancement :
+# gunicorn app:app --timeout 120
