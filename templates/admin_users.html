@@ -3,71 +3,113 @@
 
 {% block content %}
 
-<div class="header-row">
-    <h1>Gestion des utilisateurs</h1>
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold">
+        <i class="bi bi-people-gear me-2"></i> Gestion des utilisateurs
+    </h1>
 </div>
 
-<!-- FORMULAIRE DE CRÉATION D’UN COMMERCIAL -->
-<div class="card">
-    <h2>Créer un nouvel utilisateur</h2>
 
-    <form method="post" action="{{ url_for('admin_users') }}">
-        <label>Nom d'utilisateur</label>
-        <input type="text" name="username" required placeholder="ex: marc">
+<!-- ===================== CRÉATION NOUVEL UTILISATEUR ===================== -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
 
-        <label>Mot de passe</label>
-        <input type="password" name="password" required>
+        <h4 class="fw-semibold mb-3">
+            <i class="bi bi-person-plus me-2"></i> Créer un nouvel utilisateur
+        </h4>
 
-        <button class="btn" style="margin-top:1rem;">Créer l'utilisateur</button>
-    </form>
+        <form method="post" class="row g-3">
+
+            <!-- Nom utilisateur -->
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Nom d'utilisateur</label>
+                <input type="text" name="username" class="form-control" required>
+            </div>
+
+            <!-- Mot de passe -->
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Mot de passe</label>
+                <input type="password" name="password" class="form-control" required>
+            </div>
+
+            <!-- Bouton -->
+            <div class="col-12 text-end">
+                <button class="btn btn-primary btn-lg">
+                    <i class="bi bi-check-lg me-1"></i> Créer l'utilisateur
+                </button>
+            </div>
+
+        </form>
+
+    </div>
 </div>
 
-<!-- LISTE DES UTILISATEURS EXISTANTS -->
-<div class="card" style="margin-top:1.5rem;">
-    <h2>Liste des utilisateurs</h2>
 
-    <table class="table" style="margin-top:1rem;">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Nom d'utilisateur</th>
-                <th>Rôle</th>
-                <th style="width:180px;">Actions</th>
-            </tr>
-        </thead>
+<!-- ===================== LISTE UTILISATEURS ===================== -->
+<div class="card shadow-sm border-0">
+    <div class="card-body">
 
-        <tbody>
-        {% for user in users %}
-            <tr>
-                <td>{{ user.id }}</td>
-                <td>{{ user.username }}</td>
-                <td>
-                    {% if user.role == 'admin' %}
-                        <strong style="color:#d32f2f;">Admin</strong>
-                    {% else %}
-                        Commercial
-                    {% endif %}
-                </td>
+        <h4 class="fw-semibold mb-3">
+            <i class="bi bi-person-lines-fill me-2"></i> Liste des utilisateurs
+        </h4>
 
-                <td class="actions">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:70px;">ID</th>
+                    <th>Utilisateur</th>
+                    <th>Rôle</th>
+                    <th class="text-end" style="width:200px;">Actions</th>
+                </tr>
+            </thead>
 
-                    {% if user.role != "admin" %}
-                    <a class="btn" href="{{ url_for('admin_edit_user', user_id=user.id) }}"
-                       style="padding:0.3rem 0.6rem;">Modifier</a>
+            <tbody>
+            {% for u in users %}
+                <tr>
+                    <td>{{ u.id }}</td>
+                    <td class="fw-semibold">{{ u.username }}</td>
+                    <td>
+                        {% if u.role == "admin" %}
+                            <span class="badge bg-danger">Admin</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Commercial</span>
+                        {% endif %}
+                    </td>
 
-                    <form method="post"
-                          action="{{ url_for('admin_delete_user', user_id=user.id) }}"
-                          onsubmit="return confirm('Supprimer cet utilisateur ?');">
-                        <button class="danger" style="padding:0.3rem 0.6rem;">Supprimer</button>
-                    </form>
-                    {% endif %}
+                    <td class="text-end">
 
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+                        {% if u.role != "admin" %}
 
+                            <!-- Modifier -->
+                            <a href="{{ url_for('admin_edit_user', user_id=u.id) }}"
+                               class="btn btn-sm btn-outline-success">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+
+                            <!-- Supprimer -->
+                            <form method="post"
+                                  action="{{ url_for('admin_delete_user', user_id=u.id) }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Supprimer cet utilisateur ?');">
+
+                                <button class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+
+                        {% else %}
+                            <span class="text-muted">(administrateur principal)</span>
+                        {% endif %}
+
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+
+        </table>
+
+    </div>
 </div>
 
 {% endblock %}

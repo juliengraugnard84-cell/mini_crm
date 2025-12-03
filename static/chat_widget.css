@@ -1,0 +1,112 @@
+/* ----- Container du widget ----- */
+#chat-widget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 99999;
+}
+
+/* ----- Bouton flottant ----- */
+#chat-button {
+    background-color: #25D366;
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+}
+#chat-button:hover {
+    transform: scale(1.1);
+}
+
+/* ----- Fenêtre du chat ----- */
+#chat-window {
+    width: 330px;
+    height: 420px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+/* FERMÉ PAR DÉFAUT */
+.hidden {
+    display: none !important;
+}
+
+/* ----- Header WhatsApp ----- */
+#chat-header {
+    background-color: #075E54;
+    color: white;
+    padding: 12px;
+    font-size: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#chat-header button {
+    background: none;
+    border: none;
+    font-size: 22px;
+    color: white;
+    cursor: pointer;
+}
+
+/* ----- Messages ----- */
+#chat-messages {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+    background: #ECE5DD;
+}
+
+/* Bulles */
+.msg {
+    max-width: 75%;
+    padding: 8px 12px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    font-size: 14px;
+    line-height: 1.2;
+}
+
+/* Reçu */
+.msg.other {
+    background: white;
+    align-self: flex-start;
+}
+
+/* Envoyé */
+.msg.me {
+    background: #DCF8C6;
+    align-self: flex-end;
+}
+
+/* ----- Zone input ----- */
+#chat-input {
+    display: flex;
+    border-top: 1px solid #ccc;
+    background: white;
+}
+#chat-input input {
+    flex: 1;
+    border: none;
+    padding: 12px;
+}
+#chat-input button {
+    background: #128C7E;
+    border: none;
+    color: white;
+    width: 50px;
+    font-size: 18px;
+    cursor: pointer;
+}

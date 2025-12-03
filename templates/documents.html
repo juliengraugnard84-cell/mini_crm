@@ -3,75 +3,61 @@
 
 {% block content %}
 
-<div class="header-row">
-    <h1>Documents PDF</h1>
+<div class="header-row mb-4">
+    <h1>📄 Documents PDF</h1>
 </div>
 
-<!-- Formulaire Upload PDF global -->
+<!-- ================== LISTE DES DOSSIERS ================== -->
 <div class="card">
-    <h2>Importer un document PDF</h2>
+    <h2>🗂 Dossiers clients</h2>
 
-    <form method="post"
-          action="{{ url_for('upload_document') }}"
-          enctype="multipart/form-data"
-          style="margin-top: 1rem;">
-        <label>Choisir un fichier PDF :</label>
-        <input type="file" name="file" accept="application/pdf" required>
+    {% if folders %}
+        <div class="folder-grid mt-3">
+            {% for folder_name, docs in folders.items() %}
+            <div class="folder-card">
+                <div class="folder-header">
+                    <span class="folder-icon">📁</span>
+                    <span class="folder-title">{{ folder_name }}</span>
+                </div>
 
-        <button class="btn" type="submit" style="margin-top: 1rem;">
-            Importer
-        </button>
-    </form>
-</div>
+                {% if docs %}
+                    <ul class="folder-doc-list">
+                        {% for doc in docs %}
+                        <li class="folder-doc-item">
+                            <div class="folder-doc-main">
+                                <span class="doc-name">{{ doc.original_name }}</span>
+                                <span class="doc-date">
+                                    {{ doc.uploaded_at.strftime("%d/%m/%Y %H:%M") }}
+                                </span>
+                            </div>
 
-<!-- Liste des documents -->
-<div class="card">
-    <h2>Liste des documents</h2>
+                            <div class="folder-doc-actions">
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="{{ url_for('download_document', doc_id=doc.id) }}">
+                                    Télécharger
+                                </a>
 
-    <table class="table" style="margin-top: 1rem;">
-        <thead>
-            <tr>
-                <th>Nom du PDF</th>
-                <th>Client associé</th>
-                <th>Importé le</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for doc in documents %}
-            <tr>
-                <td>{{ doc.original_name }}</td>
-
-                <td>
-                    {% if doc.client %}
-                        <a href="{{ url_for('client_detail', client_id=doc.client.id) }}">
-                            {{ doc.client.name }}
-                        </a>
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
-
-                <td>{{ doc.uploaded_at.strftime("%d/%m/%Y %H:%M") }}</td>
-
-                <td class="actions">
-                    <a href="{{ url_for('download_document', doc_id=doc.id) }}">Télécharger</a>
-
-                    <form method="post"
-                          action="{{ url_for('delete_document', doc_id=doc.id) }}"
-                          onsubmit="return confirm('Supprimer ce document ?');">
-                        <button class="danger" type="submit">Supprimer</button>
-                    </form>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="4" style="text-align:center;">Aucun document trouvé.</td>
-            </tr>
+                                <form method="post"
+                                      action="{{ url_for('delete_document', doc_id=doc.id) }}"
+                                      onsubmit="return confirm('Supprimer ce document ?');"
+                                      style="display:inline;">
+                                    <button class="btn btn-sm btn-danger" type="submit">
+                                        Supprimer
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">Aucun document dans ce dossier.</p>
+                {% endif %}
+            </div>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+    {% else %}
+        <p class="text-muted mt-3">Aucun document trouvé.</p>
+    {% endif %}
 </div>
 
 {% endblock %}

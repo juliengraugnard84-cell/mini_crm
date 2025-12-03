@@ -3,59 +3,84 @@
 
 {% block content %}
 
-<div class="header-row">
-    <h1>
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold">
+
         {% if action == "new" %}
-            Nouveau rendez-vous
+            <i class="bi bi-calendar-plus me-2"></i> Nouveau rendez-vous
         {% else %}
-            Modifier le rendez-vous
+            <i class="bi bi-pencil-square me-2"></i> Modifier le rendez-vous
         {% endif %}
     </h1>
 
-    <a class="btn" href="{{ url_for('list_appointments') }}">← Retour</a>
+    <a href="{{ url_for('list_appointments') }}"
+       class="btn btn-outline-secondary btn-lg">
+        <i class="bi bi-arrow-left me-1"></i> Retour
+    </a>
 </div>
 
-<div class="card">
 
-    <form method="post">
+<!-- FORMULAIRE -->
+<div class="card shadow-sm border-0">
+    <div class="card-body">
 
-        <label>Titre :</label>
-        <input type="text" name="title" required
-               value="{{ rdv.title if rdv else '' }}">
+        <form method="post" class="row g-4">
 
-        {% if client %}
-            <!-- Si le RDV est lié à un client -->
-            <label>Client :</label>
-            <input type="text" disabled
-                   value="{{ client.name }}">
-            <input type="hidden" name="client_id" value="{{ client.id }}">
-        {% else %}
-            <label>Nom du client :</label>
-            <input type="text" name="client_name" required
-                   value="{{ rdv.client_name if rdv else '' }}">
-        {% endif %}
+            <!-- TITRE -->
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Titre *</label>
+                <input type="text" class="form-control" name="title" required
+                       value="{{ rdv.title if rdv else '' }}">
+            </div>
 
-        <label>Date :</label>
-        <input type="date" name="date" required
-               value="{{ rdv.date.strftime('%Y-%m-%d') if rdv else '' }}">
+            <!-- CLIENT -->
+            <div class="col-md-6">
+                {% if client %}
+                    <label class="form-label fw-semibold">Client</label>
+                    <input type="text" class="form-control" disabled value="{{ client.name }}">
+                    <input type="hidden" name="client_id" value="{{ client.id }}">
+                {% else %}
+                    <label class="form-label fw-semibold">Nom du client *</label>
+                    <input type="text" class="form-control" name="client_name" required
+                           value="{{ rdv.client_name if rdv else '' }}">
+                {% endif %}
+            </div>
 
-        <label>Heure :</label>
-        <input type="time" name="time" required
-               value="{{ rdv.time.strftime('%H:%M') if rdv else '' }}">
+            <!-- DATE -->
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Date *</label>
+                <input type="date" class="form-control" name="date" required
+                       value="{{ rdv.date.strftime('%Y-%m-%d') if rdv else '' }}">
+            </div>
 
-        <label>Notes :</label>
-        <textarea name="notes" rows="4">{{ rdv.notes if rdv else '' }}</textarea>
+            <!-- HEURE -->
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Heure *</label>
+                <input type="time" class="form-control" name="time" required
+                       value="{{ rdv.time.strftime('%H:%M') if rdv else '' }}">
+            </div>
 
-        <button class="btn" type="submit" style="margin-top: 1rem;">
-            {% if action == "new" %}
-                Ajouter le rendez-vous
-            {% else %}
-                Enregistrer les modifications
-            {% endif %}
-        </button>
+            <!-- NOTES -->
+            <div class="col-12">
+                <label class="form-label fw-semibold">Notes</label>
+                <textarea class="form-control" name="notes" rows="4">{{ rdv.notes if rdv else '' }}</textarea>
+            </div>
 
-    </form>
+            <!-- BOUTON -->
+            <div class="col-12 text-end">
+                <button class="btn btn-primary btn-lg" type="submit">
+                    {% if action == "new" %}
+                        <i class="bi bi-check-lg me-1"></i> Ajouter le rendez-vous
+                    {% else %}
+                        <i class="bi bi-save me-1"></i> Enregistrer les modifications
+                    {% endif %}
+                </button>
+            </div>
 
+        </form>
+
+    </div>
 </div>
 
 {% endblock %}

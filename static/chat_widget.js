@@ -1,46 +1,80 @@
-// OUVERTURE / FERMETURE
-const btn = document.getElementById("chat-widget-button");
-const box = document.getElementById("chat-widget-window");
-const closeBtn = document.getElementById("chat-widget-close");
+let chatOpen = false;
 
-btn.onclick = () => box.classList.remove("hidden");
-closeBtn.onclick = () => box.classList.add("hidden");
+document.addEventListener("DOMContentLoaded", () => {
 
-// ENVOI DE MESSAGE
-const input = document.getElementById("chat-widget-input");
-const sendBtn = document.getElementById("chat-widget-send");
-const msgBox = document.getElementById("chat-widget-messages");
+    const btn = document.getElementById("chat-button");
+    const win = document.getElementById("chat-window");
+    const close = document.getElementById("chat-close");
+    const messagesBox = document.getElementById("chat-messages");
+    const input = document.getElementById("chat-text");
+    const sendBtn = document.getElementById("chat-send");
 
-async function sendMessage() {
+    // 🔥 Assurer que la fenêtre est fermée au départ
+    win.classList.add("hidden");
+    chatOpen = false;
 
-    const text = input.value.trim();
-    if (!text) return;
+    /* ==================== FONCTIONS ==================== */
 
-    // Afficher message utilisateur
-    msgBox.innerHTML += `<div><strong>Moi :</strong> ${text}</div>`;
-    msgBox.scrollTop = msgBox.scrollHeight;
+    function refreshMessages() {
+        fetch("/chat/messages_json")
+            .then(res => res.json())
+            .then(data => {
+                messagesBox.innerHTML = "";
 
-    input.value = "";
+                data.forEach(m => {
+                    const div = document.createElement("div");
+                    div.classList.add("msg");
+                    div.classList.add(m.me ? "me" : "other");
+                    div.textContent = m.username + " : " + m.content;
+                    messagesBox.appendChild(div);
+                });
 
-    // Appeler l’API IA interne
-    const response = await fetch("/chat_ai", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ message: text })
+                messagesBox.scrollTop = messagesBox.scrollHeight;
+            });
+    }
+
+    function openChat() {
+        chatOpen = true;
+        win.classList.remove("hidden");
+        refreshMessages();
+    }
+
+    function closeChat() {
+        chatOpen = false;
+        win.classList.add("hidden");
+    }
+
+    function sendMessage() {
+        const txt = input.value.trim();
+        if (!txt) return;
+
+        fetch("/chat/send_widget", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: txt })
+        }).then(() => {
+            input.value = "";
+            refreshMessages();
+        });
+    }
+
+    /* ==================== EVENTS ==================== */
+
+    btn.addEventListener("click", () => {
+        if (chatOpen) closeChat();
+        else openChat();
     });
 
-    const data = await response.json();
+    close.addEventListener("click", closeChat);
 
-    // Afficher réponse IA
-    msgBox.innerHTML += `<div style="margin-top:6px;">
-        <strong>🤖 IA :</strong> ${data.reply}
-    </div>`;
+    sendBtn.addEventListener("click", sendMessage);
 
-    msgBox.scrollTop = msgBox.scrollHeight;
-}
+    input.addEventListener("keypress", e => {
+        if (e.key === "Enter") sendMessage();
+    });
 
-sendBtn.onclick = sendMessage;
-
-input.addEventListener("keydown", e => {
-    if (e.key === "Enter") sendMessage();
+    // Auto refresh si la fenêtre est ouverte
+    setInterval(() => {
+        if (chatOpen) refreshMessages();
+    }, 3000);
 });

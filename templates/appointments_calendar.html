@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Calendrier{% endblock %}
+
+{% block content %}
+
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold">
+        <i class="bi bi-calendar3 me-2"></i> Calendrier des rendez-vous
+    </h1>
+
+    <a href="{{ url_for('new_appointment') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-plus-lg me-1"></i> Nouveau RDV
+    </a>
+</div>
+
+<!-- CARD CALENDRIER -->
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+
+        <div class="mb-3 d-flex justify-content-between align-items-center">
+            <h4 class="fw-semibold mb-0">
+                <i class="bi bi-calendar-week me-2"></i> Vue calendrier
+            </h4>
+            <span class="text-muted small">
+                Cliquez, déplacez ou redimensionnez vos rendez-vous
+            </span>
+        </div>
+
+        <!-- FullCalendar -->
+        <div id="calendar" style="min-height: 700px;"></div>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<!-- FullCalendar (bundle global) -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<!-- Script calendrier -->
+<script src="{{ url_for('static', filename='calendar.js') }}"></script>
+{% endblock %}

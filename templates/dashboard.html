@@ -1,60 +1,161 @@
 {% extends "base.html" %}
+
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
 
-<h1>Bienvenue {{ username }}</h1>
+<h1 class="mb-4 fw-bold">
+    Bonjour {{ username }} 👋
+</h1>
 
-<div class="grid" style="margin-top: 1.5rem;">
+<!-- ===================== STATISTIQUES ===================== -->
+<div class="row g-4">
 
-    <!-- Carte statistiques -->
-    <div class="card">
-        <h2>Statistiques</h2>
-        <div style="margin-top: 1rem; line-height: 1.7;">
-            <p><strong>Clients :</strong> {{ stats.clients_total }}</p>
-            <p><strong>Rendez-vous à venir :</strong> {{ stats.rdv_cette_semaine }}</p>
-            <p><strong>Rendez-vous totaux :</strong> {{ stats.opportunites_ouvertes }}</p>
-            <p><strong>Documents :</strong> {{ stats.documents_partages }}</p>
+    <div class="col-md-3">
+        <div class="card shadow-sm stat-card border-0 text-center py-3">
+            <div class="card-body">
+                <div class="stat-icon bg-primary text-white mb-3">
+                    <i class="bi bi-people"></i>
+                </div>
+                <h6 class="text-muted">Clients</h6>
+                <h2 class="fw-bold">{{ stats.clients_total }}</h2>
+            </div>
         </div>
     </div>
 
-    <!-- Carte RDV -->
-    <div class="card">
-        <h2>Rendez-vous à venir</h2>
-        {% if upcoming_appointments %}
-            <ul style="margin-top: 1rem;">
-                {% for rdv in upcoming_appointments %}
-                <li style="margin-bottom: .5rem;">
-                    <strong>{{ rdv.date.strftime("%d/%m/%Y") }}</strong> -
-                    {{ rdv.time.strftime("%H:%M") }} :
-                    {{ rdv.title }} ({{ rdv.client_name }})
-                </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>Aucun rendez-vous.</p>
-        {% endif %}
+    <div class="col-md-3">
+        <div class="card shadow-sm stat-card border-0 text-center py-3">
+            <div class="card-body">
+                <div class="stat-icon bg-info text-white mb-3">
+                    <i class="bi bi-file-earmark-text"></i>
+                </div>
+                <h6 class="text-muted">Documents</h6>
+                <h2 class="fw-bold">{{ stats.documents_partages }}</h2>
+            </div>
+        </div>
     </div>
 
-    <!-- Carte documents -->
-    <div class="card">
-        <h2>Derniers documents</h2>
-        {% if latest_docs %}
-            <ul style="margin-top: 1rem;">
-                {% for doc in latest_docs %}
-                <li style="margin-bottom: 0.5rem;">
-                    {{ doc.original_name }}  
-                    <span style="color: #777;">
-                        ({{ doc.uploaded_at.strftime("%d/%m/%Y %H:%M") }})
-                    </span>
-                </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>Aucun document récent.</p>
-        {% endif %}
+    <div class="col-md-3">
+        <div class="card shadow-sm stat-card border-0 text-center py-3">
+            <div class="card-body">
+                <div class="stat-icon bg-success text-white mb-3">
+                    <i class="bi bi-flag"></i>
+                </div>
+                <h6 class="text-muted">Opportunités</h6>
+                <h2 class="fw-bold">{{ stats.opportunites_ouvertes }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm stat-card border-0 text-center py-3">
+            <div class="card-body">
+                <div class="stat-icon bg-warning text-white mb-3">
+                    <i class="bi bi-calendar-week"></i>
+                </div>
+                <h6 class="text-muted">RDV semaine</h6>
+                <h2 class="fw-bold">{{ stats.rdv_cette_semaine }}</h2>
+            </div>
+        </div>
     </div>
 
 </div>
+
+<!-- ===================== RDV À VENIR ===================== -->
+<div class="mt-5">
+    <h3 class="mb-3 fw-semibold">
+        📅 Rendez-vous à venir
+    </h3>
+
+    {% if upcoming_appointments %}
+        <div class="list-group shadow-sm">
+
+            {% for rdv in upcoming_appointments %}
+            <div class="list-group-item d-flex justify-content-between align-items-center py-3">
+
+                <div>
+                    <strong>{{ rdv.title }}</strong><br>
+                    <small class="text-muted">
+                        {{ rdv.date.strftime("%d/%m/%Y") }} — {{ rdv.time.strftime("%H:%M") }}
+                    </small>
+                </div>
+
+                {% if rdv.client %}
+                    <span class="badge bg-primary">{{ rdv.client.name }}</span>
+                {% else %}
+                    <span class="badge bg-secondary">{{ rdv.client_name }}</span>
+                {% endif %}
+
+            </div>
+            {% endfor %}
+
+        </div>
+    {% else %}
+        <p class="text-muted">Aucun rendez-vous prévu.</p>
+    {% endif %}
+</div>
+
+<!-- ===================== DERNIERS DOCUMENTS ===================== -->
+<div class="mt-5">
+    <h3 class="mb-3 fw-semibold">
+        📄 Derniers documents importés
+    </h3>
+
+    {% if latest_docs %}
+        <div class="list-group shadow-sm">
+
+            {% for doc in latest_docs %}
+            <div class="list-group-item d-flex justify-content-between align-items-center py-3">
+                <span>{{ doc.original_name }}</span>
+                <small class="text-muted">
+                    {{ doc.uploaded_at.strftime("%d/%m/%Y %H:%M") }}
+                </small>
+            </div>
+            {% endfor %}
+
+        </div>
+    {% else %}
+        <p class="text-muted">Aucun document importé.</p>
+    {% endif %}
+</div>
+
+<!-- ===================== ACCÈS RAPIDE ===================== -->
+<div class="mt-5">
+    <h3 class="mb-3 fw-semibold">⚡ Accès rapide</h3>
+
+    <div class="d-flex gap-3 flex-wrap">
+        <a href="{{ url_for('clients') }}" class="btn btn-primary btn-lg">
+            <i class="bi bi-people me-1"></i> Clients
+        </a>
+
+        <a href="{{ url_for('list_appointments') }}" class="btn btn-success btn-lg">
+            <i class="bi bi-list-check me-1"></i> Liste RDV
+        </a>
+
+        <a href="{{ url_for('appointments_calendar') }}" class="btn btn-warning btn-lg text-white">
+            <i class="bi bi-calendar-event me-1"></i> Calendrier
+        </a>
+
+        <a href="{{ url_for('documents') }}" class="btn btn-info btn-lg text-white">
+            <i class="bi bi-file-earmark-text me-1"></i> Documents
+        </a>
+
+        <a href="{{ url_for('chiffre_affaire') }}" class="btn btn-dark btn-lg">
+            <i class="bi bi-cash-coin me-1"></i> Chiffre d’affaire
+        </a>
+    </div>
+</div>
+
+<style>
+    .stat-icon {
+        width: 55px;
+        height: 55px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        font-size: 1.6rem;
+    }
+</style>
 
 {% endblock %}
