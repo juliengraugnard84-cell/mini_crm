@@ -1,153 +1,429 @@
 {% extends "base.html" %}
-{% block title %}Fiche client{% endblock %}
+
+{% block head %}
+<style>
+/* -------------------- ONGLET STYLE MODERNE -------------------- */
+.client-tabs {
+    display: flex;
+    gap: 0.75rem;
+    border-bottom: none;
+    flex-wrap: wrap;
+}
+
+.client-tabs .nav-link {
+    background: #f1f3f9;
+    border-radius: 50px;
+    padding: 0.55rem 1.2rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.client-tabs .nav-link.active {
+    background: #12182d;
+    color: #fff;
+    border-color: #12182d;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+}
+
+/* -------------------- BADGES DE FICHIERS -------------------- */
+.file-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 50px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: white;
+    margin-right: 10px;
+}
+.file-badge i { margin-right: 6px; }
+
+.badge-pdf { background:#d9534f; }
+.badge-doc { background:#0275d8; }
+.badge-xls { background:#5cb85c; }
+.badge-ppt { background:#f0ad4e; }
+.badge-zip { background:#6c757d; }
+.badge-txt { background:#673ab7; }
+.badge-generic { background:#444; }
+
+/* -------------------- DROPZONE PREMIUM -------------------- */
+.dropzone {
+    border: 2px dashed #c7cada;
+    padding: 1.6rem;
+    background:#fafbff;
+    border-radius: 1rem;
+    cursor:pointer;
+    transition: 0.2s ease;
+}
+.dropzone:hover { border-color:#12182d; }
+.dropzone.dragover { background:#eef3ff; border-color:#0d6efd; }
+
+.dropzone-icon { font-size:2rem;color:#0d6efd; }
+.dropzone-title { font-weight:700; margin-top:0.3rem; }
+.dropzone-subtitle { font-size:0.85rem; color:#6c757d; }
+
+.dz-preview-list { margin-top:1rem; max-height:180px; overflow-y:auto; }
+.dz-preview-item {
+    background:white;
+    border:1px solid #e3e6ef;
+    padding:0.4rem 0.6rem;
+    border-radius:0.6rem;
+    margin-bottom:0.4rem;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.dz-upload-btn { margin-top: 0.75rem; }
+
+/* -------------------- GALERIE IMAGES -------------------- */
+.client-image-thumb {
+    width:150px;
+    height:150px;
+    object-fit:cover;
+    border-radius: 1rem;
+    box-shadow:0 2px 6px rgba(0,0,0,0.12);
+    transition:0.15s ease;
+}
+.client-image-thumb:hover {
+    transform: translateY(-2px);
+    box-shadow:0 4px 12px rgba(0,0,0,0.18);
+}
+</style>
+{% endblock %}
 
 {% block content %}
 
-<!-- HEADER -->
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="fw-bold">
-        <i class="bi bi-person-badge me-2"></i> {{ client.name }}
-    </h1>
+<div class="container py-4">
 
-    <a href="{{ url_for('edit_client', client_id=client.id) }}"
-       class="btn btn-warning btn-lg text-white">
-        <i class="bi bi-pencil-square me-1"></i> Modifier
-    </a>
-</div>
-
-<div class="row g-4">
-
-    <!-- ================= INFOS CLIENT ================= -->
-    <div class="col-lg-4">
-        <div class="card shadow-sm border-0 h-100">
-            <div class="card-body">
-
-                <h4 class="fw-semibold mb-3">
-                    <i class="bi bi-info-circle me-2"></i> Informations
-                </h4>
-
-                <p><strong>Commercial :</strong><br>{{ client.commercial }}</p>
-                <p><strong>Statut :</strong><br>
-                    <span class="badge bg-primary">{{ client.status }}</span>
-                </p>
-                <p><strong>Email :</strong><br>{{ client.email or '-' }}</p>
-                <p><strong>Téléphone :</strong><br>{{ client.phone or '-' }}</p>
-                <p><strong>Adresse :</strong><br>{{ client.address or '-' }}</p>
-
-                <p><strong>Notes :</strong><br>
-                    <span class="text-muted">{{ client.notes or '-' }}</span>
-                </p>
-
-                <a class="btn btn-dark mt-3 w-100"
-                   href="{{ url_for('export_client_pdf', client_id=client.id) }}">
-                    <i class="bi bi-file-earmark-pdf me-1"></i>
-                    Exporter PDF
-                </a>
-
+    <!-- HEADER -->
+    <div class="d-flex align-items-center mb-4">
+        <i class="fa-solid fa-user fa-2x text-primary me-3"></i>
+        <div>
+            <h1 class="fw-bold mb-1">{{ client.name }}</h1>
+            <div class="text-muted">
+                <i class="fa-solid fa-briefcase me-1"></i>
+                Géré par {{ client.commercial or "—" }} • Statut : {{ client.status }}
             </div>
         </div>
     </div>
 
-    <!-- ================= RENDEZ-VOUS ================= -->
-    <div class="col-lg-4">
-        <div class="card shadow-sm border-0 h-100">
-            <div class="card-body">
+    <!-- ONGLET BAR -->
+    <ul class="nav client-tabs mb-4" id="clientTab" role="tablist">
+        <li><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#infos"><i class="fa-solid fa-circle-info"></i> Infos</button></li>
+        <li><button class="nav-link" data-bs-toggle="pill" data-bs-target="#images"><i class="fa-solid fa-image"></i> Images</button></li>
+        <li><button class="nav-link" data-bs-toggle="pill" data-bs-target="#docs"><i class="fa-solid fa-file-lines"></i> Documents</button></li>
+        <li><button class="nav-link" data-bs-toggle="pill" data-bs-target="#rdv"><i class="fa-solid fa-calendar-days"></i> RDV</button></li>
+    </ul>
 
-                <h4 class="fw-semibold mb-3">
-                    <i class="bi bi-calendar-event me-2"></i> Rendez-vous
-                </h4>
+    <div class="tab-content">
 
-                {% if appointments %}
-                    <ul class="list-group list-group-flush">
-                        {% for rdv in appointments %}
-                        <li class="list-group-item">
-                            <strong>{{ rdv.title }}</strong><br>
-                            <small class="text-muted">
-                                {{ rdv.date.strftime('%d/%m/%Y') }} —
-                                {{ rdv.time.strftime('%H:%M') }}
-                            </small>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-muted">Aucun rendez-vous.</p>
+        <!-- -------------------- TAB INFOS -------------------- -->
+        <div class="tab-pane fade show active" id="infos">
+            <div class="card shadow-sm border-0 p-4">
+
+                <h3 class="fw-semibold mb-3"><i class="fa-solid fa-id-card me-2"></i>Informations</h3>
+
+                <p><strong>Email :</strong> {{ client.email or "—" }}</p>
+                <p><strong>Téléphone :</strong> {{ client.phone or "—" }}</p>
+                <p><strong>Adresse :</strong> {{ client.address or "—" }}</p>
+                <p><strong>Commercial :</strong> {{ client.commercial or "—" }}</p>
+                <p><strong>Status :</strong> {{ client.status }}</p>
+
+                {% if client.notes %}
+                <p class="mt-3"><strong>Notes :</strong><br>{{ client.notes }}</p>
                 {% endif %}
 
-                <a class="btn btn-success mt-3 w-100"
-                   href="{{ url_for('new_appointment', client_id=client.id) }}">
-                    <i class="bi bi-plus-lg me-1"></i> Nouveau RDV
+                <a class="btn btn-primary rounded-pill px-4 mt-2"
+                   href="{{ url_for('edit_client', client_id=client.id) }}">
+                    <i class="fa-solid fa-pen me-2"></i>Modifier
                 </a>
 
             </div>
         </div>
-    </div>
 
-    <!-- ================= DOCUMENTS ================= -->
-    <div class="col-lg-4">
-        <div class="card shadow-sm border-0 h-100">
-            <div class="card-body">
+        <!-- -------------------- TAB IMAGES -------------------- -->
+        <div class="tab-pane fade" id="images">
+            <div class="card shadow-sm border-0 p-4 mb-4">
 
-                <h4 class="fw-semibold mb-3">
-                    <i class="bi bi-file-earmark-text me-2"></i> Documents PDF
-                </h4>
+                <h3 class="fw-semibold mb-3"><i class="fa-solid fa-image text-primary me-2"></i>Uploader des images</h3>
 
-                <!-- FORM UPLOAD (CORRIGÉ) -->
-                <form method="post" action="{{ url_for('upload_document') }}"
-                      enctype="multipart/form-data" class="mb-3">
+                <!-- DROPZONE IMAGES -->
+                <div class="dropzone" data-client="{{ client.id }}" data-upload="{{ url_for('upload_document') }}">
+                    <div class="dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <div class="dropzone-title">Déposez vos images ici</div>
+                    <div class="dropzone-subtitle">formats acceptés : JPG, PNG, WEBP…</div>
 
-                    <input type="hidden" name="client_id" value="{{ client.id }}">
+                    <input type="file" class="dz-input" accept="image/*" hidden multiple>
+                    <div class="dz-preview-list"></div>
 
-                    <div class="input-group">
-                        <input type="file" class="form-control" name="file"
-                               accept="application/pdf" required>
-                        <button class="btn btn-primary">
-                            <i class="bi bi-upload"></i>
-                        </button>
-                    </div>
-                </form>
+                    <button class="btn btn-primary btn-sm dz-upload-btn rounded-pill px-4" disabled>
+                        <i class="fa-solid fa-paper-plane me-2"></i>Envoyer
+                    </button>
+                </div>
+            </div>
 
-                <!-- LISTE DOCUMENTS -->
-                {% if documents %}
-                <ul class="list-group list-group-flush">
+            <!-- GALERIE -->
+            <div class="card shadow-sm border-0 p-4">
 
-                    {% for doc in documents %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                <h3 class="fw-semibold mb-3"><i class="fa-solid fa-images me-2"></i>Galerie</h3>
 
-                        <div>
-                            <strong>{{ doc.original_name }}</strong><br>
-                            <small class="text-muted">
-                                {{ doc.uploaded_at.strftime('%d/%m/%Y %H:%M') }}
-                            </small>
-                        </div>
+                {% set img_ext = ["jpg","jpeg","png","gif","webp"] %}
+                {% set has = false %}
 
-                        <div class="d-flex gap-2">
+                <div class="d-flex flex-wrap gap-3">
+                    {% for d in documents %}
+                        {% set ext = d.original_name.rsplit('.',1)[-1].lower() %}
+                        {% if ext in img_ext %}
+                            {% set has = true %}
+                            <div class="position-relative">
 
-                            <a href="{{ url_for('download_document', doc_id=doc.id) }}"
-                               class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-download"></i>
-                            </a>
+                                <a href="{{ d.cloudinary_url }}" target="_blank">
+                                    <img class="client-image-thumb" src="{{ d.cloudinary_url }}">
+                                </a>
 
-                            <form method="post"
-                                  action="{{ url_for('delete_document', doc_id=doc.id) }}"
-                                  onsubmit="return confirm('Supprimer ce document ?');">
-                                <button class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
+                                <form method="POST" action="{{ url_for('delete_document', doc_id=d.id) }}"
+                                      class="position-absolute top-0 end-0 m-1"
+                                      onsubmit="return confirm('Supprimer cette image ?')">
+                                    <button class="btn btn-danger btn-sm rounded-circle">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                {% if not has %}
+                <p class="text-muted mt-2">Aucune image pour ce client.</p>
+                {% endif %}
+
+            </div>
+        </div>
+
+        <!-- -------------------- TAB DOCUMENTS -------------------- -->
+        <div class="tab-pane fade" id="docs">
+
+            <div class="card shadow-sm border-0 p-4 mb-4">
+
+                <h3 class="fw-semibold mb-3"><i class="fa-solid fa-file-circle-plus text-success me-2"></i>Uploader des documents</h3>
+
+                <!-- DROPZONE DOCS -->
+                <div class="dropzone" data-client="{{ client.id }}" data-upload="{{ url_for('upload_document') }}">
+                    <div class="dropzone-icon"><i class="fa-solid fa-file-arrow-up"></i></div>
+                    <div class="dropzone-title">Déposez vos documents ici</div>
+                    <div class="dropzone-subtitle">PDF, Word, Excel, PowerPoint…</div>
+
+                    <input type="file" class="dz-input" hidden multiple>
+                    <div class="dz-preview-list"></div>
+
+                    <button class="btn btn-primary btn-sm dz-upload-btn rounded-pill px-4" disabled>
+                        <i class="fa-solid fa-paper-plane me-2"></i>Envoyer
+                    </button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 p-4">
+                <h3 class="fw-semibold mb-3"><i class="fa-solid fa-file-lines me-2"></i>Documents existants</h3>
+
+                {% set image_ext = ["jpg","jpeg","png","gif","webp"] %}
+                {% set has_docs = false %}
+
+                <ul class="list-group">
+                {% for d in documents %}
+                    {% set ext = d.original_name.rsplit('.',1)[-1].lower() %}
+                    {% if ext not in image_ext %}
+                        {% set has_docs = true %}
+
+                        {% if ext == "pdf" %}
+                            {% set badge = "badge-pdf" %}
+                            {% set ico = "fa-file-pdf" %}
+                            {% set label = "PDF" %}
+                        {% elif ext in ["doc","docx"] %}
+                            {% set badge = "badge-doc" %}
+                            {% set ico = "fa-file-word" %}
+                            {% set label = "DOC" %}
+                        {% elif ext in ["xls","xlsx"] %}
+                            {% set badge = "badge-xls" %}
+                            {% set ico = "fa-file-excel" %}
+                            {% set label = "XLS" %}
+                        {% elif ext in ["ppt","pptx"] %}
+                            {% set badge = "badge-ppt" %}
+                            {% set ico = "fa-file-powerpoint" %}
+                            {% set label = "PPT" %}
+                        {% elif ext in ["zip","rar"] %}
+                            {% set badge = "badge-zip" %}
+                            {% set ico = "fa-file-zipper" %}
+                            {% set label = ext.upper() %}
+                        {% elif ext == "txt" %}
+                            {% set badge = "badge-txt" %}
+                            {% set ico = "fa-file-lines" %}
+                            {% set label = "TXT" %}
+                        {% else %}
+                            {% set badge = "badge-generic" %}
+                            {% set ico = "fa-file" %}
+                            {% set label = ext.upper() %}
+                        {% endif %}
+
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+
+                            <div class="d-flex align-items-center">
+                                <span class="file-badge {{ badge }}"><i class="fa-solid {{ ico }}"></i>{{ label }}</span>
+                                <a href="{{ d.cloudinary_url }}" target="_blank">{{ d.original_name }}</a>
+                            </div>
+
+                            <form method="POST" action="{{ url_for('delete_document', doc_id=d.id) }}"
+                                  onsubmit="return confirm('Supprimer ?')">
+                                <button class="btn btn-outline-danger btn-sm rounded-pill">
+                                    <i class="fa-solid fa-trash"></i>
                                 </button>
                             </form>
 
-                        </div>
-                    </li>
-                    {% endfor %}
-
+                        </li>
+                    {% endif %}
+                {% endfor %}
                 </ul>
-                {% else %}
-                    <p class="text-muted">Aucun document.</p>
-                {% endif %}
 
+                {% if not has_docs %}
+                <p class="text-muted mt-2">Aucun document enregistré.</p>
+                {% endif %}
             </div>
         </div>
-    </div>
 
-</div>
+        <!-- -------------------- TAB RDV -------------------- -->
+        <div class="tab-pane fade" id="rdv">
+            <div class="card shadow-sm border-0 p-4">
 
+                <h3 class="fw-semibold mb-3"><i class="fa-solid fa-calendar-day text-warning me-2"></i>Rendez-vous</h3>
+
+                <a class="btn btn-primary rounded-pill px-4 mb-3"
+                   href="{{ url_for('new_appointment', client_id=client.id) }}">
+                    <i class="fa-solid fa-plus me-2"></i>Nouveau RDV
+                </a>
+
+                {% if not appointments %}
+                    <p class="text-muted">Aucun RDV pour ce client.</p>
+                {% else %}
+                <ul class="list-group">
+                    {% for rdv in appointments %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+
+                        <div>
+                            <strong>{{ rdv.title }}</strong><br>
+                            <i class="fa-solid fa-clock text-secondary me-1"></i>
+                            {{ rdv.date.strftime("%d/%m/%Y") }} à {{ rdv.time.strftime("%H:%M") }}<br>
+                            {% if rdv.notes %}
+                                <span class="text-muted small">{{ rdv.notes }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('edit_appointment', appointment_id=rdv.id) }}"
+                               class="btn btn-outline-primary btn-sm rounded-pill">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+
+                            <form method="POST"
+                                  action="{{ url_for('delete_appointment', appointment_id=rdv.id) }}"
+                                  onsubmit="return confirm('Supprimer ce RDV ?')">
+                                <button class="btn btn-outline-danger btn-sm rounded-pill">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+
+    </div><!-- tab-content -->
+
+</div><!-- container -->
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", ()=>{
+
+    document.querySelectorAll(".dropzone").forEach(zone=>{
+        initDrop(zone);
+    });
+
+    function initDrop(zone){
+        const client = zone.dataset.client;
+        const uploadURL = zone.dataset.upload;
+        const fileInput = zone.querySelector(".dz-input");
+        const preview = zone.querySelector(".dz-preview-list");
+        const btn = zone.querySelector(".dz-upload-btn");
+        let files = [];
+
+        zone.addEventListener("click", e=>{
+            if(!e.target.classList.contains("dz-upload-btn")) fileInput.click();
+        });
+
+        ["dragover","dragenter"].forEach(ev=>{
+            zone.addEventListener(ev, e=>{
+                e.preventDefault();
+                zone.classList.add("dragover");
+            });
+        });
+
+        ["dragleave","drop"].forEach(ev=>{
+            zone.addEventListener(ev, e=>{
+                e.preventDefault();
+                zone.classList.remove("dragover");
+            });
+        });
+
+        zone.addEventListener("drop", e=>{
+            files = [...e.dataTransfer.files];
+            renderPreview();
+        });
+
+        fileInput.addEventListener("change", ()=>{
+            files = [...fileInput.files];
+            renderPreview();
+        });
+
+        function renderPreview(){
+            preview.innerHTML = "";
+            if(!files.length){ btn.disabled = true; return; }
+            btn.disabled = false;
+
+            files.forEach(f=>{
+                preview.innerHTML += `
+                    <div class="dz-preview-item">
+                        <span>${f.name}</span>
+                        <span>${(f.size/1024/1024).toFixed(2)} Mo</span>
+                    </div>`;
+            });
+        }
+
+        btn.addEventListener("click", ()=>{
+            const form = new FormData();
+            form.append("client_id", client);
+            files.forEach(f=>form.append("files", f));
+
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Envoi...`;
+
+            fetch(uploadURL,{ method:"POST", body:form })
+            .then(()=> location.reload())
+            .catch(()=>{
+                btn.disabled=false;
+                btn.innerHTML="Erreur";
+            });
+        });
+    }
+
+});
+</script>
 {% endblock %}

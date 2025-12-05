@@ -1,119 +1,219 @@
 {% extends "base.html" %}
-{% block title %}Chiffre d'affaires{% endblock %}
+
+{% block head %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
 
 {% block content %}
 
-<div class="header-row">
-    <h1>📈 Chiffre d'affaires</h1>
-</div>
+<div class="container py-4">
 
-<!-- ===================== AJOUTER UNE ENTREE ======================= -->
-<div class="card">
+    <!-- TITRE -->
+    <div class="d-flex align-items-center mb-4">
+        <i class="fa-solid fa-chart-column fa-2x text-primary me-3"></i>
+        <h1 class="fw-bold">Chiffre d'affaires</h1>
+    </div>
 
-    <h2>➕ Ajouter une entrée</h2>
+    <!-- CARTE FORMULAIRE AJOUT -->
+    <div class="card shadow-sm mb-4 border-0 rounded-4">
+        <div class="card-body p-4">
 
-    {% if session.role == "admin" %}
-    <form method="post" class="row g-4">
+            <h3 class="mb-3 fw-semibold">
+                <i class="fa-solid fa-plus text-success me-2"></i>Ajouter une entrée
+            </h3>
 
-        <!-- MONTANT -->
-        <div class="col-md-4">
-            <label class="form-label">Montant (€)</label>
-            <input type="number" step="0.01" name="montant" class="form-control"
-                   placeholder="Ex : 1500" required>
+            <form method="POST" class="row g-3">
+
+                <div class="col-md-4">
+                    <label class="form-label">Montant (€)</label>
+                    <input type="number" name="montant" step="0.01" class="form-control form-control-lg rounded-3" required placeholder="Ex : 1500">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Date</label>
+                    <input type="date" name="date" value="{{ today }}" class="form-control form-control-lg rounded-3" required>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Commercial</label>
+                    <input type="text" name="commercial" class="form-control form-control-lg rounded-3" required placeholder="Nom du commercial">
+                </div>
+
+                <div class="col-12">
+                    <button class="btn btn-primary btn-lg px-4 rounded-pill mt-2">
+                        <i class="fa-solid fa-check me-2"></i>Ajouter
+                    </button>
+                </div>
+
+            </form>
+
         </div>
+    </div>
 
-        <!-- DATE -->
-        <div class="col-md-4">
-            <label class="form-label">Date</label>
-            <input type="date" name="date" class="form-control"
-                   value="{{ today }}" required>
+    <!-- RÉSUMÉ -->
+    <div class="card shadow-sm mb-4 border-0 rounded-4">
+        <div class="card-body p-4">
+
+            <h3 class="fw-semibold mb-3">
+                <i class="fa-solid fa-chart-pie text-info me-2"></i>Résumé
+            </h3>
+
+            <p class="fs-5 mb-1"><strong>CA global :</strong> {{ "%.2f"|format(ca_global) }} €</p>
+
+            <p class="fs-6 text-muted mb-0">CA par commercial :</p>
+            <ul class="list-group mt-2">
+                {% for com, montant in ca_par_com.items() %}
+                <li class="list-group-item d-flex justify-content-between align-items-center border-0">
+                    <span class="badge rounded-pill px-3 py-2"
+                          style="background-color: #{{ ((com|hash) % 0xFFFFFF)|format('06x') }}; color: white;">
+                          {{ com }}
+                    </span>
+                    <strong>{{ "%.2f"|format(montant) }} €</strong>
+                </li>
+                {% endfor %}
+            </ul>
+
         </div>
+    </div>
 
-        <!-- COMMERCIAL (manual input) -->
-        <div class="col-md-4">
-            <label class="form-label">Commercial</label>
-            <input type="text" name="commercial" class="form-control"
-                   placeholder="Nom du commercial" required>
+    <!-- GRAPHIQUE -->
+    <div class="card shadow-sm mb-4 border-0 rounded-4">
+        <div class="card-body p-4">
+            <h3 class="fw-semibold mb-3">
+                <i class="fa-solid fa-chart-line text-warning me-2"></i>Évolution mensuelle
+            </h3>
+
+            <div class="position-relative">
+                <canvas id="chartCA" height="120"></canvas>
+                <p id="chartCA-empty" class="text-muted text-center my-4 d-none">
+                    Aucune donnée de chiffre d'affaires à afficher pour le moment.
+                </p>
+            </div>
         </div>
+    </div>
 
-        <div class="col-12 mt-3">
-            <button class="btn btn-primary">
-                ✔ Ajouter
-            </button>
-        </div>
+    <!-- TABLEAU DES ENTRÉES -->
+    <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body p-4">
 
-    </form>
+            <h3 class="fw-semibold mb-3">
+                <i class="fa-solid fa-list text-secondary me-2"></i>Détails des entrées
+            </h3>
 
-    {% else %}
-    <p class="text-muted">
-        ⚠ Seul l’administrateur peut ajouter des entrées de chiffre d'affaires.
-    </p>
-    {% endif %}
-</div>
-
-
-<!-- ======================== RESUMÉ GLOBAL ======================== -->
-<div class="card">
-
-    <h2>📊 Résumé</h2>
-
-    <p><strong>CA global :</strong> {{ "%.2f"|format(ca_global) }} €</p>
-
-    {% if ca_par_com %}
-    <h3>CA par commercial :</h3>
-    <ul>
-        {% for com, montant in ca_par_com.items() %}
-            <li><strong>{{ com }}</strong> : {{ "%.2f"|format(montant) }} €</li>
-        {% endfor %}
-    </ul>
-    {% else %}
-        <p class="text-muted">Aucune donnée pour le moment.</p>
-    {% endif %}
-
-</div>
-
-
-<!-- ======================== TABLEAU DETAILLE ======================== -->
-<div class="card">
-    <h2>📄 Détails des entrées</h2>
-
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Commercial</th>
-                <th>Montant (€)</th>
-                <th style="width:120px;">Actions</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for r in revenus %}
-            <tr>
-                <td>{{ r.date.strftime("%d/%m/%Y") }}</td>
-                <td>{{ r.commercial }}</td>
-                <td>{{ "%.2f"|format(r.montant) }}</td>
-                <td>
-
-                    {% if session.role == "admin" %}
-                    <form method="post"
-                          action="{{ url_for('delete_revenue', rev_id=r.id) }}"
-                          onsubmit="return confirm('Supprimer cette entrée ?');">
-                        <button class="btn btn-danger btn-sm">Supprimer</button>
-                    </form>
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Commercial</th>
+                        <th>Montant (€)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in revenus %}
+                    <tr>
+                        <td>{{ r.date.strftime("%d/%m/%Y") }}</td>
+                        <td>
+                            <span class="badge rounded-pill px-3 py-2"
+                                  style="background-color: #{{ ((r.commercial|hash) % 0xFFFFFF)|format('06x') }}; color: white;">
+                                  {{ r.commercial }}
+                            </span>
+                        </td>
+                        <td><strong>{{ "%.2f"|format(r.montant) }} €</strong></td>
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_revenue', rev_id=r.id) }}" onsubmit="return confirm('Supprimer cette entrée ?');">
+                                <button class="btn btn-outline-danger btn-sm rounded-pill">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
                     {% else %}
-                        <span class="text-muted">—</span>
-                    {% endif %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">Aucune entrée pour le moment.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
 
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        </div>
+    </div>
 
-    {% if revenus|length == 0 %}
-        <p class="text-muted">Aucune entrée pour le moment.</p>
-    {% endif %}
 </div>
 
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const ctx = document.getElementById("chartCA");
+    const emptyMsg = document.getElementById("chartCA-empty");
+
+    if (!ctx) {
+        return;
+    }
+
+    fetch("{{ url_for('chiffre_affaire_data') }}")
+        .then(response => response.json())
+        .then(payload => {
+            const rawLabels = payload.labels || [];
+            const data = payload.data || [];
+
+            if (!rawLabels.length || !data.length) {
+                if (emptyMsg) emptyMsg.classList.remove("d-none");
+                ctx.classList.add("d-none");
+                return;
+            }
+
+            const labels = rawLabels.map(l => {
+                const [year, month] = l.split("-");
+                return month + "/" + year;
+            });
+
+            if (emptyMsg) emptyMsg.classList.add("d-none");
+            ctx.classList.remove("d-none");
+
+            new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: "Chiffre d'affaires mensuel (€)",
+                        data: data,
+                        backgroundColor: "#4C6EF5",
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => value.toLocaleString("fr-FR") + " €"
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.parsed.y.toLocaleString("fr-FR") + " €"
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(err => {
+            console.error("Erreur chargement données CA :", err);
+            if (emptyMsg) {
+                emptyMsg.textContent = "Erreur lors du chargement du graphique.";
+                emptyMsg.classList.remove("d-none");
+            }
+            ctx.classList.add("d-none");
+        });
+});
+</script>
 {% endblock %}

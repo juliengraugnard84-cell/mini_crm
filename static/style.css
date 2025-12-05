@@ -1,385 +1,109 @@
-/* ===================================================================
-    GLOBAL
-=================================================================== */
-
+/* GLOBAL */
 body {
     background: #f3f5f7;
     color: #222;
-    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4, h5 {
     font-weight: 600;
     color: #1a1a1a;
 }
 
-/* ===================================================================
-    NAVBAR
-=================================================================== */
-
-.navbar {
-    background: #0d1117 !important;
-    padding: 0.8rem 1rem;
-}
-
-.navbar-brand {
-    font-weight: 700;
-    font-size: 1.3rem;
-}
-
-.nav-link {
-    color: #d6d6d6 !important;
-    margin-right: 0.8rem;
-    font-weight: 500;
-}
-
-.nav-link:hover {
-    color: #ffffff !important;
-}
-
-/* ===================================================================
-    CARDS
-=================================================================== */
-
+/* Cards */
 .card {
-    background: #ffffff;
-    padding: 1.5rem;
-    border-radius: 14px;
+    border-radius: 18px;
     border: 1px solid #e2e6ea;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    margin-bottom: 1.5rem;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
 }
 
-.card h2 {
-    font-size: 1.3rem;
-    margin-bottom: 1rem;
+/* Dashboard cards */
+.dash-card {
+    border-radius: 18px;
+    border: none;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
 }
 
-/* ===================================================================
-    BUTTONS
-=================================================================== */
-
-.btn {
-    border-radius: 10px !important;
-    font-weight: 600 !important;
-    padding: 0.55rem 1.1rem !important;
-}
-
-.btn-primary {
-    background: #0069d9 !important;
-    border-color: #0062cc !important;
-}
-
-.btn-primary:hover {
-    background: #0052ac !important;
-}
-
-.btn-danger {
-    background: #d9534f !important;
-    border-color: #c9302c !important;
-}
-
-.btn-danger:hover {
-    background: #b52b27 !important;
-}
-
-/* ===================================================================
-    FORMS
-=================================================================== */
-
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-input[type="date"],
-input[type="time"],
-textarea,
-select {
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    border: 1px solid #d0d7de;
-    border-radius: 10px;
-    background: #fdfdfd;
-    margin-bottom: 1rem;
-    transition: border 0.15s;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-    border-color: #007bff;
-    outline: none;
-}
-
-/* ===================================================================
-    TABLES
-=================================================================== */
-
-.table {
-    width: 100%;
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.table thead {
-    background: #e9ecef;
-    font-weight: 600;
-}
-
-.table tbody tr:hover {
-    background: #f7f9fc;
-}
-
-.table td, .table th {
-    padding: 0.75rem;
-    vertical-align: middle;
-}
-
-/* ===================================================================
-    HEADER ROWS
-=================================================================== */
-
-.header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.2rem;
-}
-
-.header-row h1 {
-    font-size: 1.8rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-/* ===================================================================
-    BADGES
-=================================================================== */
-
-.badge {
-    padding: 0.5rem 0.7rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-/* ===================================================================
-    MINI CALENDAR (Liste RDV)
-=================================================================== */
-
-.mini-calendar {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-}
-
-.mini-calendar th {
-    background: #e9ecef;
-    padding: 0.5rem;
-}
-
-.mini-calendar td {
-    padding: 0.6rem;
-    text-align: center;
-    cursor: pointer;
-    border-radius: 6px;
-    transition: 0.2s;
-}
-
-.mini-calendar td:hover {
-    background: #d0e2ff;
-}
-
-.mini-calendar .selected {
-    background: #007bff;
-    color: white;
-    font-weight: 600;
-}
-
-/* ===================================================================
-    CHAT WIDGET
-=================================================================== */
-
-#chat-widget-btn {
-    position: fixed;
-    bottom: 25px;
-    right: 25px;
-    width: 62px;
-    height: 62px;
-    background: #00c853;
-    border-radius: 50%;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
-    cursor: pointer;
-    z-index: 1000;
+.dash-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 999px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: 0.2s;
-}
-
-#chat-widget-btn:hover {
-    transform: scale(1.08);
-    background: #00b84a;
-}
-
-#chat-widget {
-    position: fixed;
-    bottom: 110px;
-    right: 25px;
-    width: 360px;
-    height: 470px;
-    background: white;
-    border-radius: 14px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.18);
-    display: none;
-    flex-direction: column;
-    overflow: hidden;
-    z-index: 999;
-    border: 1px solid #d0d7de;
-}
-
-/* Header */
-#chat-header {
-    background: #0069d9;
-    color: white;
-    padding: 0.8rem;
-    font-weight: 600;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-#chat-close {
-    cursor: pointer;
     font-size: 1.2rem;
 }
 
-/* Messages */
-#chat-messages {
-    flex: 1;
-    padding: 1rem;
-    overflow-y: auto;
-    background: #f4f5f7;
-}
-
-.chat-msg {
-    padding: 0.6rem 0.9rem;
-    border-radius: 12px;
-    margin-bottom: 0.7rem;
-    max-width: 75%;
-    font-size: 0.9rem;
-}
-
-/* Mes messages */
-.chat-me {
-    background: #007bff;
-    color: white;
-    margin-left: auto;
-}
-
-/* Messages des autres */
-.chat-other {
-    background: #ffffff;
-    border: 1px solid #dde2e8;
-}
-
-/* Input */
-#chat-input-area {
-    display: flex;
-    padding: 0.7rem;
-    background: white;
-    border-top: 1px solid #e2e6ea;
-}
-
-#chat-input-area input {
-    flex: 1;
-    margin-right: 0.5rem;
-}
-
-#chat-send {
-    background: #0069d9;
-    color: white;
-    padding: 0 1rem;
-    border-radius: 10px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-}
-
-#chat-send:hover {
-    background: #0052ac;
-}
-/* ===================================================================
-    DOCUMENTS — DOSSIERS
-=================================================================== */
-
-.folder-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1rem;
-}
-
-.folder-card {
-    border-radius: 12px;
-    border: 1px solid #e2e6ea;
-    padding: 1rem;
-    background: #fdfdfd;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-}
-
-.folder-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.4rem;
-}
-
-.folder-icon {
-    font-size: 1.4rem;
-}
-
-.folder-title {
+/* Buttons */
+.btn {
+    border-radius: 999px;
     font-weight: 600;
-    font-size: 1rem;
 }
 
-.folder-doc-list {
-    list-style: none;
-    padding-left: 0;
-    margin: 0;
+.btn-primary {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+.btn-primary:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
 }
 
-.folder-doc-item {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #eceff4;
+/* Dropzone */
+#dropzone {
+    border: 2px dashed #2563eb;
+    padding: 25px;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 16px;
+    background: #f8fafc;
+    transition: 0.2s;
+    font-size: 1.05rem;
+}
+#dropzone.dragover {
+    background: #dbeafe;
+    border-color: #1d4ed8;
 }
 
-.folder-doc-item:last-child {
-    border-bottom: none;
+/* PDF modal */
+.pdf-modal-backdrop {
+    display:none;
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background:rgba(15,23,42,0.65);
+    z-index:2000;
+}
+.pdf-modal-content {
+    background:#fff;
+    width:80%;
+    height:85%;
+    margin:3% auto;
+    padding:20px;
+    border-radius:18px;
+    position:relative;
+    box-shadow:0 20px 60px rgba(15, 23, 42, 0.4);
+}
+.pdf-modal-close {
+    position:absolute;
+    top:10px; right:15px;
+    font-size:30px;
+    cursor:pointer;
 }
 
-.folder-doc-main {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
+/* Tables */
+.table thead {
+    background: #e5e7eb;
+    font-weight: 600;
+}
+.table tbody tr:hover {
+    background: #f9fafb;
 }
 
-.doc-name {
-    font-weight: 500;
-}
+/* Chat widget: tu gardes ton CSS dédié dans chat_widget.css */
 
-.doc-date {
-    font-size: 0.8rem;
-    color: #7a7a7a;
-}
-
-.folder-doc-actions {
-    margin-top: 0.4rem;
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
+/* Petits helpers */
+.rounded-4 {
+    border-radius: 18px !important;
 }

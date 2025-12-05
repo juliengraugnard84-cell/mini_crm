@@ -2,133 +2,129 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}CRM{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title or "CRM Julien" }}</title>
 
-    <!-- Bootstrap -->
+    <!-- BOOTSTRAP -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- Bootstrap Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- ICONES -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-    <!-- Styles globaux -->
+    <!-- STYLES PERSO -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    
-    <!-- Style du chat -->
     <link rel="stylesheet" href="{{ url_for('static', filename='chat_widget.css') }}">
+
+    <!-- CHART.JS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     {% block head %}{% endblock %}
 </head>
+<body style="background:#f5f7fb;">
 
-<body>
-
-<!-- ======================== NAVBAR ======================== -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg navbar-dark" style="background:#12182d;">
     <div class="container-fluid">
 
-        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}">
-            <i class="bi bi-speedometer2 me-2"></i> Mini CRM
+        <a class="navbar-brand fw-bold d-flex align-items-center" href="{{ url_for('dashboard') }}">
+            <i class="fa-solid fa-chart-line me-2"></i>
+            CRM Julien
         </a>
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>
 
-        <div id="mainNav" class="collapse navbar-collapse">
+        <div class="collapse navbar-collapse" id="navbarNav">
 
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <ul class="navbar-nav me-auto">
 
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('clients') }}">
-                        <i class="bi bi-people me-1"></i> Clients
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('list_appointments') }}">
-                        <i class="bi bi-list-check me-1"></i> Liste RDV
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('appointments_calendar') }}">
-                        <i class="bi bi-calendar3 me-1"></i> Calendrier
+                        <i class="fa-solid fa-users me-1"></i> Clients
                     </a>
                 </li>
 
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('documents') }}">
-                        <i class="bi bi-file-earrow-up me-1"></i> Documents
+                        <i class="fa-solid fa-folder-open me-1"></i> Documents
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('list_appointments') }}">
+                        <i class="fa-solid fa-calendar-days me-1"></i> Rendez-vous
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('calendar_view') }}">
+                        <i class="fa-solid fa-calendar me-1"></i> Agenda
                     </a>
                 </li>
 
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('chiffre_affaire') }}">
-                        <i class="bi bi-graph-up me-1"></i> Chiffre d'affaires
+                        <i class="fa-solid fa-coins me-1"></i> CA
                     </a>
                 </li>
 
                 {% if session.get("role") == "admin" %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('admin_users') }}">
-                        <i class="bi bi-gear me-1"></i> Utilisateurs
+                        <i class="fa-solid fa-user-gear me-1"></i> Admin
                     </a>
                 </li>
                 {% endif %}
-
             </ul>
 
-            <span class="navbar-text me-3">
-                <i class="bi bi-person-circle me-1"></i>
-                {{ session.get("username") }}
-            </span>
+            <!-- DROITE : USER INFO + LOGOUT -->
+            <div class="d-flex align-items-center">
+                <span class="navbar-text text-white me-3">
+                    Bonjour {{ session.get("username") }}
+                </span>
 
-            <a href="{{ url_for('logout') }}" class="btn btn-outline-light">
-                <i class="bi bi-box-arrow-right me-1"></i> Déconnexion
-            </a>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-light">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+            </div>
 
         </div>
     </div>
 </nav>
 
-<!-- ======================== CONTENU ======================== -->
-<div class="container mt-4">
+<!-- CONTENU PRINCIPAL -->
+<div class="container my-4">
+
+    <!-- MESSAGES FLASH -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-3">
+                {% for category, msg in messages %}
+                    <div class="alert alert-{{ category }} shadow-sm rounded-3">{{ msg }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
     {% block content %}{% endblock %}
 </div>
 
+<!-- CHAT WIDGET (inclus mais caché par défaut) -->
+{% include "chat_messages.html" %}
 
-<!-- ======================== CHAT WIDGET ======================== -->
-<div id="chat-widget">
-
-    <!-- Bulle flottante -->
-    <div id="chat-button">
-        💬
-    </div>
-
-    <!-- Fenêtre -->
-    <div id="chat-window" class="hidden">
-
-        <div id="chat-header">
-            <span>Chat interne</span>
-            <button id="chat-close">×</button>
-        </div>
-
-        <div id="chat-messages"></div>
-
-        <div id="chat-input">
-            <input type="text" id="chat-text" placeholder="Écrire un message...">
-            <button id="chat-send">➤</button>
-        </div>
-
-    </div>
-
+<!-- BOUTON FLOTTANT POUR OUVRIR LE CHAT -->
+<div id="chat-toggle" onclick="openChatWidget()">
+    <i class="fa-solid fa-comments"></i>
 </div>
 
-
-<!-- ======================== SCRIPTS ======================== -->
+<!-- BOOTSTRAP JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Script Chat -->
+<!-- CHAT SCRIPTS -->
 <script src="{{ url_for('static', filename='chat_widget.js') }}"></script>
+<script src="{{ url_for('static', filename='chat.js') }}"></script>
 
 {% block scripts %}{% endblock %}
 

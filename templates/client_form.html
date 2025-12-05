@@ -3,59 +3,51 @@
 
 {% block content %}
 
-<!-- HEADER -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="fw-bold">
         {% if action == 'new' %}
-            <i class="bi bi-person-plus me-2"></i> Nouveau client
+            <i class="fa-solid fa-user-plus me-2"></i> Nouveau client
         {% else %}
-            <i class="bi bi-pencil-square me-2"></i> Modifier le client
+            <i class="fa-solid fa-pen-to-square me-2"></i> Modifier le client
         {% endif %}
     </h1>
 </div>
 
-<!-- FORMULAIRE -->
-<div class="card shadow-sm border-0">
+<div class="card shadow-sm border-0 rounded-4">
     <div class="card-body">
 
         <form method="post" class="row g-4">
 
-            <!-- NOM -->
             <div class="col-md-6">
                 <label class="form-label fw-semibold">Nom du client *</label>
-                <input type="text" name="name" required class="form-control"
+                <input type="text" name="name" required class="form-control form-control-lg"
                        value="{{ client.name if client else '' }}">
             </div>
 
-            <!-- EMAIL -->
             <div class="col-md-6">
                 <label class="form-label fw-semibold">Email</label>
-                <input type="email" name="email" class="form-control"
+                <input type="email" name="email" class="form-control form-control-lg"
                        value="{{ client.email if client else '' }}">
             </div>
 
-            <!-- PHONE -->
             <div class="col-md-6">
                 <label class="form-label fw-semibold">Téléphone</label>
                 <input type="text" name="phone" class="form-control"
                        value="{{ client.phone if client else '' }}">
             </div>
 
-            <!-- ADRESSE -->
             <div class="col-md-6">
                 <label class="form-label fw-semibold">Adresse</label>
                 <input type="text" name="address" class="form-control"
                        value="{{ client.address if client else '' }}">
             </div>
 
-            <!-- COMMERCIAL -->
             <div class="col-md-6">
                 <label class="form-label fw-semibold">Commercial *</label>
                 <input type="text" name="commercial" required class="form-control"
                        value="{{ client.commercial if client else '' }}">
             </div>
 
-            <!-- STATUT -->
             <div class="col-md-6">
                 <label class="form-label fw-semibold">Statut du dossier</label>
                 <select name="status" class="form-select">
@@ -68,25 +60,22 @@
                 </select>
             </div>
 
-            <!-- NOTES -->
             <div class="col-12">
                 <label class="form-label fw-semibold">Notes</label>
                 <textarea name="notes" rows="4" class="form-control">{{ client.notes if client else '' }}</textarea>
             </div>
 
-            <!-- BOUTON -->
             <div class="col-12 text-end">
-                <button class="btn btn-primary btn-lg">
+                <button class="btn btn-primary btn-lg rounded-4">
                     {% if action == 'new' %}
-                        <i class="bi bi-check-lg me-1"></i> Créer le client
+                        <i class="fa-solid fa-check me-1"></i> Créer le client
                     {% else %}
-                        <i class="bi bi-save me-1"></i> Enregistrer
+                        <i class="fa-solid fa-save me-1"></i> Enregistrer
                     {% endif %}
                 </button>
             </div>
 
         </form>
-
     </div>
 </div>
 

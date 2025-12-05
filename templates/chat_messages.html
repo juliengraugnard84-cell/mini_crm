@@ -1,33 +1,24 @@
-{% for m in messages %}
-    {% set is_me = (m.user_id == current_user_id) %}
+<div id="chat-widget" style="display:none;">
 
-    <div class="chat-message {{ 'me' if is_me else 'other' }}">
-        
-        <div class="bubble">
-            <div class="bubble-header">
-                <strong>{{ 'Moi' if is_me else m.user.username }}</strong>
-                <span class="time">
-                    {{ m.timestamp.strftime('%d/%m/%Y %H:%M') }}
-                </span>
-            </div>
-
-            {% if m.content %}
-            <div class="text">{{ m.content }}</div>
-            {% endif %}
-
-            {% if m.filename %}
-            <div class="file">
-                📎 <a href="{{ url_for('chat_download', msg_id=m.id) }}">
-                    {{ m.original_name or m.filename }}
-                </a>
-            </div>
-            {% endif %}
-        </div>
-
+    <div id="chat-header">
+        <span>Chat équipe</span>
+        <button onclick="closeChatWidget()">×</button>
     </div>
 
-{% else %}
-    <p style="text-align:center; color:#777; margin-top:20px;">
-        Aucun message pour le moment 😄
-    </p>
-{% endfor %}
+    <div id="chat-messages"></div>
+
+    <div id="chat-input-area">
+        <button id="btn-file" onclick="document.getElementById('file-input').click()">
+            <i class="fa-solid fa-paperclip"></i>
+        </button>
+
+        <textarea id="chat-input" placeholder="Écrire un message..."></textarea>
+
+        <button id="btn-send" onclick="sendWidgetMessage()">
+            <i class="fa-solid fa-paper-plane"></i>
+        </button>
+
+        <input type="file" id="file-input" style="display:none;" onchange="uploadChatFile()">
+    </div>
+</div>
+

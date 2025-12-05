@@ -3,105 +3,111 @@
 
 {% block content %}
 
-<!-- HEADER + BOUTON -->
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="fw-bold"><i class="bi bi-people me-2"></i> Clients</h1>
-    <a class="btn btn-primary btn-lg" href="{{ url_for('new_client') }}">
-        <i class="bi bi-plus-lg me-1"></i> Nouveau client
+    <h1 class="fw-bold d-flex align-items-center gap-2">
+        <i class="fa-solid fa-users"></i> Clients
+    </h1>
+
+    <a href="{{ url_for('new_client') }}" class="btn btn-primary btn-lg shadow-sm rounded-4">
+        <i class="fa-solid fa-user-plus me-2"></i> Nouveau client
     </a>
 </div>
 
-<!-- FILTRE / RECHERCHE -->
-<div class="card shadow-sm mb-4 border-0">
-    <div class="card-body">
-
-        <form method="get" class="row g-3 align-items-center">
-
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">Recherche :</label>
-                <input type="text" name="q" class="form-control"
-                       placeholder="Nom, email, téléphone, statut…"
-                       value="{{ q }}">
-            </div>
-
-            <div class="col-md-6 d-flex align-items-end gap-2">
-                <button class="btn btn-dark">
-                    <i class="bi bi-search me-1"></i> Filtrer
-                </button>
-
-                <a href="{{ url_for('clients') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-counterclockwise me-1"></i> Réinitialiser
-                </a>
-            </div>
-
-        </form>
+<form method="get" class="mb-4">
+    <div class="input-group input-group-lg shadow-sm rounded-4 overflow-hidden">
+        <span class="input-group-text bg-white border-0">
+            <i class="fa-solid fa-magnifying-glass text-muted"></i>
+        </span>
+        <input type="text"
+               name="q"
+               class="form-control border-0"
+               placeholder="Rechercher par nom, email, téléphone, commercial..."
+               value="{{ q }}">
+        <button class="btn btn-outline-primary border-0">
+            Rechercher
+        </button>
     </div>
-</div>
+</form>
 
-<!-- TABLEAU CLIENTS -->
-<div class="card shadow-sm border-0">
+{% if clients %}
+
+<div class="card shadow-sm border-0 rounded-4">
     <div class="card-body p-0">
 
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>
-                    <th>Nom</th>
+                    <th>Client</th>
+                    <th>Contact</th>
                     <th>Commercial</th>
                     <th>Statut</th>
-                    <th>Email</th>
-                    <th>Téléphone</th>
-                    <th class="text-end" style="width:180px;">Actions</th>
+                    <th class="text-end" style="width:200px;">Actions</th>
                 </tr>
             </thead>
-
             <tbody>
             {% for c in clients %}
                 <tr>
-                    <td class="fw-semibold">{{ c.name }}</td>
-                    <td>{{ c.commercial }}</td>
+                    <td class="fw-semibold">
+                        <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                           class="link-primary text-decoration-none">
+                            {{ c.name }}
+                        </a>
+                    </td>
                     <td>
-                        <span class="badge bg-primary">
+                        <small class="text-muted">
+                            📞 {{ c.phone or '-' }}<br>
+                            ✉️ {{ c.email or '-' }}
+                        </small>
+                    </td>
+                    <td>{{ c.commercial or "-" }}</td>
+                    <td>
+                        <span class="badge rounded-pill
+                            {% if c.status == 'accepté' %} bg-success-subtle text-success
+                            {% elif c.status == 'refusé' %} bg-danger-subtle text-danger
+                            {% elif c.status == 'en attente' %} bg-warning-subtle text-warning
+                            {% else %} bg-info-subtle text-info
+                            {% endif %}
+                        ">
                             {{ c.status }}
                         </span>
                     </td>
-                    <td>{{ c.email or '-' }}</td>
-                    <td>{{ c.phone or '-' }}</td>
-
                     <td class="text-end">
 
-                        <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                           class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-folder2-open"></i>
-                        </a>
+                        <div class="btn-group btn-group-sm">
 
-                        <a href="{{ url_for('edit_client', client_id=c.id) }}"
-                           class="btn btn-sm btn-outline-success">
-                            <i class="bi bi-pencil"></i>
-                        </a>
+                            <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                               class="btn btn-outline-primary"
+                               title="Voir fiche">
+                                <i class="fa-solid fa-eye"></i>
+                            </a>
 
-                        <form method="post"
-                              action="{{ url_for('delete_client', client_id=c.id) }}"
-                              class="d-inline"
-                              onsubmit="return confirm('Supprimer ce client ?');">
-                            <button class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </form>
+                            <a href="{{ url_for('edit_client', client_id=c.id) }}"
+                               class="btn btn-outline-secondary"
+                               title="Modifier">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
 
-                    </td>
-                </tr>
+                            <form method="post"
+                                  action="{{ url_for('delete_client', client_id=c.id) }}"
+                                  onsubmit="return confirm('Supprimer ce client ?');">
+                                <button class="btn btn-outline-danger" title="Supprimer">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
 
-            {% else %}
-                <tr>
-                    <td colspan="6" class="text-center py-4 text-muted">
-                        Aucun client trouvé pour le moment.
+                        </div>
+
                     </td>
                 </tr>
             {% endfor %}
             </tbody>
-
         </table>
+
     </div>
 </div>
+
+{% else %}
+    <p class="text-muted">Aucun client trouvé.</p>
+{% endif %}
 
 {% endblock %}

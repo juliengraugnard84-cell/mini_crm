@@ -1,161 +1,174 @@
 {% extends "base.html" %}
-
-{% block title %}Dashboard{% endblock %}
+{% block title %}Tableau de bord{% endblock %}
 
 {% block content %}
 
-<h1 class="mb-4 fw-bold">
-    Bonjour {{ username }} 👋
-</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold d-flex align-items-center gap-2">
+        <i class="fa-solid fa-gauge-high"></i>
+        Tableau de bord
+    </h1>
+</div>
 
-<!-- ===================== STATISTIQUES ===================== -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-3">
+        <div class="card dash-card text-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-uppercase small mb-1">Clients</h6>
+                        <h3 class="mb-0">{{ stats.clients_total }}</h3>
+                    </div>
+                    <div class="dash-icon bg-primary-subtle text-primary">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card dash-card text-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-uppercase small mb-1">Documents</h6>
+                        <h3 class="mb-0">{{ stats.documents_partages }}</h3>
+                    </div>
+                    <div class="dash-icon bg-success-subtle text-success">
+                        <i class="fa-solid fa-file-circle-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card dash-card text-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-uppercase small mb-1">Opportunités</h6>
+                        <h3 class="mb-0">{{ stats.opportunites_ouvertes }}</h3>
+                    </div>
+                    <div class="dash-icon bg-warning-subtle text-warning">
+                        <i class="fa-solid fa-lightbulb"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card dash-card text-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-uppercase small mb-1">RDV aujourd'hui</h6>
+                        <h3 class="mb-0">{{ stats.rdv_cette_semaine }}</h3>
+                    </div>
+                    <div class="dash-icon bg-info-subtle text-info">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
 <div class="row g-4">
 
-    <div class="col-md-3">
-        <div class="card shadow-sm stat-card border-0 text-center py-3">
+    <!-- Prochains RDV -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 rounded-4">
             <div class="card-body">
-                <div class="stat-icon bg-primary text-white mb-3">
-                    <i class="bi bi-people"></i>
-                </div>
-                <h6 class="text-muted">Clients</h6>
-                <h2 class="fw-bold">{{ stats.clients_total }}</h2>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="card shadow-sm stat-card border-0 text-center py-3">
-            <div class="card-body">
-                <div class="stat-icon bg-info text-white mb-3">
-                    <i class="bi bi-file-earmark-text"></i>
-                </div>
-                <h6 class="text-muted">Documents</h6>
-                <h2 class="fw-bold">{{ stats.documents_partages }}</h2>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="card shadow-sm stat-card border-0 text-center py-3">
-            <div class="card-body">
-                <div class="stat-icon bg-success text-white mb-3">
-                    <i class="bi bi-flag"></i>
-                </div>
-                <h6 class="text-muted">Opportunités</h6>
-                <h2 class="fw-bold">{{ stats.opportunites_ouvertes }}</h2>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="card shadow-sm stat-card border-0 text-center py-3">
-            <div class="card-body">
-                <div class="stat-icon bg-warning text-white mb-3">
-                    <i class="bi bi-calendar-week"></i>
-                </div>
-                <h6 class="text-muted">RDV semaine</h6>
-                <h2 class="fw-bold">{{ stats.rdv_cette_semaine }}</h2>
-            </div>
-        </div>
-    </div>
-
-</div>
-
-<!-- ===================== RDV À VENIR ===================== -->
-<div class="mt-5">
-    <h3 class="mb-3 fw-semibold">
-        📅 Rendez-vous à venir
-    </h3>
-
-    {% if upcoming_appointments %}
-        <div class="list-group shadow-sm">
-
-            {% for rdv in upcoming_appointments %}
-            <div class="list-group-item d-flex justify-content-between align-items-center py-3">
-
-                <div>
-                    <strong>{{ rdv.title }}</strong><br>
-                    <small class="text-muted">
-                        {{ rdv.date.strftime("%d/%m/%Y") }} — {{ rdv.time.strftime("%H:%M") }}
-                    </small>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h4 class="fw-semibold mb-0">
+                        <i class="fa-solid fa-calendar-day me-2 text-primary"></i>
+                        Prochains rendez-vous
+                    </h4>
+                    <a href="{{ url_for('list_appointments') }}" class="btn btn-sm btn-outline-primary">
+                        Voir tous
+                    </a>
                 </div>
 
-                {% if rdv.client %}
-                    <span class="badge bg-primary">{{ rdv.client.name }}</span>
+                {% if upcoming_appointments %}
+                    <ul class="list-group list-group-flush">
+                        {% for rdv in upcoming_appointments %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ rdv.title }}</strong><br>
+                                    <small class="text-muted">
+                                        {{ rdv.date.strftime("%d/%m/%Y") }}
+                                        à {{ rdv.time.strftime("%H:%M") if rdv.time }}
+                                        {% if rdv.client %}
+                                            — {{ rdv.client.name }}
+                                        {% elif rdv.client_name %}
+                                            — {{ rdv.client_name }}
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <a href="{{ url_for('edit_appointment', appointment_id=rdv.id) }}"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    <i class="fa-solid fa-pen"></i>
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
                 {% else %}
-                    <span class="badge bg-secondary">{{ rdv.client_name }}</span>
+                    <p class="text-muted mt-3">Aucun rendez-vous à venir.</p>
                 {% endif %}
-
             </div>
-            {% endfor %}
-
         </div>
-    {% else %}
-        <p class="text-muted">Aucun rendez-vous prévu.</p>
-    {% endif %}
-</div>
-
-<!-- ===================== DERNIERS DOCUMENTS ===================== -->
-<div class="mt-5">
-    <h3 class="mb-3 fw-semibold">
-        📄 Derniers documents importés
-    </h3>
-
-    {% if latest_docs %}
-        <div class="list-group shadow-sm">
-
-            {% for doc in latest_docs %}
-            <div class="list-group-item d-flex justify-content-between align-items-center py-3">
-                <span>{{ doc.original_name }}</span>
-                <small class="text-muted">
-                    {{ doc.uploaded_at.strftime("%d/%m/%Y %H:%M") }}
-                </small>
-            </div>
-            {% endfor %}
-
-        </div>
-    {% else %}
-        <p class="text-muted">Aucun document importé.</p>
-    {% endif %}
-</div>
-
-<!-- ===================== ACCÈS RAPIDE ===================== -->
-<div class="mt-5">
-    <h3 class="mb-3 fw-semibold">⚡ Accès rapide</h3>
-
-    <div class="d-flex gap-3 flex-wrap">
-        <a href="{{ url_for('clients') }}" class="btn btn-primary btn-lg">
-            <i class="bi bi-people me-1"></i> Clients
-        </a>
-
-        <a href="{{ url_for('list_appointments') }}" class="btn btn-success btn-lg">
-            <i class="bi bi-list-check me-1"></i> Liste RDV
-        </a>
-
-        <a href="{{ url_for('appointments_calendar') }}" class="btn btn-warning btn-lg text-white">
-            <i class="bi bi-calendar-event me-1"></i> Calendrier
-        </a>
-
-        <a href="{{ url_for('documents') }}" class="btn btn-info btn-lg text-white">
-            <i class="bi bi-file-earmark-text me-1"></i> Documents
-        </a>
-
-        <a href="{{ url_for('chiffre_affaire') }}" class="btn btn-dark btn-lg">
-            <i class="bi bi-cash-coin me-1"></i> Chiffre d’affaire
-        </a>
     </div>
-</div>
 
-<style>
-    .stat-icon {
-        width: 55px;
-        height: 55px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 10px;
-        font-size: 1.6rem;
-    }
-</style>
+    <!-- Derniers documents -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 rounded-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h4 class="fw-semibold mb-0">
+                        <i class="fa-solid fa-file-lines me-2 text-success"></i>
+                        Derniers documents ajoutés
+                    </h4>
+                    <a href="{{ url_for('documents') }}" class="btn btn-sm btn-outline-success">
+                        Voir tous
+                    </a>
+                </div>
+
+                {% if latest_docs %}
+                    <ul class="list-group list-group-flush">
+                        {% for doc in latest_docs %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ doc.original_name }}</strong><br>
+                                    <small class="text-muted">
+                                        {{ doc.uploaded_at.strftime("%d/%m/%Y %H:%M") }}
+                                        {% if doc.client %} — {{ doc.client.name }}{% endif %}
+                                    </small>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ doc.cloudinary_url }}" target="_blank"
+                                       class="btn btn-outline-primary" title="Ouvrir">
+                                        <i class="fa-solid fa-up-right-from-square"></i>
+                                    </a>
+                                    <a href="{{ url_for('download_document', doc_id=doc.id) }}"
+                                       class="btn btn-outline-success" title="Télécharger">
+                                        <i class="fa-solid fa-download"></i>
+                                    </a>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mt-3">Aucun document récent.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
 
 {% endblock %}
