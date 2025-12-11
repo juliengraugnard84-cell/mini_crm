@@ -143,14 +143,6 @@
             font-size: 14px;
         }
 
-        /* CARDS */
-        .card-modern {
-            border-radius: var(--card-radius);
-            border: none;
-            box-shadow: var(--shadow-soft);
-            background: white;
-        }
-
         /* ANIMATIONS */
         .fade-in {
             opacity: 0;
@@ -163,21 +155,7 @@
             transform: translateY(0);
         }
 
-        /* RESPONSIVE */
-        @media (max-width: 992px) {
-            .layout {
-                flex-direction: column;
-            }
-            .sidebar {
-                width: 100%;
-                height: auto;
-            }
-            .content-wrapper {
-                padding: 16px;
-            }
-        }
-
-        /* CHAT WIDGET */
+        /* CHAT BUTTON */
         #chatButton {
             position: fixed;
             bottom: 28px;
@@ -194,10 +172,7 @@
             cursor: pointer;
             font-size: 32px;
             z-index: 9999;
-            transition: transform 0.15s ease;
         }
-
-        #chatButton:hover { transform: scale(1.07); }
 
         #chatWindow {
             position: fixed;
@@ -212,42 +187,6 @@
             flex-direction: column;
             overflow: hidden;
             z-index: 9999;
-        }
-
-        #chatHeader {
-            padding: 14px;
-            background: linear-gradient(90deg,#ff6b35,#ff3366);
-            color: white;
-            font-weight: 600;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        #chatMessages {
-            flex: 1;
-            padding: 12px;
-            overflow-y: auto;
-            background: #f4f5fb;
-        }
-
-        #chatInputArea {
-            display: flex;
-            border-top: 1px solid #ddd;
-        }
-
-        #chatInput {
-            flex: 1;
-            border: none;
-            padding: 12px;
-        }
-
-        #chatSend {
-            background: #ff6b35;
-            border: none;
-            padding: 12px 18px;
-            color: white;
-            cursor: pointer;
         }
     </style>
 
@@ -284,7 +223,7 @@
             </a>
 
             <a href="{{ url_for('agenda') }}"
-               class="sidebar-link {% if request.endpoint in ['agenda','new_appointment','edit_appointment'] %}active{% endif %}">
+               class="sidebar-link {% if request.endpoint == 'agenda' %}active{% endif %}">
                 <span class="material-symbols-outlined sidebar-link-icon">calendar_month</span>
                 Agenda
             </a>
@@ -353,7 +292,6 @@
 
 </div>
 
-
 <!-- CHAT BUTTON -->
 <div id="chatButton">💬</div>
 
@@ -370,14 +308,12 @@
     </div>
 </div>
 
-
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- CHAT LOGIC -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-
     const btn = document.getElementById("chatButton");
     const win = document.getElementById("chatWindow");
     const close = document.getElementById("chatClose");
@@ -411,9 +347,11 @@ document.addEventListener("DOMContentLoaded", () => {
     input.addEventListener("keypress", e => {
         if (e.key === "Enter") sendMessage();
     });
-
 });
 </script>
+
+<!-- BLOCK POUR LES SCRIPTS DES PAGES -->
+{% block scripts %}{% endblock %}
 
 </body>
 </html>

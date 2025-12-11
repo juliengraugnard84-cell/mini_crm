@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block page_title %}Agenda{% endblock %}
+{% block content %}
+
+<!-- TITRE -->
+<h1 class="fw-bold mb-4 fade-in show">Agenda</h1>
+
+<!-- CALENDRIER -->
+<div id="calendar" class="fade-in show" style="
+    background:white;
+    padding:25px;
+    border-radius:18px;
+    min-height:700px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.08);
+"></div>
+
+{% endblock %}
+
+{% block scripts %}
+    <!-- FullCalendar -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+    <!-- Ton script local -->
+    <script src="{{ url_for('static', filename='calendar.js') }}"></script>
+{% endblock %}
