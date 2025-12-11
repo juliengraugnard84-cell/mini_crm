@@ -1,60 +1,37 @@
 {% extends "base.html" %}
-{% block title %}Gestion utilisateurs{% endblock %}
-
 {% block content %}
 
-<div class="header-row">
-    <h1>Gestion des utilisateurs</h1>
-</div>
+<h2 class="mb-4">Modifier utilisateur : {{ user.username }}</h2>
 
-<div class="card">
+<div class="card shadow-sm">
+    <div class="card-body">
 
-    <h2>Créer un nouvel utilisateur</h2>
+        <form method="POST">
 
-    <form method="post" style="margin-bottom:2rem;">
-        <label>Nom d'utilisateur</label>
-        <input type="text" name="username" required>
+            <div class="mb-3">
+                <label class="form-label">Nom d'utilisateur</label>
+                <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
+            </div>
 
-        <label>Mot de passe</label>
-        <input type="password" name="password" required>
+            <div class="mb-3">
+                <label class="form-label">Nouveau mot de passe (optionnel)</label>
+                <input type="password" name="password" class="form-control">
+            </div>
 
-        <button class="btn" style="margin-top:1rem;">Créer l'utilisateur</button>
-    </form>
+            <div class="mb-3">
+                <label class="form-label">Rôle</label>
+                <select name="role" class="form-select">
+                    <option value="commercial" {% if user.role == "commercial" %}selected{% endif %}>Commercial</option>
+                    <option value="admin" {% if user.role == "admin" %}selected{% endif %}>Admin</option>
+                </select>
+            </div>
 
-    <hr>
+            <button class="btn btn-primary"><i class="bi bi-check2"></i> Enregistrer</button>
+            <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Annuler</a>
 
-    <h2>Liste des utilisateurs</h2>
+        </form>
 
-    <table class="table">
-        <tr>
-            <th>ID</th>
-            <th>Utilisateur</th>
-            <th>Rôle</th>
-            <th>Actions</th>
-        </tr>
-
-        {% for u in users %}
-        <tr>
-            <td>{{ u.id }}</td>
-            <td>{{ u.username }}</td>
-            <td>{{ u.role }}</td>
-            <td>
-                {% if u.role != "admin" %}
-                    <a class="btn" href="{{ url_for('admin_edit_user', user_id=u.id) }}">Modifier</a>
-
-                    <form method="post" action="{{ url_for('admin_delete_user', user_id=u.id) }}" style="display:inline;">
-                        <button class="btn danger" onclick="return confirm('Supprimer cet utilisateur ?');">
-                            Supprimer
-                        </button>
-                    </form>
-                {% else %}
-                    <span style="color:#aaa;">(admin)</span>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
-
+    </div>
 </div>
 
 {% endblock %}

@@ -1,180 +1,276 @@
-###############################################
-#        Mini CRM + Chat d'équipe simple      #
-###############################################
+import os
+import re
+import unicodedata
+import sqlite3
+from datetime import date
+from types import SimpleNamespace
+from functools import wraps
 
 from flask import (
-    Flask, render_template, request, redirect,
-    url_for, session, flash, send_file, send_from_directory, jsonify
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    jsonify,
+    session,
 )
-from flask_sqlalchemy import SQLAlchemy
-from functools import wraps
-import os
-from datetime import datetime, date
-from io import BytesIO
-
+from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from sqlalchemy import inspect, text
 
-# ——————————————————————————————
-# AUCUNE IA — AUCUN CHARGEMENT .env
-# ——————————————————————————————
+import boto3
+from botocore.exceptions import ClientError
+
+from config import Config
+
+
+############################################################
+# 1. CONFIGURATION
+############################################################
+
+LOCAL_MODE = Config.LOCAL_MODE
+
+AWS_ACCESS_KEY = Config.AWS_ACCESS_KEY
+AWS_SECRET_KEY = Config.AWS_SECRET_KEY
+AWS_REGION = Config.AWS_REGION
+AWS_BUCKET = Config.AWS_BUCKET
+
+DB_PATH = Config.DB_PATH
+
+ALLOWED_EXTENSIONS = {"pdf", "jpg", "jpeg", "png", "doc", "docx"}
+
+
+############################################################
+# 2. INITIALISATION FLASK
+############################################################
 
 app = Flask(__name__)
-app.secret_key = "dev-secret"
+app.config.from_object(Config)
+app.secret_key = app.config["SECRET_KEY"]
 
-# ============================================================
-#                    CONFIG BASE DE DONNÉES
-# ============================================================
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///crm.db"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+############################################################
+# 3. BASE DE DONNÉES
+############################################################
 
-UPLOAD_FOLDER = os.path.join(app.root_path, "uploads")
-CHAT_UPLOAD_FOLDER = os.path.join(app.root_path, "chat_uploads")
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(CHAT_UPLOAD_FOLDER, exist_ok=True)
 
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["CHAT_UPLOAD_FOLDER"] = CHAT_UPLOAD_FOLDER
+def row_to_obj(row):
+    return SimpleNamespace(**dict(row)) if row else None
 
-ALLOWED_EXTENSIONS = {"pdf"}
 
-db = SQLAlchemy(app)
+def init_db():
+    conn = get_db()
 
-CLIENT_STATUSES = [
-    "en cours",
-    "demande de cotation",
-    "rdv fixé",
-    "contrat signé",
-    "refusé",
-    "en attente de retour client",
-]
+    # TABLE CLIENTS
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS crm_clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT,
+            phone TEXT,
+            address TEXT,
+            commercial TEXT,
+            status TEXT,
+            notes TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
-# ============================================================
-#                       HELPERS / DÉCORATEURS
-# ============================================================
+    # TABLE UTILISATEURS
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            role TEXT
+        )
+    """)
 
-def allowed_file(filename: str) -> bool:
+    # TABLE REVENUS
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS revenus (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            commercial TEXT NOT NULL,
+            montant REAL NOT NULL
+        )
+    """)
+
+    # TABLE RENDEZ-VOUS
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS appointments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            date TEXT NOT NULL,
+            time TEXT,
+            client_id INTEGER,
+            description TEXT,
+            color TEXT,
+            FOREIGN KEY (client_id) REFERENCES crm_clients(id)
+        )
+    """)
+
+    # ——— RESET / CRÉATION DES COMPTES ———
+
+    def ensure_user(username, clear_password, role):
+        """Crée ou met à jour un user avec le mot de passe donné."""
+        hashed = generate_password_hash(clear_password)
+        existing = conn.execute(
+            "SELECT id FROM users WHERE username=?",
+            (username,)
+        ).fetchone()
+
+        if existing is None:
+            conn.execute(
+                "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                (username, hashed, role)
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET password=?, role=? WHERE username=?",
+                (hashed, role, username)
+            )
+
+    # On garantit ces 2 comptes à chaque démarrage
+    ensure_user("admin", "admin123", "admin")
+    ensure_user("julien", "test123", "commercial")
+
+    conn.commit()
+    conn.close()
+
+    print(">>> COMPTE ADMIN : admin / admin123")
+    print(">>> COMPTE JULIEN : julien / test123")
+
+
+# Initialisation de la base et des comptes
+init_db()
+############################################################
+# 4. S3 — STOCKAGE DOCUMENTS
+############################################################
+
+s3 = None
+
+if not LOCAL_MODE:
+    try:
+        s3 = boto3.client(
+            "s3",
+            region_name=AWS_REGION,
+            aws_access_key_id=AWS_ACCESS_KEY,
+            aws_secret_access_key=AWS_SECRET_KEY,
+        )
+        print("Connexion S3 OK")
+    except Exception as e:
+        print("Erreur connexion S3 :", e)
+else:
+    print("Mode local : S3 désactivé.")
+
+
+############################################################
+# 5. UTILITAIRES
+############################################################
+
+def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def login_required(f):
-    @wraps(f)
+def clean_filename(filename):
+    name, ext = os.path.splitext(filename)
+    name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    name = name.lower()
+    name = re.sub(r"[^a-z0-9]+", "_", name).strip("_")
+    return f"{name}{ext.lower()}"
+
+
+def list_client_documents(client_id):
+    """Liste les documents d’un client dans S3."""
+    if LOCAL_MODE or not s3:
+        return []
+
+    prefix = f"clients/{client_id}/"
+    docs = []
+
+    try:
+        response = s3.list_objects_v2(Bucket=AWS_BUCKET, Prefix=prefix)
+        for item in response.get("Contents", []):
+            key = item["Key"]
+            if key.endswith("/"):
+                continue
+
+            docs.append({
+                "nom": key.replace(prefix, ""),
+                "key": key,
+                "taille": item["Size"],
+                "url": f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{key}",
+            })
+    except Exception as e:
+        print("Erreur list_client_documents :", e)
+
+    return docs
+
+
+############################################################
+# 6. AUTHENTIFICATION — DÉCORATEURS
+############################################################
+
+def login_required(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        if "user_id" not in session:
-            flash("Veuillez vous connecter.", "error")
+        if "user" not in session:
             return redirect(url_for("login"))
-        return f(*args, **kwargs)
+        return func(*args, **kwargs)
     return wrapper
 
 
-def admin_required(f):
-    @wraps(f)
+def admin_required(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        if session.get("role") != "admin":
-            flash("Accès réservé à l’administrateur.", "error")
+        if "user" not in session:
+            return redirect(url_for("login"))
+        if session["user"]["role"] != "admin":
+            flash("Accès réservé à l'administrateur.", "danger")
             return redirect(url_for("dashboard"))
-        return f(*args, **kwargs)
+        return func(*args, **kwargs)
     return wrapper
 
-# ============================================================
-#                           MODÈLES
-# ============================================================
 
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), default="commercial")
-
-    clients = db.relationship("Client", backref="user", lazy=True)
-    appointments = db.relationship("Appointment", backref="user", lazy=True)
-    documents = db.relationship("Document", backref="user", lazy=True)
-    messages = db.relationship("Message", backref="user", lazy=True)
-
-    def set_password(self, pwd: str):
-        self.password_hash = generate_password_hash(pwd)
-
-    def check_password(self, pwd: str) -> bool:
-        return check_password_hash(self.password_hash, pwd)
+@app.context_processor
+def inject_current_user():
+    return dict(current_user=session.get("user"))
 
 
-class Client(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    email = db.Column(db.String(120))
-    phone = db.Column(db.String(50))
-    address = db.Column(db.String(255))
-    notes = db.Column(db.Text)
-
-    commercial = db.Column(db.String(120), nullable=False)
-    status = db.Column(db.String(50), nullable=False, default="en cours")
-
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-
-    appointments = db.relationship("Appointment", backref="client", lazy=True)
-    documents = db.relationship("Document", backref="client", lazy=True)
-
-
-class Appointment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(120), nullable=False)
-    client_name = db.Column(db.String(120), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    time = db.Column(db.Time, nullable=False)
-    notes = db.Column(db.Text)
-
-    client_id = db.Column(db.Integer, db.ForeignKey("client.id"))
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-
-
-class Document(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(255), nullable=False)
-    original_name = db.Column(db.String(255), nullable=False)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    client_id = db.Column(db.Integer, db.ForeignKey("client.id"))
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-
-
-class Revenue(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    commercial = db.Column(db.String(120), nullable=False)
-    montant = db.Column(db.Float, nullable=False)
-    date = db.Column(db.Date, nullable=False, default=date.today)
-
-
-class Message(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    content = db.Column(db.Text, nullable=False, default="")
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    filename = db.Column(db.String(255))
-    original_name = db.Column(db.String(255))
-# ============================================================
-#                           LOGIN / LOGOUT
-# ============================================================
+############################################################
+# 7. LOGIN / LOGOUT
+############################################################
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
+        password = request.form.get("password", "").strip()
 
-        user = User.query.filter_by(username=username).first()
+        conn = get_db()
+        user = conn.execute(
+            "SELECT * FROM users WHERE username=?",
+            (username,)
+        ).fetchone()
+        conn.close()
 
-        if user and user.check_password(password):
-            session["user_id"] = user.id
-            session["username"] = user.username
-            session["role"] = user.role
-            flash("Connexion réussie", "success")
+        if user and check_password_hash(user["password"], password):
+            session["user"] = {
+                "id": user["id"],
+                "username": user["username"],
+                "role": user["role"],
+            }
+            flash("Connexion réussie.", "success")
             return redirect(url_for("dashboard"))
-
-        flash("Nom d’utilisateur ou mot de passe incorrect", "error")
+        else:
+            flash("Identifiants incorrects.", "danger")
 
     return render_template("login.html")
 
@@ -182,535 +278,658 @@ def login():
 @app.route("/logout")
 def logout():
     session.clear()
-    flash("Déconnexion réussie", "info")
+    flash("Déconnexion effectuée.", "info")
     return redirect(url_for("login"))
+############################################################
+# 8. DASHBOARD
+############################################################
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    conn = get_db()
+
+    total_clients = conn.execute(
+        "SELECT COUNT(*) FROM crm_clients"
+    ).fetchone()[0]
+
+    last_clients = conn.execute("""
+        SELECT name, email, created_at
+        FROM crm_clients
+        ORDER BY created_at DESC LIMIT 5
+    """).fetchall()
+
+    # CA total
+    total_ca = conn.execute(
+        "SELECT COALESCE(SUM(montant), 0) FROM revenus"
+    ).fetchone()[0]
+
+    # Dernier revenu
+    last_rev = conn.execute("""
+        SELECT montant, date, commercial
+        FROM revenus
+        ORDER BY date DESC, id DESC
+        LIMIT 1
+    """).fetchone()
+
+    conn.close()
+
+    total_docs = 0
+    last_docs = []
+
+    # S3 seulement si non-local
+    if not LOCAL_MODE and s3:
+        try:
+            response = s3.list_objects_v2(Bucket=AWS_BUCKET)
+            files = response.get("Contents", []) or []
+            total_docs = len(files)
+
+            files_sorted = sorted(
+                files,
+                key=lambda x: x["LastModified"],
+                reverse=True
+            )
+            last_docs = [
+                {
+                    "nom": f["Key"],
+                    "taille": f["Size"],
+                    "date": f["LastModified"],
+                }
+                for f in files_sorted[:5]
+            ]
+        except Exception as e:
+            print("Erreur listing S3 pour dashboard :", e)
+
+    return render_template(
+        "dashboard.html",
+        total_clients=total_clients,
+        last_clients=last_clients,
+        total_ca=total_ca,
+        last_rev=last_rev,
+        total_docs=total_docs,
+        last_docs=last_docs,
+    )
 
 
-# ============================================================
-#              ADMIN : GESTION DES UTILISATEURS
-# ============================================================
+############################################################
+# 9. REVENUS (CHIFFRE D'AFFAIRE)
+############################################################
+
+@app.route("/chiffre_affaire", methods=["GET", "POST"])
+@login_required
+def chiffre_affaire():
+    # ---- ENREGISTREMENT D’UN REVENU ----
+    if request.method == "POST":
+        montant = request.form.get("montant")
+        commercial = request.form.get("commercial")
+        date_rev = request.form.get("date")
+
+        if not montant or not commercial or not date_rev:
+            flash("Tous les champs sont obligatoires.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
+        conn = get_db()
+        conn.execute("""
+            INSERT INTO revenus (date, commercial, montant)
+            VALUES (?, ?, ?)
+        """, (date_rev, commercial, montant))
+        conn.commit()
+        conn.close()
+
+        flash("Revenu enregistré.", "success")
+        return redirect(url_for("chiffre_affaire"))
+
+    # ---- AFFICHAGE + STATISTIQUES ----
+    conn = get_db()
+
+    revenus = conn.execute("""
+        SELECT id, date, commercial, montant
+        FROM revenus
+        ORDER BY date DESC
+    """).fetchall()
+
+    today_obj = date.today()
+    year_str = str(today_obj.year)           # ex : "2025"
+    month_str = today_obj.strftime("%Y-%m")  # ex : "2025-12"
+
+    # TOTAL ANNUEL GLOBAL
+    total_year_global = conn.execute("""
+        SELECT COALESCE(SUM(montant), 0)
+        FROM revenus
+        WHERE substr(date, 1, 4) = ?
+    """, (year_str,)).fetchone()[0]
+
+    # TOTAL MENSUEL GLOBAL
+    total_month_global = conn.execute("""
+        SELECT COALESCE(SUM(montant), 0)
+        FROM revenus
+        WHERE substr(date, 1, 7) = ?
+    """, (month_str,)).fetchone()[0]
+
+    # TOTAL ANNUEL PAR COMMERCIAL
+    ca_par_com_annuel = conn.execute("""
+        SELECT commercial, COALESCE(SUM(montant), 0) AS total
+        FROM revenus
+        WHERE substr(date, 1, 4) = ?
+        GROUP BY commercial
+        ORDER BY total DESC
+    """, (year_str,)).fetchall()
+
+    # TOTAL MENSUEL PAR COMMERCIAL
+    ca_par_com_mensuel = conn.execute("""
+        SELECT commercial, COALESCE(SUM(montant), 0) AS total
+        FROM revenus
+        WHERE substr(date, 1, 7) = ?
+        GROUP BY commercial
+        ORDER BY total DESC
+    """, (month_str,)).fetchall()
+
+    conn.close()
+
+    return render_template(
+        "chiffre_affaire.html",
+        today=today_obj.isoformat(),
+        revenus=revenus,
+        total_year_global=total_year_global,
+        total_month_global=total_month_global,
+        ca_par_com_annuel=ca_par_com_annuel,
+        ca_par_com_mensuel=ca_par_com_mensuel,
+        current_year=year_str,
+        current_month=month_str,
+    )
+
+
+############################################################
+# API — DONNÉES POUR CHART.JS
+############################################################
+
+@app.route("/chiffre_affaire/data")
+@login_required
+def chiffre_affaire_data():
+    conn = get_db()
+    rows = conn.execute("SELECT date, montant FROM revenus").fetchall()
+    conn.close()
+
+    mois_noms = {
+        "01": "Janvier", "02": "Février", "03": "Mars", "04": "Avril",
+        "05": "Mai", "06": "Juin", "07": "Juillet", "08": "Août",
+        "09": "Septembre", "10": "Octobre", "11": "Novembre", "12": "Décembre",
+    }
+
+    data_par_mois = {}
+    for r in rows:
+        month = r["date"][5:7]
+        data_par_mois.setdefault(month, 0)
+        data_par_mois[month] += float(r["montant"])
+
+    labels = [mois_noms[m] for m in sorted(data_par_mois.keys())]
+    data = [data_par_mois[m] for m in sorted(data_par_mois.keys())]
+
+    return jsonify({"labels": labels, "data": data})
+
+
+############################################################
+# SUPPRESSION D’UNE LIGNE DE REVENU
+############################################################
+
+@app.route("/chiffre_affaire/delete/<int:rev_id>", methods=["POST"])
+@login_required
+def delete_revenue(rev_id):
+    conn = get_db()
+    conn.execute("DELETE FROM revenus WHERE id=?", (rev_id,))
+    conn.commit()
+    conn.close()
+
+    flash("Entrée supprimée.", "success")
+    return redirect(url_for("chiffre_affaire"))
+############################################################
+# 10. ADMIN UTILISATEURS
+############################################################
 
 @app.route("/admin/users", methods=["GET", "POST"])
 @admin_required
 def admin_users():
+    conn = get_db()
+
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
+        username = request.form.get("username")
+        password = request.form.get("password")
+        role = request.form.get("role")
 
         if not username or not password:
-            flash("Nom d’utilisateur et mot de passe requis.", "error")
+            flash("Champs obligatoires.", "danger")
+            conn.close()
             return redirect(url_for("admin_users"))
 
-        if User.query.filter_by(username=username).first():
-            flash("Ce nom d’utilisateur existe déjà", "error")
+        exists = conn.execute(
+            "SELECT COUNT(*) FROM users WHERE username=?",
+            (username,)
+        ).fetchone()[0]
+
+        if exists > 0:
+            flash("Nom d'utilisateur déjà utilisé.", "danger")
+            conn.close()
             return redirect(url_for("admin_users"))
 
-        new_user = User(username=username, role="commercial")
-        new_user.set_password(password)
+        conn.execute("""
+            INSERT INTO users (username, password, role)
+            VALUES (?, ?, ?)
+        """, (username, generate_password_hash(password), role))
+        conn.commit()
 
-        db.session.add(new_user)
-        db.session.commit()
+        flash("Utilisateur créé.", "success")
 
-        flash("Commercial créé", "success")
-        return redirect(url_for("admin_users"))
+    users = conn.execute("SELECT * FROM users ORDER BY id ASC").fetchall()
+    conn.close()
 
-    users = User.query.all()
     return render_template("admin_users.html", users=users)
 
 
 @app.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
 @admin_required
 def admin_edit_user(user_id):
-    user = User.query.get_or_404(user_id)
+    conn = get_db()
+    user = conn.execute(
+        "SELECT * FROM users WHERE id=?",
+        (user_id,)
+    ).fetchone()
 
-    if user.role == "admin":
-        flash("Impossible de modifier l'administrateur principal.", "error")
+    if not user:
+        flash("Utilisateur introuvable.", "danger")
+        conn.close()
         return redirect(url_for("admin_users"))
 
     if request.method == "POST":
-        user.username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
+        username = request.form.get("username")
+        password = request.form.get("password")
+        role = request.form.get("role")
 
-        if password.strip():
-            user.set_password(password)
+        exists = conn.execute("""
+            SELECT COUNT(*) FROM users WHERE username=? AND id<>?
+        """, (username, user_id)).fetchone()[0]
 
-        db.session.commit()
-        flash("Utilisateur modifié", "success")
+        if exists > 0:
+            flash("Nom déjà utilisé.", "danger")
+            conn.close()
+            return redirect(url_for("admin_edit_user", user_id=user_id))
+
+        if password:
+            conn.execute("""
+                UPDATE users SET username=?, password=?, role=? WHERE id=?
+            """, (username, generate_password_hash(password), role, user_id))
+        else:
+            conn.execute("""
+                UPDATE users SET username=?, role=? WHERE id=?
+            """, (username, role, user_id))
+
+        conn.commit()
+        conn.close()
+        flash("Utilisateur mis à jour.", "success")
         return redirect(url_for("admin_users"))
 
+    conn.close()
     return render_template("admin_edit_user.html", user=user)
 
 
 @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
 @admin_required
 def admin_delete_user(user_id):
-    user = User.query.get_or_404(user_id)
-
-    if user.role == "admin":
-        flash("Impossible de supprimer l’admin.", "error")
+    if user_id == 1:
+        flash("Impossible de supprimer l'administrateur principal.", "danger")
         return redirect(url_for("admin_users"))
 
-    admin_user = User.query.filter_by(role="admin").first()
+    conn = get_db()
+    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
 
-    # Réassignation automatique
-    for c in Client.query.filter_by(user_id=user.id).all():
-        c.user_id = admin_user.id
-    for r in Appointment.query.filter_by(user_id=user.id).all():
-        r.user_id = admin_user.id
-    for d in Document.query.filter_by(user_id=user.id).all():
-        d.user_id = admin_user.id
-    for m in Message.query.filter_by(user_id=user.id).all():
-        m.user_id = admin_user.id
-
-    db.session.delete(user)
-    db.session.commit()
-
-    flash("Utilisateur supprimé", "info")
+    flash("Utilisateur supprimé.", "success")
     return redirect(url_for("admin_users"))
-
-
-# ============================================================
-#                           DASHBOARD
-# ============================================================
-
-@app.route("/")
-def index():
-    if "user_id" in session:
-        return redirect(url_for("dashboard"))
-    return redirect(url_for("login"))
-
-
-@app.route("/dashboard")
-@login_required
-def dashboard():
-    user_id = session["user_id"]
-    role = session["role"]
-
-    if role == "admin":
-        clients_count = Client.query.count()
-        docs_count = Document.query.count()
-        rdv_count = Appointment.query.count()
-        upcoming = Appointment.query.order_by(
-            Appointment.date.asc(), Appointment.time.asc()
-        ).limit(5).all()
-        latest_docs = Document.query.order_by(
-            Document.uploaded_at.desc()
-        ).limit(5).all()
-    else:
-        clients_count = Client.query.filter_by(user_id=user_id).count()
-        docs_count = Document.query.filter_by(user_id=user_id).count()
-        rdv_count = Appointment.query.filter_by(user_id=user_id).count()
-        upcoming = Appointment.query.filter_by(user_id=user_id).order_by(
-            Appointment.date.asc(), Appointment.time.asc()
-        ).limit(5).all()
-        latest_docs = Document.query.filter_by(user_id=user_id).order_by(
-            Document.uploaded_at.desc()
-        ).limit(5).all()
-
-    stats = {
-        "clients_total": clients_count,
-        "documents_partages": docs_count,
-        "opportunites_ouvertes": rdv_count,
-        "rdv_cette_semaine": rdv_count,
-    }
-
-    return render_template(
-        "dashboard.html",
-        stats=stats,
-        upcoming_appointments=upcoming,
-        latest_docs=latest_docs,
-    )
-
-
-# ============================================================
-#                           CLIENTS
-# ============================================================
-
-@app.route("/clients")
-@login_required
-def clients():
-    q = request.args.get("q", "")
-    role = session["role"]
-    user_id = session["user_id"]
-
-    base = Client.query if role == "admin" else Client.query.filter_by(user_id=user_id)
-
-    if q:
-        like = f"%{q}%"
-        base = base.filter(
-            (Client.name.ilike(like))
-            | (Client.email.ilike(like))
-            | (Client.phone.ilike(like))
-            | (Client.commercial.ilike(like))
-            | (Client.status.ilike(like))
-        )
-
-    all_clients = base.order_by(Client.name.asc()).all()
-    return render_template("clients.html", clients=all_clients, q=q)
-
-
-@app.route("/clients/new", methods=["GET", "POST"])
-@login_required
-def new_client():
-    if request.method == "POST":
-        client = Client(
-            name=request.form.get("name"),
-            email=request.form.get("email"),
-            phone=request.form.get("phone"),
-            address=request.form.get("address"),
-            notes=request.form.get("notes"),
-            commercial=request.form.get("commercial"),
-            status=request.form.get("status") or "en cours",
-            user_id=session["user_id"],
-        )
-
-        db.session.add(client)
-        db.session.commit()
-
-        flash("Client ajouté", "success")
-        return redirect(url_for("clients"))
-
-    return render_template(
-        "client_form.html",
-        client=None,
-        action="new",
-        statuses=CLIENT_STATUSES,
-    )
-# ============================================================
-#                         RENDEZ-VOUS
-# ============================================================
-
-@app.route("/appointments")
-@login_required
-def list_appointments():
-    user_id = session["user_id"]
-    role = session["role"]
-    date_str = request.args.get("date")
-
-    base = Appointment.query if role == "admin" else Appointment.query.filter_by(user_id=user_id)
-
-    if date_str:
-        try:
-            d = datetime.strptime(date_str, "%Y-%m-%d").date()
-            appointments = base.filter_by(date=d).order_by(Appointment.time.asc()).all()
-        except:
-            appointments = base.order_by(Appointment.date.asc(), Appointment.time.asc()).all()
-    else:
-        appointments = base.order_by(Appointment.date.asc(), Appointment.time.asc()).all()
-
-    return render_template("appointments.html", appointments=appointments)
-
-
-@app.route("/appointments/new", methods=["GET", "POST"])
-@login_required
-def new_appointment():
-    client_id = request.args.get("client_id")
-    client = Client.query.get(client_id) if client_id else None
-
-    if request.method == "POST":
-        date_val = datetime.strptime(request.form.get("date"), "%Y-%m-%d").date()
-        time_val = datetime.strptime(request.form.get("time"), "%H:%M").time()
-
-        rdv = Appointment(
-            title=request.form.get("title"),
-            notes=request.form.get("notes"),
-            date=date_val,
-            time=time_val,
-            client_id=client.id if client else None,
-            client_name=client.name if client else request.form.get("client_name"),
-            user_id=session["user_id"],
-        )
-
-        db.session.add(rdv)
-        db.session.commit()
-
-        flash("RDV ajouté", "success")
-
-        if client:
-            return redirect(url_for("client_detail", client_id=client.id))
-        return redirect(url_for("list_appointments"))
-
-    return render_template("appointment_form.html", rdv=None, client=client, action="new")
-
-
-@app.route("/appointments/<int:appointment_id>/edit", methods=["GET", "POST"])
-@login_required
-def edit_appointment(appointment_id):
-    rdv = Appointment.query.get_or_404(appointment_id)
-    client = rdv.client
-
-    if session["role"] != "admin" and rdv.user_id != session["user_id"]:
-        flash("Accès interdit", "error")
-        return redirect(url_for("list_appointments"))
-
-    if request.method == "POST":
-        rdv.title = request.form.get("title")
-        rdv.notes = request.form.get("notes")
-        rdv.date = datetime.strptime(request.form.get("date"), "%Y-%m-%d").date()
-        rdv.time = datetime.strptime(request.form.get("time"), "%H:%M").time()
-        rdv.client_name = client.name if client else request.form.get("client_name")
-
-        db.session.commit()
-        flash("RDV modifié", "success")
-
-        if client:
-            return redirect(url_for("client_detail", client_id=client.id))
-        return redirect(url_for("list_appointments"))
-
-    return render_template("appointment_form.html", rdv=rdv, client=client, action="edit")
-
-
-@app.route("/appointments/<int:appointment_id>/delete", methods=["POST"])
-@login_required
-def delete_appointment(appointment_id):
-    rdv = Appointment.query.get_or_404(appointment_id)
-
-    if session["role"] != "admin" and rdv.user_id != session["user_id"]:
-        flash("Accès interdit", "error")
-        return redirect(url_for("list_appointments"))
-
-    client = rdv.client
-    db.session.delete(rdv)
-    db.session.commit()
-
-    flash("RDV supprimé", "info")
-
-    if client:
-        return redirect(url_for("client_detail", client_id=client.id))
-    return redirect(url_for("list_appointments"))
-
-
-# ============================================================
-#                        DOCUMENTS PDF
-# ============================================================
+############################################################
+# 11. DOCUMENTS GLOBAUX S3
+############################################################
 
 @app.route("/documents")
 @login_required
 def documents():
-    role = session["role"]
-    user_id = session["user_id"]
+    if LOCAL_MODE or not s3:
+        # Pas de S3 en local → liste vide
+        return render_template("documents.html", fichiers=[])
 
-    docs = Document.query.order_by(Document.uploaded_at.desc()).all() if role == "admin" \
-           else Document.query.filter_by(user_id=user_id).order_by(Document.uploaded_at.desc()).all()
+    fichiers = []
 
-    return render_template("documents.html", documents=docs)
+    try:
+        response = s3.list_objects_v2(Bucket=AWS_BUCKET)
+        for item in response.get("Contents", []) or []:
+            fichiers.append({
+                "nom": item["Key"],
+                "taille": item["Size"],
+                "url": f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{item['Key']}"
+            })
+    except Exception as e:
+        print("Erreur listing S3 (documents globaux) :", e)
+        flash("Erreur lors du listing S3.", "danger")
+
+    return render_template("documents.html", fichiers=fichiers)
 
 
 @app.route("/documents/upload", methods=["POST"])
 @login_required
 def upload_document():
-    file = request.files.get("file")
-    user_id = session["user_id"]
-
-    client_id = request.form.get("client_id")
-    client = Client.query.get(client_id) if client_id else None
-
-    if not file or file.filename == "":
-        flash("Aucun fichier envoyé", "error")
-        return redirect(request.referrer or url_for("documents"))
-
-    if not allowed_file(file.filename):
-        flash("Seuls les fichiers PDF sont autorisés.", "error")
-        return redirect(request.referrer or url_for("documents"))
-
-    original = file.filename
-    safe_name = f"{int(datetime.utcnow().timestamp())}_{original}"
-
-    file.save(os.path.join(app.config["UPLOAD_FOLDER"], safe_name))
-
-    doc = Document(
-        filename=safe_name,
-        original_name=original,
-        client_id=client.id if client else None,
-        user_id=user_id,
-    )
-
-    db.session.add(doc)
-    db.session.commit()
-
-    flash("PDF importé", "success")
-    return redirect(request.referrer or url_for("documents"))
-
-
-@app.route("/documents/<int:doc_id>/download")
-@login_required
-def download_document(doc_id):
-    doc = Document.query.get_or_404(doc_id)
-
-    if session["role"] != "admin" and doc.user_id != session["user_id"]:
-        flash("Accès interdit", "error")
+    if LOCAL_MODE or not s3:
+        flash("Upload désactivé en mode local.", "warning")
         return redirect(url_for("documents"))
 
-    return send_from_directory(
-        app.config["UPLOAD_FOLDER"],
-        doc.filename,
-        as_attachment=True,
-        download_name=doc.original_name,
-    )
+    fichier = request.files.get("file")
 
-
-@app.route("/documents/<int:doc_id>/delete", methods=["POST"])
-@login_required
-def delete_document(doc_id):
-    doc = Document.query.get_or_404(doc_id)
-
-    if session["role"] != "admin" and doc.user_id != session["user_id"]:
-        flash("Accès interdit", "error")
+    if not fichier or not allowed_file(fichier.filename):
+        flash("Fichier non valide.", "danger")
         return redirect(url_for("documents"))
 
-    path = os.path.join(app.config["UPLOAD_FOLDER"], doc.filename)
-    if os.path.exists(path):
-        os.remove(path)
+    nom = clean_filename(secure_filename(fichier.filename))
 
-    db.session.delete(doc)
-    db.session.commit()
+    try:
+        s3.upload_fileobj(fichier, AWS_BUCKET, nom)
+        flash("Document envoyé.", "success")
+    except Exception as e:
+        print("Erreur upload S3 (global) :", e)
+        flash("Erreur upload S3.", "danger")
 
-    flash("Document supprimé", "info")
     return redirect(url_for("documents"))
 
 
-# ============================================================
-#                       CHIFFRE D’AFFAIRES
-# ============================================================
-
-@app.route("/chiffre_affaire", methods=["GET", "POST"])
+@app.route("/documents/delete/<path:key>", methods=["POST"])
 @login_required
-def chiffre_affaire():
-    if request.method == "POST":
-        try:
-            montant = float(request.form.get("montant"))
-            date_val = datetime.strptime(request.form.get("date"), "%Y-%m-%d").date()
-        except:
-            flash("Montant ou date invalide.", "error")
-            return redirect(url_for("chiffre_affaire"))
+def delete_document(key):
+    if LOCAL_MODE or not s3:
+        flash("Suppression désactivée en local.", "warning")
+        return redirect(url_for("documents"))
 
-        entry = Revenue(
-            commercial=session["username"],
-            montant=montant,
-            date=date_val,
+    try:
+        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+        flash("Document supprimé.", "success")
+    except Exception as e:
+        print("Erreur suppression S3 (global) :", e)
+        flash("Erreur suppression S3.", "danger")
+
+    return redirect(url_for("documents"))
+
+
+############################################################
+# 12. CLIENTS
+############################################################
+
+@app.route("/clients")
+@login_required
+def clients():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM crm_clients ORDER BY created_at DESC"
+    ).fetchall()
+    conn.close()
+
+    return render_template("clients.html", clients=[row_to_obj(r) for r in rows])
+
+
+@app.route("/clients/new", methods=["GET", "POST"])
+@login_required
+def new_client():
+    statuses = ["en cours", "signé", "perdu"]
+
+    if request.method == "POST":
+        data = (
+            request.form.get("name").strip(),
+            request.form.get("email").strip(),
+            request.form.get("phone").strip(),
+            request.form.get("address").strip(),
+            request.form.get("commercial").strip(),
+            request.form.get("status").strip(),
+            request.form.get("notes").strip(),
         )
 
-        db.session.add(entry)
-        db.session.commit()
+        if not data[0]:
+            flash("Nom obligatoire.", "danger")
+            return redirect(url_for("new_client"))
 
-        flash("Montant ajouté", "success")
-        return redirect(url_for("chiffre_affaire"))
+        conn = get_db()
+        conn.execute("""
+            INSERT INTO crm_clients
+            (name, email, phone, address, commercial, status, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, data)
+        conn.commit()
+        conn.close()
 
-    if session["role"] == "admin":
-        entries = Revenue.query.order_by(Revenue.date.desc()).all()
-    else:
-        entries = Revenue.query.filter_by(commercial=session["username"]) \
-                               .order_by(Revenue.date.desc()).all()
+        flash("Client créé.", "success")
+        return redirect(url_for("clients"))
 
-    total = sum(e.montant for e in entries)
+    return render_template("client_form.html", action="new", client=None, statuses=statuses)
 
-    return render_template(
-        "chiffre_affaire.html",
-        entries=entries,
-        total=total,
-    )
-# ============================================================
-#                          CHAT D'ÉQUIPE
-# ============================================================
 
-@app.route("/chat")
+@app.route("/clients/<int:client_id>")
 @login_required
-def chat():
-    msgs = Message.query.order_by(Message.timestamp.asc()).all()
-    return render_template("chat.html", messages=msgs)
+def client_detail(client_id):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM crm_clients WHERE id=?",
+        (client_id,)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    client = row_to_obj(row)
+    docs = list_client_documents(client_id)
+
+    return render_template("client_detail.html", client=client, documents=docs)
 
 
-@app.route("/chat/send", methods=["POST"])
+@app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
 @login_required
-def chat_send():
-    content = (request.form.get("message") or "").strip()
-    file = request.files.get("file")
+def edit_client(client_id):
+    statuses = ["en cours", "signé", "perdu"]
 
-    filename = None
-    original_name = None
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM crm_clients WHERE id=?",
+        (client_id,)
+    ).fetchone()
+    client = row_to_obj(row)
+    conn.close()
 
-    # Gestion du fichier uploadé
-    if file and file.filename:
-        original_name = file.filename
-        safe_name = f"{int(datetime.utcnow().timestamp())}_{original_name}"
-        file.save(os.path.join(app.config["CHAT_UPLOAD_FOLDER"], safe_name))
-        filename = safe_name
+    if not client:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
 
-    # Si message vide ET aucun fichier -> erreur
-    if not content and not filename:
-        flash("Message vide : écrivez un texte ou joignez un fichier.", "error")
-        return redirect(url_for("chat"))
+    if request.method == "POST":
+        data = (
+            request.form.get("name").strip(),
+            request.form.get("email").strip(),
+            request.form.get("phone").strip(),
+            request.form.get("address").strip(),
+            request.form.get("commercial").strip(),
+            request.form.get("status").strip(),
+            request.form.get("notes").strip(),
+        )
 
-    msg = Message(
-        user_id=session["user_id"],
-        content=content or "",
-        filename=filename,
-        original_name=original_name,
-    )
+        if not data[0]:
+            flash("Nom obligatoire.", "danger")
+            return redirect(url_for("edit_client", client_id=client_id))
 
-    db.session.add(msg)
-    db.session.commit()
+        conn = get_db()
+        conn.execute("""
+            UPDATE crm_clients
+            SET name=?, email=?, phone=?, address=?, commercial=?, status=?, notes=?
+            WHERE id=?
+        """, (*data, client_id))
+        conn.commit()
+        conn.close()
 
-    return redirect(url_for("chat"))
+        flash("Client mis à jour.", "success")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    return render_template("client_form.html", action="edit", client=client, statuses=statuses)
 
 
-@app.route("/chat/file/<int:msg_id>")
+@app.route("/clients/<int:client_id>/delete", methods=["POST"])
 @login_required
-def chat_download(msg_id):
-    msg = Message.query.get_or_404(msg_id)
+def delete_client(client_id):
+    conn = get_db()
+    conn.execute("DELETE FROM crm_clients WHERE id=?", (client_id,))
+    conn.commit()
+    conn.close()
 
-    if not msg.filename:
-        flash("Aucun fichier joint.", "error")
-        return redirect(url_for("chat"))
-
-    return send_from_directory(
-        app.config["CHAT_UPLOAD_FOLDER"],
-        msg.filename,
-        as_attachment=True,
-        download_name=msg.original_name or msg.filename,
-    )
+    flash("Client supprimé.", "success")
+    return redirect(url_for("clients"))
 
 
-# ============================================================
-#                 INITIALISATION DB + ADMIN AUTO
-# ============================================================
+@app.route("/clients/<int:client_id>/upload_document", methods=["POST"])
+@login_required
+def client_upload_document(client_id):
+    if LOCAL_MODE or not s3:
+        flash("Upload désactivé en local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
 
-with app.app_context():
-    db.create_all()
+    fichier = request.files.get("file")
 
-    inspector = inspect(db.engine)
+    if not fichier or not allowed_file(fichier.filename):
+        flash("Fichier non valide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
 
-    # Ajout automatique des colonnes manquantes
-    cols = [c["name"] for c in inspector.get_columns("client")]
-    if "status" not in cols:
-        with db.engine.begin() as conn:
-            conn.execute(text(
-                "ALTER TABLE client "
-                "ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'en cours'"
-            ))
+    nom = clean_filename(secure_filename(fichier.filename))
+    key = f"clients/{client_id}/{nom}"
 
-    msg_cols = [c["name"] for c in inspector.get_columns("message")]
-    if "filename" not in msg_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE message ADD COLUMN filename VARCHAR(255)"))
+    try:
+        s3.upload_fileobj(fichier, AWS_BUCKET, key)
+        flash("Document envoyé.", "success")
+    except Exception as e:
+        print("Erreur upload S3 (client) :", e)
+        flash("Erreur upload S3.", "danger")
 
-    msg_cols = [c["name"] for c in inspector.get_columns("message")]
-    if "original_name" not in msg_cols:
-        with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE message ADD COLUMN original_name VARCHAR(255)"))
-
-    # Création auto de l'admin si aucun admin trouvé
-    if not User.query.filter_by(role="admin").first():
-        admin = User(username="admin", role="admin")
-        admin.set_password("admin123")
-        db.session.add(admin)
-        db.session.commit()
-        print(">>> ADMIN CRÉÉ (admin / admin123)")
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
-# ============================================================
-#                          LANCEMENT
-# ============================================================
+@app.route("/clients/<int:client_id>/delete_document/<path:key>", methods=["POST"])
+@login_required
+def client_delete_document(client_id, key):
+    if LOCAL_MODE or not s3:
+        flash("Suppression désactivée en local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    full_key = f"clients/{client_id}/{key}"
+
+    try:
+        s3.delete_object(Bucket=AWS_BUCKET, Key=full_key)
+        flash("Document supprimé.", "success")
+    except Exception as e:
+        print("Erreur suppression S3 (client) :", e)
+        flash("Erreur suppression S3.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+############################################################
+# 13. AGENDA / FULLCALENDAR
+############################################################
+
+@app.route("/agenda")
+@login_required
+def agenda():
+    return render_template("calendar.html")
+
+
+@app.route("/appointments/events_json")
+@login_required
+def appointments_events_json():
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT a.id, a.title, a.date, a.time, a.color,
+               a.client_id, c.name AS client_name
+        FROM appointments a
+        LEFT JOIN crm_clients c ON c.id = a.client_id
+    """).fetchall()
+    conn.close()
+
+    events = []
+    for r in rows:
+        title = r["title"]
+        if r["client_name"]:
+            title += f" — {r['client_name']}"
+
+        time_part = r["time"] or "09:00"
+        start = f"{r['date']}T{time_part}:00"
+
+        events.append({
+            "id": r["id"],
+            "title": title,
+            "start": start,
+            "backgroundColor": r["color"] or "#2563eb",
+            "borderColor": r["color"] or "#2563eb",
+        })
+
+    return jsonify(events)
+
+
+@app.route("/appointments/update_from_calendar", methods=["POST"])
+@login_required
+def appointments_update_from_calendar():
+    data = request.get_json() or {}
+    appt_id = data.get("id")
+    new_date = data.get("date")
+    new_time = data.get("time")
+
+    if not appt_id or not new_date:
+        return jsonify({"status": "error"}), 400
+
+    conn = get_db()
+    conn.execute("""
+        UPDATE appointments SET date=?, time=? WHERE id=?
+    """, (new_date, new_time, appt_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"status": "ok"})
+
+
+@app.route("/appointments/create", methods=["POST"])
+@login_required
+def appointments_create():
+    """Création rapide depuis un clic dans le calendrier (modal)."""
+    data = request.get_json() or {}
+    title = (data.get("title") or "").strip()
+    date_str = (data.get("date") or "").strip()
+    description = (data.get("description") or "").strip()
+
+    if not title or not date_str:
+        return jsonify({"success": False, "message": "Titre et date obligatoires."}), 400
+
+    conn = get_db()
+    cur = conn.execute("""
+        INSERT INTO appointments (title, date, time, client_id, description, color)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (title, date_str, None, None, description, "#2563eb"))
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+
+    return jsonify({"success": True, "id": new_id})
+
+
+############################################################
+# 14. ROOT
+############################################################
+
+@app.route("/")
+def index():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    return redirect(url_for("dashboard"))
+
+
+############################################################
+# 15. RUN
+############################################################
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # En local uniquement
+    app.run(host="0.0.0.0", port=5000, debug=True)

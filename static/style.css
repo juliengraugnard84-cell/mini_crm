@@ -1,394 +1,285 @@
-/* ========================================================= */
-/* === RESET ============================================== */
-/* ========================================================= */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+/* --------------------------------------------------------------------
+   THEME CORPORATE PREMIUM (Option C)
+-------------------------------------------------------------------- */
 
-/* ========================================================= */
-/* === GLOBAL ============================================= */
-/* ========================================================= */
 body {
-    font-family: Arial, sans-serif;
-    background: #f7f7f7;
-    color: #333;
+    background: #f3f5f7;
+    color: #1f2937;
+    font-family: "Inter", -apple-system, system-ui, "Segoe UI", Arial, sans-serif;
+    margin: 0;
 }
 
-a {
-    text-decoration: none;
+/* Titres généraux */
+h1, h2, h3, h4, h5 {
+    font-weight: 600;
+    color: #111827;
 }
 
-.container {
-    max-width: 1100px;
-    margin: 2rem auto;
-    padding: 0 1rem;
+.page-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1e3a8a;
 }
 
-/* ========================================================= */
-/* === TOPBAR ============================================= */
-/* ========================================================= */
-.topbar {
-    background: #333;
-    padding: 1rem;
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* NAVBAR */
+.main-navbar {
+    background: #1e3a8a !important;
 }
 
-.topbar .logo {
-    font-weight: bold;
+/* SIDEBAR CORPORATE */
+.sidebar-corp {
+    width: 260px;
+    min-height: calc(100vh - 56px);
+    background: #ffffff;
+    border-right: 1px solid #e5e7eb;
 }
 
-nav a {
-    color: #ccc;
-    margin-left: 1rem;
+.sidebar-nav .nav-link {
+    padding: 10px 12px;
+    color: #374151 !important;
+    font-weight: 500;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    transition: background 0.2s, color 0.2s;
 }
 
-nav a:hover {
-    color: white;
+.sidebar-nav .nav-link:hover {
+    background: #e5e7eb;
 }
 
-/* ========================================================= */
-/* === FLASH MESSAGES ===================================== */
-/* ========================================================= */
-.flash {
-    padding: 0.8rem;
-    border-radius: 5px;
-    color: white;
-    margin-bottom: 1rem;
+.sidebar-nav .active-link {
+    background: #2563eb !important;
+    color: #ffffff !important;
 }
 
-.flash-success { background: #4caf50; }
-.flash-error   { background: #f44336; }
-.flash-info    { background: #2196f3; }
-
-/* ========================================================= */
-/* === BUTTONS ============================================ */
-/* ========================================================= */
-.btn {
-    background: #2196f3;
-    padding: 0.6rem 1rem;
-    border-radius: 5px;
-    color: white !important;
-    display: inline-block;
-    cursor: pointer;
+/* CONTENU PRINCIPAL */
+.main-content {
+    padding-right: 2rem;
 }
 
-.btn:hover {
-    background: #1976d2;
-}
-
-.btn-link {
-    color: #2196f3;
-}
-
-.btn-link:hover {
-    text-decoration: underline;
-}
-
-button.danger {
-    background: #f44336;
-    color: white;
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-button.danger:hover {
-    background: #d32f2f;
-}
-
-/* ========================================================= */
-/* === CARDS ============================================== */
-/* ========================================================= */
+/* CARTES GLOBALES */
 .card {
-    background: white;
-    padding: 1.2rem;
-    border-radius: 5px;
-    margin-bottom: 1.5rem;
-    border: 1px solid #e5e5e5;
-}
-
-/* ========================================================= */
-/* === TABLES ============================================= */
-/* ========================================================= */
-.table {
-    width: 100%;
-    background: white;
-    border-collapse: collapse;
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.table th {
-    background: #eee;
-    padding: 0.7rem;
-    text-align: left;
-}
-
-.table td {
-    padding: 0.7rem;
-    border-bottom: 1px solid #ddd;
-}
-
-.table .actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-/* ========================================================= */
-/* === FORMULAIRES ======================================== */
-/* ========================================================= */
-form label {
-    display: block;
-    margin-top: 1rem;
-    font-weight: bold;
-}
-
-form input,
-form textarea,
-form select {
-    width: 100%;
-    padding: 0.6rem;
-    margin-top: 0.3rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-/* ========================================================= */
-/* === LAYOUT / HEADERS =================================== */
-/* ========================================================= */
-.header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 1rem;
-}
-
-/* ========================================================= */
-/* === MINI CALENDRIER ==================================== */
-/* ========================================================= */
-.mini-cal-nav {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-}
-
-.mini-cal-nav button {
-    border: 1px solid #ccc;
-    background: #fff;
-    padding: 0.3rem 0.7rem;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.mini-cal-nav button:hover {
-    background: #eee;
-}
-
-#mini-cal-title {
-    font-weight: bold;
-    font-size: 1rem;
-}
-
-.mini-calendar {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 0.8rem;
-    background: white;
-}
-
-.mini-calendar th,
-.mini-calendar td {
-    border: 1px solid #e0e0e0;
-    text-align: center;
-    padding: 0.6rem;
-    font-size: 0.9rem;
-}
-
-.mini-calendar th {
-    background: #f3f3f3;
-}
-
-.mini-calendar td.empty {
-    background: #fafafa;
-    color: #aaa;
-}
-
-.mini-cal-day {
-    cursor: pointer;
-    transition: 0.2s;
-}
-
-.mini-cal-day:hover {
-    background: #e8f3ff;
-}
-
-.mini-cal-day.selected {
-    background: #2196f3 !important;
-    color: white;
-    font-weight: bold;
-}
-
-/* ========================================================= */
-/* === WIDGET CHAT FLOTTANT ================================ */
-/* ========================================================= */
-
-/* Bulle flottante */
-#chatbot-button {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    background: #2196f3;
-    color: white;
-    border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    font-size: 28px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-    z-index: 999;
-}
-
-/* Fenêtre */
-#chatbot-window {
-    position: fixed;
-    bottom: 110px;
-    right: 30px;
-    width: 340px;
-    height: 460px;
-    background: white;
     border-radius: 10px;
-    box-shadow: 0 3px 15px rgba(0,0,0,0.3);
-    display: none;
-    flex-direction: column;
-    overflow: hidden;
-    z-index: 999;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
-/* Header */
-#chatbot-header {
-    background: #2196f3;
-    color: white;
-    padding: 8px 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: bold;
-}
-
-/* Tabs */
-#chatbot-tabs {
-    display: flex;
-}
-.chatbot-tab {
-    flex: 1;
+/* KPI CARDS */
+.kpi-card {
+    padding: 20px;
     text-align: center;
-    padding: 6px;
+    border-top: 4px solid #2563eb;
+}
+
+.kpi-icon {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+    color: #2563eb;
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.kpi-desc {
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+/* TABLES CORPORATE */
+.table-corp thead {
+    background: #f3f4f6;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.table-corp tbody tr:hover {
+    background: #f1f5f9;
+}
+
+/* BOUTONS */
+.btn {
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.btn-primary {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+.btn-primary:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.btn-outline-primary {
+    border-color: #2563eb;
+    color: #2563eb;
+}
+
+.btn-outline-primary:hover {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.btn-outline-danger {
+    border-color: #ef4444;
+    color: #b91c1c;
+}
+
+.btn-outline-danger:hover {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+/* ALERTES (flash) */
+.alert {
+    border-radius: 10px;
+}
+
+/* LOGIN PAGE */
+.login-body {
+    background: radial-gradient(circle at top, #2563eb 0, #0f172a 55%, #020617 100%);
+}
+
+.login-card {
+    max-width: 400px;
+    width: 100%;
+    border-radius: 18px;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.45);
+}
+
+/* FORMULAIRES */
+.form-control, .form-select, .form-control:focus, .form-select:focus {
+    border-radius: 999px;
+    border-color: #d1d5db;
+    box-shadow: none;
+}
+
+/* TABLES GENERALES (fallback) */
+.table thead {
+    background: #e5e7eb;
+    font-weight: 600;
+}
+.table tbody tr:hover {
+    background: #f9fafb;
+}
+
+/* DROPZONE (si utilisé) */
+#dropzone {
+    border: 2px dashed #2563eb;
+    padding: 25px;
+    text-align: center;
     cursor: pointer;
-    background: #f5f5f5;
-    border-bottom: 2px solid transparent;
+    border-radius: 16px;
+    background: #f8fafc;
+    transition: 0.2s;
+    font-size: 1.05rem;
 }
-.chatbot-tab.active {
-    background: white;
-    border-bottom-color: #2196f3;
-}
-
-/* Messages */
-#chatbot-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-    background: #fafafa;
+#dropzone.dragover {
+    background: #dbeafe;
+    border-color: #1d4ed8;
 }
 
-.msg-user,
-.msg-bot {
-    margin-bottom: 8px;
+/* PDF MODAL (si utilisé) */
+.pdf-modal-backdrop {
+    display:none;
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background:rgba(15,23,42,0.65);
+    z-index:2000;
+}
+.pdf-modal-content {
+    background:#fff;
+    width:80%;
+    height:85%;
+    margin:3% auto;
+    padding:20px;
+    border-radius:18px;
+    position:relative;
+    box-shadow:0 20px 60px rgba(15, 23, 42, 0.4);
+}
+.pdf-modal-close {
+    position:absolute;
+    top:10px; right:15px;
+    font-size:30px;
+    cursor:pointer;
 }
 
-.msg-user {
-    text-align: right;
+/* HELPERS */
+.rounded-4 {
+    border-radius: 18px !important;
 }
 
-.msg-bot {
-    text-align: left;
+/* --------------------------------------------------------------------
+   DARK MODE
+-------------------------------------------------------------------- */
+
+body.dark {
+    background: #020617;
+    color: #e5e7eb;
 }
 
-.msg-user span {
-    background: #2196f3;
-    color: white;
-    padding: 6px 8px;
-    border-radius: 6px;
-    display: inline-block;
-    max-width: 80%;
+body.dark .main-navbar {
+    background: #020617 !important;
 }
 
-.msg-bot span {
-    background: #e0e0e0;
-    color: #333;
-    padding: 6px 8px;
-    border-radius: 6px;
-    display: inline-block;
-    max-width: 80%;
+body.dark .sidebar-corp {
+    background: #020617;
+    border-right-color: #111827;
 }
 
-/* Input */
-#chatbot-input {
-    display: flex;
-    border-top: 1px solid #ddd;
+body.dark .sidebar-nav .nav-link {
+    color: #e5e7eb !important;
 }
 
-#chatbot-input textarea {
-    flex: 1;
-    border: none;
-    padding: 8px;
-    resize: none;
-    height: 50px;
+body.dark .sidebar-nav .nav-link:hover {
+    background: #1f2937;
 }
 
-#chatbot-send {
-    background: #2196f3;
-    color: white;
-    border: none;
-    padding: 0 12px;
-    cursor: pointer;
+body.dark .sidebar-nav .active-link {
+    background: #2563eb !important;
 }
 
-/* ========================================================= */
-/* === MOBILE ============================================= */
-/* ========================================================= */
-@media (max-width: 600px) {
-    .header-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-    }
+body.dark .main-content {
+    background: #020617;
+}
 
-    nav a {
-        margin-left: 0.5rem;
-    }
+body.dark .card {
+    background: #0f172a;
+    border-color: #1f2937;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+}
 
-    #chatbot-window {
-        right: 10px;
-        width: 90%;
-    }
+body.dark .table-corp thead {
+    background: #020617;
+    border-bottom-color: #1f2937;
+}
 
-    #chatbot-button {
-        right: 20px;
-    }
+body.dark .table-corp tbody tr:hover {
+    background: #111827;
+}
+
+body.dark .form-control,
+body.dark .form-select {
+    background: #020617;
+    border-color: #1f2937;
+    color: #e5e7eb;
+}
+
+body.dark .form-control::placeholder {
+    color: #6b7280;
+}
+
+body.dark .login-body {
+    background: radial-gradient(circle at top, #1d4ed8 0, #000000 65%);
 }

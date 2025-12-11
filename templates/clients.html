@@ -1,57 +1,133 @@
 {% extends "base.html" %}
-{% block title %}Clients{% endblock %}
+
+{% block page_title %}Clients{% endblock %}
 
 {% block content %}
 
-<div class="header-row">
-    <h1>Clients</h1>
-    <a class="btn" href="{{ url_for('new_client') }}">+ Nouveau client</a>
+<h1 class="mb-4 fw-bold">Clients</h1>
+
+<div class="text-end mb-3">
+    <a href="{{ url_for('new_client') }}" class="btn btn-gradient">
+        Nouveau client
+    </a>
 </div>
 
-<div class="card">
+<div class="card card-modern card-animated fade-delay-1">
+    <div class="card-body">
 
-    <form method="get" class="filter-form" style="margin-bottom:1rem;">
-        <label>Recherche :</label>
-        <input type="text" name="q" placeholder="Nom, email, téléphone, commercial, statut"
-               value="{{ q }}">
-        <button class="btn" style="margin-left:0.5rem;">Filtrer</button>
-        <a href="{{ url_for('clients') }}" class="btn-link" style="margin-left:0.5rem;">Réinitialiser</a>
-    </form>
+        <table class="table table-hover align-middle fade-in">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th>Téléphone</th>
+                    <th>Status</th>
+                    <th>Date création</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in clients %}
+                <tr>
+                    <td class="fw-bold">{{ c.name }}</td>
+                    <td>{{ c.email if c.email else "-" }}</td>
+                    <td>{{ c.phone if c.phone else "-" }}</td>
 
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nom</th>
-                <th>Commercial</th>
-                <th>Statut</th>
-                <th>Email</th>
-                <th>Téléphone</th>
-                <th style="width:150px;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for c in clients %}
-            <tr>
-                <td>{{ c.name }}</td>
-                <td>{{ c.commercial }}</td>
-                <td>{{ c.status }}</td>
-                <td>{{ c.email or '-' }}</td>
-                <td>{{ c.phone or '-' }}</td>
-                <td class="actions">
-                    <a href="{{ url_for('client_detail', client_id=c.id) }}">Ouvrir</a>
-                    <a href="{{ url_for('edit_client', client_id=c.id) }}">Modifier</a>
-                    <form method="post"
-                          action="{{ url_for('delete_client', client_id=c.id) }}"
-                          onsubmit="return confirm('Supprimer ce client ?');">
-                        <button class="danger">Supprimer</button>
-                    </form>
-                </td>
-            </tr>
-        {% else %}
-            <tr><td colspan="6">Aucun client pour le moment.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+                    <!-- Badge de status -->
+                    <td>
+                        {% if c.status == "signé" %}
+                            <span class="badge bg-success">signé</span>
+                        {% elif c.status == "perdu" %}
+                            <span class="badge bg-danger">perdu</span>
+                        {% else %}
+                            <span class="badge bg-primary">en cours</span>
+                        {% endif %}
+                    </td>
+
+                    <td>{{ c.created_at }}</td>
+
+                    <!-- ACTIONS -->
+                    <td class="text-end">
+
+                        <!-- VOIR -->
+                        <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                           class="btn btn-sm btn-outline-primary me-1"
+                           title="Voir le client">
+                            <i class="material-icons me-1">visibility</i> Voir
+                        </a>
+
+                        <!-- MODIFIER -->
+                        <a href="{{ url_for('edit_client', client_id=c.id) }}"
+                           class="btn btn-sm btn-outline-warning me-1"
+                           title="Modifier le client">
+                            <i class="material-icons me-1">edit</i> Modifier
+                        </a>
+
+                        <!-- SUPPRIMER -->
+                        <form action="{{ url_for('delete_client', client_id=c.id) }}"
+                              method="POST"
+                              style="display:inline;">
+                            <button class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Supprimer définitivement ce client ?')"
+                                    title="Supprimer le client">
+                                <i class="material-icons me-1">delete</i> Supprimer
+                            </button>
+                        </form>
+
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
 </div>
+
+<style>
+/* Style du bouton "Nouveau Client" */
+.btn-gradient {
+    background: linear-gradient(135deg, #ff6b35, #ff3366);
+    color: white !important;
+    padding: 10px 18px;
+    border-radius: 50px;
+    font-weight: 600;
+    box-shadow: 0px 4px 12px rgba(255, 51, 102, 0.25);
+    transition: 0.25s ease-in-out;
+}
+.btn-gradient:hover {
+    transform: translateY(-2px);
+    box-shadow: 0px 6px 16px rgba(255, 51, 102, 0.35);
+}
+
+/* Animation d’apparition */
+.fade-in {
+    animation: fadeIn 0.6s ease forwards;
+    opacity: 0;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Modernisation de la table */
+.table thead th {
+    font-weight: 700;
+    font-size: 15px;
+    color: #333;
+    border-bottom: 2px solid rgba(0,0,0,0.1);
+}
+
+.table tbody tr td {
+    padding-top: 14px;
+    padding-bottom: 14px;
+    font-size: 15px;
+}
+
+/* Boutons actions cohérents */
+.btn i.material-icons {
+    font-size: 18px;
+    line-height: 0;
+}
+</style>
 
 {% endblock %}

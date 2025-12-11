@@ -1,77 +1,99 @@
 {% extends "base.html" %}
-{% block title %}Documents PDF{% endblock %}
+{% block page_title %}Documents (S3){% endblock %}
 
 {% block content %}
 
-<div class="header-row">
-    <h1>Documents PDF</h1>
+<h1 class="mb-4 fw-bold">Documents (S3)</h1>
+
+<!-- UPLOAD FORM -->
+<div class="card card-modern card-animated fade-delay-1 mb-4">
+    <div class="card-body">
+
+        <form action="{{ url_for('upload_document') }}" 
+              method="POST" 
+              enctype="multipart/form-data" 
+              class="d-flex align-items-center gap-3">
+
+            <input type="file" name="file" class="form-control" required>
+
+            <button class="btn btn-gradient" type="submit">
+                Envoyer
+            </button>
+        </form>
+
+    </div>
 </div>
 
-<!-- Formulaire Upload PDF global -->
-<div class="card">
-    <h2>Importer un document PDF</h2>
+<!-- TABLEAU DOCUMENTS -->
+<div class="card card-modern card-animated fade-delay-2">
+    <div class="card-body">
 
-    <form method="post"
-          action="{{ url_for('upload_document') }}"
-          enctype="multipart/form-data"
-          style="margin-top: 1rem;">
-        <label>Choisir un fichier PDF :</label>
-        <input type="file" name="file" accept="application/pdf" required>
+        <table class="table table-hover align-middle fade-in">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Taille</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
 
-        <button class="btn" type="submit" style="margin-top: 1rem;">
-            Importer
-        </button>
-    </form>
-</div>
-
-<!-- Liste des documents -->
-<div class="card">
-    <h2>Liste des documents</h2>
-
-    <table class="table" style="margin-top: 1rem;">
-        <thead>
-            <tr>
-                <th>Nom du PDF</th>
-                <th>Client associé</th>
-                <th>Importé le</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for doc in documents %}
-            <tr>
-                <td>{{ doc.original_name }}</td>
-
-                <td>
-                    {% if doc.client %}
-                        <a href="{{ url_for('client_detail', client_id=doc.client.id) }}">
-                            {{ doc.client.name }}
+                {% for f in fichiers %}
+                <tr>
+                    <td>
+                        <a href="{{ f.url }}" target="_blank" class="fw-bold">
+                            {{ f.nom }}
                         </a>
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
+                    </td>
 
-                <td>{{ doc.uploaded_at.strftime("%d/%m/%Y %H:%M") }}</td>
+                    <td>{{ f.taille }} bytes</td>
 
-                <td class="actions">
-                    <a href="{{ url_for('download_document', doc_id=doc.id) }}">Télécharger</a>
+                    <td class="text-end">
 
-                    <form method="post"
-                          action="{{ url_for('delete_document', doc_id=doc.id) }}"
-                          onsubmit="return confirm('Supprimer ce document ?');">
-                        <button class="danger" type="submit">Supprimer</button>
-                    </form>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="4" style="text-align:center;">Aucun document trouvé.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                        <!-- BOUTON SUPPRIMER -->
+                        <form action="{{ url_for('delete_document', key=f.nom) }}"
+                              method="POST"
+                              style="display:inline;">
+                            <button class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Supprimer définitivement ce fichier ?')"
+                                    title="Supprimer le document">
+                                <i class="material-icons me-1">delete</i> Supprimer
+                            </button>
+                        </form>
+
+                    </td>
+                </tr>
+                {% endfor %}
+
+            </tbody>
+        </table>
+
+    </div>
 </div>
+
+<style>
+
+.fade-in {
+    animation: fadeIn 0.6s ease forwards;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Table header */
+.table thead th {
+    font-weight: 700;
+    color: #333;
+    border-bottom: 2px solid rgba(0,0,0,0.1);
+}
+
+/* Button icon */
+.btn i.material-icons {
+    font-size: 18px;
+    line-height: 0;
+}
+
+</style>
 
 {% endblock %}

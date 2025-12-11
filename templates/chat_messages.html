@@ -1,0 +1,43 @@
+<!-- BOUTON FLOTTANT D'OUVERTURE DU CHAT -->
+<div id="chat-toggle" onclick="openChatWidget()">
+    <i class="fa-solid fa-comments"></i>
+</div>
+
+<!-- FENÊTRE DU CHAT -->
+<div id="chat-widget" style="display:none;">
+
+    <!-- HEADER -->
+    <div id="chat-header">
+        <span>Chat équipe</span>
+        <button type="button" onclick="closeChatWidget()">×</button>
+    </div>
+
+    <!-- ZONE DES MESSAGES -->
+    <div id="chat-messages">
+        <!-- Les messages sont injectés ici par chat_widget.js (loadMessages) -->
+    </div>
+
+    <!-- ZONE DE SAISIE -->
+    <div id="chat-input-area">
+        <!-- Bouton fichier -->
+        <button id="btn-file" type="button" onclick="document.getElementById('file-input').click()">
+            <i class="fa-solid fa-paperclip"></i>
+        </button>
+
+        <!-- Champ texte -->
+        <textarea id="chat-input" placeholder="Écrire un message..."></textarea>
+
+        <!-- Bouton envoyer -->
+        <button id="btn-send" type="button" onclick="sendWidgetMessage()">
+            <i class="fa-solid fa-paper-plane"></i>
+        </button>
+
+        <!-- Input fichier caché -->
+        <input
+            type="file"
+            id="file-input"
+            style="display:none;"
+            onchange="uploadChatFile()"
+        >
+    </div>
+</div>

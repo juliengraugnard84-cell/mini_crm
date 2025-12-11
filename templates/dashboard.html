@@ -1,60 +1,120 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
-
+{% block page_title %}Dashboard{% endblock %}
 {% block content %}
 
-<h1>Bienvenue {{ username }}</h1>
+<div class="row g-4 mb-4">
 
-<div class="grid" style="margin-top: 1.5rem;">
-
-    <!-- Carte statistiques -->
-    <div class="card">
-        <h2>Statistiques</h2>
-        <div style="margin-top: 1rem; line-height: 1.7;">
-            <p><strong>Clients :</strong> {{ stats.clients_total }}</p>
-            <p><strong>Rendez-vous à venir :</strong> {{ stats.rdv_cette_semaine }}</p>
-            <p><strong>Rendez-vous totaux :</strong> {{ stats.opportunites_ouvertes }}</p>
-            <p><strong>Documents :</strong> {{ stats.documents_partages }}</p>
+    <div class="col-md-4">
+        <div class="card card-modern card-animated fade-delay-1"
+             style="background: linear-gradient(135deg, #ff6b35, #ff3366); color:white;">
+            <div class="card-body">
+                <h5 class="fw-bold mb-2">Total Clients</h5>
+                <div style="font-size: 36px; font-weight:700;">
+                    {{ total_clients }}
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Carte RDV -->
-    <div class="card">
-        <h2>Rendez-vous à venir</h2>
-        {% if upcoming_appointments %}
-            <ul style="margin-top: 1rem;">
-                {% for rdv in upcoming_appointments %}
-                <li style="margin-bottom: .5rem;">
-                    <strong>{{ rdv.date.strftime("%d/%m/%Y") }}</strong> -
-                    {{ rdv.time.strftime("%H:%M") }} :
-                    {{ rdv.title }} ({{ rdv.client_name }})
-                </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>Aucun rendez-vous.</p>
-        {% endif %}
+    <div class="col-md-4">
+        <div class="card card-modern card-animated fade-delay-2">
+            <div class="card-body">
+                <h5 class="fw-bold mb-2">Documents totaux</h5>
+                <div style="font-size: 36px; font-weight:700;">
+                    {{ total_docs }}
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Carte documents -->
-    <div class="card">
-        <h2>Derniers documents</h2>
-        {% if latest_docs %}
-            <ul style="margin-top: 1rem;">
-                {% for doc in latest_docs %}
-                <li style="margin-bottom: 0.5rem;">
-                    {{ doc.original_name }}  
-                    <span style="color: #777;">
-                        ({{ doc.uploaded_at.strftime("%d/%m/%Y %H:%M") }})
-                    </span>
-                </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>Aucun document récent.</p>
-        {% endif %}
+    <div class="col-md-4">
+        <div class="card card-modern card-animated fade-delay-3">
+            <div class="card-body">
+                <h5 class="fw-bold mb-2">Chiffre d'affaire total</h5>
+                <div style="font-size: 36px; font-weight:700;">
+                    {{ total_ca }} €
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>
+
+
+<!-- SECTION GRAPHIQUE -->
+<div class="card card-modern card-animated fade-delay-2">
+    <div class="card-header">
+        <h5 class="fw-bold">Évolution du chiffre d'affaire</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="caChart" class="chart-animated"></canvas>
+    </div>
+</div>
+
+<!-- LISTE DES DERNIERS CLIENTS -->
+<div class="card card-modern card-animated fade-delay-3 mt-4">
+    <div class="card-header">
+        <h5 class="fw-bold">Derniers Clients</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover fade-in fade-delay-2">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in last_clients %}
+                <tr>
+                    <td>{{ c.name }}</td>
+                    <td>{{ c.email if c.email else "-" }}</td>
+                    <td>{{ c.created_at }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<!-- CHART JS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    fetch("{{ url_for('chiffre_affaire_data') }}")
+        .then(res => res.json())
+        .then(data => {
+
+            const ctx = document.getElementById("caChart");
+
+            const chart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: "CA (€)",
+                        data: data.data,
+                        fill: true,
+                        borderWidth: 3,
+                        tension: 0.35,
+                        borderColor: "#ff6b35",
+                        backgroundColor: "rgba(255,107,53,0.25)"
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        });
+
+});
+</script>
 
 {% endblock %}

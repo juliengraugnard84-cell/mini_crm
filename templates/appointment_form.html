@@ -1,61 +1,64 @@
 {% extends "base.html" %}
-{% block title %}Rendez-vous{% endblock %}
-
 {% block content %}
 
-<div class="header-row">
-    <h1>
-        {% if action == "new" %}
-            Nouveau rendez-vous
-        {% else %}
-            Modifier le rendez-vous
-        {% endif %}
-    </h1>
+<h2 class="mb-4">
+    {% if appointment %}
+        Modifier rendez-vous
+    {% else %}
+        Nouveau rendez-vous
+    {% endif %}
+</h2>
 
-    <a class="btn" href="{{ url_for('list_appointments') }}">← Retour</a>
-</div>
+<div class="card shadow-sm">
+    <div class="card-body">
 
-<div class="card">
+        <form method="POST">
 
-    <form method="post">
+            <div class="mb-3">
+                <label class="form-label">Titre</label>
+                <input type="text" name="title" class="form-control"
+                       value="{{ appointment.title if appointment else '' }}" required>
+            </div>
 
-        <label>Titre :</label>
-        <input type="text" name="title" required
-               value="{{ rdv.title if rdv else '' }}">
+            <div class="row mb-3">
+                <div class="col">
+                    <label class="form-label">Date</label>
+                    <input type="date" name="date" class="form-control"
+                           value="{{ default_date }}" required>
+                </div>
+                <div class="col">
+                    <label class="form-label">Heure</label>
+                    <input type="time" name="time" class="form-control"
+                           value="{{ appointment.time if appointment else '' }}">
+                </div>
+            </div>
 
-        {% if client %}
-            <!-- Si le RDV est lié à un client -->
-            <label>Client :</label>
-            <input type="text" disabled
-                   value="{{ client.name }}">
-            <input type="hidden" name="client_id" value="{{ client.id }}">
-        {% else %}
-            <label>Nom du client :</label>
-            <input type="text" name="client_name" required
-                   value="{{ rdv.client_name if rdv else '' }}">
-        {% endif %}
+            <div class="mb-3">
+                <label class="form-label">Client</label>
+                <select name="client_id" class="form-select">
+                    <option value="">Aucun</option>
+                    {% for c in clients %}
+                    <option value="{{ c.id }}"
+                        {% if appointment and appointment.client_id == c.id %}selected{% endif %}>
+                        {{ c.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
 
-        <label>Date :</label>
-        <input type="date" name="date" required
-               value="{{ rdv.date.strftime('%Y-%m-%d') if rdv else '' }}">
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-control" rows="4">
+                    {{ appointment.description if appointment else '' }}
+                </textarea>
+            </div>
 
-        <label>Heure :</label>
-        <input type="time" name="time" required
-               value="{{ rdv.time.strftime('%H:%M') if rdv else '' }}">
+            <button class="btn btn-primary">Enregistrer</button>
+            <a href="{{ url_for('agenda') }}" class="btn btn-secondary">Annuler</a>
 
-        <label>Notes :</label>
-        <textarea name="notes" rows="4">{{ rdv.notes if rdv else '' }}</textarea>
+        </form>
 
-        <button class="btn" type="submit" style="margin-top: 1rem;">
-            {% if action == "new" %}
-                Ajouter le rendez-vous
-            {% else %}
-                Enregistrer les modifications
-            {% endif %}
-        </button>
-
-    </form>
-
+    </div>
 </div>
 
 {% endblock %}

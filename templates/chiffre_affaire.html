@@ -1,88 +1,153 @@
 {% extends "base.html" %}
-{% block title %}Chiffre d'affaires{% endblock %}
+{% block page_title %}Chiffre d'affaire{% endblock %}
 
 {% block content %}
 
-<div class="header-row">
-    <h1>Chiffre d'affaires</h1>
+<h1 class="mb-4 fw-bold">Chiffre d'affaire</h1>
+
+<!-- CARTES RÉSUMÉ -->
+<div class="row g-4 mb-4">
+
+    <div class="col-md-6">
+        <div class="card card-modern card-animated fade-delay-1"
+             style="background: linear-gradient(135deg, #ff6b35, #ff3366); color:white;">
+            <div class="card-body">
+                <h5 class="fw-bold">Total Mensuel (tous commerciaux)</h5>
+                <div class="h3 fw-bold">{{ total_mensuel }} €</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card card-modern card-animated fade-delay-2">
+            <div class="card-body">
+                <h5 class="fw-bold">Total Annuel (tous commerciaux)</h5>
+                <div class="h3 fw-bold">{{ total_annuel }} €</div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- ===================== FORMULAIRE AJOUT ===================== -->
-
-<div class="card">
-    <h2>Ajouter une entrée</h2>
-
-    <form method="post">
-        <label>Commercial</label>
-        <input type="text" name="commercial" required placeholder="ex : Julien">
-
-        <label>Montant (€)</label>
-        <input type="number" step="0.01" name="montant" required>
-
-        <label>Date</label>
-        <input type="date" name="date" required value="{{ today }}">
-
-        <button class="btn" style="margin-top:1rem;">Ajouter</button>
-    </form>
+<!-- TOTAlS PAR COMMERCIAL -->
+<div class="card card-modern card-animated fade-delay-3 mb-4">
+    <div class="card-header">
+        <h5 class="fw-bold">Total mensuel par commercial</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Commercial</th>
+                    <th>Total mensuel (€)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in mensuel_par_com %}
+                <tr>
+                    <td>{{ c.commercial }}</td>
+                    <td class="fw-bold">{{ c.total }} €</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 
-<!-- ===================== RÉSUMÉ ===================== -->
-
-<div class="card">
-    <h2>Résumé</h2>
-
-    <p><strong>CA global :</strong> {{ ca_global }} €</p>
-
-    <h3>CA par commercial :</h3>
-
-    {% if ca_par_com %}
-        <ul>
-            {% for com, montant in ca_par_com.items() %}
-                <li><strong>{{ com }}</strong> : {{ montant }} €</li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>Aucune entrée enregistrée.</p>
-    {% endif %}
+<div class="card card-modern card-animated fade-delay-4 mb-4">
+    <div class="card-header">
+        <h5 class="fw-bold">Total annuel par commercial</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Commercial</th>
+                    <th>Total annuel (€)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in annuel_par_com %}
+                <tr>
+                    <td>{{ c.commercial }}</td>
+                    <td class="fw-bold">{{ c.total }} €</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
+<!-- FORMULAIRE AJOUT CA -->
+<div class="card card-modern card-animated fade-delay-5">
+    <div class="card-header">
+        <h5 class="fw-bold">Ajouter un revenu</h5>
+    </div>
+    <div class="card-body">
 
-<!-- ===================== TABLEAU DES ENTRÉES ===================== -->
+        <form action="{{ url_for('chiffre_affaire') }}" method="POST" class="row g-3">
 
-<div class="card">
-    <h2>Détails des entrées</h2>
+            <div class="col-md-4">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" class="form-control" value="{{ today }}" required>
+            </div>
 
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Commercial</th>
-                <th>Montant (€)</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
+            <div class="col-md-4">
+                <label class="form-label">Commercial</label>
+                <input type="text" name="commercial" class="form-control" required>
+            </div>
 
-        <tbody>
-            {% for r in revenus %}
-            <tr>
-                <td>{{ r.date.strftime("%d/%m/%Y") }}</td>
-                <td>{{ r.commercial }}</td>
-                <td>{{ r.montant }} €</td>
-                <td class="actions">
-                    <form method="post" action="{{ url_for('delete_revenue', rev_id=r.id) }}"
-                          onsubmit="return confirm('Supprimer cette entrée ?');">
-                        <button class="danger">Supprimer</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            <div class="col-md-4">
+                <label class="form-label">Montant (€)</label>
+                <input type="number" name="montant" step="0.01" class="form-control" required>
+            </div>
 
-    {% if revenus|length == 0 %}
-        <p>Aucune entrée pour le moment.</p>
-    {% endif %}
+            <div class="col-12">
+                <button class="btn btn-gradient">Valider</button>
+            </div>
+        </form>
+
+    </div>
 </div>
+
+<!-- TABLE DES REVENUS -->
+<div class="card card-modern card-animated fade-delay-6 mt-4">
+    <div class="card-header">
+        <h5 class="fw-bold">Historique des revenus</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Commercial</th>
+                    <th>Montant (€)</th>
+                    <th class="text-end">Supprimer</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in revenus %}
+                <tr>
+                    <td>{{ r.date }}</td>
+                    <td>{{ r.commercial }}</td>
+                    <td class="fw-bold">{{ r.montant }} €</td>
+
+                    <td class="text-end">
+                        <form action="{{ url_for('delete_revenue', rev_id=r.id) }}"
+                              method="POST" style="display:inline;">
+                            <button class="btn btn-sm btn-outline-danger"
+                                onclick="return confirm('Supprimer ce revenu ?')">
+                                <i class="material-icons">delete</i>
+                            </button>
+                        </form>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 
 {% endblock %}

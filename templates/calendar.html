@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block page_title %}Agenda{% endblock %}
+{% block content %}
+
+<!-- FullCalendar -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<style>
+    #calendar {
+        background: white;
+        padding: 25px;
+        border-radius: 18px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        min-height: 700px;
+        margin-top: 20px;
+    }
+</style>
+
+<h1 class="fw-bold mb-4 fade-in">Agenda</h1>
+
+<div id="calendar" class="fade-in fade-delay-1"></div>
+
+<!-- MODAL AJOUT RENDEZ-VOUS -->
+<div class="modal fade" id="eventModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form id="eventForm" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouveau rendez-vous</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <input type="hidden" id="eventDate">
+
+                <div class="mb-3">
+                    <label class="form-label">Titre</label>
+                    <input type="text" id="eventTitle" class="form-control" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea id="eventDescription" class="form-control"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Annuler
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const calendarEl = document.getElementById("calendar");
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: "dayGridMonth",
+        locale: "fr",
+        selectable: true,
+        editable: true,     // drag & drop activé
+        height: "auto",
+
+        headerToolbar: {
+            left: "prev,next today",
+            center: "title",
+            right: "dayGridMonth,timeGridWeek,timeGridDay"
+        },
+
+        events: "{{ url_for('appointments_events_json') }}",
+
+        eventColor: "#ff6b35",
+        eventTextColor: "white",
+
+        // Clic sur un jour → ouvre la modale de création
+        dateClick(info) {
+            document.getElementById("eventDate").value = info.dateStr;
+            document.getElementById("eventForm").reset();
+            new bootstrap.Modal(document.getElementById("eventModal")).show();
+        },
+
+        // Déplacement d'un rendez-vous → mise à jour en base
+        eventDrop(info) {
+            updateEventInDatabase(info.event);
+        }
+    });
+
+    calendar.render();
+
+    // Soumission du formulaire → création en base + ajout dans le calendrier
+    document.getElementById("eventForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const payload = {
+            date: document.getElementById("eventDate").value,
+            title: document.getElementById("eventTitle").value,
+            description: document.getElementById("eventDescription").value
+        };
+
+        fetch("{{ url_for('appointments_create') }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+
+                // Ajout immédiat dans l’UI avec l'ID réel
+                calendar.addEvent({
+                    id: data.id,
+                    title: payload.title,
+                    start: payload.date,
+                    color: "#ff6b35"
+                });
+
+                bootstrap.Modal.getInstance(document.getElementById("eventModal")).hide();
+            } else {
+                alert(data.message || "Erreur lors de l'enregistrement.");
+            }
+        })
+        .catch(() => alert("Erreur serveur."));
+    });
+
+    // Fonction de mise à jour après drag & drop
+    function updateEventInDatabase(event) {
+        const start = event.startStr;
+
+        fetch("{{ url_for('appointments_update_from_calendar') }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                id: event.id,
+                date: start.split("T")[0],
+                time: start.split("T")[1]?.substring(0,5) || null
+            })
+        });
+    }
+
+});
+</script>
+
+{% endblock %}
