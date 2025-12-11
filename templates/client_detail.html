@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2 class="mb-3">{{ client.name }}</h2>
+<h2 class="mb-4">{{ client.name }}</h2>
 
 <div class="row">
+
+    <!-- =====================  COLONNE GAUCHE ===================== -->
     <div class="col-md-6">
 
+        <!-- ===================== INFORMATIONS CLIENT ===================== -->
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white">
                 Informations client
@@ -16,64 +19,193 @@
                 <p><strong>Téléphone :</strong> {{ client.phone }}</p>
                 <p><strong>Adresse :</strong> {{ client.address }}</p>
                 <p><strong>Commercial :</strong> {{ client.commercial }}</p>
+
                 <p><strong>Status :</strong>
                     <span class="badge bg-primary">{{ client.status }}</span>
                 </p>
+
                 <p><strong>Notes :</strong><br>{{ client.notes }}</p>
 
                 <a href="{{ url_for('edit_client', client_id=client.id) }}" class="btn btn-secondary mt-3">
-                    <i class="bi bi-pencil"></i> Modifier
+                    Modifier
                 </a>
 
             </div>
         </div>
 
+
+        <!-- ===================== DEMANDE DE COTATION ===================== -->
+        {% if current_user and current_user.role == 'admin' %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark">
+                Demandes de cotation (Admin seulement)
+            </div>
+            <div class="card-body">
+
+                <!-- Formulaire création -->
+                <form method="POST" action="{{ url_for('create_cotation', client_id=client.id) }}" class="mb-3">
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">Description de la demande</label>
+                        <textarea class="form-control"
+                                  name="description"
+                                  required
+                                  placeholder="Décrivez la demande (type de contrat, besoins, etc.)"></textarea>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">Fournisseur actuel</label>
+                        <input type="text"
+                               name="fournisseur_actuel"
+                               class="form-control"
+                               placeholder="Ex : AXA, Allianz, Generali...">
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">Date d'échéance du contrat actuel</label>
+                        <input type="date"
+                               name="date_echeance"
+                               class="form-control">
+                    </div>
+
+                    <div class="row mb-2">
+                        <div class="col">
+                            <label class="form-label fw-bold">Date de négociation</label>
+                            <input type="date"
+                                   name="date_negociation_date"
+                                   class="form-control">
+                        </div>
+                        <div class="col">
+                            <label class="form-label fw-bold">Heure de négociation</label>
+                            <input type="time"
+                                   name="date_negociation_time"
+                                   class="form-control">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-warning mt-2">Créer la demande</button>
+                </form>
+
+                <hr>
+
+                <!-- Liste -->
+                <h6 class="fw-bold">Demandes existantes</h6>
+
+                {% if cotations %}
+                    <ul class="list-group">
+
+                    {% for c in cotations %}
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="me-3">
+                                <div class="fw-bold mb-1">
+                                    {{ c.description }}
+                                </div>
+                                <div class="small text-muted">
+                                    <div>
+                                        <strong>Fournisseur actuel :</strong>
+                                        {{ c.fournisseur_actuel or 'Non renseigné' }}
+                                    </div>
+                                    <div>
+                                        <strong>Échéance :</strong>
+                                        {{ c.date_echeance or 'Non renseignée' }}
+                                    </div>
+                                    <div>
+                                        <strong>Négociation :</strong>
+                                        {% if c.date_negociation_date or c.date_negociation_time %}
+                                            {{ c.date_negociation_date or '' }}
+                                            {% if c.date_negociation_time %}
+                                                à {{ c.date_negociation_time }}
+                                            {% endif %}
+                                        {% else %}
+                                            Non renseignée
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <strong>Créée le :</strong>
+                                        {{ c.date_creation or 'N/A' }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <form method="POST"
+                                  action="{{ url_for('delete_cotation', cotation_id=c.id) }}"
+                                  onsubmit="return confirm('Supprimer cette demande ?');">
+                                <button class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </li>
+                    {% endfor %}
+
+                    </ul>
+                {% else %}
+                    <p class="text-muted">Aucune demande enregistrée.</p>
+                {% endif %}
+
+            </div>
+        </div>
+        {% endif %}
+        <!-- FIN COTATION ADMIN -->
+
     </div>
 
-    <!-- DOCUMENTS CLIENT -->
+
+    <!-- =====================  COLONNE DROITE ===================== -->
     <div class="col-md-6">
 
+        <!-- ===================== DOCUMENTS CLIENT ===================== -->
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
                 Documents du client
             </div>
+
             <div class="card-body">
 
                 <!-- Upload -->
-                <form method="POST" action="{{ url_for('client_upload_document', client_id=client.id) }}" enctype="multipart/form-data" class="mb-3">
+                <form method="POST"
+                      action="{{ url_for('client_upload_document', client_id=client.id) }}"
+                      enctype="multipart/form-data"
+                      class="mb-3">
                     <div class="input-group">
                         <input type="file" name="file" class="form-control" required>
-                        <button class="btn btn-primary"><i class="bi bi-upload"></i></button>
+                        <button class="btn btn-primary">
+                            <i class="bi bi-upload"></i>
+                        </button>
                     </div>
                 </form>
 
+                <!-- Liste des documents -->
                 {% if documents %}
-                <ul class="list-group">
+                    <ul class="list-group">
+
                     {% for d in documents %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
 
-                        <div>
-                            <i class="bi bi-file-earmark"></i>
-                            <a href="{{ d.url }}" target="_blank">{{ d.nom }}</a>
-                        </div>
+                            <div>
+                                <i class="bi bi-file-earmark"></i>
+                                <a href="{{ d.url }}" target="_blank">{{ d.nom }}</a>
+                            </div>
 
-                        <form method="POST"
-                            action="{{ url_for('client_delete_document', client_id=client.id, key=d.nom) }}"
-                            onsubmit="return confirm('Supprimer ce document ?');">
-                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                        </form>
+                            <form method="POST"
+                                  action="{{ url_for('client_delete_document', client_id=client.id, key=d.nom) }}"
+                                  onsubmit="return confirm('Supprimer ce document ?');">
+                                <button class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
 
-                    </li>
+                        </li>
                     {% endfor %}
-                </ul>
+
+                    </ul>
                 {% else %}
-                <p class="text-muted">Aucun document.</p>
+                    <p class="text-muted">Aucun document.</p>
                 {% endif %}
 
             </div>
         </div>
 
     </div>
+
 </div>
 
 {% endblock %}

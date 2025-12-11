@@ -124,6 +124,23 @@ def init_db():
         """
     )
 
+    # TABLE COTATIONS
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS cotations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            description TEXT NOT NULL,
+            fournisseur_actuel TEXT,
+            date_echeance TEXT,
+            date_negociation_date TEXT,
+            date_negociation_time TEXT,
+            date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES crm_clients(id)
+        )
+        """
+    )
+
     # ——— RESET / CRÉATION DES COMPTES ———
 
     def ensure_user(username, clear_password, role):
@@ -207,17 +224,56 @@ def clean_filename(filename: str) -> str:
     return f"{name}{ext.lower()}"
 
 
+def slugify(text: str) -> str:
+    """
+    Transforme un texte en nom propre pour dossier :
+    - enlève les accents
+    - met en minuscules
+    - remplace tout excepté lettres/chiffres par des underscores
+    """
+    if not text:
+        return ""
+    text = (
+        unicodedata.normalize("NFKD", text)
+        .encode("ascii", "ignore")
+        .decode()
+    )
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    return text
+
+
+def client_s3_prefix(client_id: int) -> str:
+    """
+    Renvoie le chemin S3 du client, exemple :
+    clients/pierre_dupont_12/
+    """
+    conn = get_db()
+    row = conn.execute(
+        "SELECT name FROM crm_clients WHERE id=?", (client_id,)
+    ).fetchone()
+    conn.close()
+
+    base = f"client_{client_id}"
+    if row and row["name"]:
+        s = slugify(row["name"])
+        if s:
+            base = f"{s}_{client_id}"
+
+    return f"clients/{base}/"
+
+
 def s3_url(key: str) -> str:
     """Construit l’URL publique S3 standard pour un objet."""
     return f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{key}"
 
 
 def list_client_documents(client_id: int):
-    """Liste les documents d’un client dans S3."""
+    """Liste les documents d’un client dans S3, dans son dossier unique."""
     if LOCAL_MODE or not s3:
         return []
 
-    prefix = f"clients/{client_id}/"
+    prefix = client_s3_prefix(client_id)
     docs = []
 
     try:
@@ -755,7 +811,7 @@ def clients():
 @app.route("/clients/new", methods=["GET", "POST"])
 @login_required
 def new_client():
-    statuses = ["en cours", "signé", "perdu"]
+    statuses = ["demande de cotation", "en cours", "signé", "perdu"]
 
     if request.method == "POST":
         data = (
@@ -799,6 +855,14 @@ def client_detail(client_id):
     row = conn.execute(
         "SELECT * FROM crm_clients WHERE id=?", (client_id,)
     ).fetchone()
+    cot_rows = conn.execute(
+        """
+        SELECT * FROM cotations
+        WHERE client_id=?
+        ORDER BY date_creation DESC, id DESC
+        """,
+        (client_id,),
+    ).fetchall()
     conn.close()
 
     if not row:
@@ -807,16 +871,20 @@ def client_detail(client_id):
 
     client = row_to_obj(row)
     docs = list_client_documents(client_id)
+    cotations = [row_to_obj(r) for r in cot_rows]
 
     return render_template(
-        "client_detail.html", client=client, documents=docs
+        "client_detail.html",
+        client=client,
+        documents=docs,
+        cotations=cotations,
     )
 
 
 @app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_client(client_id):
-    statuses = ["en cours", "signé", "perdu"]
+    statuses = ["demande de cotation", "en cours", "signé", "perdu"]
 
     conn = get_db()
     row = conn.execute(
@@ -890,7 +958,8 @@ def client_upload_document(client_id):
         return redirect(url_for("client_detail", client_id=client_id))
 
     nom = clean_filename(secure_filename(fichier.filename))
-    key = f"clients/{client_id}/{nom}"
+    prefix = client_s3_prefix(client_id)
+    key = prefix + nom
 
     try:
         s3.upload_fileobj(fichier, AWS_BUCKET, key)
@@ -914,7 +983,8 @@ def client_delete_document(client_id, key):
         flash("Suppression désactivée en local.", "warning")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    full_key = f"clients/{client_id}/{key}"
+    prefix = client_s3_prefix(client_id)
+    full_key = prefix + key
 
     try:
         s3.delete_object(Bucket=AWS_BUCKET, Key=full_key)
@@ -926,6 +996,68 @@ def client_delete_document(client_id, key):
         print("Erreur suppression S3 (client) :", repr(e))
         flash("Erreur suppression S3.", "danger")
 
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# --------- DEMANDES DE COTATION ---------
+
+@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
+@admin_required
+def create_cotation(client_id):
+    description = (request.form.get("description") or "").strip()
+    fournisseur_actuel = (request.form.get("fournisseur_actuel") or "").strip()
+    date_echeance = (request.form.get("date_echeance") or "").strip()
+    date_negociation_date = (request.form.get("date_negociation_date") or "").strip()
+    date_negociation_time = (request.form.get("date_negociation_time") or "").strip()
+
+    if not description:
+        flash("La description est obligatoire.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    conn = get_db()
+    conn.execute(
+        """
+        INSERT INTO cotations
+        (client_id, description, fournisseur_actuel, date_echeance,
+         date_negociation_date, date_negociation_time)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            client_id,
+            description,
+            fournisseur_actuel,
+            date_echeance,
+            date_negociation_date,
+            date_negociation_time,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    flash("Demande de cotation créée.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+@app.route("/cotations/<int:cotation_id>/delete", methods=["POST"])
+@admin_required
+def delete_cotation(cotation_id):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT client_id FROM cotations WHERE id=?", (cotation_id,)
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        flash("Demande de cotation introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    client_id = row["client_id"]
+
+    conn.execute("DELETE FROM cotations WHERE id=?", (cotation_id,))
+    conn.commit()
+    conn.close()
+
+    flash("Demande de cotation supprimée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
 
