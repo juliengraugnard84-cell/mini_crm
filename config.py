@@ -4,8 +4,17 @@ class Config:
     # Clé secrète Flask
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev_key")
 
-    # Mode local ou production
-    LOCAL_MODE = os.environ.get("LOCAL_MODE", "false").lower() == "true"
+    # Render définit "RENDER" lorsqu'on tourne sur leur infra
+    IS_RENDER = os.environ.get("RENDER") is not None
+
+    # Mode local ou non
+    # - Si LOCAL_MODE est défini, on le respecte.
+    # - Sinon : on considère que Render = production (LOCAL_MODE = False)
+    _env_local_mode = os.environ.get("LOCAL_MODE")
+    if _env_local_mode is not None:
+        LOCAL_MODE = _env_local_mode.lower() == "true"
+    else:
+        LOCAL_MODE = not IS_RENDER
 
     # Répertoire base
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -17,8 +26,20 @@ class Config:
     # Base SQLite
     DB_PATH = os.path.join(INSTANCE_DIR, "crm.db")
 
-    # AWS — VARIABLES EXACTES UTILISÉES SUR RENDER
+    # AWS — identifiants
     AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID")
     AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
-    AWS_REGION     = os.environ.get("AWS_S3_REGION")
-    AWS_BUCKET     = os.environ.get("AWS_S3_BUCKET")
+
+    # Région : on accepte plusieurs noms possibles
+    AWS_REGION = (
+        os.environ.get("AWS_S3_REGION")
+        or os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "eu-west-3"  # mets ici ta région par défaut
+    )
+
+    # Bucket : on accepte plusieurs noms possibles
+    AWS_BUCKET = (
+        os.environ.get("AWS_S3_BUCKET")
+        or os.environ.get("AWS_BUCKET")
+    )

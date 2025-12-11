@@ -17,11 +17,10 @@ from flask import (
     session,
 )
 from werkzeug.utils import secure_filename
-    # send_file n'est pas utilisé pour l'instant mais peut servir plus tard
 from werkzeug.security import generate_password_hash, check_password_hash
 
 import boto3
-from botocore.exceptions import ClientError  # potentiellement utile pour affiner les erreurs
+from botocore.exceptions import ClientError
 
 from config import Config
 
@@ -69,7 +68,8 @@ def init_db():
     conn = get_db()
 
     # TABLE CLIENTS
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS crm_clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -81,30 +81,36 @@ def init_db():
             notes TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+        """
+    )
 
     # TABLE UTILISATEURS
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password TEXT,
             role TEXT
         )
-    """)
+        """
+    )
 
     # TABLE REVENUS
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS revenus (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
             commercial TEXT NOT NULL,
             montant REAL NOT NULL
         )
-    """)
+        """
+    )
 
     # TABLE RENDEZ-VOUS
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS appointments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -115,7 +121,8 @@ def init_db():
             color TEXT,
             FOREIGN KEY (client_id) REFERENCES crm_clients(id)
         )
-    """)
+        """
+    )
 
     # ——— RESET / CRÉATION DES COMPTES ———
 
@@ -123,19 +130,18 @@ def init_db():
         """Crée ou met à jour un user avec le mot de passe donné."""
         hashed = generate_password_hash(clear_password)
         existing = conn.execute(
-            "SELECT id FROM users WHERE username=?",
-            (username,)
+            "SELECT id FROM users WHERE username=?", (username,)
         ).fetchone()
 
         if existing is None:
             conn.execute(
                 "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                (username, hashed, role)
+                (username, hashed, role),
             )
         else:
             conn.execute(
                 "UPDATE users SET password=?, role=? WHERE username=?",
-                (hashed, role, username)
+                (hashed, role, username),
             )
 
     # On garantit ces 2 comptes à chaque démarrage
@@ -154,23 +160,24 @@ init_db()
 
 
 ############################################################
-# 4. S3 — STOCKAGE DOCUMENTS (CORRIGÉ)
+# 4. S3 — STOCKAGE DOCUMENTS
 ############################################################
 
 s3 = None
 
 if not LOCAL_MODE:
     try:
-        # PAS de endpoint_url personnalisé : boto3 gère automatiquement
         s3 = boto3.client(
             "s3",
             region_name=AWS_REGION,
             aws_access_key_id=AWS_ACCESS_KEY,
             aws_secret_access_key=AWS_SECRET_KEY,
         )
-        print("S3: Connexion OK")
+        print(
+            f"S3: Connexion OK (bucket={AWS_BUCKET}, region={AWS_REGION})"
+        )
     except Exception as e:
-        print("Erreur connexion S3 :", e)
+        print("Erreur connexion S3 :", repr(e))
         s3 = None
 else:
     print("Mode local : S3 désactivé.")
@@ -181,13 +188,20 @@ else:
 ############################################################
 
 def allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    )
 
 
 def clean_filename(filename: str) -> str:
     name, ext = os.path.splitext(filename)
     # Normalisation ASCII
-    name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    name = (
+        unicodedata.normalize("NFKD", name)
+        .encode("ascii", "ignore")
+        .decode()
+    )
     name = name.lower()
     name = re.sub(r"[^a-z0-9]+", "_", name).strip("_")
     return f"{name}{ext.lower()}"
@@ -208,19 +222,23 @@ def list_client_documents(client_id: int):
 
     try:
         response = s3.list_objects_v2(Bucket=AWS_BUCKET, Prefix=prefix)
-        for item in response.get("Contents", []) or []:
+        for item in (response.get("Contents") or []):
             key = item["Key"]
             if key.endswith("/"):
                 continue
 
-            docs.append({
-                "nom": key.replace(prefix, ""),
-                "key": key,
-                "taille": item["Size"],
-                "url": s3_url(key),
-            })
+            docs.append(
+                {
+                    "nom": key.replace(prefix, ""),
+                    "key": key,
+                    "taille": item["Size"],
+                    "url": s3_url(key),
+                }
+            )
+    except ClientError as e:
+        print("Erreur list_client_documents (ClientError) :", e.response)
     except Exception as e:
-        print("Erreur list_client_documents :", e)
+        print("Erreur list_client_documents :", repr(e))
 
     return docs
 
@@ -235,6 +253,7 @@ def login_required(func):
         if "user" not in session:
             return redirect(url_for("login"))
         return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -247,6 +266,7 @@ def admin_required(func):
             flash("Accès réservé à l'administrateur.", "danger")
             return redirect(url_for("dashboard"))
         return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -267,8 +287,7 @@ def login():
 
         conn = get_db()
         user = conn.execute(
-            "SELECT * FROM users WHERE username=?",
-            (username,)
+            "SELECT * FROM users WHERE username=?", (username,)
         ).fetchone()
         conn.close()
 
@@ -306,24 +325,28 @@ def dashboard():
         "SELECT COUNT(*) FROM crm_clients"
     ).fetchone()[0]
 
-    last_clients = conn.execute("""
+    last_clients = conn.execute(
+        """
         SELECT name, email, created_at
         FROM crm_clients
         ORDER BY created_at DESC LIMIT 5
-    """).fetchall()
+        """
+    ).fetchall()
 
     # CA total
     total_ca = conn.execute(
         "SELECT COALESCE(SUM(montant), 0) FROM revenus"
     ).fetchone()[0]
 
-    # Dernier revenu (si tu l’utilises plus tard)
-    last_rev = conn.execute("""
+    # Dernier revenu (si utilisé plus tard)
+    last_rev = conn.execute(
+        """
         SELECT montant, date, commercial
         FROM revenus
         ORDER BY date DESC, id DESC
         LIMIT 1
-    """).fetchone()
+        """
+    ).fetchone()
 
     conn.close()
 
@@ -334,13 +357,11 @@ def dashboard():
     if not LOCAL_MODE and s3:
         try:
             response = s3.list_objects_v2(Bucket=AWS_BUCKET)
-            files = response.get("Contents", []) or []
+            files = (response.get("Contents") or [])
             total_docs = len(files)
 
             files_sorted = sorted(
-                files,
-                key=lambda x: x["LastModified"],
-                reverse=True
+                files, key=lambda x: x["LastModified"], reverse=True
             )
             last_docs = [
                 {
@@ -350,8 +371,10 @@ def dashboard():
                 }
                 for f in files_sorted[:5]
             ]
+        except ClientError as e:
+            print("Erreur listing S3 pour dashboard (ClientError) :", e.response)
         except Exception as e:
-            print("Erreur listing S3 pour dashboard :", e)
+            print("Erreur listing S3 pour dashboard :", repr(e))
 
     return render_template(
         "dashboard.html",
@@ -382,10 +405,13 @@ def chiffre_affaire():
             return redirect(url_for("chiffre_affaire"))
 
         conn = get_db()
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO revenus (date, commercial, montant)
             VALUES (?, ?, ?)
-        """, (date_rev, commercial, montant))
+            """,
+            (date_rev, commercial, montant),
+        )
         conn.commit()
         conn.close()
 
@@ -395,47 +421,61 @@ def chiffre_affaire():
     # ---- AFFICHAGE + STATISTIQUES ----
     conn = get_db()
 
-    revenus = conn.execute("""
+    revenus = conn.execute(
+        """
         SELECT id, date, commercial, montant
         FROM revenus
         ORDER BY date DESC
-    """).fetchall()
+        """
+    ).fetchall()
 
     today_obj = date.today()
-    year_str = str(today_obj.year)           # ex : "2025"
+    year_str = str(today_obj.year)  # ex : "2025"
     month_str = today_obj.strftime("%Y-%m")  # ex : "2025-12"
 
     # TOTAL ANNUEL GLOBAL
-    total_annuel = conn.execute("""
+    total_annuel = conn.execute(
+        """
         SELECT COALESCE(SUM(montant), 0)
         FROM revenus
         WHERE substr(date, 1, 4) = ?
-    """, (year_str,)).fetchone()[0]
+        """,
+        (year_str,),
+    ).fetchone()[0]
 
     # TOTAL MENSUEL GLOBAL
-    total_mensuel = conn.execute("""
+    total_mensuel = conn.execute(
+        """
         SELECT COALESCE(SUM(montant), 0)
         FROM revenus
         WHERE substr(date, 1, 7) = ?
-    """, (month_str,)).fetchone()[0]
+        """,
+        (month_str,),
+    ).fetchone()[0]
 
     # TOTAL ANNUEL PAR COMMERCIAL
-    annuel_par_com = conn.execute("""
+    annuel_par_com = conn.execute(
+        """
         SELECT commercial, COALESCE(SUM(montant), 0) AS total
         FROM revenus
         WHERE substr(date, 1, 4) = ?
         GROUP BY commercial
         ORDER BY total DESC
-    """, (year_str,)).fetchall()
+        """,
+        (year_str,),
+    ).fetchall()
 
     # TOTAL MENSUEL PAR COMMERCIAL
-    mensuel_par_com = conn.execute("""
+    mensuel_par_com = conn.execute(
+        """
         SELECT commercial, COALESCE(SUM(montant), 0) AS total
         FROM revenus
         WHERE substr(date, 1, 7) = ?
         GROUP BY commercial
         ORDER BY total DESC
-    """, (month_str,)).fetchall()
+        """,
+        (month_str,),
+    ).fetchall()
 
     conn.close()
 
@@ -450,10 +490,7 @@ def chiffre_affaire():
     )
 
 
-############################################################
 # API — DONNÉES POUR CHART.JS
-############################################################
-
 @app.route("/chiffre_affaire/data")
 @login_required
 def chiffre_affaire_data():
@@ -462,9 +499,18 @@ def chiffre_affaire_data():
     conn.close()
 
     mois_noms = {
-        "01": "Janvier", "02": "Février", "03": "Mars", "04": "Avril",
-        "05": "Mai", "06": "Juin", "07": "Juillet", "08": "Août",
-        "09": "Septembre", "10": "Octobre", "11": "Novembre", "12": "Décembre",
+        "01": "Janvier",
+        "02": "Février",
+        "03": "Mars",
+        "04": "Avril",
+        "05": "Mai",
+        "06": "Juin",
+        "07": "Juillet",
+        "08": "Août",
+        "09": "Septembre",
+        "10": "Octobre",
+        "11": "Novembre",
+        "12": "Décembre",
     }
 
     data_par_mois = {}
@@ -479,10 +525,7 @@ def chiffre_affaire_data():
     return jsonify({"labels": labels, "data": data})
 
 
-############################################################
 # SUPPRESSION D’UNE LIGNE DE REVENU
-############################################################
-
 @app.route("/chiffre_affaire/delete/<int:rev_id>", methods=["POST"])
 @login_required
 def delete_revenue(rev_id):
@@ -515,8 +558,7 @@ def admin_users():
             return redirect(url_for("admin_users"))
 
         exists = conn.execute(
-            "SELECT COUNT(*) FROM users WHERE username=?",
-            (username,)
+            "SELECT COUNT(*) FROM users WHERE username=?", (username,)
         ).fetchone()[0]
 
         if exists > 0:
@@ -524,15 +566,20 @@ def admin_users():
             conn.close()
             return redirect(url_for("admin_users"))
 
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO users (username, password, role)
             VALUES (?, ?, ?)
-        """, (username, generate_password_hash(password), role))
+            """,
+            (username, generate_password_hash(password), role),
+        )
         conn.commit()
 
         flash("Utilisateur créé.", "success")
 
-    users = conn.execute("SELECT * FROM users ORDER BY id ASC").fetchall()
+    users = conn.execute(
+        "SELECT * FROM users ORDER BY id ASC"
+    ).fetchall()
     conn.close()
 
     return render_template("admin_users.html", users=users)
@@ -543,8 +590,7 @@ def admin_users():
 def admin_edit_user(user_id):
     conn = get_db()
     user = conn.execute(
-        "SELECT * FROM users WHERE id=?",
-        (user_id,)
+        "SELECT * FROM users WHERE id=?", (user_id,)
     ).fetchone()
 
     if not user:
@@ -557,9 +603,12 @@ def admin_edit_user(user_id):
         password = request.form.get("password")
         role = request.form.get("role")
 
-        exists = conn.execute("""
+        exists = conn.execute(
+            """
             SELECT COUNT(*) FROM users WHERE username=? AND id<>?
-        """, (username, user_id)).fetchone()[0]
+            """,
+            (username, user_id),
+        ).fetchone()[0]
 
         if exists > 0:
             flash("Nom déjà utilisé.", "danger")
@@ -567,13 +616,19 @@ def admin_edit_user(user_id):
             return redirect(url_for("admin_edit_user", user_id=user_id))
 
         if password:
-            conn.execute("""
+            conn.execute(
+                """
                 UPDATE users SET username=?, password=?, role=? WHERE id=?
-            """, (username, generate_password_hash(password), role, user_id))
+                """,
+                (username, generate_password_hash(password), role, user_id),
+            )
         else:
-            conn.execute("""
+            conn.execute(
+                """
                 UPDATE users SET username=?, role=? WHERE id=?
-            """, (username, role, user_id))
+                """,
+                (username, role, user_id),
+            )
 
         conn.commit()
         conn.close()
@@ -615,14 +670,19 @@ def documents():
 
     try:
         response = s3.list_objects_v2(Bucket=AWS_BUCKET)
-        for item in response.get("Contents", []) or []:
-            fichiers.append({
-                "nom": item["Key"],
-                "taille": item["Size"],
-                "url": s3_url(item["Key"]),
-            })
+        for item in (response.get("Contents") or []):
+            fichiers.append(
+                {
+                    "nom": item["Key"],
+                    "taille": item["Size"],
+                    "url": s3_url(item["Key"]),
+                }
+            )
+    except ClientError as e:
+        print("Erreur listing S3 (documents globaux, ClientError) :", e.response)
+        flash("Erreur lors du listing S3.", "danger")
     except Exception as e:
-        print("Erreur listing S3 (documents globaux) :", e)
+        print("Erreur listing S3 (documents globaux) :", repr(e))
         flash("Erreur lors du listing S3.", "danger")
 
     return render_template("documents.html", fichiers=fichiers)
@@ -646,8 +706,11 @@ def upload_document():
     try:
         s3.upload_fileobj(fichier, AWS_BUCKET, nom)
         flash("Document envoyé.", "success")
+    except ClientError as e:
+        print("Erreur upload S3 (global, ClientError) :", e.response)
+        flash("Erreur upload S3.", "danger")
     except Exception as e:
-        print("Erreur upload S3 (global) :", e)
+        print("Erreur upload S3 (global) :", repr(e))
         flash("Erreur upload S3.", "danger")
 
     return redirect(url_for("documents"))
@@ -663,8 +726,11 @@ def delete_document(key):
     try:
         s3.delete_object(Bucket=AWS_BUCKET, Key=key)
         flash("Document supprimé.", "success")
+    except ClientError as e:
+        print("Erreur suppression S3 (global, ClientError) :", e.response)
+        flash("Erreur suppression S3.", "danger")
     except Exception as e:
-        print("Erreur suppression S3 (global) :", e)
+        print("Erreur suppression S3 (global) :", repr(e))
         flash("Erreur suppression S3.", "danger")
 
     return redirect(url_for("documents"))
@@ -707,18 +773,23 @@ def new_client():
             return redirect(url_for("new_client"))
 
         conn = get_db()
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO crm_clients
             (name, email, phone, address, commercial, status, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, data)
+            """,
+            data,
+        )
         conn.commit()
         conn.close()
 
         flash("Client créé.", "success")
         return redirect(url_for("clients"))
 
-    return render_template("client_form.html", action="new", client=None, statuses=statuses)
+    return render_template(
+        "client_form.html", action="new", client=None, statuses=statuses
+    )
 
 
 @app.route("/clients/<int:client_id>")
@@ -726,8 +797,7 @@ def new_client():
 def client_detail(client_id):
     conn = get_db()
     row = conn.execute(
-        "SELECT * FROM crm_clients WHERE id=?",
-        (client_id,)
+        "SELECT * FROM crm_clients WHERE id=?", (client_id,)
     ).fetchone()
     conn.close()
 
@@ -738,7 +808,9 @@ def client_detail(client_id):
     client = row_to_obj(row)
     docs = list_client_documents(client_id)
 
-    return render_template("client_detail.html", client=client, documents=docs)
+    return render_template(
+        "client_detail.html", client=client, documents=docs
+    )
 
 
 @app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
@@ -748,8 +820,7 @@ def edit_client(client_id):
 
     conn = get_db()
     row = conn.execute(
-        "SELECT * FROM crm_clients WHERE id=?",
-        (client_id,)
+        "SELECT * FROM crm_clients WHERE id=?", (client_id,)
     ).fetchone()
     client = row_to_obj(row)
     conn.close()
@@ -774,18 +845,23 @@ def edit_client(client_id):
             return redirect(url_for("edit_client", client_id=client_id))
 
         conn = get_db()
-        conn.execute("""
+        conn.execute(
+            """
             UPDATE crm_clients
             SET name=?, email=?, phone=?, address=?, commercial=?, status=?, notes=?
             WHERE id=?
-        """, (*data, client_id))
+            """,
+            (*data, client_id),
+        )
         conn.commit()
         conn.close()
 
         flash("Client mis à jour.", "success")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    return render_template("client_form.html", action="edit", client=client, statuses=statuses)
+    return render_template(
+        "client_form.html", action="edit", client=client, statuses=statuses
+    )
 
 
 @app.route("/clients/<int:client_id>/delete", methods=["POST"])
@@ -819,14 +895,19 @@ def client_upload_document(client_id):
     try:
         s3.upload_fileobj(fichier, AWS_BUCKET, key)
         flash("Document envoyé.", "success")
+    except ClientError as e:
+        print("Erreur upload S3 (client, ClientError) :", e.response)
+        flash("Erreur upload S3.", "danger")
     except Exception as e:
-        print("Erreur upload S3 (client) :", e)
+        print("Erreur upload S3 (client) :", repr(e))
         flash("Erreur upload S3.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-@app.route("/clients/<int:client_id>/delete_document/<path:key>", methods=["POST"])
+@app.route(
+    "/clients/<int:client_id>/delete_document/<path:key>", methods=["POST"]
+)
 @login_required
 def client_delete_document(client_id, key):
     if LOCAL_MODE or not s3:
@@ -838,8 +919,11 @@ def client_delete_document(client_id, key):
     try:
         s3.delete_object(Bucket=AWS_BUCKET, Key=full_key)
         flash("Document supprimé.", "success")
+    except ClientError as e:
+        print("Erreur suppression S3 (client, ClientError) :", e.response)
+        flash("Erreur suppression S3.", "danger")
     except Exception as e:
-        print("Erreur suppression S3 (client) :", e)
+        print("Erreur suppression S3 (client) :", repr(e))
         flash("Erreur suppression S3.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
@@ -859,12 +943,14 @@ def agenda():
 @login_required
 def appointments_events_json():
     conn = get_db()
-    rows = conn.execute("""
+    rows = conn.execute(
+        """
         SELECT a.id, a.title, a.date, a.time, a.color,
                a.client_id, c.name AS client_name
         FROM appointments a
         LEFT JOIN crm_clients c ON c.id = a.client_id
-    """).fetchall()
+        """
+    ).fetchall()
     conn.close()
 
     events = []
@@ -876,13 +962,15 @@ def appointments_events_json():
         time_part = r["time"] or "09:00"
         start = f"{r['date']}T{time_part}:00"
 
-        events.append({
-            "id": r["id"],
-            "title": title,
-            "start": start,
-            "backgroundColor": r["color"] or "#2563eb",
-            "borderColor": r["color"] or "#2563eb",
-        })
+        events.append(
+            {
+                "id": r["id"],
+                "title": title,
+                "start": start,
+                "backgroundColor": r["color"] or "#2563eb",
+                "borderColor": r["color"] or "#2563eb",
+            }
+        )
 
     return jsonify(events)
 
@@ -899,9 +987,12 @@ def appointments_update_from_calendar():
         return jsonify({"status": "error"}), 400
 
     conn = get_db()
-    conn.execute("""
+    conn.execute(
+        """
         UPDATE appointments SET date=?, time=? WHERE id=?
-    """, (new_date, new_time, appt_id))
+        """,
+        (new_date, new_time, appt_id),
+    )
     conn.commit()
     conn.close()
 
@@ -918,13 +1009,24 @@ def appointments_create():
     description = (data.get("description") or "").strip()
 
     if not title or not date_str:
-        return jsonify({"success": False, "message": "Titre et date obligatoires."}), 400
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "Titre et date obligatoires.",
+                }
+            ),
+            400,
+        )
 
     conn = get_db()
-    cur = conn.execute("""
+    cur = conn.execute(
+        """
         INSERT INTO appointments (title, date, time, client_id, description, color)
         VALUES (?, ?, ?, ?, ?, ?)
-    """, (title, date_str, None, None, description, "#2563eb"))
+        """,
+        (title, date_str, None, None, description, "#2563eb"),
+    )
     conn.commit()
     new_id = cur.lastrowid
     conn.close()
