@@ -17,16 +17,17 @@ from flask import (
     session,
 )
 from werkzeug.utils import secure_filename
+    # send_file n'est pas utilisé pour l'instant mais peut servir plus tard
 from werkzeug.security import generate_password_hash, check_password_hash
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError  # potentiellement utile pour affiner les erreurs
 
 from config import Config
 
 
 ############################################################
-# 1. CONFIGURATION
+# 1. CONFIGURATION GLOBALE
 ############################################################
 
 LOCAL_MODE = Config.LOCAL_MODE
@@ -150,23 +151,27 @@ def init_db():
 
 # Initialisation de la base et des comptes
 init_db()
+
+
 ############################################################
-# 4. S3 — STOCKAGE DOCUMENTS
+# 4. S3 — STOCKAGE DOCUMENTS (CORRIGÉ)
 ############################################################
 
 s3 = None
 
 if not LOCAL_MODE:
     try:
+        # PAS de endpoint_url personnalisé : boto3 gère automatiquement
         s3 = boto3.client(
             "s3",
             region_name=AWS_REGION,
             aws_access_key_id=AWS_ACCESS_KEY,
             aws_secret_access_key=AWS_SECRET_KEY,
         )
-        print("Connexion S3 OK")
+        print("S3: Connexion OK")
     except Exception as e:
         print("Erreur connexion S3 :", e)
+        s3 = None
 else:
     print("Mode local : S3 désactivé.")
 
@@ -175,19 +180,25 @@ else:
 # 5. UTILITAIRES
 ############################################################
 
-def allowed_file(filename):
+def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def clean_filename(filename):
+def clean_filename(filename: str) -> str:
     name, ext = os.path.splitext(filename)
+    # Normalisation ASCII
     name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     name = name.lower()
     name = re.sub(r"[^a-z0-9]+", "_", name).strip("_")
     return f"{name}{ext.lower()}"
 
 
-def list_client_documents(client_id):
+def s3_url(key: str) -> str:
+    """Construit l’URL publique S3 standard pour un objet."""
+    return f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{key}"
+
+
+def list_client_documents(client_id: int):
     """Liste les documents d’un client dans S3."""
     if LOCAL_MODE or not s3:
         return []
@@ -197,7 +208,7 @@ def list_client_documents(client_id):
 
     try:
         response = s3.list_objects_v2(Bucket=AWS_BUCKET, Prefix=prefix)
-        for item in response.get("Contents", []):
+        for item in response.get("Contents", []) or []:
             key = item["Key"]
             if key.endswith("/"):
                 continue
@@ -206,7 +217,7 @@ def list_client_documents(client_id):
                 "nom": key.replace(prefix, ""),
                 "key": key,
                 "taille": item["Size"],
-                "url": f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{key}",
+                "url": s3_url(key),
             })
     except Exception as e:
         print("Erreur list_client_documents :", e)
@@ -280,6 +291,8 @@ def logout():
     session.clear()
     flash("Déconnexion effectuée.", "info")
     return redirect(url_for("login"))
+
+
 ############################################################
 # 8. DASHBOARD
 ############################################################
@@ -304,7 +317,7 @@ def dashboard():
         "SELECT COALESCE(SUM(montant), 0) FROM revenus"
     ).fetchone()[0]
 
-    # Dernier revenu
+    # Dernier revenu (si tu l’utilises plus tard)
     last_rev = conn.execute("""
         SELECT montant, date, commercial
         FROM revenus
@@ -393,21 +406,21 @@ def chiffre_affaire():
     month_str = today_obj.strftime("%Y-%m")  # ex : "2025-12"
 
     # TOTAL ANNUEL GLOBAL
-    total_year_global = conn.execute("""
+    total_annuel = conn.execute("""
         SELECT COALESCE(SUM(montant), 0)
         FROM revenus
         WHERE substr(date, 1, 4) = ?
     """, (year_str,)).fetchone()[0]
 
     # TOTAL MENSUEL GLOBAL
-    total_month_global = conn.execute("""
+    total_mensuel = conn.execute("""
         SELECT COALESCE(SUM(montant), 0)
         FROM revenus
         WHERE substr(date, 1, 7) = ?
     """, (month_str,)).fetchone()[0]
 
     # TOTAL ANNUEL PAR COMMERCIAL
-    ca_par_com_annuel = conn.execute("""
+    annuel_par_com = conn.execute("""
         SELECT commercial, COALESCE(SUM(montant), 0) AS total
         FROM revenus
         WHERE substr(date, 1, 4) = ?
@@ -416,7 +429,7 @@ def chiffre_affaire():
     """, (year_str,)).fetchall()
 
     # TOTAL MENSUEL PAR COMMERCIAL
-    ca_par_com_mensuel = conn.execute("""
+    mensuel_par_com = conn.execute("""
         SELECT commercial, COALESCE(SUM(montant), 0) AS total
         FROM revenus
         WHERE substr(date, 1, 7) = ?
@@ -430,12 +443,10 @@ def chiffre_affaire():
         "chiffre_affaire.html",
         today=today_obj.isoformat(),
         revenus=revenus,
-        total_year_global=total_year_global,
-        total_month_global=total_month_global,
-        ca_par_com_annuel=ca_par_com_annuel,
-        ca_par_com_mensuel=ca_par_com_mensuel,
-        current_year=year_str,
-        current_month=month_str,
+        total_mensuel=total_mensuel,
+        total_annuel=total_annuel,
+        mensuel_par_com=mensuel_par_com,
+        annuel_par_com=annuel_par_com,
     )
 
 
@@ -482,6 +493,8 @@ def delete_revenue(rev_id):
 
     flash("Entrée supprimée.", "success")
     return redirect(url_for("chiffre_affaire"))
+
+
 ############################################################
 # 10. ADMIN UTILISATEURS
 ############################################################
@@ -585,6 +598,8 @@ def admin_delete_user(user_id):
 
     flash("Utilisateur supprimé.", "success")
     return redirect(url_for("admin_users"))
+
+
 ############################################################
 # 11. DOCUMENTS GLOBAUX S3
 ############################################################
@@ -604,7 +619,7 @@ def documents():
             fichiers.append({
                 "nom": item["Key"],
                 "taille": item["Size"],
-                "url": f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{item['Key']}"
+                "url": s3_url(item["Key"]),
             })
     except Exception as e:
         print("Erreur listing S3 (documents globaux) :", e)
@@ -828,6 +843,8 @@ def client_delete_document(client_id, key):
         flash("Erreur suppression S3.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
+
+
 ############################################################
 # 13. AGENDA / FULLCALENDAR
 ############################################################
@@ -927,7 +944,7 @@ def index():
 
 
 ############################################################
-# 15. RUN
+# 15. RUN (LOCAL)
 ############################################################
 
 if __name__ == "__main__":
