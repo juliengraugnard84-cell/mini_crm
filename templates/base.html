@@ -14,6 +14,7 @@
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
 
+    <!-- CSS GLOBAL -->
     <style>
         :root {
             --primary: #ff6b35;
@@ -68,15 +69,6 @@
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
         }
 
-        .sidebar-logo-text {
-            font-size: 20px;
-            font-weight: 600;
-        }
-
-        .sidebar-nav {
-            margin-top: 10px;
-        }
-
         .sidebar-link {
             display: flex;
             align-items: center;
@@ -101,11 +93,7 @@
             box-shadow: 0 12px 22px rgba(0, 0, 0, 0.35);
         }
 
-        .sidebar-link-icon {
-            font-size: 20px;
-        }
-
-        /* MAIN CONTENT */
+        /* CONTENT */
         .content-wrapper {
             flex: 1;
             padding: 20px 30px 35px;
@@ -116,18 +104,6 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 22px;
-        }
-
-        .topbar-title {
-            font-size: 22px;
-            font-weight: 600;
-            color: #111827;
-        }
-
-        .topbar-user {
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
         .topbar-avatar {
@@ -141,18 +117,6 @@
             font-weight: 600;
             color: white;
             font-size: 14px;
-        }
-
-        /* ANIMATIONS */
-        .fade-in {
-            opacity: 0;
-            transform: translateY(18px);
-            transition: all 0.6s cubic-bezier(.25,.8,.25,1);
-        }
-
-        .fade-in.show {
-            opacity: 1;
-            transform: translateY(0);
         }
 
         /* CHAT BUTTON */
@@ -257,21 +221,22 @@
         </nav>
     </aside>
 
-    <!-- MAIN CONTENT -->
+    <!-- CONTENT -->
     <main class="content-wrapper">
 
         <div class="topbar">
-            <div class="topbar-title">
+            <h2 class="topbar-title">
                 {% block page_title %}{% endblock %}
-            </div>
+            </h2>
+
+            {% if current_user %}
             <div class="topbar-user">
-                {% if current_user %}
-                    <span style="color:#6b7280;font-size:13px;">
-                        Connecté : <strong>{{ current_user.username }}</strong>
-                    </span>
-                    <div class="topbar-avatar">{{ current_user.username[:2].upper() }}</div>
-                {% endif %}
+                <span style="color:#6b7280;font-size:13px;">
+                    Connecté : <strong>{{ current_user.username }}</strong>
+                </span>
+                <div class="topbar-avatar">{{ current_user.username[:2].upper() }}</div>
             </div>
+            {% endif %}
         </div>
 
         <!-- Flash Messages -->
@@ -350,7 +315,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
-<!-- BLOCK POUR LES SCRIPTS DES PAGES -->
+<!-- Block pour scripts spécifiques à chaque page -->
 {% block scripts %}{% endblock %}
 
 </body>
