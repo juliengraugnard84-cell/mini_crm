@@ -1,120 +1,155 @@
 {% extends "base.html" %}
 {% block page_title %}Dashboard{% endblock %}
+
 {% block content %}
 
+<!-- KPI -->
 <div class="row g-4 mb-4">
-
     <div class="col-md-4">
-        <div class="card card-modern card-animated fade-delay-1"
-             style="background: linear-gradient(135deg, #ff6b35, #ff3366); color:white;">
-            <div class="card-body">
-                <h5 class="fw-bold mb-2">Total Clients</h5>
-                <div style="font-size: 36px; font-weight:700;">
-                    {{ total_clients }}
-                </div>
-            </div>
+        <div class="kpi-tile kpi--orange">
+            <div class="kpi-label">Total Clients</div>
+            <div class="kpi-value">{{ total_clients }}</div>
         </div>
     </div>
 
     <div class="col-md-4">
-        <div class="card card-modern card-animated fade-delay-2">
-            <div class="card-body">
-                <h5 class="fw-bold mb-2">Documents totaux</h5>
-                <div style="font-size: 36px; font-weight:700;">
-                    {{ total_docs }}
-                </div>
+        <div class="kpi-tile kpi--blue">
+            <div class="kpi-label">Chiffre d’affaires (cumul)</div>
+            <div class="kpi-value">
+                {{ "{:,.0f}".format(total_ca).replace(",", " ") }} €
             </div>
+            {% if last_rev %}
+            <div class="mt-2 small" style="opacity:.92;">
+                Dernier revenu : {{ "{:,.0f}".format(last_rev.montant).replace(",", " ") }} € — {{ last_rev.date }}{% if last_rev.commercial %} ({{ last_rev.commercial }}){% endif %}
+            </div>
+            {% endif %}
         </div>
     </div>
 
     <div class="col-md-4">
-        <div class="card card-modern card-animated fade-delay-3">
+        <div class="kpi-tile kpi--green">
+            <div class="kpi-label">Documents</div>
+            <div class="kpi-value">{{ total_docs }}</div>
+            {% if last_docs and last_docs|length > 0 %}
+            <div class="mt-2 small" style="opacity:.92;">
+                Dernier : {{ last_docs[0].nom }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+
+    <!-- Derniers clients -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white fw-bold" style="border-top-left-radius:16px;border-top-right-radius:16px;">
+                Derniers clients
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Email</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for c in last_clients %}
+                        <tr>
+                            <td class="fw-semibold">{{ c.name }}</td>
+                            <td class="text-muted">{{ c.email }}</td>
+                            <td class="text-muted">
+                                {% if c.created_at %}{{ c.created_at[:10] }}{% else %}-{% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">Aucun client.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents récents -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white fw-bold" style="border-top-left-radius:16px;border-top-right-radius:16px;">
+                Documents récents
+            </div>
             <div class="card-body">
-                <h5 class="fw-bold mb-2">Chiffre d'affaire total</h5>
-                <div style="font-size: 36px; font-weight:700;">
-                    {{ total_ca }} €
-                </div>
+                {% if last_docs and last_docs|length > 0 %}
+                    <div class="list-group list-group-flush">
+                        {% for d in last_docs %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="fw-semibold">{{ d.nom }}</div>
+                            <div class="text-muted small">
+                                {% if d.date %}{{ d.date[:10] }}{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-muted">Aucun document récent.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Graph CA -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white fw-bold" style="border-top-left-radius:16px;border-top-right-radius:16px;">
+                Évolution du chiffre d’affaires (par mois)
+            </div>
+            <div class="card-body">
+                <canvas id="caChart" height="90"></canvas>
             </div>
         </div>
     </div>
 
 </div>
 
+{% endblock %}
 
-<!-- SECTION GRAPHIQUE -->
-<div class="card card-modern card-animated fade-delay-2">
-    <div class="card-header">
-        <h5 class="fw-bold">Évolution du chiffre d'affaire</h5>
-    </div>
-    <div class="card-body">
-        <canvas id="caChart" class="chart-animated"></canvas>
-    </div>
-</div>
-
-<!-- LISTE DES DERNIERS CLIENTS -->
-<div class="card card-modern card-animated fade-delay-3 mt-4">
-    <div class="card-header">
-        <h5 class="fw-bold">Derniers Clients</h5>
-    </div>
-    <div class="card-body">
-        <table class="table table-hover fade-in fade-delay-2">
-            <thead>
-                <tr>
-                    <th>Nom</th>
-                    <th>Email</th>
-                    <th>Date</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for c in last_clients %}
-                <tr>
-                    <td>{{ c.name }}</td>
-                    <td>{{ c.email if c.email else "-" }}</td>
-                    <td>{{ c.created_at }}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-
-<!-- CHART JS -->
+{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-
     fetch("{{ url_for('chiffre_affaire_data') }}")
         .then(res => res.json())
         .then(data => {
-
             const ctx = document.getElementById("caChart");
-
-            const chart = new Chart(ctx, {
+            new Chart(ctx, {
                 type: "line",
                 data: {
                     labels: data.labels,
                     datasets: [{
-                        label: "CA (€)",
+                        label: "CA",
                         data: data.data,
+                        tension: 0.35,
                         fill: true,
                         borderWidth: 3,
-                        tension: 0.35,
-                        borderColor: "#ff6b35",
-                        backgroundColor: "rgba(255,107,53,0.25)"
+                        pointRadius: 3
                     }]
                 },
                 options: {
                     responsive: true,
                     plugins: {
                         legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
                     }
                 }
             });
         });
-
 });
 </script>
-
 {% endblock %}
