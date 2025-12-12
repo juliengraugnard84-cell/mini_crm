@@ -55,7 +55,8 @@ app.secret_key = app.config["SECRET_KEY"]
 ############################################################
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    # ✅ check_same_thread=False : plus robuste en prod (threads/gunicorn)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -143,6 +144,7 @@ def init_db():
 
     # ---------------------------------------------------------
     # IMPORTANT : ne plus reset les mots de passe au démarrage
+    # => on bootstrap UNIQUEMENT l'admin si absent
     # ---------------------------------------------------------
     def create_user_if_missing(username: str, clear_password: str, role: str):
         username = (username or "").strip()
@@ -161,15 +163,13 @@ def init_db():
                 (username, generate_password_hash(clear_password), role),
             )
 
-    # Comptes bootstrap (créés UNE seule fois si absents)
+    # ✅ BOOTSTRAP : ADMIN UNIQUEMENT
     create_user_if_missing("admin", "admin123", "admin")
-    create_user_if_missing("julien", "test123", "commercial")
 
     conn.commit()
     conn.close()
 
     print(">>> BOOTSTRAP: admin/admin123 (créé si absent)")
-    print(">>> BOOTSTRAP: julien/test123 (créé si absent)")
 
 
 # Initialisation de la base et des comptes
@@ -683,7 +683,7 @@ def admin_delete_user(user_id):
     return redirect(url_for("admin_users"))
 
 
-# ✅ NOUVEAU : RESET MOT DE PASSE (ADMIN)
+# ✅ RESET MOT DE PASSE (ADMIN)
 @app.route("/admin/users/<int:user_id>/reset_password", methods=["POST"])
 @admin_required
 def admin_reset_password(user_id):
