@@ -5,10 +5,10 @@
 
 <div class="row">
 
-    <!-- =====================  COLONNE GAUCHE ===================== -->
+    <!-- ===================== COLONNE GAUCHE ===================== -->
     <div class="col-md-6">
 
-        <!-- ===================== INFORMATIONS CLIENT ===================== -->
+        <!-- ===== INFORMATIONS CLIENT ===== -->
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white">
                 Informations client
@@ -35,25 +35,24 @@
             </div>
         </div>
 
-        <!-- ===================== DEMANDES DE COTATION ===================== -->
+        <!-- ===== DEMANDES DE COTATION (ADMIN) ===== -->
         {% if current_user and current_user.role == 'admin' %}
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-warning text-dark">
                 Demandes de cotation (Admin seulement)
             </div>
+
             <div class="card-body">
 
-                <!-- Création -->
                 <form method="POST"
                       action="{{ url_for('create_cotation', client_id=client.id) }}"
                       class="mb-3">
 
                     <div class="mb-2">
                         <label class="form-label fw-bold">Description</label>
-                        <textarea name="description"
-                                  class="form-control"
-                                  required
-                                  placeholder="Type de contrat, besoins, consommation, etc."></textarea>
+                        <textarea class="form-control"
+                                  name="description"
+                                  required></textarea>
                     </div>
 
                     <div class="mb-2">
@@ -61,7 +60,7 @@
                         <input type="text"
                                name="fournisseur_actuel"
                                class="form-control"
-                               placeholder="EDF, ENGIE, TotalEnergies...">
+                               placeholder="EDF, Engie, TotalEnergies…">
                     </div>
 
                     <div class="mb-2">
@@ -73,13 +72,13 @@
 
                     <div class="row mb-2">
                         <div class="col">
-                            <label class="form-label fw-bold">Date de négociation</label>
+                            <label class="form-label fw-bold">Date négociation</label>
                             <input type="date"
                                    name="date_negociation_date"
                                    class="form-control">
                         </div>
                         <div class="col">
-                            <label class="form-label fw-bold">Heure de négociation</label>
+                            <label class="form-label fw-bold">Heure</label>
                             <input type="time"
                                    name="date_negociation_time"
                                    class="form-control">
@@ -93,47 +92,23 @@
 
                 <hr>
 
-                <!-- Liste -->
-                <h6 class="fw-bold">Demandes existantes</h6>
-
                 {% if cotations %}
-                    <ul class="list-group">
+                <ul class="list-group">
                     {% for c in cotations %}
-                        <li class="list-group-item d-flex justify-content-between align-items-start">
-
-                            <div class="me-3">
-                                <div class="fw-bold">{{ c.description }}</div>
-
-                                <div class="small text-muted">
-                                    <div><strong>Fournisseur :</strong> {{ c.fournisseur_actuel or "—" }}</div>
-                                    <div><strong>Échéance :</strong> {{ c.date_echeance or "—" }}</div>
-                                    <div>
-                                        <strong>Négociation :</strong>
-                                        {{ c.date_negociation_date or "—" }}
-                                        {% if c.date_negociation_time %}
-                                            à {{ c.date_negociation_time }}
-                                        {% endif %}
-                                    </div>
-                                    <div>
-                                        <strong>Créée le :</strong>
-                                        {{ c.date_creation }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <form method="POST"
-                                  action="{{ url_for('delete_cotation', cotation_id=c.id) }}"
-                                  onsubmit="return confirm('Supprimer cette demande ?');">
-                                <button class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
-
-                        </li>
+                    <li class="list-group-item">
+                        <strong>{{ c.description }}</strong><br>
+                        <small class="text-muted">
+                            Fournisseur : {{ c.fournisseur_actuel or "—" }}<br>
+                            Échéance : {{ c.date_echeance or "—" }}<br>
+                            Négociation :
+                            {{ c.date_negociation_date or "" }}
+                            {{ c.date_negociation_time or "" }}
+                        </small>
+                    </li>
                     {% endfor %}
-                    </ul>
+                </ul>
                 {% else %}
-                    <p class="text-muted">Aucune demande enregistrée.</p>
+                    <p class="text-muted">Aucune demande.</p>
                 {% endif %}
 
             </div>
@@ -142,10 +117,10 @@
 
     </div>
 
-    <!-- =====================  COLONNE DROITE ===================== -->
+    <!-- ===================== COLONNE DROITE ===================== -->
     <div class="col-md-6">
 
-        <!-- ===================== DOCUMENTS CLIENT ===================== -->
+        <!-- ===== DOCUMENTS CLIENT (DRAG & DROP) ===== -->
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
                 Documents du client
@@ -153,49 +128,57 @@
 
             <div class="card-body">
 
-                <!-- Upload -->
                 <form method="POST"
                       action="{{ url_for('client_upload_document', client_id=client.id) }}"
                       enctype="multipart/form-data"
+                      id="upload-form"
                       class="mb-3">
 
-                    <div class="input-group">
-                        <input type="file" name="file" class="form-control" required>
+                    <div id="drop-zone"
+                         class="border border-2 border-primary rounded p-4 text-center"
+                         style="cursor:pointer;background:#f8f9fa;">
 
-                        <button type="submit"
-                                class="btn btn-primary input-group-text">
-                            <i class="bi bi-upload"></i>
-                        </button>
+                        <p class="fw-bold mb-1">
+                            Glisser-déposer un fichier ici
+                        </p>
+                        <p class="text-muted mb-0">
+                            ou cliquez pour sélectionner
+                        </p>
+
+                        <input type="file"
+                               name="file"
+                               id="file-input"
+                               hidden
+                               required>
                     </div>
+
+                    <button type="submit"
+                            class="btn btn-primary mt-3 w-100">
+                        <i class="bi bi-upload"></i> Envoyer sur S3
+                    </button>
 
                 </form>
 
-                <!-- Liste documents -->
                 {% if documents %}
-                    <ul class="list-group">
+                <ul class="list-group">
                     {% for d in documents %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ d.url }}" target="_blank">
+                            {{ d.nom }}
+                        </a>
 
-                            <div>
-                                <i class="bi bi-file-earmark"></i>
-                                <a href="{{ d.url }}" target="_blank">
-                                    {{ d.nom }}
-                                </a>
-                            </div>
-
-                            <form method="POST"
-                                  action="{{ url_for('client_delete_document',
-                                                      client_id=client.id,
-                                                      key=d.nom) }}"
-                                  onsubmit="return confirm('Supprimer ce document ?');">
-                                <button class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
-
-                        </li>
+                        <form method="POST"
+                              action="{{ url_for('client_delete_document',
+                                                  client_id=client.id,
+                                                  key=d.nom) }}"
+                              onsubmit="return confirm('Supprimer ?');">
+                            <button class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </li>
                     {% endfor %}
-                    </ul>
+                </ul>
                 {% else %}
                     <p class="text-muted">Aucun document.</p>
                 {% endif %}
@@ -207,5 +190,27 @@
 
 </div>
 
-{% endblock %}
+<!-- ===== DRAG & DROP SCRIPT ===== -->
+<script>
+const dropZone = document.getElementById("drop-zone");
+const fileInput = document.getElementById("file-input");
 
+dropZone.addEventListener("click", () => fileInput.click());
+
+dropZone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropZone.classList.add("bg-light");
+});
+
+dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("bg-light");
+});
+
+dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("bg-light");
+    fileInput.files = e.dataTransfer.files;
+});
+</script>
+
+{% endblock %}
