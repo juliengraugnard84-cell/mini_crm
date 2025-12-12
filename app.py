@@ -141,35 +141,39 @@ def init_db():
         """
     )
 
-    # ——— RESET / CRÉATION DES COMPTES ———
+    # ---------------------------------------------------------
+    # FIX IMPORTANT : NE PLUS RESET LES MOTS DE PASSE AU DÉMARRAGE
+    # ---------------------------------------------------------
+    # On crée uniquement les comptes "bootstrap" s'ils n'existent pas.
+    # Ensuite, tout se gère via /admin/users
 
-    def ensure_user(username, clear_password, role):
-        """Crée ou met à jour un user avec le mot de passe donné."""
-        hashed = generate_password_hash(clear_password)
+    def create_user_if_missing(username: str, clear_password: str, role: str):
+        username = (username or "").strip()
+        role = (role or "").strip()
+        if not username or not clear_password or not role:
+            return
+
         existing = conn.execute(
-            "SELECT id FROM users WHERE username=?", (username,)
+            "SELECT id FROM users WHERE username=?",
+            (username,),
         ).fetchone()
 
         if existing is None:
             conn.execute(
                 "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                (username, hashed, role),
-            )
-        else:
-            conn.execute(
-                "UPDATE users SET password=?, role=? WHERE username=?",
-                (hashed, role, username),
+                (username, generate_password_hash(clear_password), role),
             )
 
-    # On garantit ces 2 comptes à chaque démarrage
-    ensure_user("admin", "admin123", "admin")
-    ensure_user("julien", "test123", "commercial")
+    # Admin bootstrap (créé UNE FOIS)
+    create_user_if_missing("admin", "admin123", "admin")
+
+    # (Optionnel) user de test : créé UNE FOIS, ne sera pas réécrit
+    create_user_if_missing("julien", "test123", "commercial")
 
     conn.commit()
     conn.close()
 
-    print(">>> COMPTE ADMIN : admin / admin123")
-    print(">>> COMPTE JULIEN : julien / test123")
+    print(">>> Bootstrap users: admin/admin123 (si absent) + julien/test123 (si absent)")
 
 
 # Initialisation de la base et des comptes
@@ -190,9 +194,7 @@ if not LOCAL_MODE:
             aws_access_key_id=AWS_ACCESS_KEY,
             aws_secret_access_key=AWS_SECRET_KEY,
         )
-        print(
-            f"S3: Connexion OK (bucket={AWS_BUCKET}, region={AWS_REGION})"
-        )
+        print(f"S3: Connexion OK (bucket={AWS_BUCKET}, region={AWS_REGION})")
     except Exception as e:
         print("Erreur connexion S3 :", repr(e))
         s3 = None
@@ -309,7 +311,6 @@ def login_required(func):
         if "user" not in session:
             return redirect(url_for("login"))
         return func(*args, **kwargs)
-
     return wrapper
 
 
@@ -322,7 +323,6 @@ def admin_required(func):
             flash("Accès réservé à l'administrateur.", "danger")
             return redirect(url_for("dashboard"))
         return func(*args, **kwargs)
-
     return wrapper
 
 
@@ -389,12 +389,10 @@ def dashboard():
         """
     ).fetchall()
 
-    # CA total
     total_ca = conn.execute(
         "SELECT COALESCE(SUM(montant), 0) FROM revenus"
     ).fetchone()[0]
 
-    # Dernier revenu (si utilisé plus tard)
     last_rev = conn.execute(
         """
         SELECT montant, date, commercial
@@ -409,7 +407,6 @@ def dashboard():
     total_docs = 0
     last_docs = []
 
-    # S3 seulement si non-local
     if not LOCAL_MODE and s3:
         try:
             response = s3.list_objects_v2(Bucket=AWS_BUCKET)
@@ -450,7 +447,6 @@ def dashboard():
 @app.route("/chiffre_affaire", methods=["GET", "POST"])
 @login_required
 def chiffre_affaire():
-    # ---- ENREGISTREMENT D’UN REVENU ----
     if request.method == "POST":
         montant = request.form.get("montant")
         commercial = request.form.get("commercial")
@@ -474,7 +470,6 @@ def chiffre_affaire():
         flash("Revenu enregistré.", "success")
         return redirect(url_for("chiffre_affaire"))
 
-    # ---- AFFICHAGE + STATISTIQUES ----
     conn = get_db()
 
     revenus = conn.execute(
@@ -486,10 +481,9 @@ def chiffre_affaire():
     ).fetchall()
 
     today_obj = date.today()
-    year_str = str(today_obj.year)  # ex : "2025"
-    month_str = today_obj.strftime("%Y-%m")  # ex : "2025-12"
+    year_str = str(today_obj.year)
+    month_str = today_obj.strftime("%Y-%m")
 
-    # TOTAL ANNUEL GLOBAL
     total_annuel = conn.execute(
         """
         SELECT COALESCE(SUM(montant), 0)
@@ -499,7 +493,6 @@ def chiffre_affaire():
         (year_str,),
     ).fetchone()[0]
 
-    # TOTAL MENSUEL GLOBAL
     total_mensuel = conn.execute(
         """
         SELECT COALESCE(SUM(montant), 0)
@@ -509,7 +502,6 @@ def chiffre_affaire():
         (month_str,),
     ).fetchone()[0]
 
-    # TOTAL ANNUEL PAR COMMERCIAL
     annuel_par_com = conn.execute(
         """
         SELECT commercial, COALESCE(SUM(montant), 0) AS total
@@ -521,7 +513,6 @@ def chiffre_affaire():
         (year_str,),
     ).fetchall()
 
-    # TOTAL MENSUEL PAR COMMERCIAL
     mensuel_par_com = conn.execute(
         """
         SELECT commercial, COALESCE(SUM(montant), 0) AS total
@@ -546,7 +537,6 @@ def chiffre_affaire():
     )
 
 
-# API — DONNÉES POUR CHART.JS
 @app.route("/chiffre_affaire/data")
 @login_required
 def chiffre_affaire_data():
@@ -581,7 +571,6 @@ def chiffre_affaire_data():
     return jsonify({"labels": labels, "data": data})
 
 
-# SUPPRESSION D’UNE LIGNE DE REVENU
 @app.route("/chiffre_affaire/delete/<int:rev_id>", methods=["POST"])
 @login_required
 def delete_revenue(rev_id):
@@ -604,11 +593,11 @@ def admin_users():
     conn = get_db()
 
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        role = request.form.get("role")
+        username = (request.form.get("username") or "").strip()
+        password = (request.form.get("password") or "").strip()
+        role = (request.form.get("role") or "").strip()
 
-        if not username or not password:
+        if not username or not password or not role:
             flash("Champs obligatoires.", "danger")
             conn.close()
             return redirect(url_for("admin_users"))
@@ -630,7 +619,6 @@ def admin_users():
             (username, generate_password_hash(password), role),
         )
         conn.commit()
-
         flash("Utilisateur créé.", "success")
 
     users = conn.execute(
@@ -655,9 +643,14 @@ def admin_edit_user(user_id):
         return redirect(url_for("admin_users"))
 
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        role = request.form.get("role")
+        username = (request.form.get("username") or "").strip()
+        password = (request.form.get("password") or "").strip()
+        role = (request.form.get("role") or "").strip()
+
+        if not username or not role:
+            flash("Champs obligatoires.", "danger")
+            conn.close()
+            return redirect(url_for("admin_edit_user", user_id=user_id))
 
         exists = conn.execute(
             """
@@ -719,7 +712,6 @@ def admin_delete_user(user_id):
 @login_required
 def documents():
     if LOCAL_MODE or not s3:
-        # Pas de S3 en local → liste vide
         return render_template("documents.html", fichiers=[])
 
     fichiers = []
@@ -855,6 +847,7 @@ def client_detail(client_id):
     row = conn.execute(
         "SELECT * FROM crm_clients WHERE id=?", (client_id,)
     ).fetchone()
+
     cot_rows = conn.execute(
         """
         SELECT * FROM cotations
@@ -974,9 +967,7 @@ def client_upload_document(client_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-@app.route(
-    "/clients/<int:client_id>/delete_document/<path:key>", methods=["POST"]
-)
+@app.route("/clients/<int:client_id>/delete_document/<path:key>", methods=["POST"])
 @login_required
 def client_delete_document(client_id, key):
     if LOCAL_MODE or not s3:
@@ -1134,7 +1125,6 @@ def appointments_update_from_calendar():
 @app.route("/appointments/create", methods=["POST"])
 @login_required
 def appointments_create():
-    """Création rapide depuis un clic dans le calendrier (modal)."""
     data = request.get_json() or {}
     title = (data.get("title") or "").strip()
     date_str = (data.get("date") or "").strip()
@@ -1182,5 +1172,4 @@ def index():
 ############################################################
 
 if __name__ == "__main__":
-    # En local uniquement
     app.run(host="0.0.0.0", port=5000, debug=True)
