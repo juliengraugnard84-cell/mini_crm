@@ -142,10 +142,10 @@ def init_db():
     )
 
     # ---------------------------------------------------------
-    # FIX IMPORTANT : NE PLUS RESET LES MOTS DE PASSE AU DÉMARRAGE
+    # IMPORTANT : NE PLUS RESET LES MOTS DE PASSE AU DÉMARRAGE
     # ---------------------------------------------------------
-    # On crée uniquement les comptes "bootstrap" s'ils n'existent pas.
-    # Ensuite, tout se gère via /admin/users
+    # Avant : ensure_user() faisait UPDATE password à chaque boot.
+    # Maintenant : on crée seulement si absent.
 
     def create_user_if_missing(username: str, clear_password: str, role: str):
         username = (username or "").strip()
@@ -164,16 +164,17 @@ def init_db():
                 (username, generate_password_hash(clear_password), role),
             )
 
-    # Admin bootstrap (créé UNE FOIS)
+    # Bootstrap admin (créé une seule fois)
     create_user_if_missing("admin", "admin123", "admin")
 
-    # (Optionnel) user de test : créé UNE FOIS, ne sera pas réécrit
+    # User de test (créé une seule fois) - optionnel
     create_user_if_missing("julien", "test123", "commercial")
 
     conn.commit()
     conn.close()
 
-    print(">>> Bootstrap users: admin/admin123 (si absent) + julien/test123 (si absent)")
+    print(">>> BOOTSTRAP : admin/admin123 (si absent)")
+    print(">>> BOOTSTRAP : julien/test123 (si absent)")
 
 
 # Initialisation de la base et des comptes
@@ -389,10 +390,12 @@ def dashboard():
         """
     ).fetchall()
 
+    # CA total
     total_ca = conn.execute(
         "SELECT COALESCE(SUM(montant), 0) FROM revenus"
     ).fetchone()[0]
 
+    # Dernier revenu
     last_rev = conn.execute(
         """
         SELECT montant, date, commercial
@@ -619,6 +622,7 @@ def admin_users():
             (username, generate_password_hash(password), role),
         )
         conn.commit()
+
         flash("Utilisateur créé.", "success")
 
     users = conn.execute(
@@ -646,11 +650,6 @@ def admin_edit_user(user_id):
         username = (request.form.get("username") or "").strip()
         password = (request.form.get("password") or "").strip()
         role = (request.form.get("role") or "").strip()
-
-        if not username or not role:
-            flash("Champs obligatoires.", "danger")
-            conn.close()
-            return redirect(url_for("admin_edit_user", user_id=user_id))
 
         exists = conn.execute(
             """
@@ -701,6 +700,34 @@ def admin_delete_user(user_id):
     conn.close()
 
     flash("Utilisateur supprimé.", "success")
+    return redirect(url_for("admin_users"))
+
+
+# ✅ NOUVEAU : RESET MOT DE PASSE (ADMIN)
+@app.route("/admin/users/<int:user_id>/reset_password", methods=["POST"])
+@admin_required
+def admin_reset_password(user_id):
+    new_password = (request.form.get("new_password") or "").strip()
+
+    if not new_password:
+        flash("Le nouveau mot de passe est obligatoire.", "danger")
+        return redirect(url_for("admin_users"))
+
+    conn = get_db()
+    user = conn.execute("SELECT id FROM users WHERE id=?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        flash("Utilisateur introuvable.", "danger")
+        return redirect(url_for("admin_users"))
+
+    conn.execute(
+        "UPDATE users SET password=? WHERE id=?",
+        (generate_password_hash(new_password), user_id),
+    )
+    conn.commit()
+    conn.close()
+
+    flash("Mot de passe réinitialisé.", "success")
     return redirect(url_for("admin_users"))
 
 
@@ -1125,6 +1152,7 @@ def appointments_update_from_calendar():
 @app.route("/appointments/create", methods=["POST"])
 @login_required
 def appointments_create():
+    """Création rapide depuis un clic dans le calendrier (modal)."""
     data = request.get_json() or {}
     title = (data.get("title") or "").strip()
     date_str = (data.get("date") or "").strip()
