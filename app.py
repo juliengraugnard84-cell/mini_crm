@@ -65,6 +65,23 @@ def row_to_obj(row):
     return SimpleNamespace(**dict(row)) if row else None
 
 
+def _try_add_column(conn: sqlite3.Connection, table: str, col_def_sql: str):
+    """
+    Ajoute une colonne si elle n'existe pas.
+    col_def_sql exemple: "is_read INTEGER DEFAULT 0"
+    """
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def_sql}")
+    except sqlite3.OperationalError as e:
+        # column already exists, etc.
+        if "duplicate column name" in str(e).lower():
+            return
+        # Sur certains SQLite, le message diffère
+        if "already exists" in str(e).lower():
+            return
+        raise
+
+
 def init_db():
     conn = get_db()
 
@@ -138,6 +155,25 @@ def init_db():
             date_negociation_time TEXT,
             date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (client_id) REFERENCES crm_clients(id)
+        )
+        """
+    )
+
+    # ✅ Ajouts nécessaires pour l'alerte admin (non-lu / statut)
+    _try_add_column(conn, "cotations", "is_read INTEGER DEFAULT 0")
+    _try_add_column(conn, "cotations", "status TEXT DEFAULT 'nouvelle'")
+
+    # ✅ Table CHAT (backend)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT,
+            message TEXT,
+            file_key TEXT,
+            file_name TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
@@ -412,6 +448,15 @@ def dashboard():
         except Exception as e:
             print("Erreur listing S3 pour dashboard :", repr(e))
 
+    # ✅ Alerte admin : nombre de cotations non lues (pour badge/popup côté UI)
+    unread_cotations = 0
+    if session.get("user", {}).get("role") == "admin":
+        conn2 = get_db()
+        unread_cotations = conn2.execute(
+            "SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0"
+        ).fetchone()[0]
+        conn2.close()
+
     return render_template(
         "dashboard.html",
         total_clients=total_clients,
@@ -420,6 +465,7 @@ def dashboard():
         last_rev=last_rev,
         total_docs=total_docs,
         last_docs=last_docs,
+        unread_cotations=unread_cotations,
     )
 
 
@@ -867,6 +913,16 @@ def client_detail(client_id):
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
+    # ✅ Admin : marquer les cotations de ce client comme lues
+    if session.get("user", {}).get("role") == "admin":
+        conn2 = get_db()
+        conn2.execute(
+            "UPDATE cotations SET is_read=1 WHERE client_id=?",
+            (client_id,),
+        )
+        conn2.commit()
+        conn2.close()
+
     client = row_to_obj(row)
     docs = list_client_documents(client_id)
     cotations = [row_to_obj(r) for r in cot_rows]
@@ -996,9 +1052,9 @@ def client_delete_document(client_id, key):
 
 
 # --------- DEMANDES DE COTATION ---------
-
+# ✅ MODIF DEMANDÉE : les commerciaux doivent pouvoir créer (login_required)
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
-@admin_required
+@login_required
 def create_cotation(client_id):
     description = (request.form.get("description") or "").strip()
     fournisseur_actuel = (request.form.get("fournisseur_actuel") or "").strip()
@@ -1015,8 +1071,8 @@ def create_cotation(client_id):
         """
         INSERT INTO cotations
         (client_id, description, fournisseur_actuel, date_echeance,
-         date_negociation_date, date_negociation_time)
-        VALUES (?, ?, ?, ?, ?, ?)
+         date_negociation_date, date_negociation_time, status, is_read)
+        VALUES (?, ?, ?, ?, ?, ?, 'nouvelle', 0)
         """,
         (
             client_id,
@@ -1057,6 +1113,18 @@ def delete_cotation(cotation_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
+# ✅ Alerte admin : compteur de cotations non lues (pour popup/badge côté UI)
+@app.route("/admin/cotations/unread_count")
+@admin_required
+def cotations_unread_count():
+    conn = get_db()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0"
+    ).fetchone()[0]
+    conn.close()
+    return jsonify({"count": count})
+
+
 ############################################################
 # 13. AGENDA / FULLCALENDAR
 ############################################################
@@ -1087,7 +1155,8 @@ def appointments_events_json():
         if r["client_name"]:
             title += f" — {r['client_name']}"
 
-        time_part = r["time"] or "09:00"
+        # ✅ start ISO : inclure l'heure si existante, sinon 09:00 par défaut
+        time_part = (r["time"] or "09:00").strip()
         start = f"{r['date']}T{time_part}:00"
 
         events.append(
@@ -1103,6 +1172,7 @@ def appointments_events_json():
     return jsonify(events)
 
 
+# ✅ Drag & drop : mise à jour date + heure
 @app.route("/appointments/update_from_calendar", methods=["POST"])
 @login_required
 def appointments_update_from_calendar():
@@ -1112,7 +1182,10 @@ def appointments_update_from_calendar():
     new_time = data.get("time")
 
     if not appt_id or not new_date:
-        return jsonify({"status": "error"}), 400
+        return jsonify({"status": "error", "message": "id/date manquants"}), 400
+
+    # Normalisation simple de l'heure (si vide -> NULL)
+    new_time = (new_time or "").strip() or None
 
     conn = get_db()
     conn.execute(
@@ -1125,13 +1198,20 @@ def appointments_update_from_calendar():
     return jsonify({"status": "ok"})
 
 
+# ✅ Création enrichie : accepte time/client_id/color
 @app.route("/appointments/create", methods=["POST"])
 @login_required
 def appointments_create():
     data = request.get_json() or {}
     title = (data.get("title") or "").strip()
     date_str = (data.get("date") or "").strip()
+    time_str = (data.get("time") or "").strip() or None
     description = (data.get("description") or "").strip()
+    color = (data.get("color") or "").strip() or "#2563eb"
+    client_id = data.get("client_id")
+
+    if client_id in ("", None):
+        client_id = None
 
     if not title or not date_str:
         return jsonify({"success": False, "message": "Titre et date obligatoires."}), 400
@@ -1142,7 +1222,187 @@ def appointments_create():
         INSERT INTO appointments (title, date, time, client_id, description, color)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (title, date_str, None, None, description, "#2563eb"),
+        (title, date_str, time_str, client_id, description, color),
+    )
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+
+    return jsonify({"success": True, "id": new_id})
+
+
+# ✅ NOUVEAU : récupérer un RDV (pour ouvrir une modale d'édition côté UI)
+@app.route("/appointments/<int:appt_id>", methods=["GET"])
+@login_required
+def appointments_get(appt_id):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM appointments WHERE id=?",
+        (appt_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"success": False, "message": "RDV introuvable"}), 404
+    return jsonify({"success": True, "appointment": dict(row)})
+
+
+# ✅ NOUVEAU : modifier un RDV (titre/date/heure/description/couleur/client)
+@app.route("/appointments/<int:appt_id>/update", methods=["POST"])
+@login_required
+def appointments_update(appt_id):
+    data = request.get_json() or {}
+
+    title = (data.get("title") or "").strip()
+    date_str = (data.get("date") or "").strip()
+    time_str = (data.get("time") or "").strip() or None
+    description = (data.get("description") or "").strip()
+    color = (data.get("color") or "").strip() or "#2563eb"
+    client_id = data.get("client_id")
+
+    if client_id in ("", None):
+        client_id = None
+
+    if not title or not date_str:
+        return jsonify({"success": False, "message": "Titre et date obligatoires."}), 400
+
+    conn = get_db()
+    exists = conn.execute(
+        "SELECT id FROM appointments WHERE id=?",
+        (appt_id,),
+    ).fetchone()
+    if not exists:
+        conn.close()
+        return jsonify({"success": False, "message": "RDV introuvable"}), 404
+
+    conn.execute(
+        """
+        UPDATE appointments
+        SET title=?, date=?, time=?, client_id=?, description=?, color=?
+        WHERE id=?
+        """,
+        (title, date_str, time_str, client_id, description, color, appt_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True})
+
+
+# ✅ NOUVEAU : supprimer un RDV
+@app.route("/appointments/<int:appt_id>/delete", methods=["POST"])
+@login_required
+def appointments_delete(appt_id):
+    conn = get_db()
+    conn.execute("DELETE FROM appointments WHERE id=?", (appt_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+############################################################
+# 14. CHAT (BACKEND)
+############################################################
+
+def _chat_store_file(file_storage):
+    """
+    Stockage pièce jointe chat.
+    - En mode S3: upload vers chat/
+    - En mode local: pas de S3 -> on ignore le fichier (tu peux l'activer ensuite)
+    Retour: (file_key, file_name) ou (None, None)
+    """
+    if not file_storage:
+        return (None, None)
+
+    if not allowed_file(file_storage.filename):
+        return (None, None)
+
+    file_name = secure_filename(file_storage.filename)
+    file_name_clean = clean_filename(file_name)
+
+    if LOCAL_MODE or not s3:
+        # Mode local : à ce stade on ne stocke pas (peut être ajouté plus tard)
+        return (None, None)
+
+    key = f"chat/{file_name_clean}"
+    try:
+        s3.upload_fileobj(file_storage, AWS_BUCKET, key)
+        return (key, file_name)
+    except ClientError as e:
+        print("Erreur upload chat S3 (ClientError):", e.response)
+        return (None, None)
+    except Exception as e:
+        print("Erreur upload chat S3:", repr(e))
+        return (None, None)
+
+
+@app.route("/chat/messages")
+@login_required
+def chat_messages():
+    """
+    Retourne les derniers messages (pour affichage du chat côté front).
+    """
+    limit = request.args.get("limit", "50")
+    try:
+        limit_int = max(1, min(200, int(limit)))
+    except Exception:
+        limit_int = 50
+
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT id, user_id, username, message, file_key, file_name, created_at
+        FROM chat_messages
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (limit_int,),
+    ).fetchall()
+    conn.close()
+
+    items = []
+    for r in reversed(rows):
+        items.append(
+            {
+                "id": r["id"],
+                "user_id": r["user_id"],
+                "username": r["username"],
+                "message": r["message"],
+                "file_key": r["file_key"],
+                "file_name": r["file_name"],
+                "file_url": (s3_url(r["file_key"]) if (r["file_key"] and not LOCAL_MODE and s3) else None),
+                "created_at": r["created_at"],
+            }
+        )
+
+    return jsonify({"success": True, "messages": items})
+
+
+@app.route("/chat/send", methods=["POST"])
+@login_required
+def chat_send():
+    """
+    Envoi message + fichier (multipart/form-data).
+    Compatible drag&drop côté front: on poste un FormData.
+    Champs:
+      - message (optionnel)
+      - file (optionnel)
+    """
+    message = (request.form.get("message") or "").strip()
+    file_obj = request.files.get("file")
+
+    file_key, file_name = _chat_store_file(file_obj)
+
+    if not message and not file_key:
+        return jsonify({"success": False, "message": "Message ou fichier requis."}), 400
+
+    u = session.get("user") or {}
+    conn = get_db()
+    cur = conn.execute(
+        """
+        INSERT INTO chat_messages (user_id, username, message, file_key, file_name)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (u.get("id"), u.get("username"), message, file_key, file_name),
     )
     conn.commit()
     new_id = cur.lastrowid
@@ -1152,7 +1412,7 @@ def appointments_create():
 
 
 ############################################################
-# 14. ROOT
+# 15. ROOT
 ############################################################
 
 @app.route("/")
@@ -1163,7 +1423,7 @@ def index():
 
 
 ############################################################
-# 15. RUN (LOCAL)
+# 16. RUN (LOCAL)
 ############################################################
 
 if __name__ == "__main__":

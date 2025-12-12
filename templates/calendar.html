@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block page_title %}Agenda{% endblock %}
+
 {% block content %}
 
 <!-- FullCalendar -->
@@ -16,41 +17,68 @@
     }
 </style>
 
-<h1 class="fw-bold mb-4 fade-in">Agenda</h1>
+<h1 class="fw-bold mb-4">Agenda</h1>
 
-<div id="calendar" class="fade-in fade-delay-1"></div>
+<div id="calendar"></div>
 
-<!-- MODAL AJOUT RENDEZ-VOUS -->
+<!-- MODALE CREATION / MODIFICATION -->
 <div class="modal fade" id="eventModal" tabindex="-1">
     <div class="modal-dialog">
         <form id="eventForm" class="modal-content">
+
             <div class="modal-header">
-                <h5 class="modal-title">Nouveau rendez-vous</h5>
+                <h5 class="modal-title" id="modalTitle">Rendez-vous</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
 
             <div class="modal-body">
-                <input type="hidden" id="eventDate">
+
+                <!-- ID RDV (si modification) -->
+                <input type="hidden" id="eventId">
 
                 <div class="mb-3">
                     <label class="form-label">Titre</label>
                     <input type="text" id="eventTitle" class="form-control" required>
                 </div>
 
+                <div class="row mb-3">
+                    <div class="col">
+                        <label class="form-label">Date</label>
+                        <input type="date" id="eventDate" class="form-control" required>
+                    </div>
+                    <div class="col">
+                        <label class="form-label">Heure</label>
+                        <input type="time" id="eventTime" class="form-control">
+                    </div>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label">Description</label>
                     <textarea id="eventDescription" class="form-control"></textarea>
                 </div>
+
             </div>
 
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    Annuler
+            <div class="modal-footer justify-content-between">
+                <button type="button"
+                        class="btn btn-outline-danger"
+                        id="deleteEventBtn"
+                        style="display:none;">
+                    Supprimer
                 </button>
-                <button type="submit" class="btn btn-primary">
-                    Enregistrer
-                </button>
+
+                <div>
+                    <button type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Enregistrer
+                    </button>
+                </div>
             </div>
+
         </form>
     </div>
 </div>
@@ -59,8 +87,12 @@
 document.addEventListener("DOMContentLoaded", function () {
 
     const calendarEl = document.getElementById("calendar");
+    const modalEl = document.getElementById("eventModal");
+    const modal = new bootstrap.Modal(modalEl);
 
-    const calendar = new FullCalendar.Calendar(calendarEl, {
+    const f = id => document.getElementById(id);
+
+    let calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: "dayGridMonth",
         locale: "fr",
         selectable: true,
@@ -73,84 +105,103 @@ document.addEventListener("DOMContentLoaded", function () {
             right: "dayGridMonth,timeGridWeek,timeGridDay"
         },
 
-        /* FIX : envoyer les cookies de session */
-        eventSources: [
-            {
-                url: "{{ url_for('appointments_events_json') }}",
-                method: "GET",
-                extraParams: {},
-                failure: () => alert("Erreur de chargement des événements."),
-                fetchOptions: {
-                    credentials: "same-origin"  /* essentiel sur Render */
-                }
-            }
-        ],
-
-        eventColor: "#ff6b35",
-        eventTextColor: "white",
+        eventSources: [{
+            url: "{{ url_for('appointments_events_json') }}",
+            method: "GET",
+            fetchOptions: { credentials: "same-origin" }
+        }],
 
         dateClick(info) {
-            document.getElementById("eventDate").value = info.dateStr;
-            document.getElementById("eventForm").reset();
-            new bootstrap.Modal(document.getElementById("eventModal")).show();
+            // Création
+            f("eventId").value = "";
+            f("eventTitle").value = "";
+            f("eventDescription").value = "";
+            f("eventDate").value = info.dateStr;
+            f("eventTime").value = "";
+            f("deleteEventBtn").style.display = "none";
+            f("modalTitle").innerText = "Nouveau rendez-vous";
+            modal.show();
+        },
+
+        eventClick(info) {
+            // Modification
+            fetch(`/appointments/${info.event.id}`, {
+                credentials: "same-origin"
+            })
+            .then(r => r.json())
+            .then(data => {
+                const e = data.appointment || data;
+                f("eventId").value = e.id;
+                f("eventTitle").value = e.title;
+                f("eventDate").value = e.date;
+                f("eventTime").value = e.time || "";
+                f("eventDescription").value = e.description || "";
+                f("deleteEventBtn").style.display = "inline-block";
+                f("modalTitle").innerText = "Modifier rendez-vous";
+                modal.show();
+            });
         },
 
         eventDrop(info) {
-            updateEventInDatabase(info.event);
+            const d = info.event.startStr.split("T");
+            fetch("{{ url_for('appointments_update_from_calendar') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "same-origin",
+                body: JSON.stringify({
+                    id: info.event.id,
+                    date: d[0],
+                    time: d[1] ? d[1].substring(0,5) : null
+                })
+            });
         }
     });
 
     calendar.render();
 
-    // Création d’un nouveau rendez-vous
-    document.getElementById("eventForm").addEventListener("submit", function (e) {
+    // ENREGISTRER (CREATE / UPDATE)
+    f("eventForm").addEventListener("submit", function(e){
         e.preventDefault();
 
         const payload = {
-            date: document.getElementById("eventDate").value,
-            title: document.getElementById("eventTitle").value,
-            description: document.getElementById("eventDescription").value
+            title: f("eventTitle").value,
+            date: f("eventDate").value,
+            time: f("eventTime").value,
+            description: f("eventDescription").value
         };
 
-        fetch("{{ url_for('appointments_create') }}", {
+        const id = f("eventId").value;
+        const url = id
+            ? `/appointments/${id}/update`
+            : "{{ url_for('appointments_create') }}";
+
+        fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
             body: JSON.stringify(payload)
         })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                calendar.addEvent({
-                    id: data.id,
-                    title: payload.title,
-                    start: payload.date,
-                    color: "#ff6b35"
-                });
-
-                bootstrap.Modal.getInstance(document.getElementById("eventModal")).hide();
-            } else {
-                alert(data.message || "Erreur lors de l'enregistrement.");
-            }
-        })
-        .catch(() => alert("Erreur serveur."));
+        .then(r => r.json())
+        .then(() => {
+            modal.hide();
+            calendar.refetchEvents();
+        });
     });
 
-    // Mise à jour après drag & drop
-    function updateEventInDatabase(event) {
-        const start = event.startStr;
+    // SUPPRESSION
+    f("deleteEventBtn").addEventListener("click", function(){
+        const id = f("eventId").value;
+        if (!confirm("Supprimer ce rendez-vous ?")) return;
 
-        fetch("{{ url_for('appointments_update_from_calendar') }}", {
+        fetch(`/appointments/${id}/delete`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify({
-                id: event.id,
-                date: start.split("T")[0],
-                time: start.split("T")[1]?.substring(0,5) || null
-            })
+            credentials: "same-origin"
+        })
+        .then(() => {
+            modal.hide();
+            calendar.refetchEvents();
         });
-    }
+    });
 
 });
 </script>
