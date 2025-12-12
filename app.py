@@ -833,7 +833,8 @@ def upload_document():
     nom = clean_filename(secure_filename(fichier.filename))
 
     try:
-        s3.upload_fileobj(fichier, AWS_BUCKET, nom)
+        # ✅ FIX: rendre l'objet lisible via l'URL publique (sinon AccessDenied au clic)
+        s3.upload_fileobj(fichier, AWS_BUCKET, nom, ExtraArgs={"ACL": "public-read"})
         flash("Document envoyé.", "success")
     except ClientError as e:
         print("Erreur upload S3 (global, ClientError) :", e.response)
@@ -1045,7 +1046,8 @@ def client_upload_document(client_id):
     key = prefix + nom
 
     try:
-        s3.upload_fileobj(fichier, AWS_BUCKET, key)
+        # ✅ FIX: rendre l'objet lisible via l'URL publique (sinon AccessDenied au clic)
+        s3.upload_fileobj(fichier, AWS_BUCKET, key, ExtraArgs={"ACL": "public-read"})
         flash("Document envoyé.", "success")
     except ClientError as e:
         print("Erreur upload S3 (client, ClientError) :", e.response)
@@ -1085,7 +1087,6 @@ def client_delete_document(client_id, key):
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
 def create_cotation(client_id):
-    # ⚠️ Render Free safe: on tente d'ajouter created_by si possible
     ensure_cotations_schema()
 
     description = (request.form.get("description") or "").strip()
@@ -1119,7 +1120,6 @@ def create_cotation(client_id):
             ),
         )
     else:
-        # Sans created_by : on crée quand même la demande sans casser l'app
         conn.execute(
             """
             INSERT INTO cotations
@@ -1160,13 +1160,11 @@ def update_cotation(cotation_id):
 
     user = session.get("user") or {}
 
-    # Si created_by existe : règle stricte
     if has_column("cotations", "created_by"):
         if user.get("role") != "admin" and cot["created_by"] != user.get("id"):
             conn.close()
             return jsonify({"success": False, "message": "Accès refusé"}), 403
     else:
-        # Sans created_by, on bloque les non-admin (sinon faille)
         if user.get("role") != "admin":
             conn.close()
             return jsonify({"success": False, "message": "Accès refusé"}), 403
@@ -1431,7 +1429,8 @@ def _chat_store_file(file_storage):
 
     key = f"chat/{file_name_clean}"
     try:
-        s3.upload_fileobj(file_storage, AWS_BUCKET, key)
+        # ✅ FIX: rendre l'objet lisible via l'URL publique (sinon AccessDenied au clic)
+        s3.upload_fileobj(file_storage, AWS_BUCKET, key, ExtraArgs={"ACL": "public-read"})
         return (key, file_name)
     except ClientError as e:
         print("Erreur upload chat S3 (ClientError):", e.response)
