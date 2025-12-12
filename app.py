@@ -142,11 +142,8 @@ def init_db():
     )
 
     # ---------------------------------------------------------
-    # IMPORTANT : NE PLUS RESET LES MOTS DE PASSE AU DÉMARRAGE
+    # IMPORTANT : ne plus reset les mots de passe au démarrage
     # ---------------------------------------------------------
-    # Avant : ensure_user() faisait UPDATE password à chaque boot.
-    # Maintenant : on crée seulement si absent.
-
     def create_user_if_missing(username: str, clear_password: str, role: str):
         username = (username or "").strip()
         role = (role or "").strip()
@@ -164,17 +161,15 @@ def init_db():
                 (username, generate_password_hash(clear_password), role),
             )
 
-    # Bootstrap admin (créé une seule fois)
+    # Comptes bootstrap (créés UNE seule fois si absents)
     create_user_if_missing("admin", "admin123", "admin")
-
-    # User de test (créé une seule fois) - optionnel
     create_user_if_missing("julien", "test123", "commercial")
 
     conn.commit()
     conn.close()
 
-    print(">>> BOOTSTRAP : admin/admin123 (si absent)")
-    print(">>> BOOTSTRAP : julien/test123 (si absent)")
+    print(">>> BOOTSTRAP: admin/admin123 (créé si absent)")
+    print(">>> BOOTSTRAP: julien/test123 (créé si absent)")
 
 
 # Initialisation de la base et des comptes
@@ -216,7 +211,6 @@ def allowed_file(filename: str) -> bool:
 
 def clean_filename(filename: str) -> str:
     name, ext = os.path.splitext(filename)
-    # Normalisation ASCII
     name = (
         unicodedata.normalize("NFKD", name)
         .encode("ascii", "ignore")
@@ -228,12 +222,6 @@ def clean_filename(filename: str) -> str:
 
 
 def slugify(text: str) -> str:
-    """
-    Transforme un texte en nom propre pour dossier :
-    - enlève les accents
-    - met en minuscules
-    - remplace tout excepté lettres/chiffres par des underscores
-    """
     if not text:
         return ""
     text = (
@@ -247,10 +235,6 @@ def slugify(text: str) -> str:
 
 
 def client_s3_prefix(client_id: int) -> str:
-    """
-    Renvoie le chemin S3 du client, exemple :
-    clients/pierre_dupont_12/
-    """
     conn = get_db()
     row = conn.execute(
         "SELECT name FROM crm_clients WHERE id=?", (client_id,)
@@ -267,12 +251,10 @@ def client_s3_prefix(client_id: int) -> str:
 
 
 def s3_url(key: str) -> str:
-    """Construit l’URL publique S3 standard pour un objet."""
     return f"https://{AWS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{key}"
 
 
 def list_client_documents(client_id: int):
-    """Liste les documents d’un client dans S3, dans son dossier unique."""
     if LOCAL_MODE or not s3:
         return []
 
@@ -390,12 +372,10 @@ def dashboard():
         """
     ).fetchall()
 
-    # CA total
     total_ca = conn.execute(
         "SELECT COALESCE(SUM(montant), 0) FROM revenus"
     ).fetchone()[0]
 
-    # Dernier revenu
     last_rev = conn.execute(
         """
         SELECT montant, date, commercial
@@ -587,7 +567,7 @@ def delete_revenue(rev_id):
 
 
 ############################################################
-# 10. ADMIN UTILISATEURS
+# 10. ADMIN UTILISATEURS + RESET PASSWORD
 ############################################################
 
 @app.route("/admin/users", methods=["GET", "POST"])
@@ -742,7 +722,6 @@ def documents():
         return render_template("documents.html", fichiers=[])
 
     fichiers = []
-
     try:
         response = s3.list_objects_v2(Bucket=AWS_BUCKET)
         for item in (response.get("Contents") or []):
@@ -874,7 +853,6 @@ def client_detail(client_id):
     row = conn.execute(
         "SELECT * FROM crm_clients WHERE id=?", (client_id,)
     ).fetchone()
-
     cot_rows = conn.execute(
         """
         SELECT * FROM cotations
@@ -1138,9 +1116,7 @@ def appointments_update_from_calendar():
 
     conn = get_db()
     conn.execute(
-        """
-        UPDATE appointments SET date=?, time=? WHERE id=?
-        """,
+        "UPDATE appointments SET date=?, time=? WHERE id=?",
         (new_date, new_time, appt_id),
     )
     conn.commit()
@@ -1152,22 +1128,13 @@ def appointments_update_from_calendar():
 @app.route("/appointments/create", methods=["POST"])
 @login_required
 def appointments_create():
-    """Création rapide depuis un clic dans le calendrier (modal)."""
     data = request.get_json() or {}
     title = (data.get("title") or "").strip()
     date_str = (data.get("date") or "").strip()
     description = (data.get("description") or "").strip()
 
     if not title or not date_str:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": "Titre et date obligatoires.",
-                }
-            ),
-            400,
-        )
+        return jsonify({"success": False, "message": "Titre et date obligatoires."}), 400
 
     conn = get_db()
     cur = conn.execute(
