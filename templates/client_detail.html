@@ -35,15 +35,15 @@
             </div>
         </div>
 
-        <!-- ===== DEMANDES DE COTATION (ADMIN) ===== -->
-        {% if current_user and current_user.role == 'admin' %}
+        <!-- ===== DEMANDES DE COTATION ===== -->
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-warning text-dark">
-                Demandes de cotation (Admin seulement)
+                Demandes de cotation
             </div>
 
             <div class="card-body">
 
+                <!-- ===== FORMULAIRE (COMMERCIAUX + ADMIN) ===== -->
                 <form method="POST"
                       action="{{ url_for('create_cotation', client_id=client.id) }}"
                       class="mb-3">
@@ -86,24 +86,41 @@
                     </div>
 
                     <button class="btn btn-warning mt-2">
-                        Créer la demande
+                        Envoyer la demande
                     </button>
                 </form>
 
                 <hr>
 
+                <!-- ===== LISTE DES COTATIONS ===== -->
                 {% if cotations %}
                 <ul class="list-group">
                     {% for c in cotations %}
                     <li class="list-group-item">
+
                         <strong>{{ c.description }}</strong><br>
+
                         <small class="text-muted">
                             Fournisseur : {{ c.fournisseur_actuel or "—" }}<br>
                             Échéance : {{ c.date_echeance or "—" }}<br>
                             Négociation :
-                            {{ c.date_negociation_date or "" }}
+                            {{ c.date_negociation_date or "—" }}
                             {{ c.date_negociation_time or "" }}
                         </small>
+
+                        <!-- ===== ACTIONS ===== -->
+                        {% if current_user.role == 'admin'
+                              or c.created_by == current_user.id %}
+                        <form method="POST"
+                              action="{{ url_for('delete_cotation', cotation_id=c.id) }}"
+                              class="mt-2"
+                              onsubmit="return confirm('Supprimer cette cotation ?');">
+                            <button class="btn btn-sm btn-outline-danger">
+                                Supprimer
+                            </button>
+                        </form>
+                        {% endif %}
+
                     </li>
                     {% endfor %}
                 </ul>
@@ -113,14 +130,13 @@
 
             </div>
         </div>
-        {% endif %}
 
     </div>
 
     <!-- ===================== COLONNE DROITE ===================== -->
     <div class="col-md-6">
 
-        <!-- ===== DOCUMENTS CLIENT (DRAG & DROP) ===== -->
+        <!-- ===== DOCUMENTS CLIENT ===== -->
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
                 Documents du client
@@ -154,7 +170,7 @@
 
                     <button type="submit"
                             class="btn btn-primary mt-3 w-100">
-                        <i class="bi bi-upload"></i> Envoyer sur S3
+                        Envoyer sur S3
                     </button>
 
                 </form>
@@ -173,7 +189,7 @@
                                                   key=d.nom) }}"
                               onsubmit="return confirm('Supprimer ?');">
                             <button class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i>
+                                Supprimer
                             </button>
                         </form>
                     </li>
