@@ -19,11 +19,10 @@
                 {{ "{:,.0f}".format(total_ca).replace(",", " ") }} €
             </div>
             {% if last_rev %}
-            <div class="mt-2 small" style="opacity:.92;">
+            <div class="mt-2 small" style="opacity:.9;">
                 Dernier revenu :
                 {{ "{:,.0f}".format(last_rev.montant).replace(",", " ") }} €
-                —
-                {{ last_rev.date.strftime('%Y-%m-%d') }}
+                — {{ last_rev.date }}
                 {% if last_rev.commercial %} ({{ last_rev.commercial }}){% endif %}
             </div>
             {% endif %}
@@ -35,7 +34,7 @@
             <div class="kpi-label">Documents</div>
             <div class="kpi-value">{{ total_docs }}</div>
             {% if last_docs and last_docs|length > 0 %}
-            <div class="mt-2 small" style="opacity:.92;">
+            <div class="mt-2 small" style="opacity:.9;">
                 Dernier : {{ last_docs[0].nom }}
             </div>
             {% endif %}
@@ -57,7 +56,7 @@
                         <tr>
                             <th>Nom</th>
                             <th>Email</th>
-                            <th>Date</th>
+                            <th>Date création</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -66,11 +65,7 @@
                             <td class="fw-semibold">{{ c.name }}</td>
                             <td class="text-muted">{{ c.email }}</td>
                             <td class="text-muted">
-                                {% if c.created_at %}
-                                    {{ c.created_at.strftime('%Y-%m-%d') }}
-                                {% else %}
-                                    -
-                                {% endif %}
+                                {{ c.created_at or "-" }}
                             </td>
                         </tr>
                     {% else %}
@@ -99,9 +94,7 @@
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div class="fw-semibold">{{ d.nom }}</div>
                             <div class="text-muted small">
-                                {% if d.date %}
-                                    {{ d.date.strftime('%Y-%m-%d') }}
-                                {% endif %}
+                                {{ d.date or "" }}
                             </div>
                         </div>
                         {% endfor %}
