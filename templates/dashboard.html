@@ -20,7 +20,11 @@
             </div>
             {% if last_rev %}
             <div class="mt-2 small" style="opacity:.92;">
-                Dernier revenu : {{ "{:,.0f}".format(last_rev.montant).replace(",", " ") }} € — {{ last_rev.date }}{% if last_rev.commercial %} ({{ last_rev.commercial }}){% endif %}
+                Dernier revenu :
+                {{ "{:,.0f}".format(last_rev.montant).replace(",", " ") }} €
+                —
+                {{ last_rev.date.strftime('%Y-%m-%d') }}
+                {% if last_rev.commercial %} ({{ last_rev.commercial }}){% endif %}
             </div>
             {% endif %}
         </div>
@@ -44,7 +48,7 @@
     <!-- Derniers clients -->
     <div class="col-lg-6">
         <div class="card">
-            <div class="card-header bg-white fw-bold" style="border-top-left-radius:16px;border-top-right-radius:16px;">
+            <div class="card-header bg-white fw-bold">
                 Derniers clients
             </div>
             <div class="card-body p-0">
@@ -62,12 +66,18 @@
                             <td class="fw-semibold">{{ c.name }}</td>
                             <td class="text-muted">{{ c.email }}</td>
                             <td class="text-muted">
-                                {% if c.created_at %}{{ c.created_at[:10] }}{% else %}-{% endif %}
+                                {% if c.created_at %}
+                                    {{ c.created_at.strftime('%Y-%m-%d') }}
+                                {% else %}
+                                    -
+                                {% endif %}
                             </td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="3" class="text-center text-muted py-4">Aucun client.</td>
+                            <td colspan="3" class="text-center text-muted py-4">
+                                Aucun client.
+                            </td>
                         </tr>
                     {% endfor %}
                     </tbody>
@@ -79,7 +89,7 @@
     <!-- Documents récents -->
     <div class="col-lg-6">
         <div class="card">
-            <div class="card-header bg-white fw-bold" style="border-top-left-radius:16px;border-top-right-radius:16px;">
+            <div class="card-header bg-white fw-bold">
                 Documents récents
             </div>
             <div class="card-body">
@@ -89,7 +99,9 @@
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div class="fw-semibold">{{ d.nom }}</div>
                             <div class="text-muted small">
-                                {% if d.date %}{{ d.date[:10] }}{% endif %}
+                                {% if d.date %}
+                                    {{ d.date.strftime('%Y-%m-%d') }}
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}
@@ -104,7 +116,7 @@
     <!-- Graph CA -->
     <div class="col-12">
         <div class="card">
-            <div class="card-header bg-white fw-bold" style="border-top-left-radius:16px;border-top-right-radius:16px;">
+            <div class="card-header bg-white fw-bold">
                 Évolution du chiffre d’affaires (par mois)
             </div>
             <div class="card-body">
@@ -119,7 +131,6 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     fetch("{{ url_for('chiffre_affaire_data') }}")
@@ -131,7 +142,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 data: {
                     labels: data.labels,
                     datasets: [{
-                        label: "CA",
                         data: data.data,
                         tension: 0.35,
                         fill: true,
@@ -141,12 +151,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
                 options: {
                     responsive: true,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
                 }
             });
         });
