@@ -433,12 +433,6 @@ def logout():
     session.clear()
     flash("Déconnexion effectuée.", "info")
     return redirect(url_for("login"))
-
-
-############################################################
-# 8. DASHBOARD
-############################################################
-
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -491,18 +485,34 @@ def dashboard():
                 }
                 for f in files_sorted[:5]
             ]
-        except ClientError as e:
-            print("Erreur listing S3 pour dashboard (ClientError) :", e.response)
-        except Exception as e:
-            print("Erreur listing S3 pour dashboard :", repr(e))
+        except Exception:
+            pass
 
     unread_cotations = 0
+    cotations_admin = []
+
     if session.get("user", {}).get("role") == "admin":
         conn2 = get_db()
+
         unread_cotations = conn2.execute(
             "SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0"
         ).fetchone()[0]
+
+        rows = conn2.execute(
+            """
+            SELECT
+                cotations.*,
+                crm_clients.name AS client_name
+            FROM cotations
+            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            WHERE COALESCE(cotations.is_read,0)=0
+            ORDER BY cotations.date_creation DESC
+            """
+        ).fetchall()
+
         conn2.close()
+
+        cotations_admin = [row_to_obj(r) for r in rows]
 
     return render_template(
         "dashboard.html",
@@ -513,9 +523,8 @@ def dashboard():
         total_docs=total_docs,
         last_docs=last_docs,
         unread_cotations=unread_cotations,
+        cotations_admin=cotations_admin,
     )
-
-
 ############################################################
 # 9. REVENUS (CHIFFRE D'AFFAIRE)
 ############################################################
@@ -1541,3 +1550,4 @@ def index():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
