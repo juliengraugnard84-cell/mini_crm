@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% block page_title %}{{ client.name }}{% endblock %}
+
 {% block content %}
 
 <h2 class="mb-4">{{ client.name }}</h2>
@@ -15,17 +17,17 @@
             </div>
             <div class="card-body">
 
-                <p><strong>Email :</strong> {{ client.email }}</p>
-                <p><strong>Téléphone :</strong> {{ client.phone }}</p>
-                <p><strong>Adresse :</strong> {{ client.address }}</p>
-                <p><strong>Commercial :</strong> {{ client.commercial }}</p>
+                <p><strong>Email :</strong> {{ client.email or "—" }}</p>
+                <p><strong>Téléphone :</strong> {{ client.phone or "—" }}</p>
+                <p><strong>Adresse :</strong> {{ client.address or "—" }}</p>
+                <p><strong>Commercial :</strong> {{ client.commercial or "—" }}</p>
 
                 <p>
                     <strong>Status :</strong>
                     <span class="badge bg-primary">{{ client.status }}</span>
                 </p>
 
-                <p><strong>Notes :</strong><br>{{ client.notes }}</p>
+                <p><strong>Notes :</strong><br>{{ client.notes or "—" }}</p>
 
                 <a href="{{ url_for('edit_client', client_id=client.id) }}"
                    class="btn btn-secondary mt-3">
@@ -43,16 +45,14 @@
 
             <div class="card-body">
 
-                <!-- ===== FORMULAIRE (COMMERCIAUX + ADMIN) ===== -->
+                <!-- ===== FORMULAIRE CRÉATION ===== -->
                 <form method="POST"
                       action="{{ url_for('create_cotation', client_id=client.id) }}"
-                      class="mb-3">
+                      class="mb-4">
 
                     <div class="mb-2">
                         <label class="form-label fw-bold">Description</label>
-                        <textarea class="form-control"
-                                  name="description"
-                                  required></textarea>
+                        <textarea class="form-control" name="description" required></textarea>
                     </div>
 
                     <div class="mb-2">
@@ -65,9 +65,7 @@
 
                     <div class="mb-2">
                         <label class="form-label fw-bold">Date d’échéance</label>
-                        <input type="date"
-                               name="date_echeance"
-                               class="form-control">
+                        <input type="date" name="date_echeance" class="form-control">
                     </div>
 
                     <div class="row mb-2">
@@ -90,8 +88,6 @@
                     </button>
                 </form>
 
-                <hr>
-
                 <!-- ===== LISTE DES COTATIONS ===== -->
                 {% if cotations %}
                 <ul class="list-group">
@@ -108,17 +104,14 @@
                             {{ c.date_negociation_time or "" }}
                         </small>
 
-                        <!-- ===== ACTIONS ===== -->
                         {% if current_user.role == 'admin'
                               or c.created_by == current_user.id %}
-                        <form method="POST"
-                              action="{{ url_for('delete_cotation', cotation_id=c.id) }}"
-                              class="mt-2"
-                              onsubmit="return confirm('Supprimer cette cotation ?');">
-                            <button class="btn btn-sm btn-outline-danger">
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-outline-danger"
+                                    onclick="deleteCotation({{ c.id }})">
                                 Supprimer
                             </button>
-                        </form>
+                        </div>
                         {% endif %}
 
                     </li>
@@ -147,7 +140,6 @@
                 <form method="POST"
                       action="{{ url_for('client_upload_document', client_id=client.id) }}"
                       enctype="multipart/form-data"
-                      id="upload-form"
                       class="mb-3">
 
                     <div id="drop-zone"
@@ -187,7 +179,7 @@
                               action="{{ url_for('client_delete_document',
                                                   client_id=client.id,
                                                   key=d.nom) }}"
-                              onsubmit="return confirm('Supprimer ?');">
+                              onsubmit="return confirm('Supprimer ce document ?');">
                             <button class="btn btn-sm btn-outline-danger">
                                 Supprimer
                             </button>
@@ -206,7 +198,26 @@
 
 </div>
 
-<!-- ===== DRAG & DROP SCRIPT ===== -->
+<!-- ===== JS SUPPRESSION COTATION (AJAX) ===== -->
+<script>
+async function deleteCotation(id) {
+    if (!confirm("Supprimer cette demande de cotation ?")) return;
+
+    const res = await fetch(`/cotations/${id}/delete`, {
+        method: "POST"
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+        location.reload();
+    } else {
+        alert(data.message || "Erreur lors de la suppression");
+    }
+}
+</script>
+
+<!-- ===== DRAG & DROP ===== -->
 <script>
 const dropZone = document.getElementById("drop-zone");
 const fileInput = document.getElementById("file-input");
