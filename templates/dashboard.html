@@ -3,7 +3,7 @@
 
 {% block content %}
 
-<!-- KPI -->
+<!-- ================= KPI ================= -->
 <div class="row g-4 mb-4">
 
     <div class="col-md-4">
@@ -34,7 +34,7 @@
         <div class="kpi-tile kpi--green">
             <div class="kpi-label">Documents</div>
             <div class="kpi-value">{{ total_docs }}</div>
-            {% if last_docs and last_docs|length > 0 %}
+            {% if last_docs %}
             <div class="mt-2 small" style="opacity:.9;">
                 Dernier : {{ last_docs[0].nom }}
             </div>
@@ -44,9 +44,39 @@
 
 </div>
 
+<!-- ================= ALERTES COTATIONS ADMIN ================= -->
+{% if current_user.role == 'admin' and cotations_admin %}
+<div class="card border-warning mb-4">
+    <div class="card-header bg-warning fw-bold d-flex align-items-center">
+        <span class="material-symbols-outlined me-2">
+            notifications_active
+        </span>
+        Nouvelles demandes de cotation
+    </div>
+
+    <ul class="list-group list-group-flush">
+        {% for c in cotations_admin %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <strong>{{ c.client_name }}</strong><br>
+                <small class="text-muted">
+                    {{ c.description[:80] }}{% if c.description|length > 80 %}…{% endif %}
+                </small>
+            </div>
+
+            <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
+               class="btn btn-sm btn-outline-warning">
+                Ouvrir le dossier
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
 <div class="row g-4">
 
-    <!-- Derniers clients -->
+    <!-- ================= DERNIERS CLIENTS ================= -->
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header bg-white fw-bold">
@@ -66,9 +96,7 @@
                         <tr>
                             <td class="fw-semibold">{{ c.name }}</td>
                             <td class="text-muted">{{ c.email }}</td>
-                            <td class="text-muted">
-                                {{ c.created_at or "-" }}
-                            </td>
+                            <td class="text-muted">{{ c.created_at }}</td>
                         </tr>
                     {% else %}
                         <tr>
@@ -83,21 +111,19 @@
         </div>
     </div>
 
-    <!-- Documents récents -->
+    <!-- ================= DOCUMENTS RÉCENTS ================= -->
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header bg-white fw-bold">
                 Documents récents
             </div>
             <div class="card-body">
-                {% if last_docs and last_docs|length > 0 %}
+                {% if last_docs %}
                     <div class="list-group list-group-flush">
                         {% for d in last_docs %}
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div class="fw-semibold">{{ d.nom }}</div>
-                            <div class="text-muted small">
-                                {{ d.date or "" }}
-                            </div>
+                            <div class="text-muted small">{{ d.date }}</div>
                         </div>
                         {% endfor %}
                     </div>
@@ -108,7 +134,7 @@
         </div>
     </div>
 
-    <!-- Graph CA -->
+    <!-- ================= GRAPHIQUE CA ================= -->
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-white fw-bold">
