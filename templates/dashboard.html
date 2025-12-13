@@ -20,11 +20,10 @@
                 {{ "{:,.0f}".format(total_ca).replace(",", " ") }} €
             </div>
             {% if last_rev %}
-            <div class="mt-2 small" style="opacity:.9;">
+            <div class="mt-2 small">
                 Dernier revenu :
                 {{ "{:,.0f}".format(last_rev.montant).replace(",", " ") }} €
                 — {{ last_rev.date }}
-                {% if last_rev.commercial %} ({{ last_rev.commercial }}){% endif %}
             </div>
             {% endif %}
         </div>
@@ -35,7 +34,7 @@
             <div class="kpi-label">Documents</div>
             <div class="kpi-value">{{ total_docs }}</div>
             {% if last_docs %}
-            <div class="mt-2 small" style="opacity:.9;">
+            <div class="mt-2 small">
                 Dernier : {{ last_docs[0].nom }}
             </div>
             {% endif %}
@@ -46,39 +45,44 @@
 
 <!-- ================= ALERTES COTATIONS ADMIN ================= -->
 {% if current_user.role == 'admin' and cotations_admin %}
-<div class="card border-warning mb-4">
-    <div class="card-header bg-warning fw-bold d-flex align-items-center">
-        <span class="material-symbols-outlined me-2">
-            notifications_active
-        </span>
-        Nouvelles demandes de cotation
-    </div>
-
-    <ul class="list-group list-group-flush">
-        {% for c in cotations_admin %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-                <strong>{{ c.client_name }}</strong><br>
-                <small class="text-muted">
-                    {{ c.description[:80] }}{% if c.description|length > 80 %}…{% endif %}
-                </small>
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header bg-warning fw-bold d-flex align-items-center">
+                <span class="material-symbols-outlined me-2">
+                    notifications_active
+                </span>
+                Nouvelles demandes de cotation
             </div>
 
-            <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
-               class="btn btn-sm btn-outline-warning">
-                Ouvrir le dossier
-            </a>
-        </li>
-        {% endfor %}
-    </ul>
+            <ul class="list-group list-group-flush">
+                {% for c in cotations_admin %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ c.client_name }}</strong><br>
+                        <small class="text-muted">
+                            {{ c.description[:80] }}{% if c.description|length > 80 %}…{% endif %}
+                        </small>
+                    </div>
+
+                    <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
+                       class="btn btn-sm btn-outline-warning">
+                        Ouvrir le dossier
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
 </div>
 {% endif %}
 
+<!-- ================= CONTENU PRINCIPAL ================= -->
 <div class="row g-4">
 
-    <!-- ================= DERNIERS CLIENTS ================= -->
+    <!-- Derniers clients -->
     <div class="col-lg-6">
-        <div class="card">
+        <div class="card h-100">
             <div class="card-header bg-white fw-bold">
                 Derniers clients
             </div>
@@ -111,22 +115,22 @@
         </div>
     </div>
 
-    <!-- ================= DOCUMENTS RÉCENTS ================= -->
+    <!-- Documents récents -->
     <div class="col-lg-6">
-        <div class="card">
+        <div class="card h-100">
             <div class="card-header bg-white fw-bold">
                 Documents récents
             </div>
             <div class="card-body">
                 {% if last_docs %}
-                    <div class="list-group list-group-flush">
+                    <ul class="list-group list-group-flush">
                         {% for d in last_docs %}
-                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div class="fw-semibold">{{ d.nom }}</div>
-                            <div class="text-muted small">{{ d.date }}</div>
-                        </div>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ d.nom }}</span>
+                            <small class="text-muted">{{ d.date }}</small>
+                        </li>
                         {% endfor %}
-                    </div>
+                    </ul>
                 {% else %}
                     <div class="text-muted">Aucun document récent.</div>
                 {% endif %}
@@ -134,7 +138,7 @@
         </div>
     </div>
 
-    <!-- ================= GRAPHIQUE CA ================= -->
+    <!-- Graphique CA -->
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-white fw-bold">
@@ -157,8 +161,7 @@ document.addEventListener("DOMContentLoaded", function () {
     fetch("{{ url_for('chiffre_affaire_data') }}")
         .then(res => res.json())
         .then(data => {
-            const ctx = document.getElementById("caChart");
-            new Chart(ctx, {
+            new Chart(document.getElementById("caChart"), {
                 type: "line",
                 data: {
                     labels: data.labels,
