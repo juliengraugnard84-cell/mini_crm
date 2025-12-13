@@ -1,6 +1,5 @@
 import os
 
-
 class Config:
     # =========================
     # Flask
@@ -8,13 +7,10 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev_key")
 
     # =========================
-    # Détection Render
+    # Environnement Render
     # =========================
     IS_RENDER = os.environ.get("RENDER") is not None
 
-    # =========================
-    # Mode local / production
-    # =========================
     _env_local_mode = os.environ.get("LOCAL_MODE")
     if _env_local_mode is not None:
         LOCAL_MODE = _env_local_mode.lower() == "true"
@@ -27,18 +23,18 @@ class Config:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
     # =========================
-    # SQLite (local + Render)
+    # DATABASE (SQLite)
     # =========================
-    INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
-    os.makedirs(INSTANCE_DIR, exist_ok=True)
-
-    SQLITE_DB_PATH = os.path.join(INSTANCE_DIR, "crm.db")
-
-    # 👉 VARIABLE MANQUANTE (CAUSE DU 500)
-    DB_PATH = SQLITE_DB_PATH
+    if IS_RENDER:
+        # ⚠️ DISK Render monté sur /data
+        DB_PATH = "/data/crm.db"
+    else:
+        INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
+        os.makedirs(INSTANCE_DIR, exist_ok=True)
+        DB_PATH = os.path.join(INSTANCE_DIR, "crm.db")
 
     # =========================
-    # PostgreSQL (si utilisé plus tard)
+    # PostgreSQL (non utilisé ici)
     # =========================
     DATABASE_URL = os.environ.get("DATABASE_URL")
 
