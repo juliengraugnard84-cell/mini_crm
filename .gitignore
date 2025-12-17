@@ -4,3 +4,4 @@ env/
 venv/
 uploads/
 chat_uploads/
+node_modules/

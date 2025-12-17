@@ -38,7 +38,13 @@ AWS_BUCKET = Config.AWS_BUCKET
 
 DB_PATH = Config.DB_PATH
 
-ALLOWED_EXTENSIONS = {"pdf", "jpg", "jpeg", "png", "doc", "docx"}
+ALLOWED_EXTENSIONS = {
+    "pdf",
+    "jpg", "jpeg", "png",
+    "doc", "docx",
+    "xls", "xlsx", "csv"
+}
+
 
 
 ############################################################
