@@ -3,6 +3,26 @@
 
 {% block content %}
 
+<!-- ================= RECHERCHE CLIENT / DOCUMENT ================= -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white fw-bold">
+                🔍 Recherche clients & documents
+            </div>
+            <div class="card-body">
+                <input
+                    type="text"
+                    id="searchInput"
+                    class="form-control"
+                    placeholder="Rechercher un client ou un document (ex: Dupont, devis, contrat...)"
+                >
+                <div id="searchResults" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- KPI -->
 <div class="row g-4 mb-4">
 
@@ -154,8 +174,65 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+
+    /* ===== Recherche client + documents ===== */
+    const input = document.getElementById("searchInput");
+    const resultsDiv = document.getElementById("searchResults");
+    let timer = null;
+
+    if (input) {
+        input.addEventListener("input", function () {
+            clearTimeout(timer);
+
+            const q = this.value.trim();
+            if (!q) {
+                resultsDiv.innerHTML = "";
+                return;
+            }
+
+            timer = setTimeout(() => {
+                fetch(`/search?q=${encodeURIComponent(q)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        resultsDiv.innerHTML = "";
+
+                        if (!data.results || !data.results.length) {
+                            resultsDiv.innerHTML =
+                                "<div class='text-muted'>Aucun résultat</div>";
+                            return;
+                        }
+
+                        data.results.forEach(r => {
+                            const block = document.createElement("div");
+                            block.className = "mb-3";
+
+                            block.innerHTML = `
+                                <div class="fw-bold mb-1">📁 ${r.client_name}</div>
+                                <ul class="list-group">
+                                    ${r.documents.map(d => `
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <a href="${d.url}" target="_blank">
+                                                📄 ${d.nom}
+                                            </a>
+                                            <a href="/clients/${r.client_id}"
+                                               class="btn btn-sm btn-outline-secondary">
+                                                Ouvrir
+                                            </a>
+                                        </li>
+                                    `).join("")}
+                                </ul>
+                            `;
+                            resultsDiv.appendChild(block);
+                        });
+                    });
+            }, 300);
+        });
+    }
+
+    /* ===== Graph CA ===== */
     fetch("{{ url_for('chiffre_affaire_data') }}")
         .then(res => res.json())
         .then(data => {
