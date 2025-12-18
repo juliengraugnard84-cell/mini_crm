@@ -688,104 +688,13 @@ def chiffre_affaire():
     )
 
 
-@app.route("/chiffre_affaire", methods=["GET", "POST"])
-@login_required
-def chiffre_affaire():
-    if request.method == "POST":
-        montant = request.form.get("montant")
-        commercial = request.form.get("commercial")
-        date_rev = request.form.get("date")
-
-        if not montant or not commercial or not date_rev:
-            flash("Tous les champs sont obligatoires.", "danger")
-            return redirect(url_for("chiffre_affaire"))
-
-        conn = get_db()
-        conn.execute(
-            """
-            INSERT INTO revenus (date, commercial, montant)
-            VALUES (?, ?, ?)
-            """,
-            (date_rev, commercial, montant),
-        )
-        conn.commit()
-        conn.close()
-
-        flash("Revenu enregistré.", "success")
-        return redirect(url_for("chiffre_affaire"))
-
-    conn = get_db()
-
-    revenus = conn.execute(
-        """
-        SELECT id, date, commercial, montant
-        FROM revenus
-        ORDER BY date DESC
-        """
-    ).fetchall()
-
-    today_obj = date.today()
-    year_str = str(today_obj.year)
-    month_str = today_obj.strftime("%Y-%m")
-
-    total_annuel = conn.execute(
-        """
-        SELECT COALESCE(SUM(montant), 0)
-        FROM revenus
-        WHERE substr(date, 1, 4) = ?
-        """,
-        (year_str,),
-    ).fetchone()[0]
-
-    total_mensuel = conn.execute(
-        """
-        SELECT COALESCE(SUM(montant), 0)
-        FROM revenus
-        WHERE substr(date, 1, 7) = ?
-        """,
-        (month_str,),
-    ).fetchone()[0]
-
-    annuel_par_com = conn.execute(
-        """
-        SELECT commercial, COALESCE(SUM(montant), 0) AS total
-        FROM revenus
-        WHERE substr(date, 1, 4) = ?
-        GROUP BY commercial
-        ORDER BY total DESC
-        """,
-        (year_str,),
-    ).fetchall()
-
-    mensuel_par_com = conn.execute(
-        """
-        SELECT commercial, COALESCE(SUM(montant), 0) AS total
-        FROM revenus
-        WHERE substr(date, 1, 7) = ?
-        GROUP BY commercial
-        ORDER BY total DESC
-        """,
-        (month_str,),
-    ).fetchall()
-
-    conn.close()
-
-    return render_template(
-        "chiffre_affaire.html",
-        today=today_obj.isoformat(),
-        revenus=revenus,
-        total_mensuel=total_mensuel,
-        total_annuel=total_annuel,
-        mensuel_par_com=mensuel_par_com,
-        annuel_par_com=annuel_par_com,
-    )
-
-
 @app.route("/chiffre_affaire/data")
 @login_required
 def chiffre_affaire_data():
     conn = get_db()
-    rows = conn.execute("SELECT date, montant FROM revenus").fetchall()
+    rows = conn.execute(
+        "SELECT date, montant FROM revenus"
+    ).fetchall()
     conn.close()
 
     mois_noms = {
