@@ -104,8 +104,9 @@
                             {{ c.date_negociation_time or "" }}
                         </small>
 
-                        {% if current_user.role == 'admin'
-                              or c.created_by == current_user.id %}
+                        {% if current_user
+                              and (current_user['role'] == 'admin'
+                                   or c.created_by == current_user['id']) %}
                         <div class="mt-2">
                             <button class="btn btn-sm btn-outline-danger"
                                     onclick="deleteCotation({{ c.id }})">
@@ -203,10 +204,7 @@
 async function deleteCotation(id) {
     if (!confirm("Supprimer cette demande de cotation ?")) return;
 
-    const res = await fetch(`/cotations/${id}/delete`, {
-        method: "POST"
-    });
-
+    const res = await fetch(`/cotations/${id}/delete`, { method: "POST" });
     const data = await res.json();
 
     if (data.success) {
@@ -222,22 +220,24 @@ async function deleteCotation(id) {
 const dropZone = document.getElementById("drop-zone");
 const fileInput = document.getElementById("file-input");
 
-dropZone.addEventListener("click", () => fileInput.click());
+if (dropZone && fileInput) {
+    dropZone.addEventListener("click", () => fileInput.click());
 
-dropZone.addEventListener("dragover", e => {
-    e.preventDefault();
-    dropZone.classList.add("bg-light");
-});
+    dropZone.addEventListener("dragover", e => {
+        e.preventDefault();
+        dropZone.classList.add("bg-light");
+    });
 
-dropZone.addEventListener("dragleave", () => {
-    dropZone.classList.remove("bg-light");
-});
+    dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("bg-light");
+    });
 
-dropZone.addEventListener("drop", e => {
-    e.preventDefault();
-    dropZone.classList.remove("bg-light");
-    fileInput.files = e.dataTransfer.files;
-});
+    dropZone.addEventListener("drop", e => {
+        e.preventDefault();
+        dropZone.classList.remove("bg-light");
+        fileInput.files = e.dataTransfer.files;
+    });
+}
 </script>
 
 {% endblock %}
