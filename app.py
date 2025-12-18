@@ -590,7 +590,6 @@ def dashboard():
         cotations_admin=cotations_admin,
     )
 
-
 ############################################################
 # 9. REVENUS (CHIFFRE D'AFFAIRE)
 ############################################################
@@ -598,12 +597,16 @@ def dashboard():
 @app.route("/chiffre_affaire", methods=["GET", "POST"])
 @login_required
 def chiffre_affaire():
+    user = session.get("user") or {}
+
     if request.method == "POST":
         montant = request.form.get("montant")
-        commercial = request.form.get("commercial")
         date_rev = request.form.get("date")
 
-        if not montant or not commercial or not date_rev:
+        # 🔐 Le commercial est FORCÉMENT l'utilisateur connecté
+        commercial = user.get("username")
+
+        if not montant or not date_rev:
             flash("Tous les champs sont obligatoires.", "danger")
             return redirect(url_for("chiffre_affaire"))
 
@@ -623,35 +626,68 @@ def chiffre_affaire():
 
     conn = get_db()
 
-    revenus = conn.execute(
-        """
-        SELECT id, date, commercial, montant
-        FROM revenus
-        ORDER BY date DESC
-        """
-    ).fetchall()
+    # 🔐 Admin voit tout, commercial voit uniquement SES revenus
+    if user.get("role") == "admin":
+        revenus = conn.execute(
+            """
+            SELECT id, date, commercial, montant
+            FROM revenus
+            ORDER BY date DESC
+            """
+        ).fetchall()
+    else:
+        revenus = conn.execute(
+            """
+            SELECT id, date, commercial, montant
+            FROM revenus
+            WHERE commercial = ?
+            ORDER BY date DESC
+            """,
+            (user.get("username"),),
+        ).fetchall()
 
     today_obj = date.today()
     year_str = str(today_obj.year)
     month_str = today_obj.strftime("%Y-%m")
 
-    total_annuel = conn.execute(
-        """
-        SELECT COALESCE(SUM(montant), 0)
-        FROM revenus
-        WHERE substr(date, 1, 4) = ?
-        """,
-        (year_str,),
-    ).fetchone()[0]
+    if user.get("role") == "admin":
+        total_annuel = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE substr(date, 1, 4) = ?
+            """,
+            (year_str,),
+        ).fetchone()[0]
 
-    total_mensuel = conn.execute(
-        """
-        SELECT COALESCE(SUM(montant), 0)
-        FROM revenus
-        WHERE substr(date, 1, 7) = ?
-        """,
-        (month_str,),
-    ).fetchone()[0]
+        total_mensuel = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE substr(date, 1, 7) = ?
+            """,
+            (month_str,),
+        ).fetchone()[0]
+    else:
+        total_annuel = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE substr(date, 1, 4) = ?
+              AND commercial = ?
+            """,
+            (year_str, user.get("username")),
+        ).fetchone()[0]
+
+        total_mensuel = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE substr(date, 1, 7) = ?
+              AND commercial = ?
+            """,
+            (month_str, user.get("username")),
+        ).fetchone()[0]
 
     annuel_par_com = conn.execute(
         """
@@ -691,25 +727,29 @@ def chiffre_affaire():
 @app.route("/chiffre_affaire/data")
 @login_required
 def chiffre_affaire_data():
+    user = session.get("user") or {}
     conn = get_db()
-    rows = conn.execute(
-        "SELECT date, montant FROM revenus"
-    ).fetchall()
+
+    if user.get("role") == "admin":
+        rows = conn.execute(
+            "SELECT date, montant FROM revenus"
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT date, montant FROM revenus
+            WHERE commercial = ?
+            """,
+            (user.get("username"),),
+        ).fetchall()
+
     conn.close()
 
     mois_noms = {
-        "01": "Janvier",
-        "02": "Février",
-        "03": "Mars",
-        "04": "Avril",
-        "05": "Mai",
-        "06": "Juin",
-        "07": "Juillet",
-        "08": "Août",
-        "09": "Septembre",
-        "10": "Octobre",
-        "11": "Novembre",
-        "12": "Décembre",
+        "01": "Janvier", "02": "Février", "03": "Mars",
+        "04": "Avril", "05": "Mai", "06": "Juin",
+        "07": "Juillet", "08": "Août", "09": "Septembre",
+        "10": "Octobre", "11": "Novembre", "12": "Décembre",
     }
 
     data_par_mois = {}
@@ -727,14 +767,31 @@ def chiffre_affaire_data():
 @app.route("/chiffre_affaire/delete/<int:rev_id>", methods=["POST"])
 @login_required
 def delete_revenue(rev_id):
+    user = session.get("user") or {}
     conn = get_db()
+
+    row = conn.execute(
+        "SELECT commercial FROM revenus WHERE id=?",
+        (rev_id,),
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        flash("Entrée introuvable.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    # 🔐 Seul l'admin ou le propriétaire peut supprimer
+    if user.get("role") != "admin" and row["commercial"] != user.get("username"):
+        conn.close()
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
     conn.execute("DELETE FROM revenus WHERE id=?", (rev_id,))
     conn.commit()
     conn.close()
 
     flash("Entrée supprimée.", "success")
     return redirect(url_for("chiffre_affaire"))
-
 
 ############################################################
 # 10. ADMIN UTILISATEURS + RESET PASSWORD
@@ -1688,4 +1745,3 @@ def index():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
