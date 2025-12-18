@@ -1040,7 +1040,10 @@ def clients():
         ).fetchall()
 
     conn.close()
-    return render_template("clients.html", clients=[row_to_obj(r) for r in rows])
+    return render_template(
+        "clients.html",
+        clients=[row_to_obj(r) for r in rows],
+    )
 
 
 @app.route("/clients/new", methods=["GET", "POST"])
@@ -1050,23 +1053,14 @@ def new_client():
     user = session.get("user") or {}
 
     if request.method == "POST":
-        commercial_value = (request.form.get("commercial") or "").strip()
-        if user.get("role") != "admin":
-            commercial_value = user.get("username")
-
-        data = (
-            (request.form.get("name") or "").strip(),
-            (request.form.get("email") or "").strip(),
-            (request.form.get("phone") or "").strip(),
-            (request.form.get("address") or "").strip(),
-            commercial_value,
-            (request.form.get("status") or "").strip(),
-            (request.form.get("notes") or "").strip(),
-        )
-
-        if not data[0]:
+        name = (request.form.get("name") or "").strip()
+        if not name:
             flash("Nom obligatoire.", "danger")
             return redirect(url_for("new_client"))
+
+        commercial = (request.form.get("commercial") or "").strip()
+        if user.get("role") != "admin":
+            commercial = user.get("username")
 
         conn = get_db()
         conn.execute(
@@ -1075,7 +1069,16 @@ def new_client():
             (name, email, phone, address, commercial, status, notes, owner_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (*data, user.get("id")),
+            (
+                name,
+                (request.form.get("email") or "").strip(),
+                (request.form.get("phone") or "").strip(),
+                (request.form.get("address") or "").strip(),
+                commercial,
+                (request.form.get("status") or "").strip(),
+                (request.form.get("notes") or "").strip(),
+                user.get("id"),
+            ),
         )
         conn.commit()
         conn.close()
@@ -1094,51 +1097,61 @@ def new_client():
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
-    if not can_access_client(client_id):
-        flash("Accès non autorisé à ce dossier.", "danger")
-        return redirect(url_for("clients"))
+    try:
+        if not can_access_client(client_id):
+            flash("Accès non autorisé à ce dossier.", "danger")
+            return redirect(url_for("clients"))
 
-    conn = get_db()
-    row = conn.execute(
-        "SELECT * FROM crm_clients WHERE id = ?",
-        (client_id,),
-    ).fetchone()
-
-    if not row:
-        conn.close()
-        flash("Client introuvable.", "danger")
-        return redirect(url_for("clients"))
-
-    cot_rows = conn.execute(
-        """
-        SELECT * FROM cotations
-        WHERE client_id = ?
-        ORDER BY date_creation DESC, id DESC
-        """,
-        (client_id,),
-    ).fetchall()
-    conn.close()
-
-    # 🔔 Admin : marque les cotations comme lues
-    if session.get("user", {}).get("role") == "admin":
-        conn2 = get_db()
-        conn2.execute(
-            "UPDATE cotations SET is_read = 1 WHERE client_id = ?",
+        conn = get_db()
+        row = conn.execute(
+            "SELECT * FROM crm_clients WHERE id = ?",
             (client_id,),
+        ).fetchone()
+
+        if not row:
+            conn.close()
+            flash("Client introuvable.", "danger")
+            return redirect(url_for("clients"))
+
+        cot_rows = conn.execute(
+            """
+            SELECT * FROM cotations
+            WHERE client_id = ?
+            ORDER BY date_creation DESC, id DESC
+            """,
+            (client_id,),
+        ).fetchall()
+
+        conn.close()
+
+        if session.get("user", {}).get("role") == "admin":
+            conn2 = get_db()
+            conn2.execute(
+                "UPDATE cotations SET is_read = 1 WHERE client_id = ?",
+                (client_id,),
+            )
+            conn2.commit()
+            conn2.close()
+
+        client = row_to_obj(row)
+        cotations = [row_to_obj(r) for r in cot_rows]
+
+        try:
+            documents = list_client_documents(client_id)
+        except Exception:
+            documents = []
+
+        return render_template(
+            "client_detail.html",
+            client=client,
+            documents=documents,
+            cotations=cotations,
         )
-        conn2.commit()
-        conn2.close()
 
-    client = row_to_obj(row)
-    documents = list_client_documents(client_id)
-    cotations = [row_to_obj(r) for r in cot_rows]
-
-    return render_template(
-        "client_detail.html",
-        client=client,
-        documents=documents,
-        cotations=cotations,
-    )
+    except Exception as e:
+        print("ERREUR client_detail :", repr(e))
+        flash("Erreur lors de l’ouverture du dossier client.", "danger")
+        return redirect(url_for("clients"))
 
 
 @app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
@@ -1165,33 +1178,33 @@ def edit_client(client_id):
     client = row_to_obj(row)
 
     if request.method == "POST":
-        commercial_value = (request.form.get("commercial") or "").strip()
-        if user.get("role") != "admin":
-            commercial_value = user.get("username")
-
-        data = (
-            (request.form.get("name") or "").strip(),
-            (request.form.get("email") or "").strip(),
-            (request.form.get("phone") or "").strip(),
-            (request.form.get("address") or "").strip(),
-            commercial_value,
-            (request.form.get("status") or "").strip(),
-            (request.form.get("notes") or "").strip(),
-        )
-
-        if not data[0]:
+        name = (request.form.get("name") or "").strip()
+        if not name:
             flash("Nom obligatoire.", "danger")
             return redirect(url_for("edit_client", client_id=client_id))
+
+        commercial = (request.form.get("commercial") or "").strip()
+        if user.get("role") != "admin":
+            commercial = user.get("username")
 
         conn = get_db()
         conn.execute(
             """
             UPDATE crm_clients
-            SET name = ?, email = ?, phone = ?, address = ?,
-                commercial = ?, status = ?, notes = ?
-            WHERE id = ?
+            SET name=?, email=?, phone=?, address=?,
+                commercial=?, status=?, notes=?
+            WHERE id=?
             """,
-            (*data, client_id),
+            (
+                name,
+                (request.form.get("email") or "").strip(),
+                (request.form.get("phone") or "").strip(),
+                (request.form.get("address") or "").strip(),
+                commercial,
+                (request.form.get("status") or "").strip(),
+                (request.form.get("notes") or "").strip(),
+                client_id,
+            ),
         )
         conn.commit()
         conn.close()
@@ -1215,78 +1228,15 @@ def delete_client(client_id):
         return redirect(url_for("clients"))
 
     conn = get_db()
-    conn.execute("DELETE FROM crm_clients WHERE id = ?", (client_id,))
+    conn.execute(
+        "DELETE FROM crm_clients WHERE id = ?",
+        (client_id,),
+    )
     conn.commit()
     conn.close()
 
     flash("Client supprimé.", "success")
     return redirect(url_for("clients"))
-
-
-@app.route("/clients/<int:client_id>/upload_document", methods=["POST"])
-@login_required
-def client_upload_document(client_id):
-    if not can_access_client(client_id):
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("clients"))
-
-    if LOCAL_MODE or not s3:
-        flash("Upload désactivé en local.", "warning")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    fichier = request.files.get("file")
-    if not fichier or not allowed_file(fichier.filename):
-        flash("Fichier non valide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    nom = clean_filename(secure_filename(fichier.filename))
-    prefix = client_s3_prefix(client_id)
-    key = prefix + nom
-
-    try:
-        # 🔒 Sécurité Render : repositionner le flux
-        try:
-            fichier.stream.seek(0)
-        except Exception:
-            pass
-
-        s3_upload_fileobj(fichier, AWS_BUCKET, key)
-        flash("Document envoyé.", "success")
-    except ClientError as e:
-        print("Erreur upload S3 (client, ClientError) :", e.response)
-        flash("Erreur upload S3.", "danger")
-    except Exception as e:
-        print("Erreur upload S3 (client) :", repr(e))
-        flash("Erreur upload S3.", "danger")
-
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-@app.route("/clients/<int:client_id>/delete_document/<path:key>", methods=["POST"])
-@login_required
-def client_delete_document(client_id, key):
-    if not can_access_client(client_id):
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("clients"))
-
-    if LOCAL_MODE or not s3:
-        flash("Suppression désactivée en local.", "warning")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    prefix = client_s3_prefix(client_id)
-    full_key = key if key.startswith(prefix) else prefix + key
-
-    try:
-        s3.delete_object(Bucket=AWS_BUCKET, Key=full_key)
-        flash("Document supprimé.", "success")
-    except ClientError as e:
-        print("Erreur suppression S3 (client, ClientError) :", e.response)
-        flash("Erreur suppression S3.", "danger")
-    except Exception as e:
-        print("Erreur suppression S3 (client) :", repr(e))
-        flash("Erreur suppression S3.", "danger")
-
-    return redirect(url_for("client_detail", client_id=client_id))
 
 
 ############################################################
