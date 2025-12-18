@@ -456,6 +456,7 @@ def inject_current_user():
 
 
 ############################################################
+############################################################
 # 7. LOGIN / LOGOUT
 ############################################################
 
@@ -467,7 +468,8 @@ def login():
 
         conn = get_db()
         user = conn.execute(
-            "SELECT * FROM users WHERE username=?", (username,)
+            "SELECT * FROM users WHERE username=?",
+            (username,),
         ).fetchone()
         conn.close()
 
@@ -490,6 +492,12 @@ def logout():
     session.clear()
     flash("Déconnexion effectuée.", "info")
     return redirect(url_for("login"))
+
+
+############################################################
+# 8. DASHBOARD
+############################################################
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -503,7 +511,8 @@ def dashboard():
         """
         SELECT name, email, created_at
         FROM crm_clients
-        ORDER BY created_at DESC LIMIT 5
+        ORDER BY created_at DESC
+        LIMIT 5
         """
     ).fetchall()
 
@@ -528,12 +537,13 @@ def dashboard():
     if not LOCAL_MODE and s3:
         try:
             response = s3.list_objects_v2(Bucket=AWS_BUCKET)
-            files = (response.get("Contents") or [])
+            files = response.get("Contents") or []
             total_docs = len(files)
 
             files_sorted = sorted(
                 files, key=lambda x: x["LastModified"], reverse=True
             )
+
             last_docs = [
                 {
                     "nom": f["Key"],
@@ -557,9 +567,7 @@ def dashboard():
 
         rows = conn2.execute(
             """
-            SELECT
-                cotations.*,
-                crm_clients.name AS client_name
+            SELECT cotations.*, crm_clients.name AS client_name
             FROM cotations
             JOIN crm_clients ON crm_clients.id = cotations.client_id
             WHERE COALESCE(cotations.is_read,0)=0
@@ -568,7 +576,6 @@ def dashboard():
         ).fetchall()
 
         conn2.close()
-
         cotations_admin = [row_to_obj(r) for r in rows]
 
     return render_template(
@@ -582,9 +589,104 @@ def dashboard():
         unread_cotations=unread_cotations,
         cotations_admin=cotations_admin,
     )
+
+
 ############################################################
 # 9. REVENUS (CHIFFRE D'AFFAIRE)
 ############################################################
+
+@app.route("/chiffre_affaire", methods=["GET", "POST"])
+@login_required
+def chiffre_affaire():
+    if request.method == "POST":
+        montant = request.form.get("montant")
+        commercial = request.form.get("commercial")
+        date_rev = request.form.get("date")
+
+        if not montant or not commercial or not date_rev:
+            flash("Tous les champs sont obligatoires.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
+        conn = get_db()
+        conn.execute(
+            """
+            INSERT INTO revenus (date, commercial, montant)
+            VALUES (?, ?, ?)
+            """,
+            (date_rev, commercial, montant),
+        )
+        conn.commit()
+        conn.close()
+
+        flash("Revenu enregistré.", "success")
+        return redirect(url_for("chiffre_affaire"))
+
+    conn = get_db()
+
+    revenus = conn.execute(
+        """
+        SELECT id, date, commercial, montant
+        FROM revenus
+        ORDER BY date DESC
+        """
+    ).fetchall()
+
+    today_obj = date.today()
+    year_str = str(today_obj.year)
+    month_str = today_obj.strftime("%Y-%m")
+
+    total_annuel = conn.execute(
+        """
+        SELECT COALESCE(SUM(montant), 0)
+        FROM revenus
+        WHERE substr(date, 1, 4) = ?
+        """,
+        (year_str,),
+    ).fetchone()[0]
+
+    total_mensuel = conn.execute(
+        """
+        SELECT COALESCE(SUM(montant), 0)
+        FROM revenus
+        WHERE substr(date, 1, 7) = ?
+        """,
+        (month_str,),
+    ).fetchone()[0]
+
+    annuel_par_com = conn.execute(
+        """
+        SELECT commercial, COALESCE(SUM(montant), 0) AS total
+        FROM revenus
+        WHERE substr(date, 1, 4) = ?
+        GROUP BY commercial
+        ORDER BY total DESC
+        """,
+        (year_str,),
+    ).fetchall()
+
+    mensuel_par_com = conn.execute(
+        """
+        SELECT commercial, COALESCE(SUM(montant), 0) AS total
+        FROM revenus
+        WHERE substr(date, 1, 7) = ?
+        GROUP BY commercial
+        ORDER BY total DESC
+        """,
+        (month_str,),
+    ).fetchall()
+
+    conn.close()
+
+    return render_template(
+        "chiffre_affaire.html",
+        today=today_obj.isoformat(),
+        revenus=revenus,
+        total_mensuel=total_mensuel,
+        total_annuel=total_annuel,
+        mensuel_par_com=mensuel_par_com,
+        annuel_par_com=annuel_par_com,
+    )
+
 
 @app.route("/chiffre_affaire", methods=["GET", "POST"])
 @login_required
@@ -870,11 +972,11 @@ def admin_reset_password(user_id):
 
 
 ############################################################
-# 11. DOCUMENTS GLOBAUX S3 (PRIVÉ + URL SIGNÉE)
+# 11. DOCUMENTS GLOBAUX S3 (ADMIN UNIQUEMENT)
 ############################################################
 
 @app.route("/documents")
-@login_required
+@admin_required
 def documents():
     if LOCAL_MODE or not s3:
         return render_template("documents.html", fichiers=[])
@@ -884,8 +986,11 @@ def documents():
         response = s3.list_objects_v2(Bucket=AWS_BUCKET)
         for item in (response.get("Contents") or []):
             key = item["Key"]
+
+            # Ignore dossiers
             if key.endswith("/"):
                 continue
+
             fichiers.append(
                 {
                     "nom": key,
@@ -894,24 +999,23 @@ def documents():
                 }
             )
     except ClientError as e:
-        print("Erreur listing S3 (documents globaux, ClientError) :", e.response)
+        print("Erreur listing S3 (admin documents) :", e.response)
         flash("Erreur lors du listing S3.", "danger")
     except Exception as e:
-        print("Erreur listing S3 (documents globaux) :", repr(e))
+        print("Erreur listing S3 (admin documents) :", repr(e))
         flash("Erreur lors du listing S3.", "danger")
 
     return render_template("documents.html", fichiers=fichiers)
 
 
 @app.route("/documents/upload", methods=["POST"])
-@login_required
+@admin_required
 def upload_document():
     if LOCAL_MODE or not s3:
         flash("Upload désactivé en mode local.", "warning")
         return redirect(url_for("documents"))
 
     fichier = request.files.get("file")
-
     if not fichier or not allowed_file(fichier.filename):
         flash("Fichier non valide.", "danger")
         return redirect(url_for("documents"))
@@ -921,18 +1025,15 @@ def upload_document():
     try:
         s3_upload_fileobj(fichier, AWS_BUCKET, nom)
         flash("Document envoyé.", "success")
-    except ClientError as e:
-        print("Erreur upload S3 (global, ClientError) :", e.response)
-        flash("Erreur upload S3.", "danger")
     except Exception as e:
-        print("Erreur upload S3 (global) :", repr(e))
+        print("Erreur upload S3 (admin) :", repr(e))
         flash("Erreur upload S3.", "danger")
 
     return redirect(url_for("documents"))
 
 
 @app.route("/documents/delete/<path:key>", methods=["POST"])
-@login_required
+@admin_required
 def delete_document(key):
     if LOCAL_MODE or not s3:
         flash("Suppression désactivée en local.", "warning")
@@ -941,76 +1042,11 @@ def delete_document(key):
     try:
         s3.delete_object(Bucket=AWS_BUCKET, Key=key)
         flash("Document supprimé.", "success")
-    except ClientError as e:
-        print("Erreur suppression S3 (global, ClientError) :", e.response)
-        flash("Erreur suppression S3.", "danger")
     except Exception as e:
-        print("Erreur suppression S3 (global) :", repr(e))
+        print("Erreur suppression S3 (admin) :", repr(e))
         flash("Erreur suppression S3.", "danger")
 
     return redirect(url_for("documents"))
-
-
-############################################################
-# SEARCH (sécurisé multi-commerciaux)
-############################################################
-
-@app.route("/search")
-@login_required
-def search():
-    query = (request.args.get("q") or "").strip().lower()
-
-    if not query:
-        return jsonify({"results": []})
-
-    conn = get_db()
-
-    if session["user"]["role"] == "admin":
-        clients = conn.execute(
-            """
-            SELECT id, name
-            FROM crm_clients
-            WHERE LOWER(name) LIKE ?
-            ORDER BY name ASC
-            """,
-            (f"%{query}%",),
-        ).fetchall()
-    else:
-        clients = conn.execute(
-            """
-            SELECT id, name
-            FROM crm_clients
-            WHERE owner_id=? AND LOWER(name) LIKE ?
-            ORDER BY name ASC
-            """,
-            (session["user"]["id"], f"%{query}%"),
-        ).fetchall()
-
-    conn.close()
-
-    results = []
-
-    for c in clients:
-        client_id = c["id"]
-        client_name = c["name"]
-
-        documents = list_client_documents(client_id)
-
-        filtered_docs = [
-            d for d in documents
-            if query in d["nom"].lower() or query in client_name.lower()
-        ]
-
-        if filtered_docs:
-            results.append(
-                {
-                    "client_id": client_id,
-                    "client_name": client_name,
-                    "documents": filtered_docs,
-                }
-            )
-
-    return jsonify({"results": results})
 
 
 ############################################################
