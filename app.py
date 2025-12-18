@@ -109,7 +109,9 @@ def ensure_cotations_schema():
 def init_db():
     conn = get_db()
 
+    # =======================
     # TABLE CLIENTS
+    # =======================
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS crm_clients (
@@ -126,7 +128,20 @@ def init_db():
         """
     )
 
+    # ➜ Ajout colonne propriétaire (multi-commerciaux)
+    _try_add_column(conn, "crm_clients", "owner_id INTEGER")
+
+    # ➜ Attribution automatique des anciens clients à l'admin (id = 1)
+    try:
+        conn.execute(
+            "UPDATE crm_clients SET owner_id = 1 WHERE owner_id IS NULL"
+        )
+    except Exception:
+        pass
+
+    # =======================
     # TABLE UTILISATEURS
+    # =======================
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -138,7 +153,9 @@ def init_db():
         """
     )
 
+    # =======================
     # TABLE REVENUS
+    # =======================
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS revenus (
@@ -150,7 +167,9 @@ def init_db():
         """
     )
 
+    # =======================
     # TABLE RENDEZ-VOUS
+    # =======================
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS appointments (
@@ -166,7 +185,9 @@ def init_db():
         """
     )
 
+    # =======================
     # TABLE COTATIONS
+    # =======================
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS cotations (
@@ -183,12 +204,14 @@ def init_db():
         """
     )
 
-    # Ajouts nécessaires (alerte admin / statut / créateur)
+    # ➜ Colonnes additionnelles cotations (safe en prod)
     _try_add_column(conn, "cotations", "is_read INTEGER DEFAULT 0")
     _try_add_column(conn, "cotations", "status TEXT DEFAULT 'nouvelle'")
     _try_add_column(conn, "cotations", "created_by INTEGER")
 
-    # TABLE CHAT (backend)
+    # =======================
+    # TABLE CHAT
+    # =======================
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS chat_messages (
@@ -203,7 +226,9 @@ def init_db():
         """
     )
 
-    # Bootstrap admin si absent
+    # =======================
+    # BOOTSTRAP ADMIN
+    # =======================
     def create_user_if_missing(username: str, clear_password: str, role: str):
         username = (username or "").strip()
         role = (role or "").strip()
@@ -228,7 +253,6 @@ def init_db():
 
 
 init_db()
-
 
 ############################################################
 # 4. S3 — STOCKAGE DOCUMENTS
@@ -372,6 +396,33 @@ def list_client_documents(client_id: int):
         print("Erreur list_client_documents :", repr(e))
 
     return docs
+def can_access_client(client_id: int) -> bool:
+    """
+    True si l'utilisateur connecté (session) a accès au client:
+    - admin : tout
+    - commercial : uniquement si crm_clients.owner_id == session["user"]["id"]
+    """
+    if not client_id:
+        return False
+
+    user = session.get("user") or {}
+    if not user:
+        return False
+
+    if user.get("role") == "admin":
+        return True
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT owner_id FROM crm_clients WHERE id=?",
+        (client_id,),
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return False
+
+    return row["owner_id"] == user.get("id")
 
 
 ############################################################
@@ -901,18 +952,92 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS
+# SEARCH (sécurisé multi-commerciaux)
+############################################################
+
+@app.route("/search")
+@login_required
+def search():
+    query = (request.args.get("q") or "").strip().lower()
+
+    if not query:
+        return jsonify({"results": []})
+
+    conn = get_db()
+
+    if session["user"]["role"] == "admin":
+        clients = conn.execute(
+            """
+            SELECT id, name
+            FROM crm_clients
+            WHERE LOWER(name) LIKE ?
+            ORDER BY name ASC
+            """,
+            (f"%{query}%",),
+        ).fetchall()
+    else:
+        clients = conn.execute(
+            """
+            SELECT id, name
+            FROM crm_clients
+            WHERE owner_id=? AND LOWER(name) LIKE ?
+            ORDER BY name ASC
+            """,
+            (session["user"]["id"], f"%{query}%"),
+        ).fetchall()
+
+    conn.close()
+
+    results = []
+
+    for c in clients:
+        client_id = c["id"]
+        client_name = c["name"]
+
+        documents = list_client_documents(client_id)
+
+        filtered_docs = [
+            d for d in documents
+            if query in d["nom"].lower() or query in client_name.lower()
+        ]
+
+        if filtered_docs:
+            results.append(
+                {
+                    "client_id": client_id,
+                    "client_name": client_name,
+                    "documents": filtered_docs,
+                }
+            )
+
+    return jsonify({"results": results})
+
+
+############################################################
+# 12. CLIENTS (sécurisé multi-commerciaux)
 ############################################################
 
 @app.route("/clients")
 @login_required
 def clients():
+    user = session.get("user") or {}
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM crm_clients ORDER BY created_at DESC"
-    ).fetchall()
-    conn.close()
 
+    if user.get("role") == "admin":
+        rows = conn.execute(
+            "SELECT * FROM crm_clients ORDER BY created_at DESC"
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT * FROM crm_clients
+            WHERE owner_id=?
+            ORDER BY created_at DESC
+            """,
+            (user.get("id"),),
+        ).fetchall()
+
+    conn.close()
     return render_template("clients.html", clients=[row_to_obj(r) for r in rows])
 
 
@@ -920,16 +1045,21 @@ def clients():
 @login_required
 def new_client():
     statuses = ["demande de cotation", "en cours", "signé", "perdu"]
+    user = session.get("user") or {}
 
     if request.method == "POST":
+        commercial_value = (request.form.get("commercial") or "").strip()
+        if user.get("role") != "admin":
+            commercial_value = user.get("username") or commercial_value
+
         data = (
-            request.form.get("name").strip(),
-            request.form.get("email").strip(),
-            request.form.get("phone").strip(),
-            request.form.get("address").strip(),
-            request.form.get("commercial").strip(),
-            request.form.get("status").strip(),
-            request.form.get("notes").strip(),
+            (request.form.get("name") or "").strip(),
+            (request.form.get("email") or "").strip(),
+            (request.form.get("phone") or "").strip(),
+            (request.form.get("address") or "").strip(),
+            commercial_value,
+            (request.form.get("status") or "").strip(),
+            (request.form.get("notes") or "").strip(),
         )
 
         if not data[0]:
@@ -940,10 +1070,10 @@ def new_client():
         conn.execute(
             """
             INSERT INTO crm_clients
-            (name, email, phone, address, commercial, status, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (name, email, phone, address, commercial, status, notes, owner_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            data,
+            (*data, user.get("id")),
         )
         conn.commit()
         conn.close()
@@ -959,10 +1089,20 @@ def new_client():
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
+    if not can_access_client(client_id):
+        flash("Accès non autorisé à ce dossier.", "danger")
+        return redirect(url_for("clients"))
+
     conn = get_db()
     row = conn.execute(
         "SELECT * FROM crm_clients WHERE id=?", (client_id,)
     ).fetchone()
+
+    if not row:
+        conn.close()
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
     cot_rows = conn.execute(
         """
         SELECT * FROM cotations
@@ -972,10 +1112,6 @@ def client_detail(client_id):
         (client_id,),
     ).fetchall()
     conn.close()
-
-    if not row:
-        flash("Client introuvable.", "danger")
-        return redirect(url_for("clients"))
 
     if session.get("user", {}).get("role") == "admin":
         conn2 = get_db()
@@ -1001,28 +1137,38 @@ def client_detail(client_id):
 @app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_client(client_id):
+    if not can_access_client(client_id):
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("clients"))
+
     statuses = ["demande de cotation", "en cours", "signé", "perdu"]
+    user = session.get("user") or {}
 
     conn = get_db()
     row = conn.execute(
         "SELECT * FROM crm_clients WHERE id=?", (client_id,)
     ).fetchone()
-    client = row_to_obj(row)
     conn.close()
 
-    if not client:
+    if not row:
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
+    client = row_to_obj(row)
+
     if request.method == "POST":
+        commercial_value = (request.form.get("commercial") or "").strip()
+        if user.get("role") != "admin":
+            commercial_value = user.get("username") or commercial_value
+
         data = (
-            request.form.get("name").strip(),
-            request.form.get("email").strip(),
-            request.form.get("phone").strip(),
-            request.form.get("address").strip(),
-            request.form.get("commercial").strip(),
-            request.form.get("status").strip(),
-            request.form.get("notes").strip(),
+            (request.form.get("name") or "").strip(),
+            (request.form.get("email") or "").strip(),
+            (request.form.get("phone") or "").strip(),
+            (request.form.get("address") or "").strip(),
+            commercial_value,
+            (request.form.get("status") or "").strip(),
+            (request.form.get("notes") or "").strip(),
         )
 
         if not data[0]:
@@ -1052,6 +1198,10 @@ def edit_client(client_id):
 @app.route("/clients/<int:client_id>/delete", methods=["POST"])
 @login_required
 def delete_client(client_id):
+    if not can_access_client(client_id):
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("clients"))
+
     conn = get_db()
     conn.execute("DELETE FROM crm_clients WHERE id=?", (client_id,))
     conn.commit()
@@ -1064,12 +1214,15 @@ def delete_client(client_id):
 @app.route("/clients/<int:client_id>/upload_document", methods=["POST"])
 @login_required
 def client_upload_document(client_id):
+    if not can_access_client(client_id):
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("clients"))
+
     if LOCAL_MODE or not s3:
         flash("Upload désactivé en local.", "warning")
         return redirect(url_for("client_detail", client_id=client_id))
 
     fichier = request.files.get("file")
-
     if not fichier or not allowed_file(fichier.filename):
         flash("Fichier non valide.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
@@ -1094,6 +1247,10 @@ def client_upload_document(client_id):
 @app.route("/clients/<int:client_id>/delete_document/<path:key>", methods=["POST"])
 @login_required
 def client_delete_document(client_id, key):
+    if not can_access_client(client_id):
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("clients"))
+
     if LOCAL_MODE or not s3:
         flash("Suppression désactivée en local.", "warning")
         return redirect(url_for("client_detail", client_id=client_id))
@@ -1114,11 +1271,15 @@ def client_delete_document(client_id, key):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-# --------- DEMANDES DE COTATION ---------
+# --------- DEMANDES DE COTATION (sécurisées) ---------
 
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
 def create_cotation(client_id):
+    if not can_access_client(client_id):
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("clients"))
+
     ensure_cotations_schema()
 
     description = (request.form.get("description") or "").strip()
@@ -1132,43 +1293,23 @@ def create_cotation(client_id):
         return redirect(url_for("client_detail", client_id=client_id))
 
     conn = get_db()
-
-    if has_column("cotations", "created_by"):
-        conn.execute(
-            """
-            INSERT INTO cotations
-            (client_id, description, fournisseur_actuel, date_echeance,
-             date_negociation_date, date_negociation_time, status, is_read, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, 'nouvelle', 0, ?)
-            """,
-            (
-                client_id,
-                description,
-                fournisseur_actuel,
-                date_echeance,
-                date_negociation_date,
-                date_negociation_time,
-                session["user"]["id"],
-            ),
-        )
-    else:
-        conn.execute(
-            """
-            INSERT INTO cotations
-            (client_id, description, fournisseur_actuel, date_echeance,
-             date_negociation_date, date_negociation_time, status, is_read)
-            VALUES (?, ?, ?, ?, ?, ?, 'nouvelle', 0)
-            """,
-            (
-                client_id,
-                description,
-                fournisseur_actuel,
-                date_echeance,
-                date_negociation_date,
-                date_negociation_time,
-            ),
-        )
-
+    conn.execute(
+        """
+        INSERT INTO cotations
+        (client_id, description, fournisseur_actuel, date_echeance,
+         date_negociation_date, date_negociation_time, status, is_read, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, 'nouvelle', 0, ?)
+        """,
+        (
+            client_id,
+            description,
+            fournisseur_actuel,
+            date_echeance,
+            date_negociation_date,
+            date_negociation_time,
+            session["user"]["id"],
+        ),
+    )
     conn.commit()
     conn.close()
 
@@ -1190,16 +1331,9 @@ def update_cotation(cotation_id):
         conn.close()
         return jsonify({"success": False, "message": "Demande introuvable"}), 404
 
-    user = session.get("user") or {}
-
-    if has_column("cotations", "created_by"):
-        if user.get("role") != "admin" and cot["created_by"] != user.get("id"):
-            conn.close()
-            return jsonify({"success": False, "message": "Accès refusé"}), 403
-    else:
-        if user.get("role") != "admin":
-            conn.close()
-            return jsonify({"success": False, "message": "Accès refusé"}), 403
+    if not can_access_client(cot["client_id"]):
+        conn.close()
+        return jsonify({"success": False, "message": "Accès refusé"}), 403
 
     data = request.get_json() or {}
 
@@ -1240,16 +1374,9 @@ def delete_cotation(cotation_id):
         conn.close()
         return jsonify({"success": False, "message": "Demande introuvable"}), 404
 
-    user = session.get("user") or {}
-
-    if has_column("cotations", "created_by"):
-        if user.get("role") != "admin" and cot["created_by"] != user.get("id"):
-            conn.close()
-            return jsonify({"success": False, "message": "Accès refusé"}), 403
-    else:
-        if user.get("role") != "admin":
-            conn.close()
-            return jsonify({"success": False, "message": "Accès refusé"}), 403
+    if not can_access_client(cot["client_id"]):
+        conn.close()
+        return jsonify({"success": False, "message": "Accès refusé"}), 403
 
     conn.execute("DELETE FROM cotations WHERE id=?", (cotation_id,))
     conn.commit()
@@ -1258,19 +1385,9 @@ def delete_cotation(cotation_id):
     return jsonify({"success": True})
 
 
-@app.route("/admin/cotations/unread_count")
-@admin_required
-def cotations_unread_count():
-    conn = get_db()
-    count = conn.execute(
-        "SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0"
-    ).fetchone()[0]
-    conn.close()
-    return jsonify({"count": count})
-
 
 ############################################################
-# 13. AGENDA / FULLCALENDAR
+# 13. AGENDA / FULLCALENDAR (sécurisé multi-commerciaux)
 ############################################################
 
 @app.route("/agenda")
@@ -1282,15 +1399,30 @@ def agenda():
 @app.route("/appointments/events_json")
 @login_required
 def appointments_events_json():
+    user = session.get("user") or {}
     conn = get_db()
-    rows = conn.execute(
-        """
-        SELECT a.id, a.title, a.date, a.time, a.color,
-               a.client_id, c.name AS client_name
-        FROM appointments a
-        LEFT JOIN crm_clients c ON c.id = a.client_id
-        """
-    ).fetchall()
+
+    if user.get("role") == "admin":
+        rows = conn.execute(
+            """
+            SELECT a.id, a.title, a.date, a.time, a.color,
+                   a.client_id, c.name AS client_name
+            FROM appointments a
+            LEFT JOIN crm_clients c ON c.id = a.client_id
+            """
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT a.id, a.title, a.date, a.time, a.color,
+                   a.client_id, c.name AS client_name
+            FROM appointments a
+            JOIN crm_clients c ON c.id = a.client_id
+            WHERE c.owner_id=?
+            """,
+            (user.get("id"),),
+        ).fetchall()
+
     conn.close()
 
     events = []
@@ -1302,15 +1434,13 @@ def appointments_events_json():
         time_part = (r["time"] or "09:00").strip()
         start = f"{r['date']}T{time_part}:00"
 
-        events.append(
-            {
-                "id": r["id"],
-                "title": title,
-                "start": start,
-                "backgroundColor": r["color"] or "#2563eb",
-                "borderColor": r["color"] or "#2563eb",
-            }
-        )
+        events.append({
+            "id": r["id"],
+            "title": title,
+            "start": start,
+            "backgroundColor": r["color"] or "#2563eb",
+            "borderColor": r["color"] or "#2563eb",
+        })
 
     return jsonify(events)
 
@@ -1327,8 +1457,23 @@ def appointments_update_from_calendar():
         return jsonify({"status": "error", "message": "id/date manquants"}), 400
 
     new_time = (new_time or "").strip() or None
+    user = session.get("user") or {}
 
     conn = get_db()
+    row = conn.execute(
+        "SELECT client_id FROM appointments WHERE id=?",
+        (appt_id,),
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        return jsonify({"status": "error", "message": "RDV introuvable"}), 404
+
+    if user.get("role") != "admin":
+        if not row["client_id"] or not can_access_client(row["client_id"]):
+            conn.close()
+            return jsonify({"status": "error", "message": "Accès refusé"}), 403
+
     conn.execute(
         "UPDATE appointments SET date=?, time=? WHERE id=?",
         (new_date, new_time, appt_id),
@@ -1356,6 +1501,12 @@ def appointments_create():
     if not title or not date_str:
         return jsonify({"success": False, "message": "Titre et date obligatoires."}), 400
 
+    user = session.get("user") or {}
+
+    if user.get("role") != "admin":
+        if not client_id or not can_access_client(int(client_id)):
+            return jsonify({"success": False, "message": "Client requis / accès refusé."}), 403
+
     conn = get_db()
     cur = conn.execute(
         """
@@ -1380,8 +1531,15 @@ def appointments_get(appt_id):
         (appt_id,),
     ).fetchone()
     conn.close()
+
     if not row:
         return jsonify({"success": False, "message": "RDV introuvable"}), 404
+
+    user = session.get("user") or {}
+    if user.get("role") != "admin":
+        if not row["client_id"] or not can_access_client(row["client_id"]):
+            return jsonify({"success": False, "message": "Accès refusé"}), 403
+
     return jsonify({"success": True, "appointment": dict(row)})
 
 
@@ -1403,14 +1561,26 @@ def appointments_update(appt_id):
     if not title or not date_str:
         return jsonify({"success": False, "message": "Titre et date obligatoires."}), 400
 
+    user = session.get("user") or {}
     conn = get_db()
-    exists = conn.execute(
-        "SELECT id FROM appointments WHERE id=?",
+
+    existing = conn.execute(
+        "SELECT client_id FROM appointments WHERE id=?",
         (appt_id,),
     ).fetchone()
-    if not exists:
+
+    if not existing:
         conn.close()
         return jsonify({"success": False, "message": "RDV introuvable"}), 404
+
+    if user.get("role") != "admin":
+        if not existing["client_id"] or not can_access_client(existing["client_id"]):
+            conn.close()
+            return jsonify({"success": False, "message": "Accès refusé"}), 403
+
+        if not client_id or not can_access_client(int(client_id)):
+            conn.close()
+            return jsonify({"success": False, "message": "Client requis / accès refusé."}), 403
 
     conn.execute(
         """
@@ -1429,10 +1599,27 @@ def appointments_update(appt_id):
 @app.route("/appointments/<int:appt_id>/delete", methods=["POST"])
 @login_required
 def appointments_delete(appt_id):
+    user = session.get("user") or {}
     conn = get_db()
+
+    row = conn.execute(
+        "SELECT client_id FROM appointments WHERE id=?",
+        (appt_id,),
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        return jsonify({"success": False, "message": "RDV introuvable"}), 404
+
+    if user.get("role") != "admin":
+        if not row["client_id"] or not can_access_client(row["client_id"]):
+            conn.close()
+            return jsonify({"success": False, "message": "Accès refusé"}), 403
+
     conn.execute("DELETE FROM appointments WHERE id=?", (appt_id,))
     conn.commit()
     conn.close()
+
     return jsonify({"success": True})
 
 
