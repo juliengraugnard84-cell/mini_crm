@@ -1033,7 +1033,7 @@ def clients():
         rows = conn.execute(
             """
             SELECT * FROM crm_clients
-            WHERE owner_id=?
+            WHERE owner_id = ?
             ORDER BY created_at DESC
             """,
             (user.get("id"),),
@@ -1052,7 +1052,7 @@ def new_client():
     if request.method == "POST":
         commercial_value = (request.form.get("commercial") or "").strip()
         if user.get("role") != "admin":
-            commercial_value = user.get("username") or commercial_value
+            commercial_value = user.get("username")
 
         data = (
             (request.form.get("name") or "").strip(),
@@ -1084,7 +1084,10 @@ def new_client():
         return redirect(url_for("clients"))
 
     return render_template(
-        "client_form.html", action="new", client=None, statuses=statuses
+        "client_form.html",
+        action="new",
+        client=None,
+        statuses=statuses,
     )
 
 
@@ -1097,7 +1100,8 @@ def client_detail(client_id):
 
     conn = get_db()
     row = conn.execute(
-        "SELECT * FROM crm_clients WHERE id=?", (client_id,)
+        "SELECT * FROM crm_clients WHERE id = ?",
+        (client_id,),
     ).fetchone()
 
     if not row:
@@ -1108,30 +1112,31 @@ def client_detail(client_id):
     cot_rows = conn.execute(
         """
         SELECT * FROM cotations
-        WHERE client_id=?
+        WHERE client_id = ?
         ORDER BY date_creation DESC, id DESC
         """,
         (client_id,),
     ).fetchall()
     conn.close()
 
+    # 🔔 Admin : marque les cotations comme lues
     if session.get("user", {}).get("role") == "admin":
         conn2 = get_db()
         conn2.execute(
-            "UPDATE cotations SET is_read=1 WHERE client_id=?",
+            "UPDATE cotations SET is_read = 1 WHERE client_id = ?",
             (client_id,),
         )
         conn2.commit()
         conn2.close()
 
     client = row_to_obj(row)
-    docs = list_client_documents(client_id)
+    documents = list_client_documents(client_id)
     cotations = [row_to_obj(r) for r in cot_rows]
 
     return render_template(
         "client_detail.html",
         client=client,
-        documents=docs,
+        documents=documents,
         cotations=cotations,
     )
 
@@ -1148,7 +1153,8 @@ def edit_client(client_id):
 
     conn = get_db()
     row = conn.execute(
-        "SELECT * FROM crm_clients WHERE id=?", (client_id,)
+        "SELECT * FROM crm_clients WHERE id = ?",
+        (client_id,),
     ).fetchone()
     conn.close()
 
@@ -1161,7 +1167,7 @@ def edit_client(client_id):
     if request.method == "POST":
         commercial_value = (request.form.get("commercial") or "").strip()
         if user.get("role") != "admin":
-            commercial_value = user.get("username") or commercial_value
+            commercial_value = user.get("username")
 
         data = (
             (request.form.get("name") or "").strip(),
@@ -1181,8 +1187,9 @@ def edit_client(client_id):
         conn.execute(
             """
             UPDATE crm_clients
-            SET name=?, email=?, phone=?, address=?, commercial=?, status=?, notes=?
-            WHERE id=?
+            SET name = ?, email = ?, phone = ?, address = ?,
+                commercial = ?, status = ?, notes = ?
+            WHERE id = ?
             """,
             (*data, client_id),
         )
@@ -1193,7 +1200,10 @@ def edit_client(client_id):
         return redirect(url_for("client_detail", client_id=client_id))
 
     return render_template(
-        "client_form.html", action="edit", client=client, statuses=statuses
+        "client_form.html",
+        action="edit",
+        client=client,
+        statuses=statuses,
     )
 
 
@@ -1205,7 +1215,7 @@ def delete_client(client_id):
         return redirect(url_for("clients"))
 
     conn = get_db()
-    conn.execute("DELETE FROM crm_clients WHERE id=?", (client_id,))
+    conn.execute("DELETE FROM crm_clients WHERE id = ?", (client_id,))
     conn.commit()
     conn.close()
 
@@ -1234,6 +1244,12 @@ def client_upload_document(client_id):
     key = prefix + nom
 
     try:
+        # 🔒 Sécurité Render : repositionner le flux
+        try:
+            fichier.stream.seek(0)
+        except Exception:
+            pass
+
         s3_upload_fileobj(fichier, AWS_BUCKET, key)
         flash("Document envoyé.", "success")
     except ClientError as e:
@@ -1258,7 +1274,7 @@ def client_delete_document(client_id, key):
         return redirect(url_for("client_detail", client_id=client_id))
 
     prefix = client_s3_prefix(client_id)
-    full_key = prefix + key
+    full_key = key if key.startswith(prefix) else prefix + key
 
     try:
         s3.delete_object(Bucket=AWS_BUCKET, Key=full_key)
@@ -1271,121 +1287,6 @@ def client_delete_document(client_id, key):
         flash("Erreur suppression S3.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
-
-
-# --------- DEMANDES DE COTATION (sécurisées) ---------
-
-@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
-@login_required
-def create_cotation(client_id):
-    if not can_access_client(client_id):
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("clients"))
-
-    ensure_cotations_schema()
-
-    description = (request.form.get("description") or "").strip()
-    fournisseur_actuel = (request.form.get("fournisseur_actuel") or "").strip()
-    date_echeance = (request.form.get("date_echeance") or "").strip()
-    date_negociation_date = (request.form.get("date_negociation_date") or "").strip()
-    date_negociation_time = (request.form.get("date_negociation_time") or "").strip()
-
-    if not description:
-        flash("La description est obligatoire.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    conn = get_db()
-    conn.execute(
-        """
-        INSERT INTO cotations
-        (client_id, description, fournisseur_actuel, date_echeance,
-         date_negociation_date, date_negociation_time, status, is_read, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, 'nouvelle', 0, ?)
-        """,
-        (
-            client_id,
-            description,
-            fournisseur_actuel,
-            date_echeance,
-            date_negociation_date,
-            date_negociation_time,
-            session["user"]["id"],
-        ),
-    )
-    conn.commit()
-    conn.close()
-
-    flash("Demande de cotation créée.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-@app.route("/cotations/<int:cotation_id>/update", methods=["POST"])
-@login_required
-def update_cotation(cotation_id):
-    ensure_cotations_schema()
-
-    conn = get_db()
-    cot = conn.execute(
-        "SELECT * FROM cotations WHERE id=?", (cotation_id,)
-    ).fetchone()
-
-    if not cot:
-        conn.close()
-        return jsonify({"success": False, "message": "Demande introuvable"}), 404
-
-    if not can_access_client(cot["client_id"]):
-        conn.close()
-        return jsonify({"success": False, "message": "Accès refusé"}), 403
-
-    data = request.get_json() or {}
-
-    conn.execute(
-        """
-        UPDATE cotations
-        SET description=?, fournisseur_actuel=?,
-            date_echeance=?, date_negociation_date=?,
-            date_negociation_time=?
-        WHERE id=?
-        """,
-        (
-            (data.get("description") or "").strip(),
-            (data.get("fournisseur_actuel") or "").strip(),
-            (data.get("date_echeance") or "").strip(),
-            (data.get("date_negociation_date") or "").strip(),
-            (data.get("date_negociation_time") or "").strip(),
-            cotation_id,
-        ),
-    )
-    conn.commit()
-    conn.close()
-
-    return jsonify({"success": True})
-
-
-@app.route("/cotations/<int:cotation_id>/delete", methods=["POST"])
-@login_required
-def delete_cotation(cotation_id):
-    ensure_cotations_schema()
-
-    conn = get_db()
-    cot = conn.execute(
-        "SELECT * FROM cotations WHERE id=?", (cotation_id,)
-    ).fetchone()
-
-    if not cot:
-        conn.close()
-        return jsonify({"success": False, "message": "Demande introuvable"}), 404
-
-    if not can_access_client(cot["client_id"]):
-        conn.close()
-        return jsonify({"success": False, "message": "Accès refusé"}), 403
-
-    conn.execute("DELETE FROM cotations WHERE id=?", (cotation_id,))
-    conn.commit()
-    conn.close()
-
-    return jsonify({"success": True})
-
 
 
 ############################################################
