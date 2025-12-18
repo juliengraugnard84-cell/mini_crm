@@ -12,7 +12,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Material Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 
     <!-- CSS GLOBAL -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -49,7 +49,7 @@
                 Agenda
             </a>
 
-            <!-- ✅ DOCUMENTS : ADMIN UNIQUEMENT -->
+            <!-- 🔐 DOCUMENTS : ADMIN UNIQUEMENT -->
             {% if current_user and current_user.role == 'admin' %}
             <a href="{{ url_for('documents') }}"
                class="sidebar-link {% if request.endpoint == 'documents' %}active{% endif %}">
@@ -64,6 +64,7 @@
                 Chiffre d'affaire
             </a>
 
+            <!-- 🔐 ADMIN -->
             {% if current_user and current_user.role == 'admin' %}
             <a href="{{ url_for('admin_users') }}"
                class="sidebar-link {% if request.endpoint in ['admin_users','admin_edit_user'] %}active{% endif %}">
@@ -102,7 +103,7 @@
             {% endif %}
         </div>
 
-        <!-- FLASH -->
+        <!-- FLASH MESSAGES -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, msg in messages %}
@@ -120,7 +121,7 @@
     </main>
 </div>
 
-<!-- ================= CHAT ================= -->
+<!-- ================= CHAT (connecté uniquement) ================= -->
 {% if current_user %}
 <button id="chatBubble" type="button" aria-label="Ouvrir le chat">
     <span class="material-symbols-outlined">chat</span>
@@ -169,10 +170,12 @@ document.addEventListener("DOMContentLoaded", () => {
         win.setAttribute("aria-hidden", isOpen ? "true" : "false");
     });
 
-    close?.addEventListener("click", () => {
-        win.style.display = "none";
-        win.setAttribute("aria-hidden", "true");
-    });
+    if (close) {
+        close.addEventListener("click", () => {
+            win.style.display = "none";
+            win.setAttribute("aria-hidden", "true");
+        });
+    }
 });
 </script>
 
