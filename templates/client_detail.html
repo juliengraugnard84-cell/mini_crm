@@ -104,15 +104,21 @@
                             {{ c.date_negociation_time or "" }}
                         </small>
 
-                        {% if current_user
-                              and (current_user['role'] == 'admin'
-                                   or c.created_by == current_user['id']) %}
+                        {% if current_user %}
+                        {% set can_delete =
+                            current_user['role'] == 'admin'
+                            or (c.created_by is defined
+                                and c.created_by
+                                and c.created_by == current_user['id'])
+                        %}
+                        {% if can_delete %}
                         <div class="mt-2">
                             <button class="btn btn-sm btn-outline-danger"
                                     onclick="deleteCotation({{ c.id }})">
                                 Supprimer
                             </button>
                         </div>
+                        {% endif %}
                         {% endif %}
 
                     </li>
