@@ -1125,7 +1125,6 @@ def client_detail(client_id):
 
         client = row_to_obj(row)
         cotations = [row_to_obj(r) for r in cot_rows]
-
         documents = list_client_documents(client_id)
 
         return render_template(
@@ -1141,82 +1140,76 @@ def client_detail(client_id):
         return redirect(url_for("clients"))
 
 
-@app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
-@login_required
-def edit_client(client_id):
-    if not can_access_client(client_id):
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("clients"))
+# ==========================================================
+# COTATIONS — ROUTES MANQUANTES (CORRECTION CRITIQUE)
+# ==========================================================
 
-    statuses = ["demande de cotation", "en cours", "signé", "perdu"]
-    user = session.get("user") or {}
+@app.route(
+    "/clients/<int:client_id>/cotations/create",
+    methods=["POST"],
+    endpoint="create_cotation"
+)
+@login_required
+def create_cotation(client_id):
+    if not can_access_client(client_id):
+        return jsonify({"success": False, "message": "Accès refusé"}), 403
+
+    description = (request.form.get("description") or "").strip()
+    if not description:
+        flash("Description obligatoire.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
 
     conn = get_db()
+    conn.execute(
+        """
+        INSERT INTO cotations
+        (client_id, description, fournisseur_actuel,
+         date_echeance, date_negociation_date,
+         date_negociation_time, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            client_id,
+            description,
+            (request.form.get("fournisseur_actuel") or "").strip(),
+            (request.form.get("date_echeance") or "").strip(),
+            (request.form.get("date_negociation_date") or "").strip(),
+            (request.form.get("date_negociation_time") or "").strip(),
+            session["user"]["id"],
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    flash("Demande de cotation envoyée.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+@app.route("/cotations/<int:cotation_id>/delete", methods=["POST"])
+@login_required
+def delete_cotation(cotation_id):
+    user = session.get("user") or {}
+    conn = get_db()
+
     row = conn.execute(
-        "SELECT * FROM crm_clients WHERE id=?",
-        (client_id,),
+        "SELECT client_id, created_by FROM cotations WHERE id=?",
+        (cotation_id,),
     ).fetchone()
 
     if not row:
         conn.close()
-        flash("Client introuvable.", "danger")
-        return redirect(url_for("clients"))
+        return jsonify({"success": False, "message": "Introuvable"}), 404
 
-    client = row_to_obj(row)
-
-    if request.method == "POST":
-        commercial = (
-            request.form.get("commercial")
-            if user.get("role") == "admin"
-            else user.get("username")
-        )
-
-        conn.execute(
-            """
-            UPDATE crm_clients
-            SET name=?, email=?, phone=?, address=?, commercial=?, status=?, notes=?
-            WHERE id=?
-            """,
-            (
-                (request.form.get("name") or "").strip(),
-                (request.form.get("email") or "").strip(),
-                (request.form.get("phone") or "").strip(),
-                (request.form.get("address") or "").strip(),
-                commercial,
-                (request.form.get("status") or "").strip(),
-                (request.form.get("notes") or "").strip(),
-                client_id,
-            ),
-        )
-        conn.commit()
+    if user.get("role") != "admin" and row["created_by"] != user.get("id"):
         conn.close()
+        return jsonify({"success": False, "message": "Accès refusé"}), 403
 
-        flash("Client mis à jour.", "success")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    conn.close()
-    return render_template(
-        "client_form.html",
-        action="edit",
-        client=client,
-        statuses=statuses,
-    )
-
-
-@app.route("/clients/<int:client_id>/delete", methods=["POST"])
-@login_required
-def delete_client(client_id):
-    if not can_access_client(client_id):
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("clients"))
-
-    conn = get_db()
-    conn.execute("DELETE FROM crm_clients WHERE id=?", (client_id,))
+    conn.execute("DELETE FROM cotations WHERE id=?", (cotation_id,))
     conn.commit()
     conn.close()
 
-    flash("Client supprimé.", "success")
-    return redirect(url_for("clients"))
+    return jsonify({"success": True})
+
 
 
 ############################################################
