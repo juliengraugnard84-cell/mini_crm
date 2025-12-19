@@ -1140,75 +1140,45 @@ def client_detail(client_id):
         return redirect(url_for("clients"))
 
 
-# ==========================================================
-# COTATIONS — ROUTES MANQUANTES (CORRECTION CRITIQUE)
-# ==========================================================
-
-@app.route(
-    "/clients/<int:client_id>/cotations/create",
-    methods=["POST"],
-    endpoint="create_cotation"
-)
+# ✅ ROUTE MANQUANTE — CORRECTION DU 500
+@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
 def create_cotation(client_id):
     if not can_access_client(client_id):
-        return jsonify({"success": False, "message": "Accès refusé"}), 403
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("clients"))
 
     description = (request.form.get("description") or "").strip()
+    fournisseur = (request.form.get("fournisseur_actuel") or "").strip()
+    date_echeance = (request.form.get("date_echeance") or "").strip()
+
     if not description:
         flash("Description obligatoire.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
+
+    user = session.get("user") or {}
 
     conn = get_db()
     conn.execute(
         """
         INSERT INTO cotations
-        (client_id, description, fournisseur_actuel,
-         date_echeance, date_negociation_date,
-         date_negociation_time, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        (client_id, description, fournisseur_actuel, date_echeance, created_by)
+        VALUES (?, ?, ?, ?, ?)
         """,
         (
             client_id,
             description,
-            (request.form.get("fournisseur_actuel") or "").strip(),
-            (request.form.get("date_echeance") or "").strip(),
-            (request.form.get("date_negociation_date") or "").strip(),
-            (request.form.get("date_negociation_time") or "").strip(),
-            session["user"]["id"],
+            fournisseur,
+            date_echeance,
+            user.get("id"),
         ),
     )
     conn.commit()
     conn.close()
 
-    flash("Demande de cotation envoyée.", "success")
+    flash("Cotation ajoutée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
-
-@app.route("/cotations/<int:cotation_id>/delete", methods=["POST"])
-@login_required
-def delete_cotation(cotation_id):
-    user = session.get("user") or {}
-    conn = get_db()
-
-    row = conn.execute(
-        "SELECT client_id, created_by FROM cotations WHERE id=?",
-        (cotation_id,),
-    ).fetchone()
-
-    if not row:
-        conn.close()
-        return jsonify({"success": False, "message": "Introuvable"}), 404
-
-    if user.get("role") != "admin" and row["created_by"] != user.get("id"):
-        conn.close()
-        return jsonify({"success": False, "message": "Accès refusé"}), 403
-
-    conn.execute("DELETE FROM cotations WHERE id=?", (cotation_id,))
-    conn.commit()
-    conn.close()
-
-    return jsonify({"success": True})
 
 
 
