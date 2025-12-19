@@ -1040,10 +1040,7 @@ def clients():
         ).fetchall()
 
     conn.close()
-    return render_template(
-        "clients.html",
-        clients=[row_to_obj(r) for r in rows],
-    )
+    return render_template("clients.html", clients=[row_to_obj(r) for r in rows])
 
 
 @app.route("/clients/new", methods=["GET", "POST"])
@@ -1058,9 +1055,11 @@ def new_client():
             flash("Nom obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
-        commercial = (request.form.get("commercial") or "").strip()
-        if user.get("role") != "admin":
-            commercial = user.get("username")
+        commercial = (
+            request.form.get("commercial")
+            if user.get("role") == "admin"
+            else user.get("username")
+        )
 
         conn = get_db()
         conn.execute(
@@ -1104,7 +1103,7 @@ def client_detail(client_id):
 
         conn = get_db()
         row = conn.execute(
-            "SELECT * FROM crm_clients WHERE id = ?",
+            "SELECT * FROM crm_clients WHERE id=?",
             (client_id,),
         ).fetchone()
 
@@ -1116,7 +1115,7 @@ def client_detail(client_id):
         cot_rows = conn.execute(
             """
             SELECT * FROM cotations
-            WHERE client_id = ?
+            WHERE client_id=?
             ORDER BY date_creation DESC, id DESC
             """,
             (client_id,),
@@ -1124,33 +1123,21 @@ def client_detail(client_id):
 
         conn.close()
 
-        if session.get("user", {}).get("role") == "admin":
-            conn2 = get_db()
-            conn2.execute(
-                "UPDATE cotations SET is_read = 1 WHERE client_id = ?",
-                (client_id,),
-            )
-            conn2.commit()
-            conn2.close()
-
         client = row_to_obj(row)
         cotations = [row_to_obj(r) for r in cot_rows]
 
-        try:
-            documents = list_client_documents(client_id)
-        except Exception:
-            documents = []
+        documents = list_client_documents(client_id)
 
         return render_template(
             "client_detail.html",
             client=client,
-            documents=documents,
             cotations=cotations,
+            documents=documents,
         )
 
     except Exception as e:
         print("ERREUR client_detail :", repr(e))
-        flash("Erreur lors de l’ouverture du dossier client.", "danger")
+        flash("Erreur lors de l'ouverture du dossier client.", "danger")
         return redirect(url_for("clients"))
 
 
@@ -1166,37 +1153,32 @@ def edit_client(client_id):
 
     conn = get_db()
     row = conn.execute(
-        "SELECT * FROM crm_clients WHERE id = ?",
+        "SELECT * FROM crm_clients WHERE id=?",
         (client_id,),
     ).fetchone()
-    conn.close()
 
     if not row:
+        conn.close()
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
     client = row_to_obj(row)
 
     if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        if not name:
-            flash("Nom obligatoire.", "danger")
-            return redirect(url_for("edit_client", client_id=client_id))
+        commercial = (
+            request.form.get("commercial")
+            if user.get("role") == "admin"
+            else user.get("username")
+        )
 
-        commercial = (request.form.get("commercial") or "").strip()
-        if user.get("role") != "admin":
-            commercial = user.get("username")
-
-        conn = get_db()
         conn.execute(
             """
             UPDATE crm_clients
-            SET name=?, email=?, phone=?, address=?,
-                commercial=?, status=?, notes=?
+            SET name=?, email=?, phone=?, address=?, commercial=?, status=?, notes=?
             WHERE id=?
             """,
             (
-                name,
+                (request.form.get("name") or "").strip(),
                 (request.form.get("email") or "").strip(),
                 (request.form.get("phone") or "").strip(),
                 (request.form.get("address") or "").strip(),
@@ -1212,6 +1194,7 @@ def edit_client(client_id):
         flash("Client mis à jour.", "success")
         return redirect(url_for("client_detail", client_id=client_id))
 
+    conn.close()
     return render_template(
         "client_form.html",
         action="edit",
@@ -1228,10 +1211,7 @@ def delete_client(client_id):
         return redirect(url_for("clients"))
 
     conn = get_db()
-    conn.execute(
-        "DELETE FROM crm_clients WHERE id = ?",
-        (client_id,),
-    )
+    conn.execute("DELETE FROM crm_clients WHERE id=?", (client_id,))
     conn.commit()
     conn.close()
 
