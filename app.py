@@ -1445,30 +1445,15 @@ def delete_cotation(cotation_id):
     return jsonify(success=True)
 
 
-# === AJOUTS / CORRECTIONS AGENDA — BACKEND ===
-# (le reste de ton fichier app.py reste IDENTIQUE)
+############################################################
+# 13. AGENDA / FULLCALENDAR (COMPLET + STABLE)
+############################################################
 
-# -------------------------------------------------------------------
-# 1. MIGRATION SAFE — APPOINTMENTS
-# -------------------------------------------------------------------
+@app.route("/agenda")
+@login_required
+def agenda():
+    return render_template("calendar.html")
 
-def ensure_appointments_schema():
-    conn = _connect_db()
-    try:
-        _try_add_column(conn, "appointments", "start_time TEXT")
-        _try_add_column(conn, "appointments", "end_time TEXT")
-        _try_add_column(conn, "appointments", "created_by INTEGER")
-        conn.commit()
-    finally:
-        conn.close()
-
-
-ensure_appointments_schema()
-
-
-# -------------------------------------------------------------------
-# 2. EVENTS JSON — FULLCALENDAR (COMPLET)
-# -------------------------------------------------------------------
 
 @app.route("/appointments/events_json")
 @login_required
@@ -1477,74 +1462,82 @@ def appointments_events_json():
     conn = get_db()
 
     if user.get("role") == "admin":
-        rows = conn.execute("""
-            SELECT
-                a.id,
-                a.title,
-                a.date,
-                a.start_time,
-                a.end_time,
-                a.color,
-                a.created_by,
-                u.username AS creator_name,
-                c.name AS client_name,
-                c.commercial AS commercial_name
+        rows = conn.execute(
+            """
+            SELECT a.*, u.username AS created_by_name, c.name AS client_name
             FROM appointments a
-            LEFT JOIN crm_clients c ON c.id = a.client_id
             LEFT JOIN users u ON u.id = a.created_by
-        """).fetchall()
+            LEFT JOIN crm_clients c ON c.id = a.client_id
+            """
+        ).fetchall()
     else:
-        rows = conn.execute("""
-            SELECT
-                a.id,
-                a.title,
-                a.date,
-                a.start_time,
-                a.end_time,
-                a.color,
-                a.created_by,
-                u.username AS creator_name,
-                c.name AS client_name,
-                c.commercial AS commercial_name
+        rows = conn.execute(
+            """
+            SELECT a.*, u.username AS created_by_name, c.name AS client_name
             FROM appointments a
             JOIN crm_clients c ON c.id = a.client_id
-            LEFT JOIN users u ON u.id = a.created_by
+            JOIN users u ON u.id = a.created_by
             WHERE c.owner_id = ?
-        """, (user["id"],)).fetchall()
+            """,
+            (user.get("id"),),
+        ).fetchall()
 
     events = []
 
     for r in rows:
-        title_parts = [r["title"]]
+        start_time = r["time"] or "09:00"
+        end_time = r["end_time"] or "10:00"
 
+        start = f"{r['date']}T{start_time}:00"
+        end = f"{r['date']}T{end_time}:00"
+
+        title = r["title"]
         if r["client_name"]:
-            title_parts.append(r["client_name"])
-
-        if r["commercial_name"]:
-            title_parts.append(f"Commercial : {r['commercial_name']}")
-
-        if r["creator_name"]:
-            title_parts.append(f"Créé par : {r['creator_name']}")
-
-        start = f"{r['date']}T{r['start_time']}"
-        end = f"{r['date']}T{r['end_time']}"
+            title += f" — {r['client_name']}"
 
         events.append({
             "id": r["id"],
-            "title": " — ".join(title_parts),
+            "title": title,
             "start": start,
             "end": end,
             "backgroundColor": r["color"] or "#2563eb",
             "borderColor": r["color"] or "#2563eb",
-            "editable": True,
+            "extendedProps": {
+                "created_by": r["created_by_name"]
+            }
         })
 
     return jsonify(events)
 
 
-# -------------------------------------------------------------------
-# 3. UPDATE VIA DRAG / RESIZE (CALENDAR)
-# -------------------------------------------------------------------
+@app.route("/appointments/create", methods=["POST"])
+@login_required
+def appointments_create():
+    data = request.get_json() or {}
+
+    title = (data.get("title") or "").strip()
+    date_str = data.get("date")
+    time_str = data.get("time") or "09:00"
+    end_time = data.get("end_time") or "10:00"
+
+    if not title or not date_str:
+        return jsonify(success=False, message="Titre et date obligatoires"), 400
+
+    user = session.get("user") or {}
+    conn = get_db()
+
+    cur = conn.execute(
+        """
+        INSERT INTO appointments
+        (title, date, time, end_time, created_by)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (title, date_str, time_str, end_time, user.get("id")),
+    )
+    conn.commit()
+
+    return jsonify(success=True, id=cur.lastrowid)
+
 
 @app.route("/appointments/update_from_calendar", methods=["POST"])
 @login_required
@@ -1552,77 +1545,38 @@ def appointments_update_from_calendar():
     data = request.get_json() or {}
 
     appt_id = data.get("id")
-    start = data.get("start")
-    end = data.get("end")
+    date_str = data.get("date")
+    time_str = data.get("time")
+    end_time = data.get("end_time")
 
-    if not appt_id or not start or not end:
-        return jsonify({"success": False}), 400
-
-    date_part, start_time = start.split("T")
-    _, end_time = end.split("T")
+    if not appt_id or not date_str:
+        return jsonify(success=False, message="Données manquantes"), 400
 
     user = session.get("user") or {}
     conn = get_db()
 
     row = conn.execute(
-        "SELECT client_id, created_by FROM appointments WHERE id=?",
-        (appt_id,)
+        "SELECT created_by FROM appointments WHERE id=?",
+        (appt_id,),
     ).fetchone()
 
     if not row:
-        return jsonify({"success": False}), 404
+        return jsonify(success=False, message="RDV introuvable"), 404
 
-    if user["role"] != "admin" and row["created_by"] != user["id"]:
-        return jsonify({"success": False}), 403
+    if user.get("role") != "admin" and row["created_by"] != user.get("id"):
+        return jsonify(success=False, message="Accès refusé"), 403
 
-    conn.execute("""
+    conn.execute(
+        """
         UPDATE appointments
-        SET date=?, start_time=?, end_time=?
+        SET date=?, time=?, end_time=?
         WHERE id=?
-    """, (date_part, start_time, end_time, appt_id))
-
-    conn.commit()
-    return jsonify({"success": True})
-
-
-# -------------------------------------------------------------------
-# 4. CREATE RDV (API JSON)
-# -------------------------------------------------------------------
-
-@app.route("/appointments/create", methods=["POST"])
-@login_required
-def appointments_create():
-    data = request.get_json() or {}
-    user = session["user"]
-
-    title = data.get("title", "").strip()
-    date_str = data.get("date")
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
-    client_id = data.get("client_id")
-    color = data.get("color", "#2563eb")
-
-    if not title or not date_str or not start_time or not end_time:
-        return jsonify({"success": False}), 400
-
-    conn = get_db()
-    cur = conn.execute("""
-        INSERT INTO appointments
-        (title, date, start_time, end_time, client_id, created_by, color)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (
-        title,
-        date_str,
-        start_time,
-        end_time,
-        client_id,
-        user["id"],
-        color
-    ))
+        """,
+        (date_str, time_str, end_time, appt_id),
+    )
     conn.commit()
 
-    return jsonify({"success": True, "id": cur.lastrowid})
-
+    return jsonify(success=True)
 
 ############################################################
 # 14. CHAT (BACKEND)
