@@ -36,30 +36,19 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            const startTime = prompt("Heure de début (HH:MM)", info.startStr.slice(11, 16));
-            if (!startTime) return;
-
-            const endTime = prompt("Heure de fin (HH:MM)", info.endStr.slice(11, 16));
-            if (!endTime) return;
-
             fetch("/appointments/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     title: title,
                     date: info.startStr.slice(0, 10),
-                    start_time: startTime,
-                    end_time: endTime
+                    start_time: info.startStr.slice(11, 16),
+                    end_time: info.endStr.slice(11, 16)
                 })
             })
             .then(r => r.json())
-            .then(data => {
-                if (!data.success) {
-                    alert(data.message || "Erreur création RDV");
-                }
-                calendar.refetchEvents();
-            })
-            .catch(() => alert("Erreur réseau"));
+            .then(() => calendar.refetchEvents())
+            .catch(() => alert("Erreur création RDV"));
 
             calendar.unselect();
         },
@@ -71,49 +60,62 @@ document.addEventListener("DOMContentLoaded", function () {
         eventResize: persistEvent,
 
         /* =====================
-           MODIFICATION AU CLIC
+           CLIC : MODIFIER / SUPPRIMER
         ===================== */
         eventClick(info) {
             const e = info.event;
 
-            const newTitle = prompt("Titre du rendez-vous", e.title);
-            if (!newTitle) return;
-
-            const startTime = prompt(
-                "Heure de début (HH:MM)",
-                e.start.toTimeString().slice(0, 5)
+            const action = prompt(
+                "Modifier le titre ou taper SUPPRIMER pour supprimer",
+                e.title
             );
-            if (!startTime) return;
 
-            const endTime = prompt(
-                "Heure de fin (HH:MM)",
-                e.end ? e.end.toTimeString().slice(0, 5) : ""
-            );
-            if (!endTime) return;
+            if (!action) return;
 
-            fetch("/appointments/update_from_calendar", {
+            /* ===== SUPPRESSION ===== */
+            if (action.toLowerCase() === "supprimer") {
+                if (!confirm("Confirmer la suppression du rendez-vous ?")) return;
+
+                fetch(`/appointments/${e.id}/delete`, {
+                    method: "POST"
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        e.remove();
+                    } else {
+                        alert(data.message || "Erreur suppression");
+                    }
+                })
+                .catch(() => alert("Erreur suppression"));
+                return;
+            }
+
+            /* ===== MODIFICATION ===== */
+            const start = e.start;
+            const end = e.end;
+
+            fetch(`/appointments/${e.id}/update`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    id: e.id,
-                    title: newTitle,
-                    date: e.start.toISOString().slice(0, 10),
-                    start_time: startTime,
-                    end_time: endTime
+                    title: action,
+                    date: start.toISOString().slice(0, 10),
+                    start_time: start.toTimeString().slice(0, 5),
+                    end_time: end ? end.toTimeString().slice(0, 5) : null
                 })
             })
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
                     alert(data.message || "Erreur modification");
+                    calendar.refetchEvents();
                 }
-                calendar.refetchEvents();
-            })
-            .catch(() => alert("Erreur réseau"));
+            });
         },
 
         /* =====================
-           INFO BULLE (QUI A CRÉÉ)
+           INFO BULLE
         ===================== */
         eventDidMount(info) {
             const createdBy = info.event.extendedProps.created_by;
@@ -136,7 +138,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 id: info.event.id,
                 date: start.toISOString().slice(0, 10),
                 start_time: start.toTimeString().slice(0, 5),
-                end_time: end ? end.toTimeString().slice(0, 5) : "10:00"
+                end_time: end ? end.toTimeString().slice(0, 5) : null
             })
         })
         .then(res => {

@@ -1377,7 +1377,7 @@ def delete_cotation(cotation_id):
 
 
 ############################################################
-# 13. AGENDA / FULLCALENDAR (COMPLET + COHÉRENT)
+# 13. AGENDA / FULLCALENDAR (CRUD COMPLET ET SÉCURISÉ)
 ############################################################
 
 @app.route("/agenda")
@@ -1393,41 +1393,30 @@ def appointments_events_json():
     conn = get_db()
 
     if user["role"] == "admin":
-        rows = conn.execute(
-            """
-            SELECT a.*, u.username AS created_by_name, c.name AS client_name
+        rows = conn.execute("""
+            SELECT a.*, u.username AS created_by_name
             FROM appointments a
             JOIN users u ON u.id = a.created_by
-            LEFT JOIN crm_clients c ON c.id = a.client_id
-            """
-        ).fetchall()
+        """).fetchall()
     else:
-        rows = conn.execute(
-            """
-            SELECT a.*, u.username AS created_by_name, c.name AS client_name
+        rows = conn.execute("""
+            SELECT a.*, u.username AS created_by_name
             FROM appointments a
             JOIN users u ON u.id = a.created_by
-            JOIN crm_clients c ON c.id = a.client_id
-            WHERE c.owner_id = ?
-            """
-        , (user["id"],)).fetchall()
+            WHERE a.created_by = ?
+        """, (user["id"],)).fetchall()
 
     events = []
     for r in rows:
-        title = r["title"]
-        if r["client_name"]:
-            title += f" — {r['client_name']}"
-
         events.append({
             "id": r["id"],
-            "title": title,
+            "title": r["title"],
             "start": f"{r['date']}T{r['start_time']}",
             "end": f"{r['date']}T{r['end_time']}",
             "backgroundColor": r["color"] or "#2563eb",
             "borderColor": r["color"] or "#2563eb",
             "extendedProps": {
-                "created_by": r["created_by_name"],
-                "description": r["description"]
+                "created_by": r["created_by_name"]
             }
         })
 
@@ -1443,26 +1432,20 @@ def appointments_create():
     date = data.get("date")
     start_time = data.get("start_time")
     end_time = data.get("end_time")
-    description = data.get("description")
-    color = data.get("color") or "#2563eb"
-    client_id = data.get("client_id")
 
     if not title or not date or not start_time or not end_time:
-        return jsonify(success=False, message="Champs obligatoires manquants"), 400
+        return jsonify(success=False, message="Champs manquants"), 400
 
     user = session.get("user")
     conn = get_db()
 
-    conn.execute(
-        """
+    conn.execute("""
         INSERT INTO appointments
-        (title, date, start_time, end_time, description, color, client_id, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (title, date, start_time, end_time, description, color, client_id, user["id"])
-    )
-    conn.commit()
+        (title, date, start_time, end_time, created_by)
+        VALUES (?, ?, ?, ?, ?)
+    """, (title, date, start_time, end_time, user["id"]))
 
+    conn.commit()
     return jsonify(success=True)
 
 
@@ -1475,7 +1458,6 @@ def appointments_update_from_calendar():
     date = data.get("date")
     start_time = data.get("start_time")
     end_time = data.get("end_time")
-    title = data.get("title")
 
     if not appt_id or not date or not start_time or not end_time:
         return jsonify(success=False, message="Données manquantes"), 400
@@ -1494,26 +1476,73 @@ def appointments_update_from_calendar():
     if user["role"] != "admin" and rdv["created_by"] != user["id"]:
         return jsonify(success=False, message="Accès refusé"), 403
 
-    if title:
-        conn.execute(
-            """
-            UPDATE appointments
-            SET title=?, date=?, start_time=?, end_time=?
-            WHERE id=?
-            """,
-            (title, date, start_time, end_time, appt_id)
-        )
-    else:
-        conn.execute(
-            """
-            UPDATE appointments
-            SET date=?, start_time=?, end_time=?
-            WHERE id=?
-            """,
-            (date, start_time, end_time, appt_id)
-        )
+    conn.execute("""
+        UPDATE appointments
+        SET date=?, start_time=?, end_time=?
+        WHERE id=?
+    """, (date, start_time, end_time, appt_id))
 
     conn.commit()
+    return jsonify(success=True)
+
+
+@app.route("/appointments/<int:appt_id>/update", methods=["POST"])
+@login_required
+def appointments_update(appt_id):
+    data = request.get_json() or {}
+
+    title = (data.get("title") or "").strip()
+    date = data.get("date")
+    start_time = data.get("start_time")
+    end_time = data.get("end_time")
+
+    if not title or not date or not start_time or not end_time:
+        return jsonify(success=False, message="Champs manquants"), 400
+
+    user = session.get("user")
+    conn = get_db()
+
+    rdv = conn.execute(
+        "SELECT created_by FROM appointments WHERE id=?",
+        (appt_id,)
+    ).fetchone()
+
+    if not rdv:
+        return jsonify(success=False, message="RDV introuvable"), 404
+
+    if user["role"] != "admin" and rdv["created_by"] != user["id"]:
+        return jsonify(success=False, message="Accès refusé"), 403
+
+    conn.execute("""
+        UPDATE appointments
+        SET title=?, date=?, start_time=?, end_time=?
+        WHERE id=?
+    """, (title, date, start_time, end_time, appt_id))
+
+    conn.commit()
+    return jsonify(success=True)
+
+
+@app.route("/appointments/<int:appt_id>/delete", methods=["POST"])
+@login_required
+def appointments_delete(appt_id):
+    user = session.get("user")
+    conn = get_db()
+
+    rdv = conn.execute(
+        "SELECT created_by FROM appointments WHERE id=?",
+        (appt_id,)
+    ).fetchone()
+
+    if not rdv:
+        return jsonify(success=False, message="RDV introuvable"), 404
+
+    if user["role"] != "admin" and rdv["created_by"] != user["id"]:
+        return jsonify(success=False, message="Accès refusé"), 403
+
+    conn.execute("DELETE FROM appointments WHERE id=?", (appt_id,))
+    conn.commit()
+
     return jsonify(success=True)
 
 
