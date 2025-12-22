@@ -63,10 +63,12 @@
 
 </div>
 
-{% if current_user.role == 'admin' %}
+{% if current_user and current_user.role == 'admin' %}
 <!-- Cotations non lues -->
 <div class="card p-3 mt-4">
-    <h5 class="mb-3">Cotations non lues ({{ unread_cotations }})</h5>
+    <h5 class="mb-3">
+        Cotations non lues ({{ unread_cotations }})
+    </h5>
 
     <ul class="list-group">
         {% for c in cotations_admin %}
@@ -75,7 +77,9 @@
             <small>{{ c.description }}</small>
         </li>
         {% else %}
-        <li class="list-group-item text-muted">Aucune cotation en attente</li>
+        <li class="list-group-item text-muted">
+            Aucune cotation en attente
+        </li>
         {% endfor %}
     </ul>
 </div>
