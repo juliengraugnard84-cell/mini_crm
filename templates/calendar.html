@@ -1,209 +1,55 @@
 {% extends "base.html" %}
-{% block page_title %}Agenda{% endblock %}
+{% block title %}Utilisateurs{% endblock %}
 
 {% block content %}
+<h1 class="page-title mb-4">Utilisateurs</h1>
 
-<!-- FullCalendar -->
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<form method="POST" class="card p-3 mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-<style>
-    #calendar {
-        background: white;
-        padding: 25px;
-        border-radius: 18px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-        min-height: 700px;
-        margin-top: 20px;
-    }
-</style>
-
-<h1 class="fw-bold mb-4">Agenda</h1>
-
-<div id="calendar"></div>
-
-<!-- MODALE CREATION / MODIFICATION -->
-<div class="modal fade" id="eventModal" tabindex="-1">
-    <div class="modal-dialog">
-        <form id="eventForm" class="modal-content">
-
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalTitle">Rendez-vous</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body">
-
-                <!-- ID RDV (si modification) -->
-                <input type="hidden" id="eventId">
-
-                <div class="mb-3">
-                    <label class="form-label">Titre</label>
-                    <input type="text" id="eventTitle" class="form-control" required>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col">
-                        <label class="form-label">Date</label>
-                        <input type="date" id="eventDate" class="form-control" required>
-                    </div>
-                    <div class="col">
-                        <label class="form-label">Heure</label>
-                        <input type="time" id="eventTime" class="form-control">
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <textarea id="eventDescription" class="form-control"></textarea>
-                </div>
-
-            </div>
-
-            <div class="modal-footer justify-content-between">
-                <button type="button"
-                        class="btn btn-outline-danger"
-                        id="deleteEventBtn"
-                        style="display:none;">
-                    Supprimer
-                </button>
-
-                <div>
-                    <button type="button"
-                            class="btn btn-secondary"
-                            data-bs-dismiss="modal">
-                        Annuler
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        Enregistrer
-                    </button>
-                </div>
-            </div>
-
-        </form>
+    <div class="row g-2">
+        <div class="col">
+            <input name="username" class="form-control" placeholder="Username" required>
+        </div>
+        <div class="col">
+            <input name="password" type="password" class="form-control" placeholder="Mot de passe" required>
+        </div>
+        <div class="col">
+            <select name="role" class="form-select" required>
+                <option value="commercial">Commercial</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <div class="col">
+            <button class="btn btn-primary w-100">Créer</button>
+        </div>
     </div>
-</div>
+</form>
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-    const calendarEl = document.getElementById("calendar");
-    const modalEl = document.getElementById("eventModal");
-    const modal = new bootstrap.Modal(modalEl);
-
-    const f = id => document.getElementById(id);
-
-    let calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: "dayGridMonth",
-        locale: "fr",
-        selectable: true,
-        editable: true,
-        height: "auto",
-
-        headerToolbar: {
-            left: "prev,next today",
-            center: "title",
-            right: "dayGridMonth,timeGridWeek,timeGridDay"
-        },
-
-        eventSources: [{
-            url: "{{ url_for('appointments_events_json') }}",
-            method: "GET",
-            fetchOptions: { credentials: "same-origin" }
-        }],
-
-        dateClick(info) {
-            // Création
-            f("eventId").value = "";
-            f("eventTitle").value = "";
-            f("eventDescription").value = "";
-            f("eventDate").value = info.dateStr;
-            f("eventTime").value = "";
-            f("deleteEventBtn").style.display = "none";
-            f("modalTitle").innerText = "Nouveau rendez-vous";
-            modal.show();
-        },
-
-        eventClick(info) {
-            // Modification
-            fetch(`/appointments/${info.event.id}`, {
-                credentials: "same-origin"
-            })
-            .then(r => r.json())
-            .then(data => {
-                const e = data.appointment || data;
-                f("eventId").value = e.id;
-                f("eventTitle").value = e.title;
-                f("eventDate").value = e.date;
-                f("eventTime").value = e.time || "";
-                f("eventDescription").value = e.description || "";
-                f("deleteEventBtn").style.display = "inline-block";
-                f("modalTitle").innerText = "Modifier rendez-vous";
-                modal.show();
-            });
-        },
-
-        eventDrop(info) {
-            const d = info.event.startStr.split("T");
-            fetch("{{ url_for('appointments_update_from_calendar') }}", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "same-origin",
-                body: JSON.stringify({
-                    id: info.event.id,
-                    date: d[0],
-                    time: d[1] ? d[1].substring(0,5) : null
-                })
-            });
-        }
-    });
-
-    calendar.render();
-
-    // ENREGISTRER (CREATE / UPDATE)
-    f("eventForm").addEventListener("submit", function(e){
-        e.preventDefault();
-
-        const payload = {
-            title: f("eventTitle").value,
-            date: f("eventDate").value,
-            time: f("eventTime").value,
-            description: f("eventDescription").value
-        };
-
-        const id = f("eventId").value;
-        const url = id
-            ? `/appointments/${id}/update`
-            : "{{ url_for('appointments_create') }}";
-
-        fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify(payload)
-        })
-        .then(r => r.json())
-        .then(() => {
-            modal.hide();
-            calendar.refetchEvents();
-        });
-    });
-
-    // SUPPRESSION
-    f("deleteEventBtn").addEventListener("click", function(){
-        const id = f("eventId").value;
-        if (!confirm("Supprimer ce rendez-vous ?")) return;
-
-        fetch(`/appointments/${id}/delete`, {
-            method: "POST",
-            credentials: "same-origin"
-        })
-        .then(() => {
-            modal.hide();
-            calendar.refetchEvents();
-        });
-    });
-
-});
-</script>
-
+<table class="table">
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Rôle</th>
+            <th class="text-end">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.username }}</td>
+            <td>{{ u.role }}</td>
+            <td class="text-end">
+                <form method="POST"
+                      action="{{ url_for('admin_delete_user', user_id=u.id) }}"
+                      class="d-inline"
+                      onsubmit="return confirm('Supprimer cet utilisateur ?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="btn btn-sm btn-danger">Supprimer</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 {% endblock %}

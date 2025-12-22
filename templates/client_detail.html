@@ -1,249 +1,69 @@
 {% extends "base.html" %}
-{% block page_title %}{{ client.name }}{% endblock %}
+{% block title %}Client{% endblock %}
 
 {% block content %}
+<h1 class="page-title mb-3">{{ client.name }}</h1>
 
-<h2 class="mb-4">{{ client.name }}</h2>
+<div class="row g-4">
 
-<div class="row">
-
-    <!-- ===================== COLONNE GAUCHE ===================== -->
-    <div class="col-md-6">
-
-        <!-- ===== INFORMATIONS CLIENT ===== -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white">
-                Informations client
-            </div>
-            <div class="card-body">
-
-                <p><strong>Email :</strong> {{ client.email or "—" }}</p>
-                <p><strong>Téléphone :</strong> {{ client.phone or "—" }}</p>
-                <p><strong>Adresse :</strong> {{ client.address or "—" }}</p>
-                <p><strong>Commercial :</strong> {{ client.commercial or "—" }}</p>
-
-                <p>
-                    <strong>Status :</strong>
-                    <span class="badge bg-primary">{{ client.status }}</span>
-                </p>
-
-                <p><strong>Notes :</strong><br>{{ client.notes or "—" }}</p>
-
-                <a href="{{ url_for('edit_client', client_id=client.id) }}"
-                   class="btn btn-secondary mt-3">
-                    Modifier
-                </a>
-
-            </div>
+    <!-- INFOS CLIENT -->
+    <div class="col-md-4">
+        <div class="card p-3">
+            <p><strong>Email :</strong> {{ client.email or "—" }}</p>
+            <p><strong>Téléphone :</strong> {{ client.phone or "—" }}</p>
+            <p><strong>Commercial :</strong> {{ client.commercial }}</p>
+            <p><strong>Notes :</strong><br>{{ client.notes or "—" }}</p>
         </div>
-
-        <!-- ===== DEMANDES DE COTATION ===== -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-warning text-dark">
-                Demandes de cotation
-            </div>
-
-            <div class="card-body">
-
-                <!-- ===== FORMULAIRE CRÉATION ===== -->
-                <form method="POST"
-                      action="{{ url_for('create_cotation', client_id=client.id) }}"
-                      class="mb-4">
-
-                    <div class="mb-2">
-                        <label class="form-label fw-bold">Description</label>
-                        <textarea class="form-control" name="description" required></textarea>
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label fw-bold">Fournisseur actuel</label>
-                        <input type="text"
-                               name="fournisseur_actuel"
-                               class="form-control"
-                               placeholder="EDF, Engie, TotalEnergies…">
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label fw-bold">Date d’échéance</label>
-                        <input type="date" name="date_echeance" class="form-control">
-                    </div>
-
-                    <div class="row mb-2">
-                        <div class="col">
-                            <label class="form-label fw-bold">Date négociation</label>
-                            <input type="date"
-                                   name="date_negociation_date"
-                                   class="form-control">
-                        </div>
-                        <div class="col">
-                            <label class="form-label fw-bold">Heure</label>
-                            <input type="time"
-                                   name="date_negociation_time"
-                                   class="form-control">
-                        </div>
-                    </div>
-
-                    <button class="btn btn-warning mt-2">
-                        Envoyer la demande
-                    </button>
-                </form>
-
-                <!-- ===== LISTE DES COTATIONS ===== -->
-                {% if cotations %}
-                <ul class="list-group">
-                    {% for c in cotations %}
-                    <li class="list-group-item">
-
-                        <strong>{{ c.description }}</strong><br>
-
-                        <small class="text-muted">
-                            Fournisseur : {{ c.fournisseur_actuel or "—" }}<br>
-                            Échéance : {{ c.date_echeance or "—" }}<br>
-                            Négociation :
-                            {{ c.date_negociation_date or "—" }}
-                            {{ c.date_negociation_time or "" }}
-                        </small>
-
-                        {% if current_user %}
-                        {% set can_delete =
-                            current_user['role'] == 'admin'
-                            or (c.created_by is defined
-                                and c.created_by
-                                and c.created_by == current_user['id'])
-                        %}
-                        {% if can_delete %}
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-outline-danger"
-                                    onclick="deleteCotation({{ c.id }})">
-                                Supprimer
-                            </button>
-                        </div>
-                        {% endif %}
-                        {% endif %}
-
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                    <p class="text-muted">Aucune demande.</p>
-                {% endif %}
-
-            </div>
-        </div>
-
     </div>
 
-    <!-- ===================== COLONNE DROITE ===================== -->
-    <div class="col-md-6">
+    <!-- COTATIONS -->
+    <div class="col-md-8">
+        <div class="card p-3 mb-4">
+            <h5 class="mb-3">Ajouter une cotation</h5>
+            <form method="POST"
+                  action="{{ url_for('create_cotation', client_id=client.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <!-- ===== DOCUMENTS CLIENT ===== -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                Documents du client
-            </div>
+                <textarea name="description" class="form-control mb-2"
+                          placeholder="Description…" required></textarea>
 
-            <div class="card-body">
+                <input name="fournisseur_actuel" class="form-control mb-2"
+                       placeholder="Fournisseur actuel">
 
-                <form method="POST"
-                      action="{{ url_for('client_upload_document', client_id=client.id) }}"
-                      enctype="multipart/form-data"
-                      class="mb-3">
+                <input type="date" name="date_echeance" class="form-control mb-3">
 
-                    <div id="drop-zone"
-                         class="border border-2 border-primary rounded p-4 text-center"
-                         style="cursor:pointer;background:#f8f9fa;">
-
-                        <p class="fw-bold mb-1">
-                            Glisser-déposer un fichier ici
-                        </p>
-                        <p class="text-muted mb-0">
-                            ou cliquez pour sélectionner
-                        </p>
-
-                        <input type="file"
-                               name="file"
-                               id="file-input"
-                               hidden
-                               required>
-                    </div>
-
-                    <button type="submit"
-                            class="btn btn-primary mt-3 w-100">
-                        Envoyer sur S3
-                    </button>
-
-                </form>
-
-                {% if documents %}
-                <ul class="list-group">
-                    {% for d in documents %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <a href="{{ d.url }}" target="_blank">
-                            {{ d.nom }}
-                        </a>
-
-                        <form method="POST"
-                              action="{{ url_for('client_delete_document',
-                                                  client_id=client.id,
-                                                  key=d.nom) }}"
-                              onsubmit="return confirm('Supprimer ce document ?');">
-                            <button class="btn btn-sm btn-outline-danger">
-                                Supprimer
-                            </button>
-                        </form>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                    <p class="text-muted">Aucun document.</p>
-                {% endif %}
-
-            </div>
+                <button class="btn btn-primary">Ajouter</button>
+            </form>
         </div>
 
-    </div>
+        <div class="card p-3">
+            <h5 class="mb-3">Documents</h5>
 
+            <form method="POST"
+                  action="{{ url_for('client_upload_document', client_id=client.id) }}"
+                  enctype="multipart/form-data"
+                  class="mb-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="file" name="file" class="form-control mb-2">
+                <button class="btn btn-secondary">Uploader</button>
+            </form>
+
+            <ul class="list-group">
+                {% for d in documents %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="{{ d.url }}" target="_blank">{{ d.nom }}</a>
+                    <form method="POST"
+                          action="{{ url_for('client_delete_document', client_id=client.id, key=d.nom) }}"
+                          onsubmit="return confirm('Supprimer ce document ?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="btn btn-sm btn-danger">Supprimer</button>
+                    </form>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">Aucun document</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
 </div>
-
-<!-- ===== JS SUPPRESSION COTATION (AJAX) ===== -->
-<script>
-async function deleteCotation(id) {
-    if (!confirm("Supprimer cette demande de cotation ?")) return;
-
-    const res = await fetch(`/cotations/${id}/delete`, { method: "POST" });
-    const data = await res.json();
-
-    if (data.success) {
-        location.reload();
-    } else {
-        alert(data.message || "Erreur lors de la suppression");
-    }
-}
-</script>
-
-<!-- ===== DRAG & DROP ===== -->
-<script>
-const dropZone = document.getElementById("drop-zone");
-const fileInput = document.getElementById("file-input");
-
-if (dropZone && fileInput) {
-    dropZone.addEventListener("click", () => fileInput.click());
-
-    dropZone.addEventListener("dragover", e => {
-        e.preventDefault();
-        dropZone.classList.add("bg-light");
-    });
-
-    dropZone.addEventListener("dragleave", () => {
-        dropZone.classList.remove("bg-light");
-    });
-
-    dropZone.addEventListener("drop", e => {
-        e.preventDefault();
-        dropZone.classList.remove("bg-light");
-        fileInput.files = e.dataTransfer.files;
-    });
-}
-</script>
-
 {% endblock %}

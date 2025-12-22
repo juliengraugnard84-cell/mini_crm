@@ -2,20 +2,30 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>{{ title if title else "Mini CRM" }}</title>
+    <title>{% block title %}CRM SynergyGroup{% endblock %}</title>
+
+    <!-- Responsive -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CSRF GLOBAL (AJAX + forms) -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
 
     <!-- Bootstrap 5 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- Material Icons -->
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Google Material Symbols -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 
-    <!-- CSS GLOBAL -->
+    <!-- Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- CSS principal -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    {% block head %}{% endblock %}
 </head>
 
 <body>
@@ -24,22 +34,23 @@
 
     <!-- ================= SIDEBAR ================= -->
     <aside class="sidebar">
-        <div class="sidebar-logo mb-4">
-            <strong>Mini CRM</strong><br>
-            <small class="text-muted">Dashboard Courtage</small>
+
+        <div class="sidebar-logo">
+            <strong>SynergyGroup</strong><br>
+            <small>CRM interne</small>
         </div>
 
         <nav class="sidebar-nav">
 
             <a href="{{ url_for('dashboard') }}"
                class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                <span class="material-symbols-outlined">space_dashboard</span>
-                Dashboard
+                <span class="material-symbols-outlined">dashboard</span>
+                Tableau de bord
             </a>
 
             <a href="{{ url_for('clients') }}"
                class="sidebar-link {% if request.endpoint in ['clients','client_detail','new_client','edit_client'] %}active{% endif %}">
-                <span class="material-symbols-outlined">group</span>
+                <span class="material-symbols-outlined">groups</span>
                 Clients
             </a>
 
@@ -49,138 +60,114 @@
                 Agenda
             </a>
 
-            <!-- 🔐 DOCUMENTS : ADMIN UNIQUEMENT -->
-            {% if current_user and current_user.role == 'admin' %}
-            <a href="{{ url_for('documents') }}"
-               class="sidebar-link {% if request.endpoint == 'documents' %}active{% endif %}">
-                <span class="material-symbols-outlined">folder_open</span>
-                Documents
-            </a>
-            {% endif %}
-
             <a href="{{ url_for('chiffre_affaire') }}"
-               class="sidebar-link {% if request.endpoint == 'chiffre_affaire' %}active{% endif %}">
-                <span class="material-symbols-outlined">payments</span>
-                Chiffre d'affaire
+               class="sidebar-link {% if request.endpoint.startswith('chiffre_affaire') %}active{% endif %}">
+                <span class="material-symbols-outlined">monitoring</span>
+                Chiffre d’affaires
             </a>
 
-            <!-- 🔐 ADMIN -->
             {% if current_user and current_user.role == 'admin' %}
-            <a href="{{ url_for('admin_users') }}"
-               class="sidebar-link {% if request.endpoint in ['admin_users','admin_edit_user'] %}active{% endif %}">
-                <span class="material-symbols-outlined">admin_panel_settings</span>
-                Administration
-            </a>
+                <hr style="border-color: rgba(255,255,255,.2);">
+
+                <a href="{{ url_for('admin_users') }}"
+                   class="sidebar-link {% if request.endpoint.startswith('admin_') %}active{% endif %}">
+                    <span class="material-symbols-outlined">admin_panel_settings</span>
+                    Utilisateurs
+                </a>
+
+                <a href="{{ url_for('documents') }}"
+                   class="sidebar-link {% if request.endpoint == 'documents' %}active{% endif %}">
+                    <span class="material-symbols-outlined">folder</span>
+                    Documents
+                </a>
             {% endif %}
 
-            <hr>
-
-            <a href="{{ url_for('logout') }}" class="sidebar-link">
-                <span class="material-symbols-outlined">logout</span>
-                Déconnexion
-            </a>
         </nav>
     </aside>
 
     <!-- ================= CONTENT ================= -->
     <main class="content-wrapper">
 
-        <!-- TOPBAR -->
+        <!-- ===== TOPBAR ===== -->
         <div class="topbar">
-            <h1 class="page-title">
-                {% block page_title %}{% endblock %}
-            </h1>
 
-            {% if current_user %}
-            <div class="d-flex align-items-center gap-2">
-                <span class="text-muted small">
-                    {{ current_user.username }}
+            <div>
+                <span class="fw-semibold">
+                    Bonjour {{ current_user.username if current_user else '' }}
                 </span>
-                <div class="topbar-avatar">
-                    {{ current_user.username[:2].upper() }}
-                </div>
             </div>
-            {% endif %}
+
+            <div class="d-flex align-items-center gap-3">
+                <div class="topbar-avatar">
+                    {{ current_user.username[0]|upper if current_user }}
+                </div>
+
+                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-box-arrow-right me-1"></i> Déconnexion
+                </a>
+            </div>
+
         </div>
 
-        <!-- FLASH MESSAGES -->
+        <!-- ===== FLASH MESSAGES ===== -->
         {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, msg in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible fade show mb-3">
-                {{ msg }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            {% endfor %}
-        {% endif %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} mb-3">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
         {% endwith %}
 
-        <!-- PAGE CONTENT -->
+        <!-- ===== PAGE CONTENT ===== -->
         {% block content %}{% endblock %}
 
     </main>
 </div>
 
-<!-- ================= CHAT (connecté uniquement) ================= -->
-{% if current_user %}
-<button id="chatBubble" type="button" aria-label="Ouvrir le chat">
-    <span class="material-symbols-outlined">chat</span>
+<!-- ================= CHAT FLOAT ================= -->
+<button id="chatBubble" title="Chat interne">
+    <i class="bi bi-chat-dots-fill fs-4"></i>
 </button>
 
-<div id="chatWindow" aria-hidden="true">
+<div id="chatWindow">
     <div id="chatHeader">
         <span>Chat interne</span>
-        <button id="chatClose" type="button" aria-label="Fermer">✖</button>
+        <button id="chatClose" class="btn btn-sm btn-light">✕</button>
     </div>
 
     <div id="chatMessages"></div>
 
-    <div id="chatInputArea" class="d-flex gap-2">
-        <input type="file" id="chatUpload" hidden>
-
-        <button type="button"
-                onclick="document.getElementById('chatUpload').click()"
-                class="btn btn-light btn-sm">
-            <span class="material-symbols-outlined">attach_file</span>
-        </button>
-
-        <input id="chatInput" class="form-control" placeholder="Message…">
-
-        <button id="chatSend" type="button" class="btn btn-primary btn-sm">
-            Envoyer
-        </button>
+    <div class="p-2 border-top">
+        <input type="text" id="chatInput" class="form-control mb-2" placeholder="Votre message…">
+        <input type="file" id="chatUpload" class="form-control mb-2">
+        <button id="chatSend" class="btn btn-primary w-100">Envoyer</button>
     </div>
 </div>
-{% endif %}
 
-<!-- ================= SCRIPTS ================= -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- ================= JS ================= -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Chat widget -->
+<script src="{{ url_for('static', filename='chat_widget.js') }}"></script>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
+    // Toggle chat
     const bubble = document.getElementById("chatBubble");
     const win = document.getElementById("chatWindow");
-    const close = document.getElementById("chatClose");
+    const closeBtn = document.getElementById("chatClose");
 
-    if (!bubble || !win) return;
-
-    bubble.addEventListener("click", () => {
-        const isOpen = win.style.display === "flex";
-        win.style.display = isOpen ? "none" : "flex";
-        win.setAttribute("aria-hidden", isOpen ? "true" : "false");
-    });
-
-    if (close) {
-        close.addEventListener("click", () => {
+    if (bubble && win && closeBtn) {
+        bubble.addEventListener("click", () => {
+            win.style.display = win.style.display === "flex" ? "none" : "flex";
+        });
+        closeBtn.addEventListener("click", () => {
             win.style.display = "none";
-            win.setAttribute("aria-hidden", "true");
         });
     }
-});
 </script>
-
-<!-- SCRIPT CHAT -->
-<script src="{{ url_for('static', filename='chat_widget.js') }}"></script>
 
 {% block scripts %}{% endblock %}
 

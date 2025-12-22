@@ -1,99 +1,31 @@
 {% extends "base.html" %}
-{% block page_title %}Documents (S3){% endblock %}
+{% block title %}Documents{% endblock %}
 
 {% block content %}
+<h1 class="page-title mb-4">Documents (Admin)</h1>
 
-<h1 class="mb-4 fw-bold">Documents (S3)</h1>
+<form method="POST"
+      action="{{ url_for('upload_document') }}"
+      enctype="multipart/form-data"
+      class="mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="file" name="file" class="form-control mb-2">
+    <button class="btn btn-primary">Uploader</button>
+</form>
 
-<!-- UPLOAD FORM -->
-<div class="card card-modern card-animated fade-delay-1 mb-4">
-    <div class="card-body">
-
-        <form action="{{ url_for('upload_document') }}" 
-              method="POST" 
-              enctype="multipart/form-data" 
-              class="d-flex align-items-center gap-3">
-
-            <input type="file" name="file" class="form-control" required>
-
-            <button class="btn btn-gradient" type="submit">
-                Envoyer
-            </button>
+<ul class="list-group">
+    {% for f in fichiers %}
+    <li class="list-group-item d-flex justify-content-between">
+        <a href="{{ f.url }}" target="_blank">{{ f.nom }}</a>
+        <form method="POST"
+              action="{{ url_for('delete_document', key=f.nom) }}"
+              onsubmit="return confirm('Supprimer ce fichier ?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn btn-sm btn-danger">Supprimer</button>
         </form>
-
-    </div>
-</div>
-
-<!-- TABLEAU DOCUMENTS -->
-<div class="card card-modern card-animated fade-delay-2">
-    <div class="card-body">
-
-        <table class="table table-hover align-middle fade-in">
-            <thead>
-                <tr>
-                    <th>Nom</th>
-                    <th>Taille</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-
-                {% for f in fichiers %}
-                <tr>
-                    <td>
-                        <a href="{{ f.url }}" target="_blank" class="fw-bold">
-                            {{ f.nom }}
-                        </a>
-                    </td>
-
-                    <td>{{ f.taille }} bytes</td>
-
-                    <td class="text-end">
-
-                        <!-- BOUTON SUPPRIMER -->
-                        <form action="{{ url_for('delete_document', key=f.nom) }}"
-                              method="POST"
-                              style="display:inline;">
-                            <button class="btn btn-sm btn-outline-danger"
-                                    onclick="return confirm('Supprimer définitivement ce fichier ?')"
-                                    title="Supprimer le document">
-                                <i class="material-icons me-1">delete</i> Supprimer
-                            </button>
-                        </form>
-
-                    </td>
-                </tr>
-                {% endfor %}
-
-            </tbody>
-        </table>
-
-    </div>
-</div>
-
-<style>
-
-.fade-in {
-    animation: fadeIn 0.6s ease forwards;
-}
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Table header */
-.table thead th {
-    font-weight: 700;
-    color: #333;
-    border-bottom: 2px solid rgba(0,0,0,0.1);
-}
-
-/* Button icon */
-.btn i.material-icons {
-    font-size: 18px;
-    line-height: 0;
-}
-
-</style>
-
+    </li>
+    {% else %}
+    <li class="list-group-item text-muted">Aucun document</li>
+    {% endfor %}
+</ul>
 {% endblock %}
