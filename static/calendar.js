@@ -47,13 +47,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 })
             })
             .then(r => r.json())
-            .then(res => {
-                if (!res.success) {
-                    alert(res.message || "Erreur création RDV");
+            .then(data => {
+                if (!data.success) {
+                    alert(data.message || "Erreur création RDV");
                 }
                 calendar.refetchEvents();
             })
-            .catch(() => alert("Erreur création RDV"));
+            .catch(() => alert("Erreur réseau"));
 
             calendar.unselect();
         },
@@ -63,6 +63,36 @@ document.addEventListener("DOMContentLoaded", function () {
         ===================== */
         eventDrop: persistEvent,
         eventResize: persistEvent,
+
+        /* =====================
+           ÉDITION AU CLIC
+        ===================== */
+        eventClick(info) {
+            const e = info.event;
+
+            const newTitle = prompt("Titre du rendez-vous", e.title);
+            if (!newTitle) return;
+
+            fetch("/appointments/update_from_calendar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: e.id,
+                    date: e.start.toISOString().slice(0, 10),
+                    start_time: e.start.toTimeString().slice(0, 5),
+                    end_time: e.end ? e.end.toTimeString().slice(0, 5) : "10:00",
+                    title: newTitle
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.message || "Erreur modification");
+                }
+                calendar.refetchEvents();
+            })
+            .catch(() => alert("Erreur réseau"));
+        },
 
         /* =====================
            INFO BULLE

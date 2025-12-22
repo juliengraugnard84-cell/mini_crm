@@ -1377,7 +1377,7 @@ def delete_cotation(cotation_id):
 
 
 ############################################################
-# 13. AGENDA / FULLCALENDAR (FONCTIONNEL COMPLET)
+# 13. AGENDA / FULLCALENDAR (COMPLET + COHÉRENT)
 ############################################################
 
 @app.route("/agenda")
@@ -1393,20 +1393,24 @@ def appointments_events_json():
     conn = get_db()
 
     if user["role"] == "admin":
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT a.*, u.username AS created_by_name, c.name AS client_name
             FROM appointments a
             JOIN users u ON u.id = a.created_by
             LEFT JOIN crm_clients c ON c.id = a.client_id
-        """).fetchall()
+            """
+        ).fetchall()
     else:
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT a.*, u.username AS created_by_name, c.name AS client_name
             FROM appointments a
             JOIN users u ON u.id = a.created_by
             JOIN crm_clients c ON c.id = a.client_id
             WHERE c.owner_id = ?
-        """, (user["id"],)).fetchall()
+            """
+        , (user["id"],)).fetchall()
 
     events = []
     for r in rows:
@@ -1436,32 +1440,30 @@ def appointments_create():
     data = request.get_json() or {}
 
     title = (data.get("title") or "").strip()
-    date_str = data.get("date")
-
-    # Compat: accepte "time" (ancien) ou "start_time"
-    start_time = data.get("start_time") or data.get("time") or "09:00"
-    end_time = data.get("end_time") or "10:00"
-
-    description = data.get("description") or ""
+    date = data.get("date")
+    start_time = data.get("start_time")
+    end_time = data.get("end_time")
+    description = data.get("description")
     color = data.get("color") or "#2563eb"
     client_id = data.get("client_id")
-    if client_id in ("", None):
-        client_id = None
 
-    if not title or not date_str:
-        return jsonify(success=False, message="Titre et date obligatoires"), 400
+    if not title or not date or not start_time or not end_time:
+        return jsonify(success=False, message="Champs obligatoires manquants"), 400
 
     user = session.get("user")
     conn = get_db()
 
-    cur = conn.execute("""
+    conn.execute(
+        """
         INSERT INTO appointments
         (title, date, start_time, end_time, description, color, client_id, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (title, date_str, start_time, end_time, description, color, client_id, user["id"]))
+        """,
+        (title, date, start_time, end_time, description, color, client_id, user["id"])
+    )
     conn.commit()
 
-    return jsonify(success=True, id=cur.lastrowid)
+    return jsonify(success=True)
 
 
 @app.route("/appointments/update_from_calendar", methods=["POST"])
@@ -1470,20 +1472,13 @@ def appointments_update_from_calendar():
     data = request.get_json() or {}
 
     appt_id = data.get("id")
-    date_str = data.get("date")
-
-    # Compat: accepte "time" -> start_time
-    start_time = data.get("start_time") or data.get("time")
+    date = data.get("date")
+    start_time = data.get("start_time")
     end_time = data.get("end_time")
+    title = data.get("title")
 
-    if not appt_id or not date_str:
+    if not appt_id or not date or not start_time or not end_time:
         return jsonify(success=False, message="Données manquantes"), 400
-
-    # Si le front n'envoie pas les heures pendant un drag/drop
-    if not start_time:
-        start_time = "09:00"
-    if not end_time:
-        end_time = "10:00"
 
     user = session.get("user")
     conn = get_db()
@@ -1499,11 +1494,24 @@ def appointments_update_from_calendar():
     if user["role"] != "admin" and rdv["created_by"] != user["id"]:
         return jsonify(success=False, message="Accès refusé"), 403
 
-    conn.execute("""
-        UPDATE appointments
-        SET date=?, start_time=?, end_time=?
-        WHERE id=?
-    """, (date_str, start_time, end_time, appt_id))
+    if title:
+        conn.execute(
+            """
+            UPDATE appointments
+            SET title=?, date=?, start_time=?, end_time=?
+            WHERE id=?
+            """,
+            (title, date, start_time, end_time, appt_id)
+        )
+    else:
+        conn.execute(
+            """
+            UPDATE appointments
+            SET date=?, start_time=?, end_time=?
+            WHERE id=?
+            """,
+            (date, start_time, end_time, appt_id)
+        )
 
     conn.commit()
     return jsonify(success=True)
