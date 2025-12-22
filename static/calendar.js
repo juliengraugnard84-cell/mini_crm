@@ -36,14 +36,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
+            const startTime = prompt("Heure de début (HH:MM)", info.startStr.slice(11, 16));
+            if (!startTime) return;
+
+            const endTime = prompt("Heure de fin (HH:MM)", info.endStr.slice(11, 16));
+            if (!endTime) return;
+
             fetch("/appointments/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     title: title,
                     date: info.startStr.slice(0, 10),
-                    start_time: info.startStr.slice(11, 16),
-                    end_time: info.endStr.slice(11, 16)
+                    start_time: startTime,
+                    end_time: endTime
                 })
             })
             .then(r => r.json())
@@ -65,7 +71,7 @@ document.addEventListener("DOMContentLoaded", function () {
         eventResize: persistEvent,
 
         /* =====================
-           ÉDITION AU CLIC
+           MODIFICATION AU CLIC
         ===================== */
         eventClick(info) {
             const e = info.event;
@@ -73,15 +79,27 @@ document.addEventListener("DOMContentLoaded", function () {
             const newTitle = prompt("Titre du rendez-vous", e.title);
             if (!newTitle) return;
 
+            const startTime = prompt(
+                "Heure de début (HH:MM)",
+                e.start.toTimeString().slice(0, 5)
+            );
+            if (!startTime) return;
+
+            const endTime = prompt(
+                "Heure de fin (HH:MM)",
+                e.end ? e.end.toTimeString().slice(0, 5) : ""
+            );
+            if (!endTime) return;
+
             fetch("/appointments/update_from_calendar", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     id: e.id,
+                    title: newTitle,
                     date: e.start.toISOString().slice(0, 10),
-                    start_time: e.start.toTimeString().slice(0, 5),
-                    end_time: e.end ? e.end.toTimeString().slice(0, 5) : "10:00",
-                    title: newTitle
+                    start_time: startTime,
+                    end_time: endTime
                 })
             })
             .then(r => r.json())
@@ -95,7 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
         },
 
         /* =====================
-           INFO BULLE
+           INFO BULLE (QUI A CRÉÉ)
         ===================== */
         eventDidMount(info) {
             const createdBy = info.event.extendedProps.created_by;
