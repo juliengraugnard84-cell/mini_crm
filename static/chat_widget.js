@@ -1,13 +1,33 @@
 document.addEventListener("DOMContentLoaded", () => {
 
+    const bubble = document.getElementById("chatBubble");
+    const win = document.getElementById("chatWindow");
+    const closeBtn = document.getElementById("chatClose");
+
     const input = document.getElementById("chatInput");
     const sendBtn = document.getElementById("chatSend");
     const fileInput = document.getElementById("chatUpload");
     const messagesBox = document.getElementById("chatMessages");
 
-    if (!input || !sendBtn || !messagesBox) return;
+    if (!bubble || !win || !input || !sendBtn || !messagesBox) {
+        console.warn("Chat widget incomplet");
+        return;
+    }
 
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
+    /* ================= TOGGLE ================= */
+
+    bubble.addEventListener("click", () => {
+        win.style.display = win.style.display === "flex" ? "none" : "flex";
+        if (win.style.display === "flex") {
+            loadMessages();
+        }
+    });
+
+    closeBtn.addEventListener("click", () => {
+        win.style.display = "none";
+    });
+
+    /* ================= HELPERS ================= */
 
     function escapeHTML(str) {
         const div = document.createElement("div");
@@ -15,11 +35,15 @@ document.addEventListener("DOMContentLoaded", () => {
         return div.innerHTML;
     }
 
+    /* ================= LOAD ================= */
+
     async function loadMessages() {
         try {
-            const res = await fetch("/chat/messages?limit=80", { credentials: "same-origin" });
-            const data = await res.json();
+            const res = await fetch("/chat/messages?limit=80", {
+                credentials: "same-origin"
+            });
 
+            const data = await res.json();
             messagesBox.innerHTML = "";
 
             (data.messages || []).forEach(m => {
@@ -27,9 +51,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 div.className = "chat-message";
 
                 let html = `<strong>${escapeHTML(m.username)}</strong> : ${escapeHTML(m.message || "")}`;
+
                 if (m.file_url) {
                     const safeName = escapeHTML(m.file_name || "fichier");
-                    html += ` <a href="${m.file_url}" target="_blank" rel="noopener noreferrer">📎 ${safeName}</a>`;
+                    html += ` <a href="${m.file_url}" target="_blank">📎 ${safeName}</a>`;
                 }
 
                 div.innerHTML = html;
@@ -37,14 +62,18 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             messagesBox.scrollTop = messagesBox.scrollHeight;
+
         } catch (e) {
-            console.error("Erreur chargement messages", e);
+            console.error("Erreur chargement chat", e);
         }
     }
 
+    /* ================= SEND ================= */
+
     async function sendMessage() {
+
         const message = input.value.trim();
-        const file = fileInput?.files?.[0];
+        const file = fileInput.files[0];
 
         if (!message && !file) {
             alert("Message ou fichier requis");
@@ -54,17 +83,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const formData = new FormData();
         if (message) formData.append("message", message);
         if (file) formData.append("file", file);
-        // compat CSRF form
-        formData.append("csrf_token", csrfToken);
 
         try {
             const res = await fetch("/chat/send", {
                 method: "POST",
                 body: formData,
-                credentials: "same-origin",
-                headers: {
-                    "X-CSRF-Token": csrfToken
-                }
+                credentials: "same-origin"
             });
 
             const data = await res.json();
@@ -75,23 +99,23 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             input.value = "";
-            if (fileInput) fileInput.value = "";
+            fileInput.value = "";
 
-            await loadMessages();
+            loadMessages();
+
         } catch (e) {
-            console.error("Erreur sendMessage", e);
-            alert("Erreur réseau lors de l'envoi.");
+            console.error("Erreur send chat", e);
+            alert("Erreur réseau");
         }
     }
 
     sendBtn.addEventListener("click", sendMessage);
 
-    input.addEventListener("keydown", (e) => {
+    input.addEventListener("keydown", e => {
         if (e.key === "Enter") {
             e.preventDefault();
             sendMessage();
         }
     });
 
-    loadMessages();
 });
