@@ -36,46 +36,24 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            const startTime = prompt(
-                "Heure de début (HH:MM)",
-                info.startStr.slice(11, 16)
-            );
-            if (!startTime) {
-                calendar.unselect();
-                return;
-            }
-
-            const endTime = prompt(
-                "Heure de fin (HH:MM)",
-                info.endStr
-                    ? info.endStr.slice(11, 16)
-                    : startTime
-            );
-            if (!endTime) {
-                calendar.unselect();
-                return;
-            }
-
             fetch("/appointments/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     title: title,
                     date: info.startStr.slice(0, 10),
-                    start_time: startTime,
-                    end_time: endTime,
-                    client_id: null
+                    start_time: info.startStr.slice(11, 16),
+                    end_time: info.endStr.slice(11, 16)
                 })
             })
             .then(r => r.json())
-            .then(data => {
-                if (!data.success) {
-                    alert(data.message || "Erreur création RDV");
-                    return;
+            .then(res => {
+                if (!res.success) {
+                    alert(res.message || "Erreur création RDV");
                 }
                 calendar.refetchEvents();
             })
-            .catch(() => alert("Erreur réseau création RDV"));
+            .catch(() => alert("Erreur création RDV"));
 
             calendar.unselect();
         },
@@ -85,54 +63,6 @@ document.addEventListener("DOMContentLoaded", function () {
         ===================== */
         eventDrop: persistEvent,
         eventResize: persistEvent,
-
-        /* =====================
-           ÉDITION AU CLIC
-        ===================== */
-        eventClick(info) {
-            const e = info.event;
-
-            const title = prompt("Titre du rendez-vous", e.title);
-            if (!title) return;
-
-            const startTime = prompt(
-                "Heure de début (HH:MM)",
-                e.start.toTimeString().slice(0, 5)
-            );
-            if (!startTime) return;
-
-            const endTime = prompt(
-                "Heure de fin (HH:MM)",
-                e.end
-                    ? e.end.toTimeString().slice(0, 5)
-                    : startTime
-            );
-            if (!endTime) return;
-
-            fetch("/appointments/update_from_calendar", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    id: e.id,
-                    date: e.start.toISOString().slice(0, 10),
-                    start_time: startTime,
-                    end_time: endTime
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) {
-                    alert(data.message || "Erreur modification");
-                    calendar.refetchEvents();
-                } else {
-                    calendar.refetchEvents();
-                }
-            })
-            .catch(() => {
-                alert("Erreur réseau modification");
-                calendar.refetchEvents();
-            });
-        },
 
         /* =====================
            INFO BULLE
@@ -158,9 +88,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 id: info.event.id,
                 date: start.toISOString().slice(0, 10),
                 start_time: start.toTimeString().slice(0, 5),
-                end_time: end
-                    ? end.toTimeString().slice(0, 5)
-                    : start.toTimeString().slice(0, 5)
+                end_time: end ? end.toTimeString().slice(0, 5) : "10:00"
             })
         })
         .then(res => {
