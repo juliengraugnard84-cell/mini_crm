@@ -9,7 +9,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
-
         initialView: "timeGridWeek",
         locale: "fr",
         firstDay: 1,
@@ -19,8 +18,6 @@ document.addEventListener("DOMContentLoaded", function () {
         eventResizableFromStart: true,
 
         height: "auto",
-        nowIndicator: true,
-
         slotMinTime: "07:00:00",
         slotMaxTime: "20:00:00",
         slotDuration: "00:15:00",
@@ -31,14 +28,11 @@ document.addEventListener("DOMContentLoaded", function () {
             right: "dayGridMonth,timeGridWeek,timeGridDay"
         },
 
-        /* =====================
-           CHARGEMENT DES RDV
-        ===================== */
         events: "/appointments/events_json",
 
-        /* =====================
+        /* ===============================
            CRÉATION RDV
-        ===================== */
+        =============================== */
         select(info) {
 
             const title = prompt("Titre du rendez-vous");
@@ -47,18 +41,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
+            const start = info.start;
+            const end = info.end;
+
             fetch("/appointments/create", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     title: title,
-                    date: info.startStr.slice(0, 10),
-                    time: info.startStr.slice(11, 16)
+                    date: start.toISOString().slice(0, 10),
+                    start_time: start.toTimeString().slice(0, 5),
+                    end_time: end.toTimeString().slice(0, 5)
                 })
             })
-            .then(res => res.json())
+            .then(r => r.json())
             .then(data => {
                 if (!data.success) {
                     alert(data.message || "Erreur création RDV");
@@ -67,51 +63,57 @@ document.addEventListener("DOMContentLoaded", function () {
                 calendar.refetchEvents();
             })
             .catch(err => {
-                console.error("❌ Erreur création RDV", err);
-                alert("Erreur serveur");
+                console.error("❌ Création RDV", err);
             });
 
             calendar.unselect();
         },
 
-        /* =====================
+        /* ===============================
            DÉPLACEMENT RDV
-        ===================== */
+        =============================== */
         eventDrop(info) {
             persistEvent(info);
         },
 
-        /* =====================
+        /* ===============================
            REDIMENSIONNEMENT RDV
-        ===================== */
+        =============================== */
         eventResize(info) {
             persistEvent(info);
-        }
+        },
 
+        /* ===============================
+           TOOLTIP
+        =============================== */
+        eventDidMount(info) {
+            info.el.title = info.event.title;
+        }
     });
 
     calendar.render();
 
-    /* =====================
+    /* ===============================
        SAUVEGARDE BACKEND
-    ===================== */
+    =============================== */
     function persistEvent(info) {
 
         const start = info.event.start;
-        if (!start) {
+        const end = info.event.end;
+
+        if (!start || !end) {
+            console.error("❌ start/end manquants");
             info.revert();
             return;
         }
 
         fetch("/appointments/update_from_calendar", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 id: info.event.id,
-                date: start.toISOString().slice(0, 10),
-                time: start.toTimeString().slice(0, 5)
+                start: start.toISOString(),
+                end: end.toISOString()
             })
         })
         .then(res => {
@@ -121,9 +123,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         })
         .catch(err => {
-            console.error("❌ Erreur update RDV", err);
+            console.error("❌ Update RDV", err);
             info.revert();
         });
     }
-
 });
