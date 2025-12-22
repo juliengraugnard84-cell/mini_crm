@@ -2,6 +2,7 @@ import os
 import re
 import unicodedata
 import sqlite3
+import secrets
 from datetime import date
 from types import SimpleNamespace
 from functools import wraps
@@ -15,7 +16,10 @@ from flask import (
     flash,
     jsonify,
     session,
+    abort,
+    g,
 )
+
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -42,9 +46,11 @@ ALLOWED_EXTENSIONS = {
     "pdf",
     "jpg", "jpeg", "png",
     "doc", "docx",
-    "xls", "xlsx", "csv"
+    "xls", "xlsx", "csv",
 }
 
+# Max upload (MB) — configurable via Config.MAX_UPLOAD_MB sinon 10MB
+MAX_UPLOAD_MB = getattr(Config, "MAX_UPLOAD_MB", 10)
 
 
 ############################################################
@@ -55,15 +61,45 @@ app = Flask(__name__)
 app.config.from_object(Config)
 app.secret_key = app.config["SECRET_KEY"]
 
+# Sécurité cookies session (prod-friendly)
+app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
+app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+if os.environ.get("FLASK_ENV") == "production":
+    app.config["SESSION_COOKIE_SECURE"] = True
+
+# Limite upload (évite DOS)
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+
 
 ############################################################
 # 3. BASE DE DONNÉES
 ############################################################
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+def _connect_db():
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def get_db():
+    """
+    Connexion SQLite par requête (via flask.g).
+    - stable sous gunicorn (multi-workers)
+    - pas de check_same_thread=False
+    """
+    if "db" not in g:
+        g.db = _connect_db()
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(exception):
+    db = g.pop("db", None)
+    if db is not None:
+        try:
+            db.close()
+        except Exception:
+            pass
 
 
 def row_to_obj(row):
@@ -79,23 +115,24 @@ def _try_add_column(conn: sqlite3.Connection, table: str, col_def_sql: str):
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def_sql}")
     except sqlite3.OperationalError as e:
         msg = str(e).lower()
-        if "duplicate column name" in msg:
-            return
-        if "already exists" in msg:
+        if "duplicate column name" in msg or "already exists" in msg:
             return
         raise
 
 
 def has_column(table: str, column: str) -> bool:
-    conn = get_db()
+    conn = _connect_db()
     rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
     conn.close()
     return any(r["name"] == column for r in rows)
 
 
 def ensure_cotations_schema():
+    """
+    Helper conservé (compat), mais non indispensable si init_db est exécuté.
+    """
     try:
-        conn = get_db()
+        conn = _connect_db()
         _try_add_column(conn, "cotations", "created_by INTEGER")
         conn.commit()
         conn.close()
@@ -107,7 +144,11 @@ def ensure_cotations_schema():
 
 
 def init_db():
-    conn = get_db()
+    """
+    Initialisation DB (compat avec ton code existant).
+    Note: garde l'auto-add colonne pour éviter casse chez toi.
+    """
+    conn = _connect_db()
 
     # =======================
     # TABLE CLIENTS
@@ -133,9 +174,7 @@ def init_db():
 
     # ➜ Attribution automatique des anciens clients à l'admin (id = 1)
     try:
-        conn.execute(
-            "UPDATE crm_clients SET owner_id = 1 WHERE owner_id IS NULL"
-        )
+        conn.execute("UPDATE crm_clients SET owner_id = 1 WHERE owner_id IS NULL")
     except Exception:
         pass
 
@@ -204,7 +243,6 @@ def init_db():
         """
     )
 
-    # ➜ Colonnes additionnelles cotations (safe en prod)
     _try_add_column(conn, "cotations", "is_read INTEGER DEFAULT 0")
     _try_add_column(conn, "cotations", "status TEXT DEFAULT 'nouvelle'")
     _try_add_column(conn, "cotations", "created_by INTEGER")
@@ -253,6 +291,7 @@ def init_db():
 
 
 init_db()
+
 
 ############################################################
 # 4. S3 — STOCKAGE DOCUMENTS
@@ -312,9 +351,9 @@ def slugify(text: str) -> str:
 def client_s3_prefix(client_id: int) -> str:
     conn = get_db()
     row = conn.execute(
-        "SELECT name FROM crm_clients WHERE id=?", (client_id,)
+        "SELECT name FROM crm_clients WHERE id=?",
+        (client_id,),
     ).fetchone()
-    conn.close()
 
     base = f"client_{client_id}"
     if row and row["name"]:
@@ -396,6 +435,8 @@ def list_client_documents(client_id: int):
         print("Erreur list_client_documents :", repr(e))
 
     return docs
+
+
 def can_access_client(client_id: int) -> bool:
     """
     True si l'utilisateur connecté (session) a accès au client:
@@ -417,7 +458,6 @@ def can_access_client(client_id: int) -> bool:
         "SELECT owner_id FROM crm_clients WHERE id=?",
         (client_id,),
     ).fetchone()
-    conn.close()
 
     if not row:
         return False
@@ -450,12 +490,56 @@ def admin_required(func):
     return wrapper
 
 
-@app.context_processor
-def inject_current_user():
-    return dict(current_user=session.get("user"))
-
-
 ############################################################
+# 6bis. CSRF + CONTEXT GLOBALS (SAFE / NON BLOQUANT)
+############################################################
+
+# Génère un token en session (utile si un jour tu veux le réactiver)
+@app.before_request
+def ensure_csrf_token():
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_hex(32)
+
+
+# ⚠️ CSRF DÉSACTIVÉ VOLONTAIREMENT
+# --------------------------------
+# IMPORTANT :
+# - AUCUNE validation CSRF
+# - ZÉRO impact sur les formulaires existants
+# - Compatible AJAX / JSON / FullCalendar
+# - Comportement IDENTIQUE à ton ancien CRM fonctionnel
+#
+# (Ne rien ajouter ici)
+
+
+@app.context_processor
+def inject_globals():
+    u = session.get("user")
+    return dict(
+        current_user=SimpleNamespace(**u) if u else None,
+        csrf_token=session.get("csrf_token"),
+    )
+
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template(
+        "error.html",
+        code=403,
+        message="Accès refusé."
+    ), 403
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template(
+        "error.html",
+        code=404,
+        message="Page introuvable."
+    ), 404
+
+
+
 ############################################################
 # 7. LOGIN / LOGOUT
 ############################################################
@@ -471,7 +555,6 @@ def login():
             "SELECT * FROM users WHERE username=?",
             (username,),
         ).fetchone()
-        conn.close()
 
         if user and check_password_hash(user["password"], password):
             session["user"] = {
@@ -481,8 +564,8 @@ def login():
             }
             flash("Connexion réussie.", "success")
             return redirect(url_for("dashboard"))
-        else:
-            flash("Identifiants incorrects.", "danger")
+
+        flash("Identifiants incorrects.", "danger")
 
     return render_template("login.html")
 
@@ -495,7 +578,7 @@ def logout():
 
 
 ############################################################
-# 8. DASHBOARD
+# 8. DASHBOARD + SEARCH
 ############################################################
 
 @app.route("/dashboard")
@@ -503,9 +586,7 @@ def logout():
 def dashboard():
     conn = get_db()
 
-    total_clients = conn.execute(
-        "SELECT COUNT(*) FROM crm_clients"
-    ).fetchone()[0]
+    total_clients = conn.execute("SELECT COUNT(*) FROM crm_clients").fetchone()[0]
 
     last_clients = conn.execute(
         """
@@ -529,8 +610,6 @@ def dashboard():
         """
     ).fetchone()
 
-    conn.close()
-
     total_docs = 0
     last_docs = []
 
@@ -538,18 +617,12 @@ def dashboard():
         try:
             response = s3.list_objects_v2(Bucket=AWS_BUCKET)
             files = response.get("Contents") or []
+            files = [f for f in files if not f["Key"].endswith("/")]
             total_docs = len(files)
 
-            files_sorted = sorted(
-                files, key=lambda x: x["LastModified"], reverse=True
-            )
-
+            files_sorted = sorted(files, key=lambda x: x["LastModified"], reverse=True)
             last_docs = [
-                {
-                    "nom": f["Key"],
-                    "taille": f["Size"],
-                    "date": f["LastModified"],
-                }
+                {"nom": f["Key"], "taille": f["Size"], "date": f["LastModified"]}
                 for f in files_sorted[:5]
             ]
         except Exception:
@@ -559,13 +632,11 @@ def dashboard():
     cotations_admin = []
 
     if session.get("user", {}).get("role") == "admin":
-        conn2 = get_db()
-
-        unread_cotations = conn2.execute(
+        unread_cotations = conn.execute(
             "SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0"
         ).fetchone()[0]
 
-        rows = conn2.execute(
+        rows = conn.execute(
             """
             SELECT cotations.*, crm_clients.name AS client_name
             FROM cotations
@@ -575,7 +646,6 @@ def dashboard():
             """
         ).fetchall()
 
-        conn2.close()
         cotations_admin = [row_to_obj(r) for r in rows]
 
     return render_template(
@@ -590,6 +660,62 @@ def dashboard():
         cotations_admin=cotations_admin,
     )
 
+
+@app.route("/search")
+@login_required
+def search():
+    """
+    Recherche clients + documents (safe).
+    - Admin: voit tout
+    - Commercial: voit ses clients
+    """
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"results": []})
+
+    user = session.get("user") or {}
+    q_lower = q.lower()
+
+    conn = get_db()
+    if user.get("role") == "admin":
+        client_rows = conn.execute(
+            """
+            SELECT id, name
+            FROM crm_clients
+            WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?
+            ORDER BY created_at DESC
+            LIMIT 10
+            """,
+            (f"%{q}%", f"%{q}%", f"%{q}%"),
+        ).fetchall()
+    else:
+        client_rows = conn.execute(
+            """
+            SELECT id, name
+            FROM crm_clients
+            WHERE owner_id=?
+              AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)
+            ORDER BY created_at DESC
+            LIMIT 10
+            """,
+            (user.get("id"), f"%{q}%", f"%{q}%", f"%{q}%"),
+        ).fetchall()
+
+    results = []
+    for c in client_rows:
+        docs = list_client_documents(c["id"])
+        filtered_docs = [d for d in docs if q_lower in (d.get("nom") or "").lower()]
+        results.append(
+            {
+                "client_id": c["id"],
+                "client_name": c["name"],
+                "documents": (filtered_docs or docs)[:10],
+            }
+        )
+
+    return jsonify({"results": results})
+
+
 ############################################################
 # 9. REVENUS (CHIFFRE D'AFFAIRE)
 ############################################################
@@ -603,7 +729,7 @@ def chiffre_affaire():
         montant = request.form.get("montant")
         date_rev = request.form.get("date")
 
-        # 🔐 Le commercial est FORCÉMENT l'utilisateur connecté
+        # Le commercial est l'utilisateur connecté
         commercial = user.get("username")
 
         if not montant or not date_rev:
@@ -619,14 +745,12 @@ def chiffre_affaire():
             (date_rev, commercial, montant),
         )
         conn.commit()
-        conn.close()
 
         flash("Revenu enregistré.", "success")
         return redirect(url_for("chiffre_affaire"))
 
     conn = get_db()
 
-    # 🔐 Admin voit tout, commercial voit uniquement SES revenus
     if user.get("role") == "admin":
         revenus = conn.execute(
             """
@@ -711,8 +835,6 @@ def chiffre_affaire():
         (month_str,),
     ).fetchall()
 
-    conn.close()
-
     return render_template(
         "chiffre_affaire.html",
         today=today_obj.isoformat(),
@@ -731,9 +853,7 @@ def chiffre_affaire_data():
     conn = get_db()
 
     if user.get("role") == "admin":
-        rows = conn.execute(
-            "SELECT date, montant FROM revenus"
-        ).fetchall()
+        rows = conn.execute("SELECT date, montant FROM revenus").fetchall()
     else:
         rows = conn.execute(
             """
@@ -742,8 +862,6 @@ def chiffre_affaire_data():
             """,
             (user.get("username"),),
         ).fetchall()
-
-    conn.close()
 
     mois_noms = {
         "01": "Janvier", "02": "Février", "03": "Mars",
@@ -776,22 +894,19 @@ def delete_revenue(rev_id):
     ).fetchone()
 
     if not row:
-        conn.close()
         flash("Entrée introuvable.", "danger")
         return redirect(url_for("chiffre_affaire"))
 
-    # 🔐 Seul l'admin ou le propriétaire peut supprimer
     if user.get("role") != "admin" and row["commercial"] != user.get("username"):
-        conn.close()
         flash("Accès refusé.", "danger")
         return redirect(url_for("chiffre_affaire"))
 
     conn.execute("DELETE FROM revenus WHERE id=?", (rev_id,))
     conn.commit()
-    conn.close()
 
     flash("Entrée supprimée.", "success")
     return redirect(url_for("chiffre_affaire"))
+
 
 ############################################################
 # 10. ADMIN UTILISATEURS + RESET PASSWORD
@@ -809,16 +924,15 @@ def admin_users():
 
         if not username or not password or not role:
             flash("Champs obligatoires.", "danger")
-            conn.close()
             return redirect(url_for("admin_users"))
 
         exists = conn.execute(
-            "SELECT COUNT(*) FROM users WHERE username=?", (username,)
+            "SELECT COUNT(*) FROM users WHERE username=?",
+            (username,),
         ).fetchone()[0]
 
         if exists > 0:
             flash("Nom d'utilisateur déjà utilisé.", "danger")
-            conn.close()
             return redirect(url_for("admin_users"))
 
         conn.execute(
@@ -832,11 +946,7 @@ def admin_users():
 
         flash("Utilisateur créé.", "success")
 
-    users = conn.execute(
-        "SELECT * FROM users ORDER BY id ASC"
-    ).fetchall()
-    conn.close()
-
+    users = conn.execute("SELECT * FROM users ORDER BY id ASC").fetchall()
     return render_template("admin_users.html", users=users)
 
 
@@ -845,12 +955,12 @@ def admin_users():
 def admin_edit_user(user_id):
     conn = get_db()
     user = conn.execute(
-        "SELECT * FROM users WHERE id=?", (user_id,)
+        "SELECT * FROM users WHERE id=?",
+        (user_id,),
     ).fetchone()
 
     if not user:
         flash("Utilisateur introuvable.", "danger")
-        conn.close()
         return redirect(url_for("admin_users"))
 
     if request.method == "POST":
@@ -867,7 +977,6 @@ def admin_edit_user(user_id):
 
         if exists > 0:
             flash("Nom déjà utilisé.", "danger")
-            conn.close()
             return redirect(url_for("admin_edit_user", user_id=user_id))
 
         if password:
@@ -886,11 +995,9 @@ def admin_edit_user(user_id):
             )
 
         conn.commit()
-        conn.close()
         flash("Utilisateur mis à jour.", "success")
         return redirect(url_for("admin_users"))
 
-    conn.close()
     return render_template("admin_edit_user.html", user=user)
 
 
@@ -904,7 +1011,6 @@ def admin_delete_user(user_id):
     conn = get_db()
     conn.execute("DELETE FROM users WHERE id=?", (user_id,))
     conn.commit()
-    conn.close()
 
     flash("Utilisateur supprimé.", "success")
     return redirect(url_for("admin_users"))
@@ -920,9 +1026,12 @@ def admin_reset_password(user_id):
         return redirect(url_for("admin_users"))
 
     conn = get_db()
-    user = conn.execute("SELECT id FROM users WHERE id=?", (user_id,)).fetchone()
+    user = conn.execute(
+        "SELECT id FROM users WHERE id=?",
+        (user_id,),
+    ).fetchone()
+
     if not user:
-        conn.close()
         flash("Utilisateur introuvable.", "danger")
         return redirect(url_for("admin_users"))
 
@@ -931,7 +1040,6 @@ def admin_reset_password(user_id):
         (generate_password_hash(new_password), user_id),
     )
     conn.commit()
-    conn.close()
 
     flash("Mot de passe réinitialisé.", "success")
     return redirect(url_for("admin_users"))
@@ -952,11 +1060,8 @@ def documents():
         response = s3.list_objects_v2(Bucket=AWS_BUCKET)
         for item in (response.get("Contents") or []):
             key = item["Key"]
-
-            # Ignore dossiers
             if key.endswith("/"):
                 continue
-
             fichiers.append(
                 {
                     "nom": key,
@@ -1016,7 +1121,7 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS (sécurisé multi-commerciaux)
+# 12. CLIENTS (sécurisé multi-commerciaux) + EDIT/DELETE + DOCS
 ############################################################
 
 @app.route("/clients")
@@ -1039,7 +1144,6 @@ def clients():
             (user.get("id"),),
         ).fetchall()
 
-    conn.close()
     return render_template("clients.html", clients=[row_to_obj(r) for r in rows])
 
 
@@ -1080,7 +1184,6 @@ def new_client():
             ),
         )
         conn.commit()
-        conn.close()
 
         flash("Client créé.", "success")
         return redirect(url_for("clients"))
@@ -1108,7 +1211,6 @@ def client_detail(client_id):
         ).fetchone()
 
         if not row:
-            conn.close()
             flash("Client introuvable.", "danger")
             return redirect(url_for("clients"))
 
@@ -1120,8 +1222,6 @@ def client_detail(client_id):
             """,
             (client_id,),
         ).fetchall()
-
-        conn.close()
 
         client = row_to_obj(row)
         cotations = [row_to_obj(r) for r in cot_rows]
@@ -1140,7 +1240,137 @@ def client_detail(client_id):
         return redirect(url_for("clients"))
 
 
-# ✅ ROUTE MANQUANTE — CORRECTION DU 500
+@app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_client(client_id):
+    if not can_access_client(client_id):
+        flash("Accès non autorisé à ce dossier.", "danger")
+        return redirect(url_for("clients"))
+
+    statuses = ["demande de cotation", "en cours", "signé", "perdu"]
+    user = session.get("user") or {}
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM crm_clients WHERE id=?",
+        (client_id,),
+    ).fetchone()
+
+    if not row:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("Nom obligatoire.", "danger")
+            return redirect(url_for("edit_client", client_id=client_id))
+
+        commercial = (request.form.get("commercial") or "").strip()
+        if user.get("role") != "admin":
+            commercial = row["commercial"]
+
+        conn.execute(
+            """
+            UPDATE crm_clients
+            SET name=?, email=?, phone=?, address=?, commercial=?, status=?, notes=?
+            WHERE id=?
+            """,
+            (
+                name,
+                (request.form.get("email") or "").strip(),
+                (request.form.get("phone") or "").strip(),
+                (request.form.get("address") or "").strip(),
+                commercial,
+                (request.form.get("status") or "").strip(),
+                (request.form.get("notes") or "").strip(),
+                client_id,
+            ),
+        )
+        conn.commit()
+
+        flash("Client mis à jour.", "success")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    return render_template(
+        "client_form.html",
+        action="edit",
+        client=row_to_obj(row),
+        statuses=statuses,
+    )
+
+
+@app.route("/clients/<int:client_id>/delete", methods=["POST"])
+@login_required
+def delete_client(client_id):
+    if not can_access_client(client_id):
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("clients"))
+
+    conn = get_db()
+    conn.execute("DELETE FROM crm_clients WHERE id=?", (client_id,))
+    conn.commit()
+
+    flash("Client supprimé.", "success")
+    return redirect(url_for("clients"))
+
+
+@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
+@login_required
+def client_upload_document(client_id):
+    if not can_access_client(client_id):
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("clients"))
+
+    if LOCAL_MODE or not s3:
+        flash("Upload désactivé en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    fichier = request.files.get("file")
+    if not fichier or not allowed_file(fichier.filename):
+        flash("Fichier non valide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    filename = clean_filename(secure_filename(fichier.filename))
+    key = client_s3_prefix(client_id) + filename
+
+    try:
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
+        flash("Document envoyé.", "success")
+    except Exception as e:
+        print("Erreur upload doc client:", repr(e))
+        flash("Erreur upload document.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+@app.route("/clients/<int:client_id>/documents/delete/<path:key>", methods=["POST"])
+@login_required
+def client_delete_document(client_id, key):
+    if not can_access_client(client_id):
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("clients"))
+
+    if LOCAL_MODE or not s3:
+        flash("Suppression désactivée en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    full_key = client_s3_prefix(client_id) + key
+
+    try:
+        s3.delete_object(Bucket=AWS_BUCKET, Key=full_key)
+        flash("Document supprimé.", "success")
+    except Exception as e:
+        print("Erreur suppression doc client:", repr(e))
+        flash("Erreur suppression document.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+############################################################
+# 12bis. COTATIONS: création + suppression (AJAX/JSON)
+############################################################
+
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
 def create_cotation(client_id):
@@ -1151,6 +1381,8 @@ def create_cotation(client_id):
     description = (request.form.get("description") or "").strip()
     fournisseur = (request.form.get("fournisseur_actuel") or "").strip()
     date_echeance = (request.form.get("date_echeance") or "").strip()
+    date_negociation_date = (request.form.get("date_negociation_date") or "").strip()
+    date_negociation_time = (request.form.get("date_negociation_time") or "").strip()
 
     if not description:
         flash("Description obligatoire.", "danger")
@@ -1162,24 +1394,55 @@ def create_cotation(client_id):
     conn.execute(
         """
         INSERT INTO cotations
-        (client_id, description, fournisseur_actuel, date_echeance, created_by)
-        VALUES (?, ?, ?, ?, ?)
+        (client_id, description, fournisseur_actuel, date_echeance,
+         date_negociation_date, date_negociation_time, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             client_id,
             description,
             fournisseur,
             date_echeance,
+            date_negociation_date or None,
+            date_negociation_time or None,
             user.get("id"),
         ),
     )
     conn.commit()
-    conn.close()
 
     flash("Cotation ajoutée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
 
+@app.route("/cotations/<int:cotation_id>/delete", methods=["POST"])
+@login_required
+def delete_cotation(cotation_id):
+    """
+    Suppression cotation: admin ou créateur.
+    Retour JSON.
+    """
+    user = session.get("user") or {}
+    conn = get_db()
+
+    row = conn.execute(
+        "SELECT id, client_id, created_by FROM cotations WHERE id=?",
+        (cotation_id,),
+    ).fetchone()
+
+    if not row:
+        return jsonify(success=False, message="Cotation introuvable"), 404
+
+    if user.get("role") != "admin" and row["created_by"] != user.get("id"):
+        return jsonify(success=False, message="Accès refusé"), 403
+
+    if user.get("role") != "admin":
+        if not can_access_client(row["client_id"]):
+            return jsonify(success=False, message="Accès refusé"), 403
+
+    conn.execute("DELETE FROM cotations WHERE id=?", (cotation_id,))
+    conn.commit()
+
+    return jsonify(success=True)
 
 
 ############################################################
@@ -1218,8 +1481,6 @@ def appointments_events_json():
             """,
             (user.get("id"),),
         ).fetchall()
-
-    conn.close()
 
     events = []
     for r in rows:
@@ -1262,12 +1523,10 @@ def appointments_update_from_calendar():
     ).fetchone()
 
     if not row:
-        conn.close()
         return jsonify({"status": "error", "message": "RDV introuvable"}), 404
 
     if user.get("role") != "admin":
         if not row["client_id"] or not can_access_client(row["client_id"]):
-            conn.close()
             return jsonify({"status": "error", "message": "Accès refusé"}), 403
 
     conn.execute(
@@ -1275,7 +1534,6 @@ def appointments_update_from_calendar():
         (new_date, new_time, appt_id),
     )
     conn.commit()
-    conn.close()
 
     return jsonify({"status": "ok"})
 
@@ -1298,7 +1556,6 @@ def appointments_create():
         return jsonify({"success": False, "message": "Titre et date obligatoires."}), 400
 
     user = session.get("user") or {}
-
     if user.get("role") != "admin":
         if not client_id or not can_access_client(int(client_id)):
             return jsonify({"success": False, "message": "Client requis / accès refusé."}), 403
@@ -1312,10 +1569,8 @@ def appointments_create():
         (title, date_str, time_str, client_id, description, color),
     )
     conn.commit()
-    new_id = cur.lastrowid
-    conn.close()
 
-    return jsonify({"success": True, "id": new_id})
+    return jsonify({"success": True, "id": cur.lastrowid})
 
 
 @app.route("/appointments/<int:appt_id>", methods=["GET"])
@@ -1326,7 +1581,6 @@ def appointments_get(appt_id):
         "SELECT * FROM appointments WHERE id=?",
         (appt_id,),
     ).fetchone()
-    conn.close()
 
     if not row:
         return jsonify({"success": False, "message": "RDV introuvable"}), 404
@@ -1366,16 +1620,13 @@ def appointments_update(appt_id):
     ).fetchone()
 
     if not existing:
-        conn.close()
         return jsonify({"success": False, "message": "RDV introuvable"}), 404
 
     if user.get("role") != "admin":
         if not existing["client_id"] or not can_access_client(existing["client_id"]):
-            conn.close()
             return jsonify({"success": False, "message": "Accès refusé"}), 403
 
         if not client_id or not can_access_client(int(client_id)):
-            conn.close()
             return jsonify({"success": False, "message": "Client requis / accès refusé."}), 403
 
     conn.execute(
@@ -1387,7 +1638,6 @@ def appointments_update(appt_id):
         (title, date_str, time_str, client_id, description, color, appt_id),
     )
     conn.commit()
-    conn.close()
 
     return jsonify({"success": True})
 
@@ -1404,17 +1654,14 @@ def appointments_delete(appt_id):
     ).fetchone()
 
     if not row:
-        conn.close()
         return jsonify({"success": False, "message": "RDV introuvable"}), 404
 
     if user.get("role") != "admin":
         if not row["client_id"] or not can_access_client(row["client_id"]):
-            conn.close()
             return jsonify({"success": False, "message": "Accès refusé"}), 403
 
     conn.execute("DELETE FROM appointments WHERE id=?", (appt_id,))
     conn.commit()
-    conn.close()
 
     return jsonify({"success": True})
 
@@ -1440,7 +1687,10 @@ def _chat_store_file(file_storage):
     if LOCAL_MODE or not s3:
         return (None, None)
 
-    key = f"chat/{file_name_clean}"
+    # évite collisions
+    rnd = secrets.token_hex(6)
+    key = f"chat/{rnd}_{file_name_clean}"
+
     try:
         s3_upload_fileobj(file_storage, AWS_BUCKET, key)
         return (key, file_name)
@@ -1471,7 +1721,6 @@ def chat_messages():
         """,
         (limit_int,),
     ).fetchall()
-    conn.close()
 
     items = []
     for r in reversed(rows):
@@ -1516,10 +1765,8 @@ def chat_send():
         (u.get("id"), u.get("username"), message, file_key, file_name),
     )
     conn.commit()
-    new_id = cur.lastrowid
-    conn.close()
 
-    return jsonify({"success": True, "id": new_id})
+    return jsonify({"success": True, "id": cur.lastrowid})
 
 
 ############################################################
@@ -1539,4 +1786,3 @@ def index():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
