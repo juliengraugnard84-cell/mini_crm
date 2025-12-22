@@ -1377,7 +1377,7 @@ def delete_cotation(cotation_id):
 
 
 ############################################################
-# 13. AGENDA / FULLCALENDAR (CRUD COMPLET ET SÉCURISÉ)
+# 13. AGENDA / FULLCALENDAR (CRUD COMPLET + COMPAT DB EXISTANTE)
 ############################################################
 
 @app.route("/agenda")
@@ -1386,37 +1386,76 @@ def agenda():
     return render_template("calendar.html")
 
 
+def _normalize_hhmm(value, default_hhmm="09:00"):
+    v = (value or "").strip()
+    if not v:
+        return default_hhmm
+    # accepte "HH:MM" uniquement
+    if len(v) >= 5:
+        return v[:5]
+    return default_hhmm
+
+
+def _default_end_time(start_hhmm: str, minutes: int = 60) -> str:
+    # évite d'ajouter des imports globaux
+    from datetime import datetime, timedelta
+    try:
+        dt = datetime.strptime(start_hhmm, "%H:%M")
+        dt2 = dt + timedelta(minutes=minutes)
+        return dt2.strftime("%H:%M")
+    except Exception:
+        return "10:00"
+
+
 @app.route("/appointments/events_json")
 @login_required
 def appointments_events_json():
-    user = session.get("user")
+    user = session.get("user") or {}
     conn = get_db()
 
-    if user["role"] == "admin":
+    # Assure colonnes (si la DB est ancienne)
+    try:
+        _try_add_column(conn, "appointments", "end_time TEXT")
+    except Exception:
+        pass
+    try:
+        _try_add_column(conn, "appointments", "created_by INTEGER")
+    except Exception:
+        pass
+
+    # NB: on reste sur le schéma existant: date + time + end_time
+    if user.get("role") == "admin":
         rows = conn.execute("""
-            SELECT a.*, u.username AS created_by_name
+            SELECT a.id, a.title, a.date, a.time, a.end_time, a.color,
+                   a.created_by, u.username AS created_by_name
             FROM appointments a
-            JOIN users u ON u.id = a.created_by
+            LEFT JOIN users u ON u.id = a.created_by
+            ORDER BY a.date DESC, a.time DESC
         """).fetchall()
     else:
         rows = conn.execute("""
-            SELECT a.*, u.username AS created_by_name
+            SELECT a.id, a.title, a.date, a.time, a.end_time, a.color,
+                   a.created_by, u.username AS created_by_name
             FROM appointments a
-            JOIN users u ON u.id = a.created_by
+            LEFT JOIN users u ON u.id = a.created_by
             WHERE a.created_by = ?
-        """, (user["id"],)).fetchall()
+            ORDER BY a.date DESC, a.time DESC
+        """, (user.get("id"),)).fetchall()
 
     events = []
     for r in rows:
+        start_hhmm = _normalize_hhmm(r["time"], "09:00")
+        end_hhmm = _normalize_hhmm(r["end_time"], _default_end_time(start_hhmm))
+
         events.append({
             "id": r["id"],
             "title": r["title"],
-            "start": f"{r['date']}T{r['start_time']}",
-            "end": f"{r['date']}T{r['end_time']}",
+            "start": f"{r['date']}T{start_hhmm}:00",
+            "end": f"{r['date']}T{end_hhmm}:00",
             "backgroundColor": r["color"] or "#2563eb",
             "borderColor": r["color"] or "#2563eb",
             "extendedProps": {
-                "created_by": r["created_by_name"]
+                "created_by": r["created_by_name"] or ""
             }
         })
 
@@ -1429,24 +1468,33 @@ def appointments_create():
     data = request.get_json() or {}
 
     title = (data.get("title") or "").strip()
-    date = data.get("date")
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
+    date_str = (data.get("date") or "").strip()
+    start_hhmm = _normalize_hhmm(data.get("time"), "09:00")
+    end_hhmm = _normalize_hhmm(data.get("end_time"), _default_end_time(start_hhmm))
 
-    if not title or not date or not start_time or not end_time:
-        return jsonify(success=False, message="Champs manquants"), 400
+    if not title or not date_str:
+        return jsonify(success=False, message="Titre et date obligatoires"), 400
 
-    user = session.get("user")
+    user = session.get("user") or {}
     conn = get_db()
 
-    conn.execute("""
-        INSERT INTO appointments
-        (title, date, start_time, end_time, created_by)
-        VALUES (?, ?, ?, ?, ?)
-    """, (title, date, start_time, end_time, user["id"]))
+    # Assure colonnes (DB ancienne)
+    try:
+        _try_add_column(conn, "appointments", "end_time TEXT")
+    except Exception:
+        pass
+    try:
+        _try_add_column(conn, "appointments", "created_by INTEGER")
+    except Exception:
+        pass
 
+    cur = conn.execute("""
+        INSERT INTO appointments (title, date, time, end_time, created_by)
+        VALUES (?, ?, ?, ?, ?)
+    """, (title, date_str, start_hhmm, end_hhmm, user.get("id")))
     conn.commit()
-    return jsonify(success=True)
+
+    return jsonify(success=True, id=cur.lastrowid)
 
 
 @app.route("/appointments/update_from_calendar", methods=["POST"])
@@ -1455,34 +1503,30 @@ def appointments_update_from_calendar():
     data = request.get_json() or {}
 
     appt_id = data.get("id")
-    date = data.get("date")
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
+    date_str = (data.get("date") or "").strip()
+    start_hhmm = _normalize_hhmm(data.get("time"), "09:00")
+    end_hhmm = _normalize_hhmm(data.get("end_time"), _default_end_time(start_hhmm))
 
-    if not appt_id or not date or not start_time or not end_time:
+    if not appt_id or not date_str:
         return jsonify(success=False, message="Données manquantes"), 400
 
-    user = session.get("user")
+    user = session.get("user") or {}
     conn = get_db()
 
-    rdv = conn.execute(
-        "SELECT created_by FROM appointments WHERE id=?",
-        (appt_id,)
-    ).fetchone()
-
-    if not rdv:
+    row = conn.execute("SELECT created_by FROM appointments WHERE id=?", (appt_id,)).fetchone()
+    if not row:
         return jsonify(success=False, message="RDV introuvable"), 404
 
-    if user["role"] != "admin" and rdv["created_by"] != user["id"]:
+    if user.get("role") != "admin" and row["created_by"] != user.get("id"):
         return jsonify(success=False, message="Accès refusé"), 403
 
     conn.execute("""
         UPDATE appointments
-        SET date=?, start_time=?, end_time=?
+        SET date=?, time=?, end_time=?
         WHERE id=?
-    """, (date, start_time, end_time, appt_id))
-
+    """, (date_str, start_hhmm, end_hhmm, appt_id))
     conn.commit()
+
     return jsonify(success=True)
 
 
@@ -1492,59 +1536,49 @@ def appointments_update(appt_id):
     data = request.get_json() or {}
 
     title = (data.get("title") or "").strip()
-    date = data.get("date")
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
+    date_str = (data.get("date") or "").strip()
+    start_hhmm = _normalize_hhmm(data.get("time"), "09:00")
+    end_hhmm = _normalize_hhmm(data.get("end_time"), _default_end_time(start_hhmm))
 
-    if not title or not date or not start_time or not end_time:
-        return jsonify(success=False, message="Champs manquants"), 400
+    if not title or not date_str:
+        return jsonify(success=False, message="Titre et date obligatoires"), 400
 
-    user = session.get("user")
+    user = session.get("user") or {}
     conn = get_db()
 
-    rdv = conn.execute(
-        "SELECT created_by FROM appointments WHERE id=?",
-        (appt_id,)
-    ).fetchone()
-
-    if not rdv:
+    row = conn.execute("SELECT created_by FROM appointments WHERE id=?", (appt_id,)).fetchone()
+    if not row:
         return jsonify(success=False, message="RDV introuvable"), 404
 
-    if user["role"] != "admin" and rdv["created_by"] != user["id"]:
+    if user.get("role") != "admin" and row["created_by"] != user.get("id"):
         return jsonify(success=False, message="Accès refusé"), 403
 
     conn.execute("""
         UPDATE appointments
-        SET title=?, date=?, start_time=?, end_time=?
+        SET title=?, date=?, time=?, end_time=?
         WHERE id=?
-    """, (title, date, start_time, end_time, appt_id))
-
+    """, (title, date_str, start_hhmm, end_hhmm, appt_id))
     conn.commit()
+
     return jsonify(success=True)
 
 
 @app.route("/appointments/<int:appt_id>/delete", methods=["POST"])
 @login_required
 def appointments_delete(appt_id):
-    user = session.get("user")
+    user = session.get("user") or {}
     conn = get_db()
 
-    rdv = conn.execute(
-        "SELECT created_by FROM appointments WHERE id=?",
-        (appt_id,)
-    ).fetchone()
-
-    if not rdv:
+    row = conn.execute("SELECT created_by FROM appointments WHERE id=?", (appt_id,)).fetchone()
+    if not row:
         return jsonify(success=False, message="RDV introuvable"), 404
 
-    if user["role"] != "admin" and rdv["created_by"] != user["id"]:
+    if user.get("role") != "admin" and row["created_by"] != user.get("id"):
         return jsonify(success=False, message="Accès refusé"), 403
 
     conn.execute("DELETE FROM appointments WHERE id=?", (appt_id,))
     conn.commit()
-
     return jsonify(success=True)
-
 
 ############################################################
 # 14. CHAT (BACKEND)
