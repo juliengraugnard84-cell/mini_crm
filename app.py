@@ -82,11 +82,6 @@ def _connect_db():
 
 
 def get_db():
-    """
-    Connexion SQLite par requête (via flask.g).
-    - stable sous gunicorn (multi-workers)
-    - pas de check_same_thread=False
-    """
     if "db" not in g:
         g.db = _connect_db()
     return g.db
@@ -106,55 +101,20 @@ def row_to_obj(row):
     return SimpleNamespace(**dict(row)) if row else None
 
 
-def _try_add_column(conn: sqlite3.Connection, table: str, col_def_sql: str):
-    """
-    Ajoute une colonne si elle n'existe pas.
-    col_def_sql exemple: "is_read INTEGER DEFAULT 0"
-    """
+def _try_add_column(conn, table, col_def_sql):
     try:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def_sql}")
-    except sqlite3.OperationalError as e:
-        msg = str(e).lower()
-        if "duplicate column name" in msg or "already exists" in msg:
-            return
-        raise
-
-
-def has_column(table: str, column: str) -> bool:
-    conn = _connect_db()
-    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
-    conn.close()
-    return any(r["name"] == column for r in rows)
-
-
-def ensure_cotations_schema():
-    """
-    Helper conservé (compat), mais non indispensable si init_db est exécuté.
-    """
-    try:
-        conn = _connect_db()
-        _try_add_column(conn, "cotations", "created_by INTEGER")
-        conn.commit()
-        conn.close()
-    except Exception:
-        try:
-            conn.close()
-        except Exception:
-            pass
+    except sqlite3.OperationalError:
+        pass
 
 
 def init_db():
-    """
-    Initialisation DB (compat avec ton code existant).
-    Note: garde l'auto-add colonne pour éviter casse chez toi.
-    """
     conn = _connect_db()
 
     # =======================
     # TABLE CLIENTS
     # =======================
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS crm_clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -164,71 +124,58 @@ def init_db():
             commercial TEXT,
             status TEXT,
             notes TEXT,
+            owner_id INTEGER,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
-        """
-    )
-
-    # ➜ Ajout colonne propriétaire (multi-commerciaux)
-    _try_add_column(conn, "crm_clients", "owner_id INTEGER")
-
-    # ➜ Attribution automatique des anciens clients à l'admin (id = 1)
-    try:
-        conn.execute("UPDATE crm_clients SET owner_id = 1 WHERE owner_id IS NULL")
-    except Exception:
-        pass
+    """)
 
     # =======================
     # TABLE UTILISATEURS
     # =======================
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password TEXT,
             role TEXT
         )
-        """
-    )
+    """)
 
     # =======================
     # TABLE REVENUS
     # =======================
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS revenus (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
             commercial TEXT NOT NULL,
             montant REAL NOT NULL
         )
-        """
-    )
+    """)
 
     # =======================
-    # TABLE RENDEZ-VOUS
+    # TABLE RENDEZ-VOUS (AGENDA) ✅ CORRIGÉE
     # =======================
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS appointments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             date TEXT NOT NULL,
-            time TEXT,
-            client_id INTEGER,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
             description TEXT,
             color TEXT,
-            FOREIGN KEY (client_id) REFERENCES crm_clients(id)
+            client_id INTEGER,
+            created_by INTEGER NOT NULL,
+            FOREIGN KEY (client_id) REFERENCES crm_clients(id),
+            FOREIGN KEY (created_by) REFERENCES users(id)
         )
-        """
-    )
+    """)
 
     # =======================
     # TABLE COTATIONS
     # =======================
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS cotations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id INTEGER NOT NULL,
@@ -237,21 +184,18 @@ def init_db():
             date_echeance TEXT,
             date_negociation_date TEXT,
             date_negociation_time TEXT,
+            created_by INTEGER,
+            is_read INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'nouvelle',
             date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (client_id) REFERENCES crm_clients(id)
         )
-        """
-    )
-
-    _try_add_column(conn, "cotations", "is_read INTEGER DEFAULT 0")
-    _try_add_column(conn, "cotations", "status TEXT DEFAULT 'nouvelle'")
-    _try_add_column(conn, "cotations", "created_by INTEGER")
+    """)
 
     # =======================
     # TABLE CHAT
     # =======================
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS chat_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
@@ -261,30 +205,17 @@ def init_db():
             file_name TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
-        """
-    )
+    """)
 
     # =======================
     # BOOTSTRAP ADMIN
     # =======================
-    def create_user_if_missing(username: str, clear_password: str, role: str):
-        username = (username or "").strip()
-        role = (role or "").strip()
-        if not username or not clear_password or not role:
-            return
-
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username=?",
-            (username,),
-        ).fetchone()
-
-        if existing is None:
-            conn.execute(
-                "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                (username, generate_password_hash(clear_password), role),
-            )
-
-    create_user_if_missing("admin", "admin123", "admin")
+    admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
+    if not admin:
+        conn.execute(
+            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+            ("admin", generate_password_hash("admin123"), "admin"),
+        )
 
     conn.commit()
     conn.close()
@@ -1446,7 +1377,7 @@ def delete_cotation(cotation_id):
 
 
 ############################################################
-# 13. AGENDA / FULLCALENDAR (COMPLET + STABLE)
+# 13. AGENDA / FULLCALENDAR (FONCTIONNEL COMPLET)
 ############################################################
 
 @app.route("/agenda")
@@ -1458,39 +1389,27 @@ def agenda():
 @app.route("/appointments/events_json")
 @login_required
 def appointments_events_json():
-    user = session.get("user") or {}
+    user = session.get("user")
     conn = get_db()
 
-    if user.get("role") == "admin":
-        rows = conn.execute(
-            """
+    if user["role"] == "admin":
+        rows = conn.execute("""
             SELECT a.*, u.username AS created_by_name, c.name AS client_name
             FROM appointments a
-            LEFT JOIN users u ON u.id = a.created_by
-            LEFT JOIN crm_clients c ON c.id = a.client_id
-            """
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            """
-            SELECT a.*, u.username AS created_by_name, c.name AS client_name
-            FROM appointments a
-            JOIN crm_clients c ON c.id = a.client_id
             JOIN users u ON u.id = a.created_by
+            LEFT JOIN crm_clients c ON c.id = a.client_id
+        """).fetchall()
+    else:
+        rows = conn.execute("""
+            SELECT a.*, u.username AS created_by_name, c.name AS client_name
+            FROM appointments a
+            JOIN users u ON u.id = a.created_by
+            JOIN crm_clients c ON c.id = a.client_id
             WHERE c.owner_id = ?
-            """,
-            (user.get("id"),),
-        ).fetchall()
+        """, (user["id"],)).fetchall()
 
     events = []
-
     for r in rows:
-        start_time = r["time"] or "09:00"
-        end_time = r["end_time"] or "10:00"
-
-        start = f"{r['date']}T{start_time}:00"
-        end = f"{r['date']}T{end_time}:00"
-
         title = r["title"]
         if r["client_name"]:
             title += f" — {r['client_name']}"
@@ -1498,12 +1417,13 @@ def appointments_events_json():
         events.append({
             "id": r["id"],
             "title": title,
-            "start": start,
-            "end": end,
+            "start": f"{r['date']}T{r['start_time']}",
+            "end": f"{r['date']}T{r['end_time']}",
             "backgroundColor": r["color"] or "#2563eb",
             "borderColor": r["color"] or "#2563eb",
             "extendedProps": {
-                "created_by": r["created_by_name"]
+                "created_by": r["created_by_name"],
+                "description": r["description"]
             }
         })
 
@@ -1517,23 +1437,28 @@ def appointments_create():
 
     title = (data.get("title") or "").strip()
     date_str = data.get("date")
-    time_str = data.get("time") or "09:00"
+
+    # Compat: accepte "time" (ancien) ou "start_time"
+    start_time = data.get("start_time") or data.get("time") or "09:00"
     end_time = data.get("end_time") or "10:00"
+
+    description = data.get("description") or ""
+    color = data.get("color") or "#2563eb"
+    client_id = data.get("client_id")
+    if client_id in ("", None):
+        client_id = None
 
     if not title or not date_str:
         return jsonify(success=False, message="Titre et date obligatoires"), 400
 
-    user = session.get("user") or {}
+    user = session.get("user")
     conn = get_db()
 
-    cur = conn.execute(
-        """
+    cur = conn.execute("""
         INSERT INTO appointments
-        (title, date, time, end_time, created_by)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (title, date_str, time_str, end_time, user.get("id")),
-    )
+        (title, date, start_time, end_time, description, color, client_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (title, date_str, start_time, end_time, description, color, client_id, user["id"]))
     conn.commit()
 
     return jsonify(success=True, id=cur.lastrowid)
@@ -1546,37 +1471,43 @@ def appointments_update_from_calendar():
 
     appt_id = data.get("id")
     date_str = data.get("date")
-    time_str = data.get("time")
+
+    # Compat: accepte "time" -> start_time
+    start_time = data.get("start_time") or data.get("time")
     end_time = data.get("end_time")
 
     if not appt_id or not date_str:
         return jsonify(success=False, message="Données manquantes"), 400
 
-    user = session.get("user") or {}
+    # Si le front n'envoie pas les heures pendant un drag/drop
+    if not start_time:
+        start_time = "09:00"
+    if not end_time:
+        end_time = "10:00"
+
+    user = session.get("user")
     conn = get_db()
 
-    row = conn.execute(
+    rdv = conn.execute(
         "SELECT created_by FROM appointments WHERE id=?",
-        (appt_id,),
+        (appt_id,)
     ).fetchone()
 
-    if not row:
+    if not rdv:
         return jsonify(success=False, message="RDV introuvable"), 404
 
-    if user.get("role") != "admin" and row["created_by"] != user.get("id"):
+    if user["role"] != "admin" and rdv["created_by"] != user["id"]:
         return jsonify(success=False, message="Accès refusé"), 403
 
-    conn.execute(
-        """
+    conn.execute("""
         UPDATE appointments
-        SET date=?, time=?, end_time=?
+        SET date=?, start_time=?, end_time=?
         WHERE id=?
-        """,
-        (date_str, time_str, end_time, appt_id),
-    )
-    conn.commit()
+    """, (date_str, start_time, end_time, appt_id))
 
+    conn.commit()
     return jsonify(success=True)
+
 
 ############################################################
 # 14. CHAT (BACKEND)
