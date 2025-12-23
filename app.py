@@ -103,8 +103,7 @@ def row_to_obj(row):
 
 def _try_add_column(conn, table, col_def_sql):
     """
-    Ajoute une colonne à une table SQLite si elle n'existe pas déjà.
-    Safe : aucune erreur si la colonne existe.
+    Ajoute une colonne si elle n'existe pas (safe prod).
     """
     try:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def_sql}")
@@ -157,8 +156,11 @@ def init_db():
         )
     """)
 
+    # 🔥 AJOUT COLONNE DOSSIER (UNE SEULE FOIS)
+    _try_add_column(conn, "revenus", "dossier TEXT")
+
     # =======================
-    # TABLE RENDEZ-VOUS (AGENDA)
+    # TABLE AGENDA
     # =======================
     conn.execute("""
         CREATE TABLE IF NOT EXISTS appointments (
@@ -170,14 +172,12 @@ def init_db():
             description TEXT,
             color TEXT,
             client_id INTEGER,
-            created_by INTEGER NOT NULL,
-            FOREIGN KEY (client_id) REFERENCES crm_clients(id),
-            FOREIGN KEY (created_by) REFERENCES users(id)
+            created_by INTEGER NOT NULL
         )
     """)
 
     # =======================
-    # TABLE COTATIONS (BASE)
+    # TABLE COTATIONS
     # =======================
     conn.execute("""
         CREATE TABLE IF NOT EXISTS cotations (
@@ -188,36 +188,7 @@ def init_db():
             created_by INTEGER,
             is_read INTEGER DEFAULT 0,
             status TEXT DEFAULT 'nouvelle',
-            date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (client_id) REFERENCES crm_clients(id)
-        )
-    """)
-
-    # =======================
-    # EXTENSION TABLE COTATIONS (NOUVELLES DONNÉES MÉTIER)
-    # =======================
-    _try_add_column(conn, "cotations", "date_negociation TEXT")
-    _try_add_column(conn, "cotations", "signataire_nom TEXT")
-    _try_add_column(conn, "cotations", "signataire_tel TEXT")
-    _try_add_column(conn, "cotations", "signataire_email TEXT")
-    _try_add_column(conn, "cotations", "siret TEXT")
-    _try_add_column(conn, "cotations", "entreprise_nom TEXT")
-    _try_add_column(conn, "cotations", "energie_type TEXT")
-    _try_add_column(conn, "cotations", "pdl_pce TEXT")
-    _try_add_column(conn, "cotations", "commentaire TEXT")
-
-    # =======================
-    # TABLE CHAT
-    # =======================
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            username TEXT,
-            message TEXT,
-            file_key TEXT,
-            file_name TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            date_creation TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -238,7 +209,7 @@ def init_db():
     conn.close()
 
 
-# INITIALISATION AUTOMATIQUE DE LA BASE
+# INITIALISATION AUTOMATIQUE
 init_db()
 
 
@@ -689,62 +660,40 @@ def search():
 
 
 ############################################################
-# 9. CHIFFRE D'AFFAIRE (STATISTIQUES COMPLÈTES)
+# 9. REVENUS (CHIFFRE D'AFFAIRE)
 ############################################################
 
-@app.route("/chiffre_affaire")
+@app.route("/chiffre_affaire", methods=["GET"])
 @login_required
 def chiffre_affaire():
-    user = session.get("user") or {}
     conn = get_db()
+    user = session.get("user") or {}
 
     today = date.today()
     year_str = str(today.year)
     month_str = today.strftime("%Y-%m")
 
-    # 1️⃣ CA TOTAL ANNUEL
-    if user.get("role") == "admin":
-        ca_annuel = conn.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE substr(date, 1, 4) = ?
-            """,
-            (year_str,),
-        ).fetchone()[0]
-    else:
-        ca_annuel = conn.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE substr(date, 1, 4) = ?
-              AND commercial = ?
-            """,
-            (year_str, user.get("username")),
-        ).fetchone()[0]
+    # CA total annuel
+    ca_annuel = conn.execute(
+        """
+        SELECT COALESCE(SUM(montant), 0)
+        FROM revenus
+        WHERE substr(date, 1, 4) = ?
+        """,
+        (year_str,),
+    ).fetchone()[0]
 
-    # 2️⃣ CA TOTAL MENSUEL
-    if user.get("role") == "admin":
-        ca_mensuel = conn.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE substr(date, 1, 7) = ?
-            """,
-            (month_str,),
-        ).fetchone()[0]
-    else:
-        ca_mensuel = conn.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE substr(date, 1, 7) = ?
-              AND commercial = ?
-            """,
-            (month_str, user.get("username")),
-        ).fetchone()[0]
+    # CA total mensuel
+    ca_mensuel = conn.execute(
+        """
+        SELECT COALESCE(SUM(montant), 0)
+        FROM revenus
+        WHERE substr(date, 1, 7) = ?
+        """,
+        (month_str,),
+    ).fetchone()[0]
 
-    # 3️⃣ CA ANNUEL PAR COMMERCIAL
+    # CA par commercial (année)
     annuel_par_com = conn.execute(
         """
         SELECT commercial, COALESCE(SUM(montant), 0) AS total
@@ -756,28 +705,26 @@ def chiffre_affaire():
         (year_str,),
     ).fetchall()
 
-    # 4️⃣ CA MENSUEL PAR COMMERCIAL
+    # CA par commercial / mois
     mensuel_par_com = conn.execute(
         """
-        SELECT commercial, substr(date,1,7) AS mois, COALESCE(SUM(montant), 0) AS total
+        SELECT substr(date, 1, 7) AS mois, commercial,
+               COALESCE(SUM(montant), 0) AS total
         FROM revenus
-        WHERE substr(date,1,4) = ?
-        GROUP BY commercial, mois
-        ORDER BY mois ASC
-        """,
-        (year_str,),
+        GROUP BY mois, commercial
+        ORDER BY mois DESC, total DESC
+        """
     ).fetchall()
 
-    # 5️⃣ CA GLOBAL PAR MOIS
+    # CA global par mois
     global_par_mois = conn.execute(
         """
-        SELECT substr(date,1,7) AS mois, COALESCE(SUM(montant), 0) AS total
+        SELECT substr(date, 1, 7) AS mois,
+               COALESCE(SUM(montant), 0) AS total
         FROM revenus
-        WHERE substr(date,1,4) = ?
         GROUP BY mois
-        ORDER BY mois ASC
-        """,
-        (year_str,),
+        ORDER BY mois DESC
+        """
     ).fetchall()
 
     return render_template(
@@ -787,10 +734,34 @@ def chiffre_affaire():
         annuel_par_com=annuel_par_com,
         mensuel_par_com=mensuel_par_com,
         global_par_mois=global_par_mois,
-        year=year_str,
-        month=month_str,
+        today=today.isoformat(),
     )
 
+
+@app.route("/chiffre_affaire/add", methods=["POST"])
+@login_required
+def add_chiffre_affaire():
+    date_rev = request.form.get("date")
+    commercial = request.form.get("commercial")
+    dossier = request.form.get("dossier")
+    montant = request.form.get("montant")
+
+    if not all([date_rev, commercial, dossier, montant]):
+        flash("Tous les champs sont obligatoires.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    conn = get_db()
+    conn.execute(
+        """
+        INSERT INTO revenus (date, commercial, dossier, montant)
+        VALUES (?, ?, ?, ?)
+        """,
+        (date_rev, commercial, dossier, montant),
+    )
+    conn.commit()
+
+    flash("Chiffre d’affaires enregistré.", "success")
+    return redirect(url_for("chiffre_affaire"))
 
 ############################################################
 # 10. ADMIN UTILISATEURS + RESET PASSWORD
