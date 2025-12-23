@@ -663,38 +663,104 @@ def search():
 # 9. REVENUS (CHIFFRE D'AFFAIRE)
 ############################################################
 
+def _parse_amount(value: str) -> float:
+    """
+    Accepte: 1200, 1200.50, "1 200,50", "1.200,50"
+    Retourne float, sinon lève ValueError.
+    """
+    if value is None:
+        raise ValueError("montant manquant")
+    s = str(value).strip()
+    s = s.replace("\u202f", " ").replace("\xa0", " ")  # espaces insécables
+    s = s.replace(" ", "")
+    # si virgule utilisée comme décimale
+    if "," in s and "." in s:
+        # ex: 1.200,50 -> enlever séparateurs milliers "." puis "," -> "."
+        s = s.replace(".", "").replace(",", ".")
+    else:
+        s = s.replace(",", ".")
+    return float(s)
+
+
+def _list_commerciaux(conn):
+    # Liste pour dropdown (admin). Ajuste si tu veux inclure admin.
+    return conn.execute(
+        "SELECT username FROM users WHERE username IS NOT NULL ORDER BY username ASC"
+    ).fetchall()
+
+
 @app.route("/chiffre_affaire", methods=["GET"])
 @login_required
 def chiffre_affaire():
-    conn = get_db()
     user = session.get("user") or {}
+    conn = get_db()
 
-    today = date.today()
-    year_str = str(today.year)
-    month_str = today.strftime("%Y-%m")
+    today_obj = date.today()
+    year_str = str(today_obj.year)
+    month_str = today_obj.strftime("%Y-%m")
 
-    # CA total annuel
-    ca_annuel = conn.execute(
-        """
-        SELECT COALESCE(SUM(montant), 0)
-        FROM revenus
-        WHERE substr(date, 1, 4) = ?
-        """,
-        (year_str,),
-    ).fetchone()[0]
+    # Liste revenus (admin = tout, sinon uniquement son username)
+    if user.get("role") == "admin":
+        revenus = conn.execute(
+            """
+            SELECT id, date, commercial, COALESCE(dossier,'') AS dossier, montant
+            FROM revenus
+            ORDER BY date DESC, id DESC
+            """
+        ).fetchall()
+    else:
+        revenus = conn.execute(
+            """
+            SELECT id, date, commercial, COALESCE(dossier,'') AS dossier, montant
+            FROM revenus
+            WHERE commercial = ?
+            ORDER BY date DESC, id DESC
+            """,
+            (user.get("username"),),
+        ).fetchall()
 
-    # CA total mensuel
-    ca_mensuel = conn.execute(
-        """
-        SELECT COALESCE(SUM(montant), 0)
-        FROM revenus
-        WHERE substr(date, 1, 7) = ?
-        """,
-        (month_str,),
-    ).fetchone()[0]
+    # KPI année / mois (sur l'utilisateur si commercial, global si admin)
+    if user.get("role") == "admin":
+        ca_annuel = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE substr(date, 1, 4) = ?
+            """,
+            (year_str,),
+        ).fetchone()[0]
 
-    # CA par commercial (année)
-    annuel_par_com = conn.execute(
+        ca_mensuel = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE substr(date, 1, 7) = ?
+            """,
+            (month_str,),
+        ).fetchone()[0]
+    else:
+        ca_annuel = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE substr(date, 1, 4) = ?
+              AND commercial = ?
+            """,
+            (year_str, user.get("username")),
+        ).fetchone()[0]
+
+        ca_mensuel = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE substr(date, 1, 7) = ?
+              AND commercial = ?
+            """,
+            (month_str, user.get("username")),
+        ).fetchone()[0]
+
+    # 3) CA total par commercial (année en cours)
+    ca_par_com = conn.execute(
         """
         SELECT commercial, COALESCE(SUM(montant), 0) AS total
         FROM revenus
@@ -705,63 +771,122 @@ def chiffre_affaire():
         (year_str,),
     ).fetchall()
 
-    # CA par commercial / mois
-    mensuel_par_com = conn.execute(
+    # 4) CA par mois et par commercial (année en cours)
+    ca_par_mois_com = conn.execute(
         """
-        SELECT substr(date, 1, 7) AS mois, commercial,
-               COALESCE(SUM(montant), 0) AS total
+        SELECT substr(date, 1, 7) AS mois, commercial, COALESCE(SUM(montant), 0) AS total
         FROM revenus
-        GROUP BY mois, commercial
+        WHERE substr(date, 1, 4) = ?
+        GROUP BY substr(date, 1, 7), commercial
         ORDER BY mois DESC, total DESC
-        """
+        """,
+        (year_str,),
     ).fetchall()
 
-    # CA global par mois
-    global_par_mois = conn.execute(
+    # 5) CA global par mois (année en cours)
+    ca_global_mois = conn.execute(
         """
-        SELECT substr(date, 1, 7) AS mois,
-               COALESCE(SUM(montant), 0) AS total
+        SELECT substr(date, 1, 7) AS mois, COALESCE(SUM(montant), 0) AS total
         FROM revenus
-        GROUP BY mois
+        WHERE substr(date, 1, 4) = ?
+        GROUP BY substr(date, 1, 7)
         ORDER BY mois DESC
-        """
+        """,
+        (year_str,),
     ).fetchall()
+
+    commerciaux = _list_commerciaux(conn) if user.get("role") == "admin" else []
 
     return render_template(
         "chiffre_affaire.html",
+        today=today_obj.isoformat(),
+        revenus=revenus,
         ca_annuel=ca_annuel,
         ca_mensuel=ca_mensuel,
-        annuel_par_com=annuel_par_com,
-        mensuel_par_com=mensuel_par_com,
-        global_par_mois=global_par_mois,
-        today=today.isoformat(),
+        ca_par_com=ca_par_com,
+        ca_par_mois_com=ca_par_mois_com,
+        ca_global_mois=ca_global_mois,
+        commerciaux=commerciaux,
+        year_str=year_str,
+        month_str=month_str,
     )
 
 
 @app.route("/chiffre_affaire/add", methods=["POST"])
 @login_required
-def add_chiffre_affaire():
-    date_rev = request.form.get("date")
-    commercial = request.form.get("commercial")
-    dossier = request.form.get("dossier")
-    montant = request.form.get("montant")
+def chiffre_affaire_add():
+    user = session.get("user") or {}
+    conn = get_db()
 
-    if not all([date_rev, commercial, dossier, montant]):
-        flash("Tous les champs sont obligatoires.", "danger")
+    try:
+        date_rev = (request.form.get("date") or "").strip()
+        dossier = (request.form.get("dossier") or "").strip()
+        montant_raw = request.form.get("montant")
+        montant = _parse_amount(montant_raw)
+
+        if not date_rev:
+            flash("La date est obligatoire.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
+        # Commercial
+        if user.get("role") == "admin":
+            commercial = (request.form.get("commercial") or "").strip()
+            if not commercial:
+                flash("Le commercial est obligatoire.", "danger")
+                return redirect(url_for("chiffre_affaire"))
+        else:
+            commercial = user.get("username")
+
+        conn.execute(
+            """
+            INSERT INTO revenus (date, commercial, dossier, montant)
+            VALUES (?, ?, ?, ?)
+            """,
+            (date_rev, commercial, dossier, montant),
+        )
+        conn.commit()
+        flash("Montant ajouté.", "success")
         return redirect(url_for("chiffre_affaire"))
 
-    conn = get_db()
-    conn.execute(
-        """
-        INSERT INTO revenus (date, commercial, dossier, montant)
-        VALUES (?, ?, ?, ?)
-        """,
-        (date_rev, commercial, dossier, montant),
-    )
-    conn.commit()
+    except ValueError:
+        flash("Montant invalide (ex: 1200.50 ou 1 200,50).", "danger")
+        return redirect(url_for("chiffre_affaire"))
+    except Exception as e:
+        print("ERREUR chiffre_affaire_add :", repr(e))
+        flash("Erreur lors de l'ajout du montant.", "danger")
+        return redirect(url_for("chiffre_affaire"))
 
-    flash("Chiffre d’affaires enregistré.", "success")
-    return redirect(url_for("chiffre_affaire"))
+
+@app.route("/chiffre_affaire/delete/<int:rev_id>", methods=["POST"])
+@login_required
+def chiffre_affaire_delete(rev_id):
+    user = session.get("user") or {}
+    conn = get_db()
+
+    try:
+        row = conn.execute(
+            "SELECT id, commercial FROM revenus WHERE id=?",
+            (rev_id,),
+        ).fetchone()
+
+        if not row:
+            flash("Entrée introuvable.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
+        if user.get("role") != "admin" and row["commercial"] != user.get("username"):
+            flash("Accès refusé.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
+        conn.execute("DELETE FROM revenus WHERE id=?", (rev_id,))
+        conn.commit()
+
+        flash("Montant supprimé.", "success")
+        return redirect(url_for("chiffre_affaire"))
+
+    except Exception as e:
+        print("ERREUR chiffre_affaire_delete :", repr(e))
+        flash("Erreur lors de la suppression.", "danger")
+        return redirect(url_for("chiffre_affaire"))
 
 ############################################################
 # 10. ADMIN UTILISATEURS + RESET PASSWORD
