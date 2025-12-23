@@ -1,12 +1,13 @@
 {% extends "base.html" %}
+
 {% block title %}Dashboard{% endblock %}
+{% block page_title %}Tableau de bord{% endblock %}
 
 {% block content %}
 
-<h1 class="page-title mb-4">Tableau de bord</h1>
-
 <!-- KPI -->
 <div class="row g-4 mb-4">
+
     <div class="col-md-4">
         <div class="kpi-tile kpi--blue">
             <div class="kpi-label">Clients</div>
@@ -17,7 +18,9 @@
     <div class="col-md-4">
         <div class="kpi-tile kpi--green">
             <div class="kpi-label">Chiffre d’affaires total</div>
-            <div class="kpi-value">{{ total_ca | round(2) }} €</div>
+            <div class="kpi-value">
+                {{ total_ca | round(2) }} €
+            </div>
         </div>
     </div>
 
@@ -27,6 +30,7 @@
             <div class="kpi-value">{{ total_docs }}</div>
         </div>
     </div>
+
 </div>
 
 <div class="row g-4">
@@ -35,14 +39,19 @@
     <div class="col-md-6">
         <div class="card p-3 h-100">
             <h5 class="mb-3">Derniers clients</h5>
+
             <ul class="list-group list-group-flush">
                 {% for c in last_clients %}
                 <li class="list-group-item">
                     <strong>{{ c.name }}</strong><br>
-                    <small class="text-muted">{{ c.email or "—" }}</small>
+                    <small class="text-muted">
+                        {{ c.email or "—" }}
+                    </small>
                 </li>
                 {% else %}
-                <li class="list-group-item text-muted">Aucun client</li>
+                <li class="list-group-item text-muted">
+                    Aucun client
+                </li>
                 {% endfor %}
             </ul>
         </div>
@@ -52,12 +61,21 @@
     <div class="col-md-6">
         <div class="card p-3 h-100">
             <h5 class="mb-3">Dernier revenu</h5>
+
             {% if last_rev %}
-                <p class="mb-1"><strong>{{ last_rev.montant }} €</strong></p>
-                <p class="mb-1">Date : {{ last_rev.date }}</p>
-                <p class="mb-0 text-muted">Commercial : {{ last_rev.commercial }}</p>
+                <p class="mb-1">
+                    <strong>{{ last_rev.montant }} €</strong>
+                </p>
+                <p class="mb-1">
+                    Date : {{ last_rev.date }}
+                </p>
+                <p class="mb-0 text-muted">
+                    Commercial : {{ last_rev.commercial }}
+                </p>
             {% else %}
-                <p class="text-muted">Aucun revenu enregistré</p>
+                <p class="text-muted">
+                    Aucun revenu enregistré
+                </p>
             {% endif %}
         </div>
     </div>
