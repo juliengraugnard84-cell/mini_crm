@@ -33,7 +33,7 @@
 
     <!-- Derniers clients -->
     <div class="col-md-6">
-        <div class="card p-3">
+        <div class="card p-3 h-100">
             <h5 class="mb-3">Derniers clients</h5>
             <ul class="list-group list-group-flush">
                 {% for c in last_clients %}
@@ -50,7 +50,7 @@
 
     <!-- Dernier revenu -->
     <div class="col-md-6">
-        <div class="card p-3">
+        <div class="card p-3 h-100">
             <h5 class="mb-3">Dernier revenu</h5>
             {% if last_rev %}
                 <p class="mb-1"><strong>{{ last_rev.montant }} €</strong></p>
@@ -71,7 +71,7 @@
         Cotations non lues ({{ unread_cotations }})
     </h5>
 
-    <ul class="list-group">
+    <ul class="list-group list-group-flush">
         {% for c in cotations_admin %}
         <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
            class="list-group-item list-group-item-action">
