@@ -2,24 +2,16 @@
 {% block title %}Agenda{% endblock %}
 
 {% block content %}
-
 <h1 class="page-title mb-4">Agenda</h1>
 
 <div class="card p-3">
-    <div id="calendar" style="min-height: 720px;"></div>
+    <div id="calendar" style="min-height: 700px;"></div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
-
-<!-- FullCalendar CSS -->
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
-
-<!-- FullCalendar JS -->
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 
-<!-- Script agenda -->
-<script src="{{ url_for('static', filename='calendar.js') }}?v=2"></script>
-
+<script src="{{ url_for('static', filename='calendar.js') }}"></script>
 {% endblock %}
