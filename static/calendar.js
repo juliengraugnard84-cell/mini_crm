@@ -21,28 +21,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
         slotMinTime: "07:00:00",
         slotMaxTime: "20:00:00",
-        slotDuration: "00:15:00",
-
-        height: "auto",
+        slotDuration: "00:30:00",
 
         events: "/appointments/events_json",
 
-        /* =====================================================
+        /* ===============================
            CRÉATION RDV
-           - Mois : heures par défaut
-           - Semaine / Jour : vraies heures
-        ===================================================== */
+        =============================== */
         select(info) {
             const title = prompt("Titre du rendez-vous");
-            if (!title) {
-                calendar.unselect();
-                return;
-            }
+            if (!title) return calendar.unselect();
 
             let start = info.start;
             let end = info.end;
 
-            // Cas vue MOIS (pas d'heure)
+            // Vue MOIS → heures par défaut
             if (!info.startStr.includes("T")) {
                 start = new Date(info.startStr + "T09:00");
                 end = new Date(info.startStr + "T10:00");
@@ -61,98 +54,70 @@ document.addEventListener("DOMContentLoaded", function () {
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
-                    alert("Erreur création RDV");
+                    alert(data.message || "Erreur création RDV");
                 }
                 calendar.refetchEvents();
-            })
-            .catch(() => alert("Erreur réseau"));
+            });
 
             calendar.unselect();
         },
 
-        /* =====================================================
-           DRAG & RESIZE
-        ===================================================== */
-        eventDrop: persistEvent,
-        eventResize: persistEvent,
+        /* ===============================
+           DRAG / RESIZE
+        =============================== */
+        eventDrop: updateEvent,
+        eventResize: updateEvent,
 
-        /* =====================================================
+        /* ===============================
            MODIFICATION AU CLIC
-        ===================================================== */
+        =============================== */
         eventClick(info) {
             const e = info.event;
 
-            const newTitle = prompt("Modifier le titre", e.title);
-            if (!newTitle) return;
-
-            const start = e.start;
-            const end = e.end;
+            const title = prompt("Modifier le titre", e.title);
+            if (!title) return;
 
             fetch("/appointments/update_from_calendar", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     id: e.id,
-                    date: start.toISOString().slice(0, 10),
-                    start_time: start.toTimeString().slice(0, 5),
-                    end_time: end ? end.toTimeString().slice(0, 5) : start.toTimeString().slice(0, 5),
-                    title: newTitle
+                    date: e.start.toISOString().slice(0, 10),
+                    start_time: e.start.toTimeString().slice(0, 5),
+                    end_time: e.end.toTimeString().slice(0, 5),
+                    title: title
                 })
             })
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
-                    alert("Erreur modification RDV");
+                    alert("Erreur modification");
                     calendar.refetchEvents();
                 } else {
-                    e.setProp("title", newTitle);
+                    e.setProp("title", title);
                 }
-            })
-            .catch(() => {
-                alert("Erreur réseau");
-                calendar.refetchEvents();
             });
-        },
-
-        /* =====================================================
-           INFO BULLE
-        ===================================================== */
-        eventDidMount(info) {
-            const createdBy = info.event.extendedProps.created_by;
-            if (createdBy) {
-                info.el.title = "Créé par : " + createdBy;
-            }
         }
     });
 
     calendar.render();
 
-    /* =====================================================
-       PERSIST DRAG / RESIZE
-    ===================================================== */
-    function persistEvent(info) {
-        const start = info.event.start;
-        const end = info.event.end;
-
+    function updateEvent(info) {
         fetch("/appointments/update_from_calendar", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 id: info.event.id,
-                date: start.toISOString().slice(0, 10),
-                start_time: start.toTimeString().slice(0, 5),
-                end_time: end ? end.toTimeString().slice(0, 5) : start.toTimeString().slice(0, 5)
+                date: info.event.start.toISOString().slice(0, 10),
+                start_time: info.event.start.toTimeString().slice(0, 5),
+                end_time: info.event.end.toTimeString().slice(0, 5)
             })
         })
-        .then(res => {
-            if (!res.ok) {
-                alert("Erreur mise à jour RDV");
+        .then(r => {
+            if (!r.ok) {
+                alert("Erreur déplacement RDV");
                 info.revert();
             }
-        })
-        .catch(() => {
-            alert("Erreur réseau");
-            info.revert();
         });
     }
 });
