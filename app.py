@@ -527,7 +527,7 @@ def logout():
 
 
 ############################################################
-# 8. DASHBOARD + SEARCH
+# 8. DASHBOARD + SEARCH + OUVERTURE COTATION
 ############################################################
 
 @app.route("/dashboard")
@@ -535,7 +535,9 @@ def logout():
 def dashboard():
     conn = get_db()
 
-    total_clients = conn.execute("SELECT COUNT(*) FROM crm_clients").fetchone()[0]
+    total_clients = conn.execute(
+        "SELECT COUNT(*) FROM crm_clients"
+    ).fetchone()[0]
 
     last_clients = conn.execute(
         """
@@ -560,20 +562,12 @@ def dashboard():
     ).fetchone()
 
     total_docs = 0
-    last_docs = []
 
     if not LOCAL_MODE and s3:
         try:
             response = s3.list_objects_v2(Bucket=AWS_BUCKET)
             files = response.get("Contents") or []
-            files = [f for f in files if not f["Key"].endswith("/")]
-            total_docs = len(files)
-
-            files_sorted = sorted(files, key=lambda x: x["LastModified"], reverse=True)
-            last_docs = [
-                {"nom": f["Key"], "taille": f["Size"], "date": f["LastModified"]}
-                for f in files_sorted[:5]
-            ]
+            total_docs = len([f for f in files if not f["Key"].endswith("/")])
         except Exception:
             pass
 
@@ -604,9 +598,37 @@ def dashboard():
         total_ca=total_ca,
         last_rev=last_rev,
         total_docs=total_docs,
-        last_docs=last_docs,
         unread_cotations=unread_cotations,
         cotations_admin=cotations_admin,
+    )
+
+
+@app.route("/cotations/<int:cotation_id>")
+@login_required
+def open_cotation(cotation_id):
+    conn = get_db()
+
+    cot = conn.execute(
+        "SELECT * FROM cotations WHERE id=?",
+        (cotation_id,),
+    ).fetchone()
+
+    if not cot:
+        flash("Demande de cotation introuvable.", "danger")
+        return redirect(url_for("dashboard"))
+
+    if not can_access_client(cot["client_id"]):
+        flash("Accès non autorisé.", "danger")
+        return redirect(url_for("dashboard"))
+
+    conn.execute(
+        "UPDATE cotations SET is_read=1 WHERE id=?",
+        (cotation_id,),
+    )
+    conn.commit()
+
+    return redirect(
+        url_for("client_detail", client_id=cot["client_id"])
     )
 
 
@@ -663,6 +685,7 @@ def search():
         )
 
     return jsonify({"results": results})
+
 
 
 ############################################################
