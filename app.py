@@ -689,65 +689,22 @@ def search():
 
 
 ############################################################
-# 9. REVENUS (CHIFFRE D'AFFAIRE)
+# 9. CHIFFRE D'AFFAIRE (STATISTIQUES COMPLÈTES)
 ############################################################
 
-@app.route("/chiffre_affaire", methods=["GET", "POST"])
+@app.route("/chiffre_affaire")
 @login_required
 def chiffre_affaire():
     user = session.get("user") or {}
-
-    if request.method == "POST":
-        montant = request.form.get("montant")
-        date_rev = request.form.get("date")
-
-        # Le commercial est l'utilisateur connecté
-        commercial = user.get("username")
-
-        if not montant or not date_rev:
-            flash("Tous les champs sont obligatoires.", "danger")
-            return redirect(url_for("chiffre_affaire"))
-
-        conn = get_db()
-        conn.execute(
-            """
-            INSERT INTO revenus (date, commercial, montant)
-            VALUES (?, ?, ?)
-            """,
-            (date_rev, commercial, montant),
-        )
-        conn.commit()
-
-        flash("Revenu enregistré.", "success")
-        return redirect(url_for("chiffre_affaire"))
-
     conn = get_db()
 
-    if user.get("role") == "admin":
-        revenus = conn.execute(
-            """
-            SELECT id, date, commercial, montant
-            FROM revenus
-            ORDER BY date DESC
-            """
-        ).fetchall()
-    else:
-        revenus = conn.execute(
-            """
-            SELECT id, date, commercial, montant
-            FROM revenus
-            WHERE commercial = ?
-            ORDER BY date DESC
-            """,
-            (user.get("username"),),
-        ).fetchall()
+    today = date.today()
+    year_str = str(today.year)
+    month_str = today.strftime("%Y-%m")
 
-    today_obj = date.today()
-    year_str = str(today_obj.year)
-    month_str = today_obj.strftime("%Y-%m")
-
+    # 1️⃣ CA TOTAL ANNUEL
     if user.get("role") == "admin":
-        total_annuel = conn.execute(
+        ca_annuel = conn.execute(
             """
             SELECT COALESCE(SUM(montant), 0)
             FROM revenus
@@ -755,17 +712,8 @@ def chiffre_affaire():
             """,
             (year_str,),
         ).fetchone()[0]
-
-        total_mensuel = conn.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE substr(date, 1, 7) = ?
-            """,
-            (month_str,),
-        ).fetchone()[0]
     else:
-        total_annuel = conn.execute(
+        ca_annuel = conn.execute(
             """
             SELECT COALESCE(SUM(montant), 0)
             FROM revenus
@@ -775,7 +723,18 @@ def chiffre_affaire():
             (year_str, user.get("username")),
         ).fetchone()[0]
 
-        total_mensuel = conn.execute(
+    # 2️⃣ CA TOTAL MENSUEL
+    if user.get("role") == "admin":
+        ca_mensuel = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE substr(date, 1, 7) = ?
+            """,
+            (month_str,),
+        ).fetchone()[0]
+    else:
+        ca_mensuel = conn.execute(
             """
             SELECT COALESCE(SUM(montant), 0)
             FROM revenus
@@ -785,6 +744,7 @@ def chiffre_affaire():
             (month_str, user.get("username")),
         ).fetchone()[0]
 
+    # 3️⃣ CA ANNUEL PAR COMMERCIAL
     annuel_par_com = conn.execute(
         """
         SELECT commercial, COALESCE(SUM(montant), 0) AS total
@@ -796,88 +756,40 @@ def chiffre_affaire():
         (year_str,),
     ).fetchall()
 
+    # 4️⃣ CA MENSUEL PAR COMMERCIAL
     mensuel_par_com = conn.execute(
         """
-        SELECT commercial, COALESCE(SUM(montant), 0) AS total
+        SELECT commercial, substr(date,1,7) AS mois, COALESCE(SUM(montant), 0) AS total
         FROM revenus
-        WHERE substr(date, 1, 7) = ?
-        GROUP BY commercial
-        ORDER BY total DESC
+        WHERE substr(date,1,4) = ?
+        GROUP BY commercial, mois
+        ORDER BY mois ASC
         """,
-        (month_str,),
+        (year_str,),
+    ).fetchall()
+
+    # 5️⃣ CA GLOBAL PAR MOIS
+    global_par_mois = conn.execute(
+        """
+        SELECT substr(date,1,7) AS mois, COALESCE(SUM(montant), 0) AS total
+        FROM revenus
+        WHERE substr(date,1,4) = ?
+        GROUP BY mois
+        ORDER BY mois ASC
+        """,
+        (year_str,),
     ).fetchall()
 
     return render_template(
         "chiffre_affaire.html",
-        today=today_obj.isoformat(),
-        revenus=revenus,
-        total_mensuel=total_mensuel,
-        total_annuel=total_annuel,
-        mensuel_par_com=mensuel_par_com,
+        ca_annuel=ca_annuel,
+        ca_mensuel=ca_mensuel,
         annuel_par_com=annuel_par_com,
+        mensuel_par_com=mensuel_par_com,
+        global_par_mois=global_par_mois,
+        year=year_str,
+        month=month_str,
     )
-
-
-@app.route("/chiffre_affaire/data")
-@login_required
-def chiffre_affaire_data():
-    user = session.get("user") or {}
-    conn = get_db()
-
-    if user.get("role") == "admin":
-        rows = conn.execute("SELECT date, montant FROM revenus").fetchall()
-    else:
-        rows = conn.execute(
-            """
-            SELECT date, montant FROM revenus
-            WHERE commercial = ?
-            """,
-            (user.get("username"),),
-        ).fetchall()
-
-    mois_noms = {
-        "01": "Janvier", "02": "Février", "03": "Mars",
-        "04": "Avril", "05": "Mai", "06": "Juin",
-        "07": "Juillet", "08": "Août", "09": "Septembre",
-        "10": "Octobre", "11": "Novembre", "12": "Décembre",
-    }
-
-    data_par_mois = {}
-    for r in rows:
-        month = r["date"][5:7]
-        data_par_mois.setdefault(month, 0)
-        data_par_mois[month] += float(r["montant"])
-
-    labels = [mois_noms[m] for m in sorted(data_par_mois.keys())]
-    data_vals = [data_par_mois[m] for m in sorted(data_par_mois.keys())]
-
-    return jsonify({"labels": labels, "data": data_vals})
-
-
-@app.route("/chiffre_affaire/delete/<int:rev_id>", methods=["POST"])
-@login_required
-def delete_revenue(rev_id):
-    user = session.get("user") or {}
-    conn = get_db()
-
-    row = conn.execute(
-        "SELECT commercial FROM revenus WHERE id=?",
-        (rev_id,),
-    ).fetchone()
-
-    if not row:
-        flash("Entrée introuvable.", "danger")
-        return redirect(url_for("chiffre_affaire"))
-
-    if user.get("role") != "admin" and row["commercial"] != user.get("username"):
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("chiffre_affaire"))
-
-    conn.execute("DELETE FROM revenus WHERE id=?", (rev_id,))
-    conn.commit()
-
-    flash("Entrée supprimée.", "success")
-    return redirect(url_for("chiffre_affaire"))
 
 
 ############################################################
