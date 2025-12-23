@@ -4,167 +4,85 @@
 {% block content %}
 <h1 class="page-title mb-4">Chiffre d'affaires</h1>
 
-<!-- FORMULAIRE AJOUT -->
-<div class="card p-3 mb-4">
-  <h5 class="mb-3">Ajouter un montant</h5>
-
-  <form method="POST" action="{{ url_for('chiffre_affaire_add') }}" class="row g-3">
-    <div class="col-md-3">
-      <label class="form-label">Date</label>
-      <input type="date" class="form-control" name="date" value="{{ today }}" required>
-    </div>
-
-    <div class="col-md-3">
-      <label class="form-label">Commercial</label>
-      {% if current_user and current_user.role == 'admin' %}
-        <select class="form-select" name="commercial" required>
-          <option value="" selected disabled>Choisir…</option>
-          {% for u in commerciaux %}
-            <option value="{{ u.username }}">{{ u.username }}</option>
-          {% endfor %}
-        </select>
-      {% else %}
-        <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
-      {% endif %}
-    </div>
-
-    <div class="col-md-4">
-      <label class="form-label">Nom du dossier</label>
-      <input type="text" class="form-control" name="dossier" placeholder="Ex: Dossier Dupont">
-    </div>
-
-    <div class="col-md-2">
-      <label class="form-label">CA du dossier (€)</label>
-      <input type="text" class="form-control" name="montant" placeholder="1200,50" required>
-    </div>
-
-    <div class="col-12">
-      <button class="btn btn-primary" type="submit">Enregistrer</button>
-    </div>
-  </form>
-</div>
-
-<!-- KPI -->
 <div class="row g-4 mb-4">
-  <div class="col-md-6">
-    <div class="kpi-tile kpi--blue">
-      <div class="kpi-label">CA Année {{ year_str }}</div>
-      <div class="kpi-value">{{ (ca_annuel or 0) | round(2) }} €</div>
+    <div class="col-md-6">
+        <div class="kpi-tile kpi--blue">
+            <div class="kpi-label">CA Année</div>
+            <div class="kpi-value">{{ ca_annuel }} €</div>
+        </div>
     </div>
-  </div>
-  <div class="col-md-6">
-    <div class="kpi-tile kpi--green">
-      <div class="kpi-label">CA Mois {{ month_str }}</div>
-      <div class="kpi-value">{{ (ca_mensuel or 0) | round(2) }} €</div>
+    <div class="col-md-6">
+        <div class="kpi-tile kpi--green">
+            <div class="kpi-label">CA Mois</div>
+            <div class="kpi-value">{{ ca_mensuel }} €</div>
+        </div>
     </div>
-  </div>
 </div>
 
-<!-- LISTE DES ENTREES + SUPPRESSION -->
+{% if current_user.role == "admin" %}
 <div class="card p-3 mb-4">
-  <h5 class="mb-3">Entrées</h5>
-
-  <div class="table-responsive">
-    <table class="table align-middle mb-0">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Commercial</th>
-          <th>Dossier</th>
-          <th class="text-end">Montant</th>
-          <th class="text-end">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in revenus %}
-        <tr>
-          <td>{{ r.date }}</td>
-          <td>{{ r.commercial }}</td>
-          <td>{{ r.dossier or "—" }}</td>
-          <td class="text-end">{{ (r.montant or 0) | round(2) }} €</td>
-          <td class="text-end">
-            <form method="POST" action="{{ url_for('chiffre_affaire_delete', rev_id=r.id) }}"
-                  onsubmit="return confirm('Supprimer ce montant ?');"
-                  style="display:inline;">
-              <button class="btn btn-sm btn-outline-danger" type="submit">Supprimer</button>
-            </form>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="5" class="text-muted">Aucune entrée</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+    <h5>Ajouter un chiffre d'affaires</h5>
+    <form method="POST">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <input type="date" name="date" class="form-control" required>
+            </div>
+            <div class="col-md-3">
+                <input name="commercial" class="form-control" placeholder="Commercial" required>
+            </div>
+            <div class="col-md-3">
+                <input name="dossier" class="form-control" placeholder="Dossier" required>
+            </div>
+            <div class="col-md-3">
+                <input name="montant" class="form-control" placeholder="Montant €" required>
+            </div>
+        </div>
+        <button class="btn btn-primary mt-3">Ajouter</button>
+    </form>
 </div>
+{% endif %}
 
-<!-- CA par commercial (année) -->
 <div class="card p-3 mb-4">
-  <h5 class="mb-3">CA par commercial (année)</h5>
-  <div class="table-responsive">
-    <table class="table mb-0">
-      <thead>
-        <tr><th>Commercial</th><th class="text-end">Total</th></tr>
-      </thead>
-      <tbody>
-        {% for row in ca_par_com %}
+    <h5>CA par commercial (année)</h5>
+    <table class="table">
+        {% for r in annuel_par_com %}
         <tr>
-          <td>{{ row.commercial }}</td>
-          <td class="text-end">{{ (row.total or 0) | round(2) }} €</td>
+            <td>{{ r.commercial }}</td>
+            <td class="text-end">{{ r.total }} €</td>
         </tr>
         {% else %}
         <tr><td colspan="2" class="text-muted">Aucune donnée</td></tr>
         {% endfor %}
-      </tbody>
     </table>
-  </div>
 </div>
 
-<!-- CA par commercial / mois -->
 <div class="card p-3 mb-4">
-  <h5 class="mb-3">CA par commercial / mois</h5>
-  <div class="table-responsive">
-    <table class="table mb-0">
-      <thead>
-        <tr><th>Mois</th><th>Commercial</th><th class="text-end">Total</th></tr>
-      </thead>
-      <tbody>
-        {% for row in ca_par_mois_com %}
+    <h5>CA par commercial / mois</h5>
+    <table class="table">
+        {% for r in mensuel_par_com %}
         <tr>
-          <td>{{ row.mois }}</td>
-          <td>{{ row.commercial }}</td>
-          <td class="text-end">{{ (row.total or 0) | round(2) }} €</td>
+            <td>{{ r.mois }}</td>
+            <td>{{ r.commercial }}</td>
+            <td class="text-end">{{ r.total }} €</td>
         </tr>
         {% else %}
         <tr><td colspan="3" class="text-muted">Aucune donnée</td></tr>
         {% endfor %}
-      </tbody>
     </table>
-  </div>
 </div>
 
-<!-- CA global par mois -->
 <div class="card p-3">
-  <h5 class="mb-3">CA global par mois</h5>
-  <div class="table-responsive">
-    <table class="table mb-0">
-      <thead>
-        <tr><th>Mois</th><th class="text-end">Total</th></tr>
-      </thead>
-      <tbody>
-        {% for row in ca_global_mois %}
+    <h5>CA global par mois</h5>
+    <table class="table">
+        {% for r in global_par_mois %}
         <tr>
-          <td>{{ row.mois }}</td>
-          <td class="text-end">{{ (row.total or 0) | round(2) }} €</td>
+            <td>{{ r.mois }}</td>
+            <td class="text-end">{{ r.total }} €</td>
         </tr>
         {% else %}
         <tr><td colspan="2" class="text-muted">Aucune donnée</td></tr>
         {% endfor %}
-      </tbody>
     </table>
-  </div>
 </div>
 
 {% endblock %}

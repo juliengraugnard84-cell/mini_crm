@@ -660,233 +660,101 @@ def search():
 
 
 ############################################################
-# 9. REVENUS (CHIFFRE D'AFFAIRE)
+# 9. CHIFFRE D'AFFAIRES (ADMIN WRITE ONLY)
 ############################################################
 
-def _parse_amount(value: str) -> float:
-    """
-    Accepte: 1200, 1200.50, "1 200,50", "1.200,50"
-    Retourne float, sinon lève ValueError.
-    """
-    if value is None:
-        raise ValueError("montant manquant")
-    s = str(value).strip()
-    s = s.replace("\u202f", " ").replace("\xa0", " ")  # espaces insécables
-    s = s.replace(" ", "")
-    # si virgule utilisée comme décimale
-    if "," in s and "." in s:
-        # ex: 1.200,50 -> enlever séparateurs milliers "." puis "," -> "."
-        s = s.replace(".", "").replace(",", ".")
-    else:
-        s = s.replace(",", ".")
-    return float(s)
-
-
-def _list_commerciaux(conn):
-    # Liste pour dropdown (admin). Ajuste si tu veux inclure admin.
-    return conn.execute(
-        "SELECT username FROM users WHERE username IS NOT NULL ORDER BY username ASC"
-    ).fetchall()
-
-
-@app.route("/chiffre_affaire", methods=["GET"])
+@app.route("/chiffre_affaire", methods=["GET", "POST"])
 @login_required
 def chiffre_affaire():
-    user = session.get("user") or {}
+    user = session.get("user")
     conn = get_db()
 
-    today_obj = date.today()
-    year_str = str(today_obj.year)
-    month_str = today_obj.strftime("%Y-%m")
+    # 🔒 Sécurité : seuls les admins peuvent modifier
+    if request.method == "POST" and user["role"] != "admin":
+        abort(403)
 
-    # Liste revenus (admin = tout, sinon uniquement son username)
-    if user.get("role") == "admin":
-        revenus = conn.execute(
-            """
-            SELECT id, date, commercial, COALESCE(dossier,'') AS dossier, montant
-            FROM revenus
-            ORDER BY date DESC, id DESC
-            """
-        ).fetchall()
-    else:
-        revenus = conn.execute(
-            """
-            SELECT id, date, commercial, COALESCE(dossier,'') AS dossier, montant
-            FROM revenus
-            WHERE commercial = ?
-            ORDER BY date DESC, id DESC
-            """,
-            (user.get("username"),),
-        ).fetchall()
+    # ➕ AJOUT CA (ADMIN)
+    if request.method == "POST":
+        date_rev = request.form.get("date")
+        commercial = request.form.get("commercial")
+        dossier = request.form.get("dossier")
+        montant = request.form.get("montant")
 
-    # KPI année / mois (sur l'utilisateur si commercial, global si admin)
-    if user.get("role") == "admin":
-        ca_annuel = conn.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE substr(date, 1, 4) = ?
-            """,
-            (year_str,),
-        ).fetchone()[0]
+        if not all([date_rev, commercial, dossier, montant]):
+            flash("Tous les champs sont obligatoires.", "danger")
+            return redirect(url_for("chiffre_affaire"))
 
-        ca_mensuel = conn.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE substr(date, 1, 7) = ?
-            """,
-            (month_str,),
-        ).fetchone()[0]
-    else:
-        ca_annuel = conn.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE substr(date, 1, 4) = ?
-              AND commercial = ?
-            """,
-            (year_str, user.get("username")),
-        ).fetchone()[0]
+        conn.execute("""
+            INSERT INTO revenus (date, commercial, dossier, montant)
+            VALUES (?, ?, ?, ?)
+        """, (date_rev, commercial, dossier, montant))
+        conn.commit()
 
-        ca_mensuel = conn.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE substr(date, 1, 7) = ?
-              AND commercial = ?
-            """,
-            (month_str, user.get("username")),
-        ).fetchone()[0]
+        flash("Chiffre d’affaires ajouté.", "success")
+        return redirect(url_for("chiffre_affaire"))
 
-    # 3) CA total par commercial (année en cours)
-    ca_par_com = conn.execute(
-        """
-        SELECT commercial, COALESCE(SUM(montant), 0) AS total
+    # === CALCULS ===
+    today = date.today()
+    year = str(today.year)
+    month = today.strftime("%Y-%m")
+
+    ca_annuel = conn.execute("""
+        SELECT COALESCE(SUM(montant), 0)
         FROM revenus
-        WHERE substr(date, 1, 4) = ?
+        WHERE substr(date,1,4)=?
+    """, (year,)).fetchone()[0]
+
+    ca_mensuel = conn.execute("""
+        SELECT COALESCE(SUM(montant), 0)
+        FROM revenus
+        WHERE substr(date,1,7)=?
+    """, (month,)).fetchone()[0]
+
+    annuel_par_com = conn.execute("""
+        SELECT commercial, SUM(montant) AS total
+        FROM revenus
+        WHERE substr(date,1,4)=?
         GROUP BY commercial
         ORDER BY total DESC
-        """,
-        (year_str,),
-    ).fetchall()
+    """, (year,)).fetchall()
 
-    # 4) CA par mois et par commercial (année en cours)
-    ca_par_mois_com = conn.execute(
-        """
-        SELECT substr(date, 1, 7) AS mois, commercial, COALESCE(SUM(montant), 0) AS total
+    mensuel_par_com = conn.execute("""
+        SELECT substr(date,1,7) AS mois, commercial, SUM(montant) AS total
         FROM revenus
-        WHERE substr(date, 1, 4) = ?
-        GROUP BY substr(date, 1, 7), commercial
-        ORDER BY mois DESC, total DESC
-        """,
-        (year_str,),
-    ).fetchall()
-
-    # 5) CA global par mois (année en cours)
-    ca_global_mois = conn.execute(
-        """
-        SELECT substr(date, 1, 7) AS mois, COALESCE(SUM(montant), 0) AS total
-        FROM revenus
-        WHERE substr(date, 1, 4) = ?
-        GROUP BY substr(date, 1, 7)
+        GROUP BY mois, commercial
         ORDER BY mois DESC
-        """,
-        (year_str,),
-    ).fetchall()
+    """).fetchall()
 
-    commerciaux = _list_commerciaux(conn) if user.get("role") == "admin" else []
+    global_par_mois = conn.execute("""
+        SELECT substr(date,1,7) AS mois, SUM(montant) AS total
+        FROM revenus
+        GROUP BY mois
+        ORDER BY mois DESC
+    """).fetchall()
 
     return render_template(
         "chiffre_affaire.html",
-        today=today_obj.isoformat(),
-        revenus=revenus,
         ca_annuel=ca_annuel,
         ca_mensuel=ca_mensuel,
-        ca_par_com=ca_par_com,
-        ca_par_mois_com=ca_par_mois_com,
-        ca_global_mois=ca_global_mois,
-        commerciaux=commerciaux,
-        year_str=year_str,
-        month_str=month_str,
+        annuel_par_com=annuel_par_com,
+        mensuel_par_com=mensuel_par_com,
+        global_par_mois=global_par_mois,
     )
-
-
-@app.route("/chiffre_affaire/add", methods=["POST"])
-@login_required
-def chiffre_affaire_add():
-    user = session.get("user") or {}
-    conn = get_db()
-
-    try:
-        date_rev = (request.form.get("date") or "").strip()
-        dossier = (request.form.get("dossier") or "").strip()
-        montant_raw = request.form.get("montant")
-        montant = _parse_amount(montant_raw)
-
-        if not date_rev:
-            flash("La date est obligatoire.", "danger")
-            return redirect(url_for("chiffre_affaire"))
-
-        # Commercial
-        if user.get("role") == "admin":
-            commercial = (request.form.get("commercial") or "").strip()
-            if not commercial:
-                flash("Le commercial est obligatoire.", "danger")
-                return redirect(url_for("chiffre_affaire"))
-        else:
-            commercial = user.get("username")
-
-        conn.execute(
-            """
-            INSERT INTO revenus (date, commercial, dossier, montant)
-            VALUES (?, ?, ?, ?)
-            """,
-            (date_rev, commercial, dossier, montant),
-        )
-        conn.commit()
-        flash("Montant ajouté.", "success")
-        return redirect(url_for("chiffre_affaire"))
-
-    except ValueError:
-        flash("Montant invalide (ex: 1200.50 ou 1 200,50).", "danger")
-        return redirect(url_for("chiffre_affaire"))
-    except Exception as e:
-        print("ERREUR chiffre_affaire_add :", repr(e))
-        flash("Erreur lors de l'ajout du montant.", "danger")
-        return redirect(url_for("chiffre_affaire"))
 
 
 @app.route("/chiffre_affaire/delete/<int:rev_id>", methods=["POST"])
 @login_required
-def chiffre_affaire_delete(rev_id):
-    user = session.get("user") or {}
+def delete_revenue(rev_id):
+    if session["user"]["role"] != "admin":
+        abort(403)
+
     conn = get_db()
+    conn.execute("DELETE FROM revenus WHERE id=?", (rev_id,))
+    conn.commit()
 
-    try:
-        row = conn.execute(
-            "SELECT id, commercial FROM revenus WHERE id=?",
-            (rev_id,),
-        ).fetchone()
+    flash("Montant supprimé.", "success")
+    return redirect(url_for("chiffre_affaire"))
 
-        if not row:
-            flash("Entrée introuvable.", "danger")
-            return redirect(url_for("chiffre_affaire"))
-
-        if user.get("role") != "admin" and row["commercial"] != user.get("username"):
-            flash("Accès refusé.", "danger")
-            return redirect(url_for("chiffre_affaire"))
-
-        conn.execute("DELETE FROM revenus WHERE id=?", (rev_id,))
-        conn.commit()
-
-        flash("Montant supprimé.", "success")
-        return redirect(url_for("chiffre_affaire"))
-
-    except Exception as e:
-        print("ERREUR chiffre_affaire_delete :", repr(e))
-        flash("Erreur lors de la suppression.", "danger")
-        return redirect(url_for("chiffre_affaire"))
 
 ############################################################
 # 10. ADMIN UTILISATEURS + RESET PASSWORD
@@ -1397,7 +1265,7 @@ def create_cotation(client_id):
 
 
 ############################################################
-# 13. AGENDA / FULLCALENDAR (STABLE + MODALE)
+# 13. AGENDA / FULLCALENDAR (ADMIN + COMMERCIAL)
 ############################################################
 
 @app.route("/agenda")
@@ -1410,12 +1278,23 @@ def agenda():
 @login_required
 def appointments_events_json():
     conn = get_db()
+    user = session.get("user")
 
-    rows = conn.execute("""
-        SELECT a.*, u.username AS created_by_name
-        FROM appointments a
-        JOIN users u ON u.id = a.created_by
-    """).fetchall()
+    # ADMIN : voit tous les rendez-vous
+    if user["role"] == "admin":
+        rows = conn.execute("""
+            SELECT a.*, u.username AS created_by_name
+            FROM appointments a
+            JOIN users u ON u.id = a.created_by
+        """).fetchall()
+    else:
+        # COMMERCIAL : voit uniquement ses rendez-vous
+        rows = conn.execute("""
+            SELECT a.*, u.username AS created_by_name
+            FROM appointments a
+            JOIN users u ON u.id = a.created_by
+            WHERE a.created_by = ?
+        """, (user["id"],)).fetchall()
 
     events = []
     for r in rows:
@@ -1424,71 +1303,10 @@ def appointments_events_json():
             "title": r["title"],
             "start": f"{r['date']}T{r['start_time']}",
             "end": f"{r['date']}T{r['end_time']}",
-            "extendedProps": {
-                "created_by": r["created_by_name"]
-            }
         })
 
     return jsonify(events)
 
-
-@app.route("/appointments/create", methods=["POST"])
-@login_required
-def appointments_create():
-    data = request.get_json()
-
-    title = data.get("title")
-    date = data.get("date")
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
-
-    if not all([title, date, start_time, end_time]):
-        return jsonify(success=False, message="Champs manquants"), 400
-
-    user = session["user"]
-    conn = get_db()
-
-    conn.execute("""
-        INSERT INTO appointments (title, date, start_time, end_time, created_by)
-        VALUES (?, ?, ?, ?, ?)
-    """, (title, date, start_time, end_time, user["id"]))
-
-    conn.commit()
-    return jsonify(success=True)
-
-
-@app.route("/appointments/update", methods=["POST"])
-@login_required
-def appointments_update():
-    data = request.get_json()
-
-    appt_id = data.get("id")
-    title = data.get("title")
-    date = data.get("date")
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
-
-    conn = get_db()
-    conn.execute("""
-        UPDATE appointments
-        SET title=?, date=?, start_time=?, end_time=?
-        WHERE id=?
-    """, (title, date, start_time, end_time, appt_id))
-
-    conn.commit()
-    return jsonify(success=True)
-
-
-@app.route("/appointments/delete", methods=["POST"])
-@login_required
-def appointments_delete():
-    appt_id = request.get_json().get("id")
-
-    conn = get_db()
-    conn.execute("DELETE FROM appointments WHERE id=?", (appt_id,))
-    conn.commit()
-
-    return jsonify(success=True)
 
 ############################################################
 # 14. CHAT (BACKEND)
