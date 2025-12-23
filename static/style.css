@@ -15,12 +15,12 @@
 
     --border: #e5e7eb;
 
-    /* ===== SYNERGY COLORS ===== */
-    --primary: #050A3A;        /* Bleu nuit Synergy */
+    /* ===== BRAND ===== */
+    --primary: #050A3A;
     --primary-600: #0B1B5E;
     --primary-700: #0E2275;
 
-    --accent: #F2B233;         /* Or Synergy */
+    --accent: #F2B233;
     --accent-600: #D99A1F;
 
     --success: #16a34a;
@@ -82,7 +82,7 @@ h1, h2, h3, h4, h5 {
     padding: 20px 16px;
     position: sticky;
     top: 0;
-    align-self: flex-start;
+    height: 100vh;
 }
 
 .sidebar-logo {
@@ -93,15 +93,10 @@ h1, h2, h3, h4, h5 {
 
 .sidebar-logo strong {
     font-size: 1.05rem;
-    color: #ffffff;
 }
 
 .sidebar-logo small {
     color: rgba(255,255,255,.7);
-}
-
-.sidebar-nav {
-    padding-top: 10px;
 }
 
 .sidebar-link {
@@ -110,13 +105,11 @@ h1, h2, h3, h4, h5 {
     gap: 10px;
     padding: 10px 12px;
     margin-bottom: 6px;
-
     text-decoration: none;
     color: rgba(255,255,255,.85);
     font-weight: 600;
-
     border-radius: var(--radius-sm);
-    transition: background .18s ease, color .18s ease;
+    transition: all .18s ease;
 }
 
 .sidebar-link:hover {
@@ -125,24 +118,15 @@ h1, h2, h3, h4, h5 {
 }
 
 .sidebar-link.active {
-    background: linear-gradient(
-        135deg,
-        var(--accent),
-        var(--accent-600)
-    );
+    background: linear-gradient(135deg, var(--accent), var(--accent-600));
     color: var(--primary);
     font-weight: 700;
-}
-
-.sidebar-link .material-symbols-outlined {
-    font-size: 22px;
 }
 
 /* ================= CONTENT ================= */
 
 .content-wrapper {
     flex: 1;
-    min-width: 0;
     padding: 22px 24px;
 }
 
@@ -150,16 +134,13 @@ h1, h2, h3, h4, h5 {
 
 .topbar {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-
+    align-items: center;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-
     padding: 14px 18px;
     margin-bottom: 20px;
-
     box-shadow: var(--shadow-sm);
 }
 
@@ -169,13 +150,8 @@ h1, h2, h3, h4, h5 {
     border-radius: 50%;
     display: grid;
     place-items: center;
-
-    background: linear-gradient(
-        135deg,
-        var(--primary),
-        var(--primary-700)
-    );
-    color: #ffffff;
+    background: linear-gradient(135deg, var(--primary), var(--primary-700));
+    color: #fff;
     font-weight: 700;
 }
 
@@ -192,32 +168,26 @@ h1, h2, h3, h4, h5 {
     background: transparent;
     border-bottom: 1px solid var(--border);
     font-weight: 700;
-    color: var(--title);
-}
-
-/* ================= TABLES ================= */
-
-.table thead {
-    background: var(--surface-2);
-    color: var(--muted);
-    font-weight: 700;
-}
-
-.table tbody tr:hover {
-    background: #f9fafb;
 }
 
 /* ================= FORMS ================= */
+
+.form-label {
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--muted);
+}
 
 .form-control,
 .form-select {
     border-radius: var(--radius-sm);
     border-color: var(--border);
+    font-size: .9rem;
 }
 
 .form-control:focus,
 .form-select:focus {
-    box-shadow: none;
+    box-shadow: 0 0 0 .15rem rgba(5,10,58,.12);
     border-color: var(--primary);
 }
 
@@ -229,11 +199,7 @@ h1, h2, h3, h4, h5 {
 }
 
 .btn-primary {
-    background: linear-gradient(
-        135deg,
-        var(--primary),
-        var(--primary-700)
-    );
+    background: linear-gradient(135deg, var(--primary), var(--primary-700));
     border: none;
 }
 
@@ -241,16 +207,17 @@ h1, h2, h3, h4, h5 {
     opacity: .95;
 }
 
-/* Accent button (optionnel) */
-.btn-accent {
-    background: linear-gradient(
-        135deg,
-        var(--accent),
-        var(--accent-600)
-    );
-    color: var(--primary);
+.btn-success {
+    background: linear-gradient(135deg, var(--success), #15803d);
     border: none;
-    font-weight: 700;
+}
+
+/* ================= BADGES ================= */
+
+.badge {
+    border-radius: 999px;
+    font-size: .7rem;
+    padding: 6px 10px;
 }
 
 /* ================= KPI ================= */
@@ -267,13 +234,11 @@ h1, h2, h3, h4, h5 {
     color: var(--muted);
     font-size: .85rem;
     font-weight: 600;
-    margin-bottom: 4px;
 }
 
 .kpi-value {
     font-size: 2rem;
     font-weight: 800;
-    letter-spacing: -0.02em;
     color: var(--primary);
 }
 
@@ -281,11 +246,16 @@ h1, h2, h3, h4, h5 {
 .kpi--blue   { border-left: 4px solid var(--primary); }
 .kpi--green  { border-left: 4px solid var(--success); }
 
-/* ================= ALERTS ================= */
+/* ================= COTATIONS ================= */
 
-.alert {
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
+.cotation-card {
+    background: var(--surface-2);
+    transition: all .2s ease;
+}
+
+.cotation-card:hover {
+    background: #ffffff;
+    box-shadow: var(--shadow-sm);
 }
 
 /* ================= CHAT ================= */
@@ -298,19 +268,11 @@ h1, h2, h3, h4, h5 {
     height: 60px;
     border-radius: 50%;
     border: none;
-
-    background: linear-gradient(
-        135deg,
-        var(--accent),
-        var(--accent-600)
-    );
+    background: linear-gradient(135deg, var(--accent), var(--accent-600));
     color: var(--primary);
-
     display: grid;
     place-items: center;
     cursor: pointer;
-    z-index: 9999;
-
     box-shadow: var(--shadow-md);
 }
 
@@ -320,46 +282,12 @@ h1, h2, h3, h4, h5 {
     bottom: 100px;
     width: 360px;
     height: 480px;
-
     background: var(--surface);
     border-radius: var(--radius);
     border: 1px solid var(--border);
-
     box-shadow: var(--shadow-md);
     display: none;
     flex-direction: column;
-    overflow: hidden;
-    z-index: 9998;
-}
-
-#chatHeader {
-    padding: 14px 16px;
-    background: linear-gradient(
-        135deg,
-        var(--primary),
-        var(--primary-700)
-    );
-    color: #ffffff;
-    font-weight: 700;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-#chatMessages {
-    flex: 1;
-    padding: 14px;
-    background: var(--surface-2);
-    overflow-y: auto;
-}
-
-.chat-message {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    font-size: .9rem;
 }
 
 /* ================= RESPONSIVE ================= */
