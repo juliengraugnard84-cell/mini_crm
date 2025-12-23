@@ -1,99 +1,111 @@
-{% extends "base.html" %}
-{% block title %}Client{% endblock %}
+<div class="card p-3 mb-4">
+    <h5 class="mb-3">Demande de cotation</h5>
 
-{% block content %}
+    <form method="POST"
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
 
-<h1 class="page-title mb-3">{{ client.name }}</h1>
+        <div class="row g-3">
 
-<div class="row g-4">
+            <div class="col-md-6">
+                <label>Date de négociation</label>
+                <input type="date" name="date_negociation" class="form-control">
+            </div>
 
-    <!-- INFOS CLIENT -->
-    <div class="col-md-4">
-        <div class="card p-3">
-            <p><strong>Email :</strong> {{ client.email or "—" }}</p>
-            <p><strong>Téléphone :</strong> {{ client.phone or "—" }}</p>
-            <p><strong>Commercial :</strong> {{ client.commercial }}</p>
-            <p><strong>Notes :</strong><br>{{ client.notes or "—" }}</p>
+            <div class="col-md-6">
+                <label>Type d’énergie</label>
+                <select name="energie_type" class="form-control">
+                    <option value="">—</option>
+                    <option value="gaz">Gaz</option>
+                    <option value="electricite">Électricité</option>
+                </select>
+            </div>
 
-            <a href="{{ url_for('edit_client', client_id=client.id) }}"
-               class="btn btn-sm btn-outline-secondary mt-2">
-                Modifier le client
-            </a>
-        </div>
-    </div>
+            <div class="col-md-6">
+                <label>Nom de l’entreprise</label>
+                <input name="entreprise_nom" class="form-control">
+            </div>
 
-    <!-- COTATIONS + DOCUMENTS -->
-    <div class="col-md-8">
+            <div class="col-md-6">
+                <label>SIRET</label>
+                <input name="siret" class="form-control">
+            </div>
 
-        <!-- AJOUT COTATION -->
-        <div class="card p-3 mb-4">
-            <h5 class="mb-3">Ajouter une cotation</h5>
+            <div class="col-md-6">
+                <label>Nom du signataire</label>
+                <input name="signataire_nom" class="form-control">
+            </div>
 
-            <form method="POST"
-                  action="{{ url_for('create_cotation', client_id=client.id) }}">
+            <div class="col-md-6">
+                <label>Téléphone</label>
+                <input name="signataire_tel" class="form-control">
+            </div>
 
-                <textarea name="description"
-                          class="form-control mb-2"
-                          placeholder="Description"
-                          required></textarea>
+            <div class="col-md-6">
+                <label>Email</label>
+                <input type="email" name="signataire_email" class="form-control">
+            </div>
 
-                <input name="fournisseur_actuel"
-                       class="form-control mb-2"
-                       placeholder="Fournisseur actuel">
+            <div class="col-md-6">
+                <label>PDL / PCE</label>
+                <input name="pdl_pce" class="form-control">
+            </div>
 
-                <input type="date"
-                       name="date_echeance"
-                       class="form-control mb-3">
+            <div class="col-md-6">
+                <label>Fournisseur actuel</label>
+                <input name="fournisseur_actuel" class="form-control">
+            </div>
 
-                <button class="btn btn-primary">
-                    Ajouter
-                </button>
-            </form>
-        </div>
+            <div class="col-md-6">
+                <label>Date d’échéance du contrat</label>
+                <input type="date" name="date_echeance" class="form-control">
+            </div>
 
-        <!-- DOCUMENTS -->
-        <div class="card p-3">
-            <h5 class="mb-3">Documents</h5>
+            <div class="col-12">
+                <label>Commentaire</label>
+                <textarea name="commentaire"
+                          class="form-control"
+                          rows="3"></textarea>
+            </div>
 
-            <form method="POST"
-                  action="{{ url_for('client_upload_document', client_id=client.id) }}"
-                  enctype="multipart/form-data"
-                  class="mb-3">
-
-                <input type="file"
-                       name="file"
-                       class="form-control mb-2">
-
-                <button class="btn btn-secondary">
-                    Uploader
-                </button>
-            </form>
-
-            <ul class="list-group">
-                {% for d in documents %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <a href="{{ d.url }}" target="_blank">
-                        {{ d.nom }}
-                    </a>
-
-                    <form method="POST"
-                          action="{{ url_for('client_delete_document', client_id=client.id, key=d.nom) }}"
-                          onsubmit="return confirm('Supprimer ce document ?');">
-
-                        <button class="btn btn-sm btn-danger">
-                            Supprimer
-                        </button>
-                    </form>
-                </li>
-                {% else %}
-                <li class="list-group-item text-muted">
-                    Aucun document
-                </li>
-                {% endfor %}
-            </ul>
         </div>
 
-    </div>
+        <button type="submit" class="btn btn-primary mt-4">
+            Enregistrer la demande de cotation
+        </button>
+    </form>
 </div>
+<div class="card p-3">
+    <h5 class="mb-3">Demandes de cotation</h5>
 
-{% endblock %}
+    {% for c in cotations %}
+    <div class="border rounded p-3 mb-3">
+
+        <strong>{{ c.entreprise_nom or client.name }}</strong>
+
+        <div class="small text-muted mb-2">
+            {{ "Gaz" if c.energie_type == "gaz"
+               else "Électricité" if c.energie_type == "electricite"
+               else "—" }}
+            — Échéance : {{ c.date_echeance or "—" }}
+        </div>
+
+        <ul class="small mb-2">
+            <li>Date de négociation : {{ c.date_negociation or "—" }}</li>
+            <li>Signataire : {{ c.signataire_nom or "—" }}</li>
+            <li>Email : {{ c.signataire_email or "—" }}</li>
+            <li>Téléphone : {{ c.signataire_tel or "—" }}</li>
+            <li>SIRET : {{ c.siret or "—" }}</li>
+            <li>PDL / PCE : {{ c.pdl_pce or "—" }}</li>
+            <li>Fournisseur actuel : {{ c.fournisseur_actuel or "—" }}</li>
+        </ul>
+
+        {% if c.commentaire %}
+        <div class="fst-italic small">
+            “{{ c.commentaire }}”
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <p class="text-muted">Aucune demande de cotation.</p>
+    {% endfor %}
+</div>

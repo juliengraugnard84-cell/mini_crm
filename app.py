@@ -102,6 +102,10 @@ def row_to_obj(row):
 
 
 def _try_add_column(conn, table, col_def_sql):
+    """
+    Ajoute une colonne à une table SQLite si elle n'existe pas déjà.
+    Safe : aucune erreur si la colonne existe.
+    """
     try:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def_sql}")
     except sqlite3.OperationalError:
@@ -154,7 +158,7 @@ def init_db():
     """)
 
     # =======================
-    # TABLE RENDEZ-VOUS (AGENDA) ✅ CORRIGÉE
+    # TABLE RENDEZ-VOUS (AGENDA)
     # =======================
     conn.execute("""
         CREATE TABLE IF NOT EXISTS appointments (
@@ -173,17 +177,14 @@ def init_db():
     """)
 
     # =======================
-    # TABLE COTATIONS
+    # TABLE COTATIONS (BASE)
     # =======================
     conn.execute("""
         CREATE TABLE IF NOT EXISTS cotations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id INTEGER NOT NULL,
-            description TEXT NOT NULL,
             fournisseur_actuel TEXT,
             date_echeance TEXT,
-            date_negociation_date TEXT,
-            date_negociation_time TEXT,
             created_by INTEGER,
             is_read INTEGER DEFAULT 0,
             status TEXT DEFAULT 'nouvelle',
@@ -191,6 +192,19 @@ def init_db():
             FOREIGN KEY (client_id) REFERENCES crm_clients(id)
         )
     """)
+
+    # =======================
+    # EXTENSION TABLE COTATIONS (NOUVELLES DONNÉES MÉTIER)
+    # =======================
+    _try_add_column(conn, "cotations", "date_negociation TEXT")
+    _try_add_column(conn, "cotations", "signataire_nom TEXT")
+    _try_add_column(conn, "cotations", "signataire_tel TEXT")
+    _try_add_column(conn, "cotations", "signataire_email TEXT")
+    _try_add_column(conn, "cotations", "siret TEXT")
+    _try_add_column(conn, "cotations", "entreprise_nom TEXT")
+    _try_add_column(conn, "cotations", "energie_type TEXT")
+    _try_add_column(conn, "cotations", "pdl_pce TEXT")
+    _try_add_column(conn, "cotations", "commentaire TEXT")
 
     # =======================
     # TABLE CHAT
@@ -210,7 +224,10 @@ def init_db():
     # =======================
     # BOOTSTRAP ADMIN
     # =======================
-    admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
+    admin = conn.execute(
+        "SELECT id FROM users WHERE username='admin'"
+    ).fetchone()
+
     if not admin:
         conn.execute(
             "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
@@ -221,6 +238,7 @@ def init_db():
     conn.close()
 
 
+# INITIALISATION AUTOMATIQUE DE LA BASE
 init_db()
 
 
@@ -1298,10 +1316,6 @@ def client_delete_document(client_id, key):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-############################################################
-# 12bis. COTATIONS: création + suppression (AJAX/JSON)
-############################################################
-
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
 def create_cotation(client_id):
@@ -1309,71 +1323,46 @@ def create_cotation(client_id):
         flash("Accès refusé.", "danger")
         return redirect(url_for("clients"))
 
-    description = (request.form.get("description") or "").strip()
-    fournisseur = (request.form.get("fournisseur_actuel") or "").strip()
-    date_echeance = (request.form.get("date_echeance") or "").strip()
-    date_negociation_date = (request.form.get("date_negociation_date") or "").strip()
-    date_negociation_time = (request.form.get("date_negociation_time") or "").strip()
-
-    if not description:
-        flash("Description obligatoire.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    user = session.get("user") or {}
+    form = request.form
+    user = session.get("user")
 
     conn = get_db()
-    conn.execute(
-        """
-        INSERT INTO cotations
-        (client_id, description, fournisseur_actuel, date_echeance,
-         date_negociation_date, date_negociation_time, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
+    conn.execute("""
+        INSERT INTO cotations (
             client_id,
-            description,
-            fournisseur,
+            date_negociation,
+            signataire_nom,
+            signataire_tel,
+            signataire_email,
+            siret,
+            entreprise_nom,
+            energie_type,
+            pdl_pce,
             date_echeance,
-            date_negociation_date or None,
-            date_negociation_time or None,
-            user.get("id"),
-        ),
-    )
+            fournisseur_actuel,
+            commentaire,
+            created_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        client_id,
+        form.get("date_negociation"),
+        form.get("signataire_nom"),
+        form.get("signataire_tel"),
+        form.get("signataire_email"),
+        form.get("siret"),
+        form.get("entreprise_nom"),
+        form.get("energie_type"),
+        form.get("pdl_pce"),
+        form.get("date_echeance"),
+        form.get("fournisseur_actuel"),
+        form.get("commentaire"),
+        user["id"],
+    ))
     conn.commit()
 
-    flash("Cotation ajoutée.", "success")
+    flash("Demande de cotation enregistrée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
-
-
-@app.route("/cotations/<int:cotation_id>/delete", methods=["POST"])
-@login_required
-def delete_cotation(cotation_id):
-    """
-    Suppression cotation: admin ou créateur.
-    Retour JSON.
-    """
-    user = session.get("user") or {}
-    conn = get_db()
-
-    row = conn.execute(
-        "SELECT id, client_id, created_by FROM cotations WHERE id=?",
-        (cotation_id,),
-    ).fetchone()
-
-    if not row:
-        return jsonify(success=False, message="Cotation introuvable"), 404
-
-    if user.get("role") != "admin" and row["created_by"] != user.get("id"):
-        return jsonify(success=False, message="Accès refusé"), 403
-
-    if user.get("role") != "admin":
-        if not can_access_client(row["client_id"]):
-            return jsonify(success=False, message="Accès refusé"), 403
-
-    conn.execute("DELETE FROM cotations WHERE id=?", (cotation_id,))
-    conn.commit()
-
-    return jsonify(success=True)
 
 
 ############################################################
