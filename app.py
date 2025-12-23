@@ -1377,61 +1377,43 @@ def delete_cotation(cotation_id):
 
 
 ############################################################
-# 13. AGENDA / FULLCALENDAR (STABLE & COMPAT SQLITE)
+# 13. AGENDA / FULLCALENDAR — STABLE ET TESTÉ
 ############################################################
-
-def ensure_appointments_schema():
-    conn = get_db()
-    try:
-        conn.execute("ALTER TABLE appointments ADD COLUMN end_time TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        conn.execute("ALTER TABLE appointments ADD COLUMN created_by INTEGER")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        conn.execute("ALTER TABLE appointments ADD COLUMN color TEXT")
-    except sqlite3.OperationalError:
-        pass
-    conn.commit()
-
 
 @app.route("/agenda")
 @login_required
 def agenda():
-    ensure_appointments_schema()
     return render_template("calendar.html")
 
 
-@app.route("/appointments/events_json")
+@app.route("/appointments/events")
 @login_required
-def appointments_events_json():
-    ensure_appointments_schema()
-
-    user = session.get("user")
+def appointments_events():
+    user = session["user"]
     conn = get_db()
 
-    rows = conn.execute("""
-        SELECT a.id, a.title, a.date, a.time, a.end_time,
-               a.created_by, u.username
-        FROM appointments a
-        LEFT JOIN users u ON u.id = a.created_by
-    """).fetchall()
+    if user["role"] == "admin":
+        rows = conn.execute("""
+            SELECT a.*, u.username
+            FROM appointments a
+            JOIN users u ON u.id = a.created_by
+        """).fetchall()
+    else:
+        rows = conn.execute("""
+            SELECT a.*, u.username
+            FROM appointments a
+            JOIN users u ON u.id = a.created_by
+            JOIN crm_clients c ON c.id = a.client_id
+            WHERE c.owner_id = ?
+        """, (user["id"],)).fetchall()
 
     events = []
     for r in rows:
-        start_time = r["time"] or "09:00"
-        end_time = r["end_time"] or "10:00"
-
         events.append({
             "id": r["id"],
-            "title": r["title"],
-            "start": f"{r['date']}T{start_time}",
-            "end": f"{r['date']}T{end_time}",
-            "extendedProps": {
-                "created_by": r["username"]
-            }
+            "title": f"{r['title']} ({r['username']})",
+            "start": f"{r['date']}T{r['start_time']}",
+            "end": f"{r['date']}T{r['end_time']}",
         })
 
     return jsonify(events)
@@ -1440,60 +1422,89 @@ def appointments_events_json():
 @app.route("/appointments/create", methods=["POST"])
 @login_required
 def appointments_create():
-    ensure_appointments_schema()
+    data = request.get_json()
+    user = session["user"]
 
-    data = request.get_json() or {}
     title = data.get("title")
     date = data.get("date")
-    time = data.get("time") or "09:00"
-    end_time = data.get("end_time") or "10:00"
-
-    if not title or not date:
-        return jsonify(success=False), 400
-
-    user = session.get("user")
-    conn = get_db()
-
-    conn.execute("""
-        INSERT INTO appointments (title, date, time, end_time, created_by)
-        VALUES (?, ?, ?, ?, ?)
-    """, (title, date, time, end_time, user["id"]))
-
-    conn.commit()
-    return jsonify(success=True)
-
-
-@app.route("/appointments/update_from_calendar", methods=["POST"])
-@login_required
-def appointments_update_from_calendar():
-    ensure_appointments_schema()
-
-    data = request.get_json() or {}
-    appt_id = data.get("id")
-    date = data.get("date")
-    time = data.get("time")
+    start_time = data.get("start_time")
     end_time = data.get("end_time")
 
-    if not appt_id:
-        return jsonify(success=False), 400
+    if not all([title, date, start_time, end_time]):
+        return jsonify(success=False, message="Données manquantes"), 400
 
     conn = get_db()
     conn.execute("""
-        UPDATE appointments
-        SET date=?, time=?, end_time=?
-        WHERE id=?
-    """, (date, time, end_time, appt_id))
-
+        INSERT INTO appointments (title, date, start_time, end_time, created_by)
+        VALUES (?, ?, ?, ?, ?)
+    """, (title, date, start_time, end_time, user["id"]))
     conn.commit()
+
     return jsonify(success=True)
 
 
-@app.route("/appointments/<int:appt_id>/delete", methods=["POST"])
+@app.route("/appointments/update", methods=["POST"])
 @login_required
-def appointments_delete(appt_id):
+def appointments_update():
+    data = request.get_json()
+    user = session["user"]
+
+    appt_id = data.get("id")
+    title = data.get("title")
+    start = data.get("start")
+    end = data.get("end")
+
+    if not all([appt_id, title, start, end]):
+        return jsonify(success=False), 400
+
+    date = start[:10]
+    start_time = start[11:16]
+    end_time = end[11:16]
+
     conn = get_db()
+    rdv = conn.execute(
+        "SELECT created_by FROM appointments WHERE id=?",
+        (appt_id,)
+    ).fetchone()
+
+    if not rdv:
+        return jsonify(success=False), 404
+
+    if user["role"] != "admin" and rdv["created_by"] != user["id"]:
+        return jsonify(success=False), 403
+
+    conn.execute("""
+        UPDATE appointments
+        SET title=?, date=?, start_time=?, end_time=?
+        WHERE id=?
+    """, (title, date, start_time, end_time, appt_id))
+    conn.commit()
+
+    return jsonify(success=True)
+
+
+@app.route("/appointments/delete", methods=["POST"])
+@login_required
+def appointments_delete():
+    data = request.get_json()
+    user = session["user"]
+    appt_id = data.get("id")
+
+    conn = get_db()
+    rdv = conn.execute(
+        "SELECT created_by FROM appointments WHERE id=?",
+        (appt_id,)
+    ).fetchone()
+
+    if not rdv:
+        return jsonify(success=False), 404
+
+    if user["role"] != "admin" and rdv["created_by"] != user["id"]:
+        return jsonify(success=False), 403
+
     conn.execute("DELETE FROM appointments WHERE id=?", (appt_id,))
     conn.commit()
+
     return jsonify(success=True)
 
 ############################################################
