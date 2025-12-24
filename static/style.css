@@ -396,3 +396,122 @@ h5 {
     height: 1px;
     background: rgba(242,178,51,.35);
 }
+/* =========================================================
+   DOCUMENTS (ADMIN) — UI
+   ========================================================= */
+
+.page-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:16px;
+    margin-bottom:16px;
+}
+
+.text-muted { color: var(--muted); }
+
+.doc-card { padding: 18px; }
+
+.doc-card-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:14px;
+    margin-bottom:12px;
+}
+
+.doc-card-title {
+    margin:0;
+    color: var(--accent);
+    font-weight: 800;
+    letter-spacing: .10em;
+    text-transform: uppercase;
+    font-size: .75rem;
+}
+
+.doc-card-sub {
+    color: var(--muted);
+    font-size: .9rem;
+    margin-top: 2px;
+    text-align:right;
+}
+
+.doc-upload-row{
+    display:flex;
+    gap:12px;
+    align-items:center;
+}
+
+.doc-upload .form-control{
+    background:#fff;
+}
+
+.doc-help{
+    margin-top:10px;
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+.doc-table-wrap{
+    overflow:auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.doc-table{
+    width:100%;
+    border-collapse:collapse;
+    margin:0;
+}
+
+.doc-table th{
+    background: #f8fafc;
+}
+
+.doc-name .doc-link{
+    font-weight:700;
+    color: var(--primary);
+    text-decoration:none;
+}
+
+.doc-name .doc-link:hover{
+    text-decoration:underline;
+}
+
+.doc-path{
+    font-size:.82rem;
+    margin-top:4px;
+    opacity:.85;
+}
+
+.doc-size{
+    white-space:nowrap;
+    color: var(--muted);
+    font-weight:600;
+}
+
+.doc-actions{
+    text-align:right;
+    white-space:nowrap;
+}
+
+.btn-icon{
+    padding:8px 12px;
+    border-radius: 10px;
+}
+
+@media (max-width: 720px){
+    .doc-upload-row{
+        flex-direction:column;
+        align-items:stretch;
+    }
+    .doc-card-sub{
+        text-align:left;
+    }
+    .doc-actions{
+        display:flex;
+        gap:10px;
+        justify-content:flex-end;
+        flex-wrap:wrap;
+    }
+}
