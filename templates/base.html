@@ -6,7 +6,9 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- CSS principal -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -25,37 +27,35 @@
 
         <a href="{{ url_for('dashboard') }}"
            class="sidebar-link {% if ep == 'dashboard' %}active{% endif %}">
-            📊 Dashboard
+            Dashboard
         </a>
 
         <a href="{{ url_for('clients') }}"
-           class="sidebar-link {% if ep.startswith('client') %}active{% endif %}">
-            👥 Clients
+           class="sidebar-link {% if ep.startswith('clients') %}active{% endif %}">
+            Clients
         </a>
 
         <a href="{{ url_for('chiffre_affaire') }}"
            class="sidebar-link {% if ep.startswith('chiffre_affaire') %}active{% endif %}">
-            💶 Chiffre d’affaires
+            Chiffre d’affaires
         </a>
 
         {% if current_user and current_user.role == 'admin' %}
         <a href="{{ url_for('admin_users') }}"
            class="sidebar-link {% if ep.startswith('admin') %}active{% endif %}">
-            ⚙️ Utilisateurs
+            Utilisateurs
         </a>
 
         <a href="{{ url_for('documents') }}"
            class="sidebar-link {% if ep.startswith('documents') %}active{% endif %}">
-            📁 Documents
+            Documents
         </a>
         {% endif %}
 
         <div style="flex:1"></div>
 
-        <a href="{{ url_for('logout') }}"
-           class="sidebar-link"
-           style="color:#ffb4b4;">
-            ⏻ Déconnexion
+        <a href="{{ url_for('logout') }}" class="sidebar-link" style="color:#fca5a5;">
+            Déconnexion
         </a>
 
     </aside>
@@ -66,28 +66,21 @@
         <!-- TOPBAR -->
         <div class="topbar">
             <div>
-                {% if current_user %}
-                    <strong>{{ current_user.username }}</strong>
-                    <small style="color:#6b7280">({{ current_user.role }})</small>
-                {% else %}
-                    <strong>Invité</strong>
-                {% endif %}
+                <strong>{{ current_user.username }}</strong>
+                <span class="text-muted">({{ current_user.role }})</span>
             </div>
+
             <div class="topbar-avatar">
                 {{ current_user.username[0]|upper if current_user else '?' }}
             </div>
         </div>
-
-        <!-- PAGE TITLE -->
-        {% block page_title %}{% endblock %}
 
         <!-- FLASH -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
                 <div class="card"
-                     style="margin-bottom:12px; padding:12px;
-                     border-left:4px solid
+                     style="margin-bottom:12px;padding:12px 16px;border-left:4px solid
                      {% if category=='success' %}#16a34a
                      {% elif category=='danger' %}#dc2626
                      {% else %}#f2b233{% endif %};">
@@ -103,6 +96,88 @@
 
 </div>
 
+<!-- ================= CHAT FLOAT (STABLE) ================= -->
+
+<button id="chatBubble" type="button"
+        style="position:fixed;right:24px;bottom:24px;z-index:1000;">
+    💬
+</button>
+
+<div id="chatWindow"
+     style="display:none;position:fixed;right:24px;bottom:96px;
+            width:340px;height:420px;z-index:1000;
+            background:#fff;border:1px solid var(--border);
+            border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.2);
+            display:flex;flex-direction:column;">
+
+    <div style="padding:10px;border-bottom:1px solid var(--border);
+                display:flex;justify-content:space-between;align-items:center;">
+        <strong>Chat interne</strong>
+        <button id="chatClose" type="button" class="btn btn-secondary btn-sm">✕</button>
+    </div>
+
+    <div id="chatMessages"
+         style="flex:1;padding:10px;overflow-y:auto;font-size:.9rem;"></div>
+
+    <form id="chatForm"
+          style="padding:10px;border-top:1px solid var(--border);">
+
+        <input id="chatInput"
+               type="text"
+               class="form-control"
+               placeholder="Votre message…"
+               autocomplete="off"
+               required>
+
+        <button type="submit"
+                class="btn btn-success"
+                style="margin-top:8px;width:100%;">
+            Envoyer
+        </button>
+
+    </form>
+
+</div>
+
 {% block extra_js %}{% endblock %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const bubble = document.getElementById("chatBubble");
+    const windowChat = document.getElementById("chatWindow");
+    const closeBtn = document.getElementById("chatClose");
+    const form = document.getElementById("chatForm");
+    const input = document.getElementById("chatInput");
+    const messages = document.getElementById("chatMessages");
+
+    if (!bubble || !windowChat) return;
+
+    bubble.addEventListener("click", () => {
+        windowChat.style.display = "flex";
+    });
+
+    closeBtn.addEventListener("click", () => {
+        windowChat.style.display = "none";
+    });
+
+    form.addEventListener("submit", (e) => {
+        e.preventDefault();
+
+        const text = input.value.trim();
+        if (!text) return;
+
+        const msg = document.createElement("div");
+        msg.textContent = text;
+        msg.style.marginBottom = "6px";
+        messages.appendChild(msg);
+
+        input.value = "";
+        messages.scrollTop = messages.scrollHeight;
+    });
+
+});
+</script>
+
 </body>
 </html>

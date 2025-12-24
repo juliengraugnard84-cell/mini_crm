@@ -1,39 +1,31 @@
 /* =========================================================
-   SYNERGYGROUP — CRM UI
-   OPTION B : Moderne, sérieux, lisible
+   SYNERGYGROUP CRM — CLEAN B2B BASE
+   Stable / Lisible / Sans gadgets
    ========================================================= */
 
-/* ================= VARIABLES ================= */
-
+/* ---------- VARIABLES ---------- */
 :root {
     --bg: #f4f6f9;
     --surface: #ffffff;
-    --surface-soft: #f9fafb;
+    --border: #e5e7eb;
 
     --text: #0f172a;
     --muted: #6b7280;
 
     --primary: #050A3A;
-    --primary-light: #e6e9f5;
-
     --accent: #F2B233;
-
-    --border: #e5e7eb;
 
     --success: #16a34a;
     --danger: #dc2626;
 
-    --radius: 6px;
-    --radius-sm: 4px;
+    --radius: 8px;
+    --shadow: 0 2px 10px rgba(5,10,58,.06);
 
-    --shadow: 0 2px 10px rgba(0,0,0,.06);
+    --sidebar-w: 240px;
 }
 
-/* ================= RESET ================= */
-
-*,
-*::before,
-*::after {
+/* ---------- RESET ---------- */
+* {
     box-sizing: border-box;
 }
 
@@ -44,73 +36,60 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
                  Roboto, Arial, sans-serif;
     font-size: 14px;
-    line-height: 1.5;
 }
 
-/* ================= LAYOUT ================= */
-
+/* ---------- LAYOUT ---------- */
 .layout {
     display: flex;
     min-height: 100vh;
 }
 
-.content-wrapper {
-    flex: 1;
-    padding: 24px 28px;
-}
-
-/* ================= TITRES ================= */
-
-h1, h2, h3 {
-    font-weight: 700;
-    color: var(--text);
-}
-
-.page-title {
-    font-size: 1.4rem;
-    margin-bottom: 20px;
-}
-
-/* ================= SIDEBAR ================= */
-
+/* ---------- SIDEBAR ---------- */
 .sidebar {
-    width: 250px;
+    width: var(--sidebar-w);
     background: var(--primary);
     color: #fff;
-    padding: 20px;
+    padding: 18px 14px;
+}
+
+.sidebar-logo {
+    font-weight: 700;
+    margin-bottom: 20px;
 }
 
 .sidebar a {
     display: block;
     padding: 10px 12px;
     margin-bottom: 6px;
-    color: rgba(255,255,255,.9);
+    color: rgba(255,255,255,.85);
     text-decoration: none;
-    border-radius: var(--radius-sm);
+    border-radius: 6px;
+}
+
+.sidebar a.active,
+.sidebar a:hover {
+    background: var(--accent);
+    color: var(--primary);
     font-weight: 600;
 }
 
-.sidebar a:hover {
-    background: rgba(255,255,255,.08);
+/* ---------- CONTENT ---------- */
+.content-wrapper {
+    flex: 1;
+    padding: 22px;
 }
 
-.sidebar a.active {
-    background: var(--accent);
-    color: var(--primary);
-}
-
-/* ================= TOPBAR ================= */
-
+/* ---------- TOPBAR ---------- */
 .topbar {
     background: var(--surface);
     border: 1px solid var(--border);
-    padding: 14px 18px;
     border-radius: var(--radius);
-    margin-bottom: 24px;
+    padding: 14px 18px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: var(--shadow);
+    margin-bottom: 20px;
 }
 
 .topbar-avatar {
@@ -124,140 +103,148 @@ h1, h2, h3 {
     font-weight: 700;
 }
 
-/* ================= CARDS ================= */
+/* ---------- TITRES ---------- */
+h1 {
+    font-size: 1.4rem;
+    margin-bottom: 16px;
+}
 
+h5 {
+    font-size: .9rem;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+/* ---------- CARDS ---------- */
 .card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    padding: 16px;
     box-shadow: var(--shadow);
+    margin-bottom: 18px;
 }
 
-.card + .card {
-    margin-top: 20px;
+/* ---------- KPI ---------- */
+.kpi-tile {
+    padding: 16px;
+    border-left: 4px solid var(--accent);
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
 }
 
-.card-header {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
+.kpi-label {
+    font-size: .75rem;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+.kpi-value {
+    font-size: 1.8rem;
     font-weight: 700;
+    margin-top: 4px;
 }
 
-.card-body {
-    padding: 18px;
-}
-
-/* ================= FORMULAIRES ================= */
-
+/* ---------- FORMULAIRES ---------- */
 .form-label {
     font-size: .75rem;
-    font-weight: 600;
     text-transform: uppercase;
     color: var(--muted);
     margin-bottom: 4px;
 }
 
 .form-control,
-.form-select,
-textarea {
+.form-select {
     width: 100%;
     padding: 8px 10px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
     font-size: .9rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
     background: #fff;
 }
 
 .form-control:focus,
-.form-select:focus,
-textarea:focus {
+.form-select:focus {
     outline: none;
     border-color: var(--primary);
 }
 
-textarea {
-    resize: vertical;
-}
-
-/* ================= BOUTONS ================= */
-
+/* ---------- BOUTONS ---------- */
 .btn {
-    font-size: .85rem;
-    font-weight: 600;
     padding: 8px 14px;
-    border-radius: var(--radius-sm);
+    font-size: .85rem;
+    border-radius: 6px;
     border: none;
     cursor: pointer;
 }
 
-/* 👉 BOUTON PRINCIPAL CLAIR */
 .btn-primary {
-    background: var(--primary-light);
+    background: var(--accent);
     color: var(--primary);
+    font-weight: 600;
 }
 
-.btn-primary:hover {
-    background: #d9def0;
-}
-
-/* 👉 BOUTON SECONDAIRE */
 .btn-secondary {
-    background: #f1f3f5;
+    background: #e5e7eb;
     color: var(--text);
 }
 
-.btn-secondary:hover {
-    background: #e5e7eb;
-}
-
-/* 👉 SUCCESS */
 .btn-success {
-    background: #e6f4ea;
-    color: var(--success);
+    background: var(--success);
+    color: #fff;
 }
 
-/* 👉 DANGER */
 .btn-danger {
-    background: #fee2e2;
-    color: var(--danger);
+    background: var(--danger);
+    color: #fff;
 }
 
-/* ================= TABLES ================= */
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: .9rem;
-}
-
-th {
-    text-align: left;
-    padding: 10px 8px;
-    font-size: .75rem;
-    text-transform: uppercase;
-    color: var(--muted);
+/* ---------- LISTES ---------- */
+.list-group-item {
+    padding: 10px 0;
     border-bottom: 1px solid var(--border);
+    font-size: .85rem;
 }
 
-td {
-    padding: 12px 8px;
-    border-bottom: 1px solid var(--border);
+.list-group-item:last-child {
+    border-bottom: none;
 }
 
-tr:hover {
-    background: var(--surface-soft);
+/* ---------- CHAT (simple, sans effets) ---------- */
+#chatBubble {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--primary);
+    border: none;
+    font-size: 20px;
 }
 
-/* ================= UTILITAIRES ================= */
-
-.text-muted {
-    color: var(--muted);
+#chatWindow {
+    position: fixed;
+    right: 20px;
+    bottom: 80px;
+    width: 320px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: none;
+    box-shadow: var(--shadow);
 }
 
-.text-end {
-    text-align: right;
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 900px) {
+    .sidebar {
+        width: 200px;
+    }
+
+    .content-wrapper {
+        padding: 16px;
+    }
 }
 
-.mt-4 {
-    margin-top: 20px;
-}

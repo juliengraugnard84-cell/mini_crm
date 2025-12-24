@@ -1,85 +1,89 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 
-{% block page_title %}
-<h1 class="page-title mb-4">Tableau de bord</h1>
-{% endblock %}
-
 {% block content %}
 
-<div class="row g-4 mb-4">
-    <div class="col-md-4">
-        <div class="kpi-tile kpi--blue">
-            <div class="kpi-label">Clients</div>
-            <div class="kpi-value">{{ total_clients }}</div>
-        </div>
+<h1 class="page-title">Tableau de bord</h1>
+
+<!-- KPI -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+
+    <div class="kpi-tile">
+        <div class="kpi-label">Clients</div>
+        <div class="kpi-value">{{ total_clients }}</div>
     </div>
 
-    <div class="col-md-4">
-        <div class="kpi-tile kpi--green">
-            <div class="kpi-label">Chiffre d’affaires</div>
-            <div class="kpi-value">{{ total_ca | round(2) }} €</div>
-        </div>
+    <div class="kpi-tile">
+        <div class="kpi-label">Chiffre d’affaires</div>
+        <div class="kpi-value">{{ total_ca }} €</div>
     </div>
 
-    <div class="col-md-4">
-        <div class="kpi-tile kpi--orange">
-            <div class="kpi-label">Documents</div>
-            <div class="kpi-value">{{ total_docs }}</div>
-        </div>
+    <div class="kpi-tile">
+        <div class="kpi-label">Documents</div>
+        <div class="kpi-value">{{ total_docs }}</div>
     </div>
+
 </div>
 
-<div class="row g-4">
+<!-- CONTENU -->
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
 
-    <div class="col-md-6">
-        <div class="card p-3">
-            <h5>Derniers clients</h5>
-            <ul class="list-group list-group-flush">
-                {% for c in last_clients %}
-                <li class="list-group-item">
+    <!-- Derniers clients -->
+    <div class="card">
+        <h5>Derniers clients</h5>
+
+        {% if last_clients %}
+        <div class="list-group">
+            {% for c in last_clients %}
+                <div class="list-group-item">
                     <strong>{{ c.name }}</strong><br>
                     <small class="text-muted">{{ c.email or "—" }}</small>
-                </li>
-                {% else %}
-                <li class="list-group-item text-muted">Aucun client</li>
-                {% endfor %}
-            </ul>
+                </div>
+            {% endfor %}
         </div>
+        {% else %}
+            <p class="text-muted">Aucun client enregistré.</p>
+        {% endif %}
     </div>
 
-    <div class="col-md-6">
-        <div class="card p-3">
-            <h5>Dernier revenu</h5>
-            {% if last_rev %}
-                <strong>{{ last_rev.montant }} €</strong><br>
-                <small class="text-muted">
-                    {{ last_rev.date }} — {{ last_rev.commercial }}
-                </small>
-            {% else %}
-                <p class="text-muted">Aucun revenu enregistré</p>
-            {% endif %}
-        </div>
+    <!-- Dernier revenu -->
+    <div class="card">
+        <h5>Dernier revenu</h5>
+
+        {% if last_rev %}
+            <div style="font-size:1.6rem;font-weight:700;">
+                {{ last_rev.montant }} €
+            </div>
+            <small class="text-muted">
+                {{ last_rev.date }} — {{ last_rev.commercial }}
+            </small>
+        {% else %}
+            <p class="text-muted">Aucun revenu enregistré.</p>
+        {% endif %}
     </div>
 
 </div>
 
-{% if current_user and current_user.role == 'admin' %}
-<div class="card p-3 mt-4">
+<!-- COTATIONS ADMIN -->
+{% if current_user.role == 'admin' %}
+<div class="card">
     <h5>Cotations non lues ({{ unread_cotations }})</h5>
-    <ul class="list-group">
+
+    {% if cotations_admin %}
+    <div class="list-group">
         {% for c in cotations_admin %}
-        <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
-           class="list-group-item list-group-item-action">
-            <strong>{{ c.client_name }}</strong><br>
-            <small class="text-muted">
-                {{ c.energie_type or "—" }} — échéance {{ c.date_echeance or "—" }}
-            </small>
-        </a>
-        {% else %}
-        <li class="list-group-item text-muted">Aucune cotation</li>
+            <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
+               class="list-group-item">
+                <strong>{{ c.client_name }}</strong><br>
+                <small class="text-muted">
+                    {{ c.energie_type or "—" }} — échéance {{ c.date_echeance or "—" }}
+                </small>
+            </a>
         {% endfor %}
-    </ul>
+    </div>
+    {% else %}
+        <p class="text-muted">Aucune cotation non lue.</p>
+    {% endif %}
 </div>
 {% endif %}
 

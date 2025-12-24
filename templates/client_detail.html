@@ -1,140 +1,56 @@
 {% extends "base.html" %}
 {% block title %}Client{% endblock %}
 
-{% block page_title %}
-<h1 class="page-title mb-4">{{ client.name }}</h1>
-{% endblock %}
-
 {% block content %}
 
-<div class="row g-4">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <h1>{{ client.name }}</h1>
 
-    <!-- INFOS CLIENT -->
-    <div class="col-md-4">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <p><strong>Email :</strong> {{ client.email or "—" }}</p>
-                <p><strong>Téléphone :</strong> {{ client.phone or "—" }}</p>
-                <p><strong>Commercial :</strong> {{ client.commercial }}</p>
-                <p><strong>Notes :</strong><br>{{ client.notes or "—" }}</p>
-
-                <a href="{{ url_for('edit_client', client_id=client.id) }}"
-                   class="btn btn-sm btn-outline-secondary mt-2">
-                    Modifier le client
-                </a>
-            </div>
-        </div>
+    <div style="display:flex;gap:8px;">
+        <a href="{{ url_for('edit_client', client_id=client.id) }}" class="btn btn-primary">
+            Modifier
+        </a>
+        <form method="POST" action="{{ url_for('delete_client', client_id=client.id) }}"
+              onsubmit="return confirm('Supprimer ce client ?');">
+            <button class="btn btn-danger">Supprimer</button>
+        </form>
     </div>
+</div>
 
-    <!-- COTATIONS -->
-    <div class="col-md-8">
+<div class="card">
 
-        <!-- FORM -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white">
-                <strong>Demande de cotation</strong>
-            </div>
+    <h5>Informations</h5>
 
-            <div class="card-body">
-                <form method="POST"
-                      action="{{ url_for('create_cotation', client_id=client.id) }}">
+    <p><strong>Email :</strong> {{ client.email or "—" }}</p>
+    <p><strong>Téléphone :</strong> {{ client.phone or "—" }}</p>
+    <p><strong>Adresse :</strong> {{ client.address or "—" }}</p>
+    <p><strong>Commercial :</strong> {{ client.commercial or "—" }}</p>
 
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Date de négociation</label>
-                            <input type="date" name="date_negociation" class="form-control">
-                        </div>
+    {% if client.notes %}
+    <p><strong>Notes :</strong><br>{{ client.notes }}</p>
+    {% endif %}
 
-                        <div class="col-md-4">
-                            <label class="form-label">Énergie</label>
-                            <select name="energie_type" class="form-select">
-                                <option value="">—</option>
-                                <option value="gaz">Gaz</option>
-                                <option value="electricite">Électricité</option>
-                            </select>
-                        </div>
+</div>
 
-                        <div class="col-md-4">
-                            <label class="form-label">Entreprise</label>
-                            <input name="entreprise_nom" class="form-control">
-                        </div>
+<div class="card">
 
-                        <div class="col-md-4">
-                            <label class="form-label">SIRET</label>
-                            <input name="siret" class="form-control">
-                        </div>
+    <h5>Cotations</h5>
 
-                        <div class="col-md-4">
-                            <label class="form-label">Signataire</label>
-                            <input name="signataire_nom" class="form-control">
-                        </div>
+    {% if cotations %}
+        <ul class="list-group">
+            {% for c in cotations %}
+            <li class="list-group-item">
+                <strong>{{ c.energie_type or "—" }}</strong><br>
+                <small class="text-muted">
+                    Fournisseur : {{ c.fournisseur_actuel or "—" }} · Échéance : {{ c.date_echeance or "—" }}
+                </small>
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted">Aucune cotation.</p>
+    {% endif %}
 
-                        <div class="col-md-4">
-                            <label class="form-label">Téléphone</label>
-                            <input name="signataire_tel" class="form-control">
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Email</label>
-                            <input type="email" name="signataire_email" class="form-control">
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">PDL / PCE</label>
-                            <input name="pdl_pce" class="form-control">
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Fournisseur actuel</label>
-                            <input name="fournisseur_actuel" class="form-control">
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Date d’échéance</label>
-                            <input type="date" name="date_echeance" class="form-control">
-                        </div>
-
-                        <div class="col-12">
-                            <label class="form-label">Commentaire</label>
-                            <textarea name="commentaire"
-                                      class="form-control"
-                                      rows="3"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="text-end mt-4">
-                        <button class="btn btn-success px-4">
-                            Enregistrer la demande
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- LISTE -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-light">
-                <strong>Demandes de cotation</strong>
-            </div>
-
-            <div class="card-body">
-                {% for c in cotations %}
-                <div class="border rounded p-3 mb-3">
-                    <strong>{{ c.entreprise_nom or client.name }}</strong>
-                    <div class="small text-muted mb-2">
-                        {{ c.energie_type or "—" }} — échéance {{ c.date_echeance or "—" }}
-                    </div>
-                    {% if c.commentaire %}
-                    <div class="fst-italic small">“{{ c.commentaire }}”</div>
-                    {% endif %}
-                </div>
-                {% else %}
-                <p class="text-muted">Aucune demande de cotation.</p>
-                {% endfor %}
-            </div>
-        </div>
-
-    </div>
 </div>
 
 {% endblock %}
