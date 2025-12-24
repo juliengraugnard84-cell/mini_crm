@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <title>{% block title %}CRM{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <!-- CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -14,32 +12,30 @@
 
 <div class="layout">
 
-    <!-- SIDEBAR -->
     <aside class="sidebar">
-
         <div class="sidebar-logo">
             <strong>CRM</strong><br>
             <small>Synergy Group</small>
         </div>
 
         <a href="{{ url_for('dashboard') }}"
-           class="sidebar-link {% if 'dashboard' in ep %}active{% endif %}">
+           class="sidebar-link {% if ep == 'dashboard' %}active{% endif %}">
             Dashboard
         </a>
 
         <a href="{{ url_for('clients') }}"
-           class="sidebar-link {% if 'clients' in ep %}active{% endif %}">
+           class="sidebar-link {% if ep == 'clients' %}active{% endif %}">
             Clients
         </a>
 
         <a href="{{ url_for('chiffre_affaire') }}"
-           class="sidebar-link {% if 'chiffre_affaire' in ep %}active{% endif %}">
+           class="sidebar-link {% if ep == 'chiffre_affaire' %}active{% endif %}">
             Chiffre d’affaires
         </a>
 
         {% if current_user and current_user.role == 'admin' %}
         <a href="{{ url_for('admin_users') }}"
-           class="sidebar-link {% if 'admin' in ep %}active{% endif %}">
+           class="sidebar-link {% if ep.startswith('admin') %}active{% endif %}">
             Utilisateurs
         </a>
         {% endif %}
@@ -49,19 +45,17 @@
         <a href="{{ url_for('logout') }}" class="sidebar-link">
             Déconnexion
         </a>
-
     </aside>
 
-    <!-- CONTENT -->
     <main class="content-wrapper">
 
         <div class="topbar">
             <div>
-                <strong>{{ current_user.username if current_user else '' }}</strong><br>
-                <small>{{ current_user.role if current_user else '' }}</small>
+                <strong>{{ current_user.username }}</strong><br>
+                <small>{{ current_user.role }}</small>
             </div>
             <div class="topbar-avatar">
-                {{ current_user.username[0]|upper if current_user else '?' }}
+                {{ current_user.username[0]|upper }}
             </div>
         </div>
 
@@ -78,6 +72,5 @@
     </main>
 
 </div>
-
 </body>
 </html>
