@@ -919,3 +919,287 @@ h1, h2, h3, h4, h5 {
 .kpi-tile::after {
     display: none !important;
 }
+/* =========================================================
+   ADMIN — UTILISATEURS (MIX FINANCE + CRM STRUCTURÉ)
+   ========================================================= */
+
+/* ---------- TITRES ADMIN ---------- */
+
+.page-title {
+    font-size: 1.45rem;
+    font-weight: 700;
+    margin-bottom: 18px;
+}
+
+/* ---------- CARD ADMIN ---------- */
+
+.admin-card {
+    padding: 20px 22px;
+}
+
+.admin-card h5 {
+    font-size: .9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+    margin-bottom: 14px;
+}
+
+/* ---------- FORM CREATE USER ---------- */
+
+.admin-card form {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.admin-card form .btn {
+    grid-column: span 4;
+    justify-self: flex-start;
+}
+
+/* ---------- TABLE UTILISATEURS ---------- */
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .9rem;
+}
+
+.admin-table thead th {
+    text-align: left;
+    padding: 10px 8px;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-table tbody td {
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.admin-table tbody tr:hover {
+    background: var(--surface-2);
+}
+
+/* ---------- COLONNE ACTIONS ---------- */
+
+.admin-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.admin-actions input {
+    max-width: 160px;
+}
+
+.admin-actions .btn {
+    font-size: .75rem;
+    padding: 6px 10px;
+}
+
+/* ---------- BADGES ROLE ---------- */
+
+.role-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    font-size: .7rem;
+    font-weight: 600;
+    border-radius: 6px;
+    background: var(--surface-2);
+    color: var(--primary);
+}
+
+/* ---------- BOUTONS ---------- */
+
+.btn-danger {
+    background: #dc2626;
+    border: none;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    opacity: .9;
+}
+
+/* ---------- MOBILE ---------- */
+
+@media (max-width: 991px) {
+    .admin-card form {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+/* =========================================================
+   FINAL OVERRIDE — CRM B2B / FINANCE (CLEAN & PRO)
+   ========================================================= */
+
+/* ---------- TYPOGRAPHIE ---------- */
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont,
+                 "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    letter-spacing: 0;
+}
+
+/* ---------- TITRES ---------- */
+
+.page-title {
+    font-size: 1.45rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.page-title::before,
+.page-title::after {
+    display: none !important;
+}
+
+/* ---------- SIDEBAR ---------- */
+
+.sidebar {
+    background: var(--primary);
+    box-shadow: 4px 0 16px rgba(5,10,58,.18);
+}
+
+.sidebar-link {
+    border-radius: 6px;
+    font-size: .9rem;
+}
+
+.sidebar-link.active {
+    background: rgba(242,178,51,.15);
+    color: #fff;
+}
+
+.sidebar-link.active::after {
+    display: none !important;
+}
+
+/* ---------- TOPBAR ---------- */
+
+.topbar {
+    box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    border-radius: 8px;
+}
+
+/* ---------- CARDS ---------- */
+
+.card {
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 6px rgba(0,0,0,.05);
+}
+
+.card:hover {
+    transform: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
+}
+
+.card::before {
+    display: none !important;
+}
+
+/* ---------- HEADERS ---------- */
+
+.card-header {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+}
+
+/* ---------- KPI ---------- */
+
+.kpi-tile {
+    padding: 16px 18px;
+}
+
+.kpi-tile::after {
+    display: none !important;
+}
+
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+/* ---------- FORMULAIRES ---------- */
+
+.form-label {
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.form-control,
+.form-select {
+    border-radius: 4px;
+    font-size: .9rem;
+    padding: 7px 9px;
+    box-shadow: none;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary);
+}
+
+/* ---------- BOUTONS ---------- */
+
+.btn {
+    border-radius: 4px;
+    font-size: .85rem;
+    padding: 7px 14px;
+    box-shadow: none;
+}
+
+.btn-primary,
+.btn-success {
+    background: var(--primary);
+}
+
+.btn-primary:hover,
+.btn-success:hover {
+    opacity: .92;
+    transform: none;
+}
+
+/* ---------- TABLES / LISTES ---------- */
+
+.admin-table th,
+.admin-table td {
+    font-size: .85rem;
+}
+
+.admin-table tbody tr:hover {
+    background: var(--surface-2);
+}
+
+/* ---------- BADGES ---------- */
+
+.role-badge {
+    border-radius: 4px;
+    font-size: .7rem;
+}
+
+/* ---------- SUPPRESSION FLUFF ---------- */
+
+.kpi-tile:hover,
+.card:hover,
+.btn:hover {
+    transition: none;
+}
