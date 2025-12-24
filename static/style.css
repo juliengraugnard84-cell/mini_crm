@@ -351,3 +351,48 @@ h5 {
         display:none;
     }
 }
+/* ---------- TITRES DE SECTIONS SIDEBAR ---------- */
+.nav-section {
+    margin-top: 18px;
+    margin-bottom: 8px;
+    padding: 0 12px;
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 800;
+    color: var(--accent);
+}
+/* ---------- LIENS SIDEBAR ---------- */
+.sidebar-nav {
+    gap: 8px;
+}
+
+.nav-link {
+    padding: 11px 14px;
+    border-radius: 12px;
+    font-size: .9rem;
+}
+
+.nav-link:hover {
+    background: rgba(242,178,51,.14);
+}
+
+.nav-link.active {
+    box-shadow: 0 6px 14px rgba(242,178,51,.35);
+}
+/* ---------- SECTION ADMIN PLUS DISCRÈTE ---------- */
+.sidebar-nav .nav-section + .nav-link {
+    margin-top: 2px;
+}
+
+.sidebar-nav .nav-section ~ .nav-link {
+    font-size: .88rem;
+    opacity: .9;
+}
+.nav-section::after {
+    content: "";
+    display: block;
+    margin-top: 6px;
+    height: 1px;
+    background: rgba(242,178,51,.35);
+}
