@@ -3,17 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}CRM{% endblock %}</title>
-
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- CSS principal -->
+    <!-- CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
+{% set ep = request.endpoint if request and request.endpoint else '' %}
+
 <div class="layout">
 
-    <!-- ================= SIDEBAR ================= -->
+    <!-- SIDEBAR -->
     <aside class="sidebar">
 
         <div class="sidebar-logo">
@@ -21,31 +22,29 @@
             <small>Synergy Group</small>
         </div>
 
-        {% set ep = request.endpoint or '' %}
-
         <a href="{{ url_for('dashboard') }}"
-           class="sidebar-link {% if ep.startswith('dashboard') %}active{% endif %}">
+           class="sidebar-link {% if 'dashboard' in ep %}active{% endif %}">
             Dashboard
         </a>
 
         <a href="{{ url_for('clients') }}"
-           class="sidebar-link {% if ep.startswith('clients') %}active{% endif %}">
+           class="sidebar-link {% if 'clients' in ep %}active{% endif %}">
             Clients
         </a>
 
         <a href="{{ url_for('chiffre_affaire') }}"
-           class="sidebar-link {% if ep.startswith('chiffre_affaire') %}active{% endif %}">
+           class="sidebar-link {% if 'chiffre_affaire' in ep %}active{% endif %}">
             Chiffre d’affaires
         </a>
 
         {% if current_user and current_user.role == 'admin' %}
         <a href="{{ url_for('admin_users') }}"
-           class="sidebar-link {% if ep.startswith('admin_') %}active{% endif %}">
+           class="sidebar-link {% if 'admin' in ep %}active{% endif %}">
             Utilisateurs
         </a>
         {% endif %}
 
-        <hr style="border: none; border-top: 1px solid rgba(255,255,255,.15); margin: 14px 0;">
+        <hr style="border-top:1px solid rgba(255,255,255,.15); margin:14px 0">
 
         <a href="{{ url_for('logout') }}" class="sidebar-link">
             Déconnexion
@@ -53,33 +52,27 @@
 
     </aside>
 
-    <!-- ================= CONTENT ================= -->
+    <!-- CONTENT -->
     <main class="content-wrapper">
 
-        <!-- TOPBAR -->
         <div class="topbar">
             <div>
-                <strong>{{ current_user.username if current_user else "" }}</strong><br>
-                <small class="text-muted">{{ current_user.role if current_user else "" }}</small>
+                <strong>{{ current_user.username if current_user else '' }}</strong><br>
+                <small>{{ current_user.role if current_user else '' }}</small>
             </div>
-
             <div class="topbar-avatar">
-                {{ current_user.username[0]|upper if current_user else "?" }}
+                {{ current_user.username[0]|upper if current_user else '?' }}
             </div>
         </div>
 
-        <!-- FLASH MESSAGES -->
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
+        {% if messages %}
+            {% for cat, msg in messages %}
+                <div class="card p-3 mb-3">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
         {% endwith %}
 
-        <!-- PAGE CONTENT -->
         {% block content %}{% endblock %}
 
     </main>
