@@ -5,8 +5,8 @@
     <title>{% block title %}CRM{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- CSS principal -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- CSS principal (CHEMIN CORRECT) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
     {% block extra_css %}{% endblock %}
 </head>
@@ -72,37 +72,36 @@
 
     <!-- ================= MAIN ================= -->
     <main class="main">
+
         <!-- TOPBAR -->
         <header class="topbar">
-            <div class="topbar-left">
-                <div class="page-context">
-                    <div class="page-app">CRM</div>
-                    <div class="page-sep">/</div>
-                    <div class="page-user">
-                        {{ current_user.username if current_user else '' }}
-                        {% if current_user %}<span class="page-role">({{ current_user.role }})</span>{% endif %}
-                    </div>
-                </div>
+            <div class="page-context">
+                <span class="page-app">CRM</span>
+                <span class="page-sep">/</span>
+                <span class="page-user">
+                    {{ current_user.username if current_user else '' }}
+                    {% if current_user %}
+                        <span class="page-role">({{ current_user.role }})</span>
+                    {% endif %}
+                </span>
             </div>
 
-            <div class="topbar-right">
-                <div class="avatar">
-                    {{ current_user.username[0]|upper if current_user else '?' }}
-                </div>
+            <div class="avatar">
+                {{ current_user.username[0]|upper if current_user else '?' }}
             </div>
         </header>
 
         <!-- FLASH -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            <section class="flash-stack">
-                {% for category, message in messages %}
-                    <div class="flash flash-{{ category }}">
-                        <div class="flash-bar"></div>
-                        <div class="flash-msg">{{ message }}</div>
-                    </div>
-                {% endfor %}
-            </section>
+        <section class="flash-stack">
+            {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">
+                <div class="flash-bar"></div>
+                <div class="flash-msg">{{ message }}</div>
+            </div>
+            {% endfor %}
+        </section>
         {% endif %}
         {% endwith %}
 
@@ -112,27 +111,28 @@
         </section>
 
         <footer class="footer">
-            <span>SYNERGYGROUP • CRM</span>
+            SYNERGYGROUP • CRM
         </footer>
+
     </main>
 </div>
 
-<!-- ================= CHAT FLOAT (STABLE & SOBRE) ================= -->
+<!-- ================= CHAT ================= -->
 <button id="chatBubble" type="button" aria-label="Ouvrir le chat">💬</button>
 
 <div id="chatWindow" aria-hidden="true">
     <div class="chat-header">
         <strong>Chat interne</strong>
-        <button id="chatClose" type="button" class="chat-close" aria-label="Fermer">✕</button>
+        <button id="chatClose" class="chat-close" type="button">✕</button>
     </div>
 
     <div id="chatMessages" class="chat-messages"></div>
 
     <form id="chatForm" class="chat-form">
-        <input id="chatInput" name="message" type="text" class="form-control" placeholder="Votre message…" autocomplete="off" required>
+        <input id="chatInput" name="message" class="form-control" placeholder="Votre message…" required>
         <div class="chat-actions">
             <input id="chatFile" name="file" type="file" class="form-control">
-            <button type="submit" class="btn btn-primary" style="min-width:120px;">Envoyer</button>
+            <button class="btn btn-primary" type="submit">Envoyer</button>
         </div>
     </form>
 </div>
@@ -149,122 +149,46 @@
     const fileInput = document.getElementById("chatFile");
     const messagesEl = document.getElementById("chatMessages");
 
-    if (!bubble || !windowChat || !closeBtn || !form || !input || !messagesEl) return;
+    if (!bubble || !windowChat) return;
 
-    let pollingTimer = null;
-
-    function escapeHtml(str) {
-        return String(str)
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#039;");
-    }
-
-    function renderMessages(items) {
-        messagesEl.innerHTML = "";
-        for (const m of items) {
-            const wrap = document.createElement("div");
-            wrap.className = "chat-bubble";
-
-            const header = document.createElement("div");
-            header.className = "chat-meta";
-
-            const who = document.createElement("strong");
-            who.textContent = m.username ? String(m.username) : "—";
-
-            const when = document.createElement("small");
-            when.textContent = m.created_at || "";
-
-            header.appendChild(who);
-            header.appendChild(when);
-
-            const body = document.createElement("div");
-            body.className = "chat-text";
-            body.innerHTML = escapeHtml(m.message || "");
-
-            wrap.appendChild(header);
-            wrap.appendChild(body);
-
-            if (m.file_url && m.file_name) {
-                const a = document.createElement("a");
-                a.href = m.file_url;
-                a.target = "_blank";
-                a.rel = "noopener";
-                a.className = "chat-file";
-                a.textContent = "📎 " + String(m.file_name);
-                wrap.appendChild(a);
-            }
-
-            messagesEl.appendChild(wrap);
-        }
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
+    let polling = null;
 
     async function loadMessages() {
         try {
-            const r = await fetch("/chat/messages?limit=80", { credentials: "same-origin" });
+            const r = await fetch("/chat/messages?limit=80");
             const data = await r.json();
-            if (data && data.success) renderMessages(data.messages || []);
-        } catch (e) {}
-    }
+            if (!data.success) return;
 
-    function startPolling() {
-        if (pollingTimer) return;
-        pollingTimer = setInterval(loadMessages, 3000);
-    }
-
-    function stopPolling() {
-        if (pollingTimer) clearInterval(pollingTimer);
-        pollingTimer = null;
-    }
-
-    function openChat() {
-        windowChat.style.display = "flex";
-        windowChat.setAttribute("aria-hidden", "false");
-        messagesEl.innerHTML = "<div class='chat-hint'>Chargement…</div>";
-        loadMessages().then(startPolling);
-    }
-
-    function closeChat() {
-        windowChat.style.display = "none";
-        windowChat.setAttribute("aria-hidden", "true");
-        stopPolling();
-    }
-
-    bubble.addEventListener("click", openChat);
-    closeBtn.addEventListener("click", closeChat);
-    window.addEventListener("beforeunload", stopPolling);
-
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-
-        const text = input.value.trim();
-        const file = fileInput.files ? fileInput.files[0] : null;
-        if (!text && !file) return;
-
-        const fd = new FormData();
-        fd.append("message", text);
-        if (file) fd.append("file", file);
-
-        try {
-            const r = await fetch("/chat/send", {
-                method: "POST",
-                body: fd,
-                credentials: "same-origin",
+            messagesEl.innerHTML = "";
+            data.messages.forEach(m => {
+                const div = document.createElement("div");
+                div.className = "chat-bubble";
+                div.innerHTML = `<strong>${m.username}</strong><br>${m.message}`;
+                messagesEl.appendChild(div);
             });
-            if (r.ok) {
-                input.value = "";
-                fileInput.value = "";
-                await loadMessages();
-            } else {
-                alert("Erreur lors de l’envoi du message.");
-            }
-        } catch (err) {
-            alert("Erreur lors de l’envoi du message.");
-        }
-    });
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        } catch {}
+    }
+
+    bubble.onclick = () => {
+        windowChat.style.display = "flex";
+        loadMessages();
+        polling = setInterval(loadMessages, 3000);
+    };
+
+    closeBtn.onclick = () => {
+        windowChat.style.display = "none";
+        clearInterval(polling);
+    };
+
+    form.onsubmit = async e => {
+        e.preventDefault();
+        const fd = new FormData(form);
+        await fetch("/chat/send", { method:"POST", body:fd });
+        input.value = "";
+        fileInput.value = "";
+        loadMessages();
+    };
 })();
 </script>
 
