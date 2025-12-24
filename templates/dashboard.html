@@ -65,14 +65,15 @@
 </div>
 
 <!-- COTATIONS ADMIN -->
-{% if current_user.role == 'admin' %}
+{% if current_user and current_user.role == 'admin' %}
 <div class="card">
     <h5>Cotations non lues ({{ unread_cotations }})</h5>
 
     {% if cotations_admin %}
     <div class="list-group">
         {% for c in cotations_admin %}
-            <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
+            <!-- IMPORTANT: passer par open_cotation pour marquer "lu" -->
+            <a href="{{ url_for('open_cotation', cotation_id=c.id) }}"
                class="list-group-item">
                 <strong>{{ c.client_name }}</strong><br>
                 <small class="text-muted">

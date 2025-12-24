@@ -10,6 +10,7 @@
 <div class="card">
 
 <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <div class="row g-3">
 
@@ -22,8 +23,21 @@
         <div class="col-md-6">
             <label class="form-label">Commercial</label>
             <input type="text" name="commercial" class="form-control"
-                   value="{{ client.commercial if client else current_user.username }}"
-                   {% if current_user.role != 'admin' %}readonly{% endif %}>
+                   value="{{ client.commercial if client else (current_user.username if current_user else '') }}"
+                   {% if current_user and current_user.role != 'admin' %}readonly{% endif %}>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Statut</label>
+            <select name="status" class="form-select">
+                <option value="">—</option>
+                {% for s in statuses %}
+                    <option value="{{ s }}"
+                        {% if client and client.status == s %}selected{% endif %}>
+                        {{ s }}
+                    </option>
+                {% endfor %}
+            </select>
         </div>
 
         <div class="col-md-6">

@@ -29,6 +29,7 @@
                 </span><br>
                 <small class="text-muted">
                     Commercial : {{ client.commercial or "—" }}
+                    {% if client.status %} · Statut : {{ client.status }}{% endif %}
                 </small>
             </div>
 

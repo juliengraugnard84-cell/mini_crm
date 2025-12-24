@@ -163,8 +163,6 @@ def init_db():
             montant REAL NOT NULL
         )
     """)
-
-    # AJOUT COLONNE DOSSIER (SAFE)
     _try_add_column(conn, "revenus", "dossier TEXT")
 
     # =======================
@@ -200,7 +198,7 @@ def init_db():
         )
     """)
 
-    # ✅ EXTENSIONS COTATIONS (pour coller à tes templates + create_cotation)
+    # Extensions cotations
     _try_add_column(conn, "cotations", "date_negociation TEXT")
     _try_add_column(conn, "cotations", "energie_type TEXT")
     _try_add_column(conn, "cotations", "entreprise_nom TEXT")
@@ -212,7 +210,7 @@ def init_db():
     _try_add_column(conn, "cotations", "commentaire TEXT")
 
     # =======================
-    # TABLE CHAT (MANQUANTE AVANT)
+    # TABLE CHAT
     # =======================
     conn.execute("""
         CREATE TABLE IF NOT EXISTS chat_messages (
@@ -229,10 +227,7 @@ def init_db():
     # =======================
     # BOOTSTRAP ADMIN
     # =======================
-    admin = conn.execute(
-        "SELECT id FROM users WHERE username='admin'"
-    ).fetchone()
-
+    admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
     if not admin:
         conn.execute(
             "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
@@ -325,9 +320,7 @@ def s3_upload_fileobj(fileobj, bucket: str, key: str):
     if not s3:
         raise RuntimeError("Client S3 non initialisé")
 
-    # ✅ FileStorage : boto3 préfère un file-like
     stream = getattr(fileobj, "stream", fileobj)
-
     try:
         stream.seek(0)
     except Exception:
@@ -547,9 +540,7 @@ def logout():
 def dashboard():
     conn = get_db()
 
-    total_clients = conn.execute(
-        "SELECT COUNT(*) FROM crm_clients"
-    ).fetchone()[0]
+    total_clients = conn.execute("SELECT COUNT(*) FROM crm_clients").fetchone()[0]
 
     last_clients = conn.execute(
         """
@@ -607,7 +598,7 @@ def dashboard():
         total_clients=total_clients,
         last_clients=last_clients,
         total_ca=total_ca,
-        last_rev=last_rev,
+        last_rev=row_to_obj(last_rev) if last_rev else None,
         total_docs=total_docs,
         unread_cotations=unread_cotations,
         cotations_admin=cotations_admin,
@@ -638,9 +629,7 @@ def open_cotation(cotation_id):
     )
     conn.commit()
 
-    return redirect(
-        url_for("client_detail", client_id=cot["client_id"])
-    )
+    return redirect(url_for("client_detail", client_id=cot["client_id"]))
 
 
 @app.route("/search")
@@ -708,11 +697,9 @@ def chiffre_affaire():
     user = session.get("user")
     conn = get_db()
 
-    # 🔒 Sécurité : seuls les admins peuvent modifier
     if request.method == "POST" and user["role"] != "admin":
         abort(403)
 
-    # ➕ AJOUT CA (ADMIN)
     if request.method == "POST":
         date_rev = request.form.get("date")
         commercial = request.form.get("commercial")
@@ -732,7 +719,6 @@ def chiffre_affaire():
         flash("Chiffre d’affaires ajouté.", "success")
         return redirect(url_for("chiffre_affaire"))
 
-    # === CALCULS ===
     today = date.today()
     year = str(today.year)
     month = today.strftime("%Y-%m")
@@ -832,6 +818,7 @@ def admin_users():
         conn.commit()
 
         flash("Utilisateur créé.", "success")
+        return redirect(url_for("admin_users"))
 
     users = conn.execute("SELECT * FROM users ORDER BY id ASC").fetchall()
     return render_template("admin_users.html", users=users)
@@ -855,10 +842,12 @@ def admin_edit_user(user_id):
         password = (request.form.get("password") or "").strip()
         role = (request.form.get("role") or "").strip()
 
+        if not username or not role:
+            flash("Nom d’utilisateur et rôle obligatoires.", "danger")
+            return redirect(url_for("admin_edit_user", user_id=user_id))
+
         exists = conn.execute(
-            """
-            SELECT COUNT(*) FROM users WHERE username=? AND id<>?
-            """,
+            "SELECT COUNT(*) FROM users WHERE username=? AND id<>?",
             (username, user_id),
         ).fetchone()[0]
 
@@ -868,16 +857,12 @@ def admin_edit_user(user_id):
 
         if password:
             conn.execute(
-                """
-                UPDATE users SET username=?, password=?, role=? WHERE id=?
-                """,
+                "UPDATE users SET username=?, password=?, role=? WHERE id=?",
                 (username, generate_password_hash(password), role, user_id),
             )
         else:
             conn.execute(
-                """
-                UPDATE users SET username=?, role=? WHERE id=?
-                """,
+                "UPDATE users SET username=?, role=? WHERE id=?",
                 (username, role, user_id),
             )
 
@@ -885,7 +870,7 @@ def admin_edit_user(user_id):
         flash("Utilisateur mis à jour.", "success")
         return redirect(url_for("admin_users"))
 
-    return render_template("admin_edit_user.html", user=user)
+    return render_template("admin_edit_user.html", user=row_to_obj(user))
 
 
 @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
@@ -1046,18 +1031,30 @@ def new_client():
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
+        status = (request.form.get("status") or "").strip()
+
         if not name:
             flash("Nom obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
-        # attribution propriétaire
+        if status and status not in statuses:
+            flash("Statut invalide.", "danger")
+            return redirect(url_for("new_client"))
+
         if user["role"] == "admin":
-            commercial = request.form.get("commercial")
+            commercial = (request.form.get("commercial") or "").strip()
+            if not commercial:
+                flash("Le commercial est obligatoire pour un admin.", "danger")
+                return redirect(url_for("new_client"))
+
             owner_row = conn.execute(
                 "SELECT id FROM users WHERE username=?",
                 (commercial,)
             ).fetchone()
             owner_id = owner_row["id"] if owner_row else None
+            if owner_id is None:
+                flash("Commercial introuvable (username).", "danger")
+                return redirect(url_for("new_client"))
         else:
             commercial = user["username"]
             owner_id = user["id"]
@@ -1074,7 +1071,7 @@ def new_client():
                 request.form.get("phone"),
                 request.form.get("address"),
                 commercial,
-                request.form.get("status"),
+                status,
                 request.form.get("notes"),
                 owner_id,
             ),
@@ -1126,7 +1123,6 @@ def client_detail(client_id):
     )
 
 
-# ✅ ROUTE MANQUANTE AVANT : utilisée par ton template client_detail.html
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
 def create_cotation(client_id):
@@ -1194,16 +1190,34 @@ def edit_client(client_id):
         return redirect(url_for("clients"))
 
     if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        status = (request.form.get("status") or "").strip()
+
+        if not name:
+            flash("Nom obligatoire.", "danger")
+            return redirect(url_for("edit_client", client_id=client_id))
+
+        if status and status not in statuses:
+            flash("Statut invalide.", "danger")
+            return redirect(url_for("edit_client", client_id=client_id))
+
         commercial = row["commercial"]
         owner_id = row["owner_id"]
 
         if user["role"] == "admin":
-            commercial = request.form.get("commercial")
+            commercial = (request.form.get("commercial") or "").strip()
+            if not commercial:
+                flash("Le commercial est obligatoire.", "danger")
+                return redirect(url_for("edit_client", client_id=client_id))
+
             owner_row = conn.execute(
                 "SELECT id FROM users WHERE username=?",
                 (commercial,)
             ).fetchone()
-            owner_id = owner_row["id"] if owner_row else owner_id
+            if not owner_row:
+                flash("Commercial introuvable (username).", "danger")
+                return redirect(url_for("edit_client", client_id=client_id))
+            owner_id = owner_row["id"]
 
         conn.execute(
             """
@@ -1212,12 +1226,12 @@ def edit_client(client_id):
             WHERE id=?
             """,
             (
-                request.form.get("name"),
+                name,
                 request.form.get("email"),
                 request.form.get("phone"),
                 request.form.get("address"),
                 commercial,
-                request.form.get("status"),
+                status,
                 request.form.get("notes"),
                 owner_id,
                 client_id,

@@ -11,6 +11,7 @@
     <h5>Créer un utilisateur</h5>
 
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="row g-3">
 
@@ -65,9 +66,15 @@
                 <td>{{ u.role }}</td>
                 <td style="text-align:right;">
 
+                    <a class="btn btn-primary btn-sm"
+                       href="{{ url_for('admin_edit_user', user_id=u.id) }}">
+                        Modifier
+                    </a>
+
                     <form method="POST"
                           action="{{ url_for('admin_reset_password', user_id=u.id) }}"
                           style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="password"
                                name="new_password"
                                placeholder="Nouveau mot de passe"
@@ -83,6 +90,7 @@
                           action="{{ url_for('admin_delete_user', user_id=u.id) }}"
                           style="display:inline;"
                           onsubmit="return confirm('Supprimer cet utilisateur ?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button class="btn btn-danger btn-sm">
                             Supprimer
                         </button>
