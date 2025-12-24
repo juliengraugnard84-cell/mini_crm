@@ -78,6 +78,14 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 def _connect_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+
+    # Robustesse SQLite (optionnel mais safe)
+    try:
+        conn.execute("PRAGMA foreign_keys=ON;")
+        conn.execute("PRAGMA busy_timeout=5000;")
+    except Exception:
+        pass
+
     return conn
 
 
@@ -156,7 +164,7 @@ def init_db():
         )
     """)
 
-    # 🔥 AJOUT COLONNE DOSSIER (UNE SEULE FOIS)
+    # AJOUT COLONNE DOSSIER (SAFE)
     _try_add_column(conn, "revenus", "dossier TEXT")
 
     # =======================
@@ -177,7 +185,7 @@ def init_db():
     """)
 
     # =======================
-    # TABLE COTATIONS
+    # TABLE COTATIONS (BASE)
     # =======================
     conn.execute("""
         CREATE TABLE IF NOT EXISTS cotations (
@@ -189,6 +197,32 @@ def init_db():
             is_read INTEGER DEFAULT 0,
             status TEXT DEFAULT 'nouvelle',
             date_creation TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # ✅ EXTENSIONS COTATIONS (pour coller à tes templates + create_cotation)
+    _try_add_column(conn, "cotations", "date_negociation TEXT")
+    _try_add_column(conn, "cotations", "energie_type TEXT")
+    _try_add_column(conn, "cotations", "entreprise_nom TEXT")
+    _try_add_column(conn, "cotations", "siret TEXT")
+    _try_add_column(conn, "cotations", "signataire_nom TEXT")
+    _try_add_column(conn, "cotations", "signataire_tel TEXT")
+    _try_add_column(conn, "cotations", "signataire_email TEXT")
+    _try_add_column(conn, "cotations", "pdl_pce TEXT")
+    _try_add_column(conn, "cotations", "commentaire TEXT")
+
+    # =======================
+    # TABLE CHAT (MANQUANTE AVANT)
+    # =======================
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT,
+            message TEXT,
+            file_key TEXT,
+            file_name TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -291,13 +325,16 @@ def s3_upload_fileobj(fileobj, bucket: str, key: str):
     if not s3:
         raise RuntimeError("Client S3 non initialisé")
 
+    # ✅ FileStorage : boto3 préfère un file-like
+    stream = getattr(fileobj, "stream", fileobj)
+
     try:
-        fileobj.stream.seek(0)
+        stream.seek(0)
     except Exception:
         pass
 
     s3.upload_fileobj(
-        fileobj,
+        stream,
         bucket,
         key,
         ExtraArgs={
@@ -335,20 +372,34 @@ def list_client_documents(client_id: int):
     docs = []
 
     try:
-        response = s3.list_objects_v2(Bucket=AWS_BUCKET, Prefix=prefix)
-        for item in (response.get("Contents") or []):
-            key = item["Key"]
-            if key.endswith("/"):
-                continue
+        token = None
+        while True:
+            kwargs = {"Bucket": AWS_BUCKET, "Prefix": prefix}
+            if token:
+                kwargs["ContinuationToken"] = token
 
-            docs.append(
-                {
-                    "nom": key.replace(prefix, ""),
-                    "key": key,
-                    "taille": item["Size"],
-                    "url": s3_presigned_url(key),
-                }
-            )
+            response = s3.list_objects_v2(**kwargs)
+            for item in (response.get("Contents") or []):
+                key = item["Key"]
+                if key.endswith("/"):
+                    continue
+
+                docs.append(
+                    {
+                        "nom": key.replace(prefix, ""),
+                        "key": key,
+                        "taille": item["Size"],
+                        "url": s3_presigned_url(key),
+                    }
+                )
+
+            if response.get("IsTruncated"):
+                token = response.get("NextContinuationToken")
+                if not token:
+                    break
+            else:
+                break
+
     except ClientError as e:
         print("Erreur list_client_documents (ClientError) :", e.response)
     except Exception as e:
@@ -414,22 +465,13 @@ def admin_required(func):
 # 6bis. CSRF + CONTEXT GLOBALS (SAFE / NON BLOQUANT)
 ############################################################
 
-# Génère un token en session (utile si un jour tu veux le réactiver)
 @app.before_request
 def ensure_csrf_token():
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
 
 
-# ⚠️ CSRF DÉSACTIVÉ VOLONTAIREMENT
-# --------------------------------
-# IMPORTANT :
-# - AUCUNE validation CSRF
-# - ZÉRO impact sur les formulaires existants
-# - Compatible AJAX / JSON / FullCalendar
-# - Comportement IDENTIQUE à ton ancien CRM fonctionnel
-#
-# (Ne rien ajouter ici)
+# ⚠️ CSRF volontairement désactivé (comme ton CRM d’origine)
 
 
 @app.context_processor
@@ -457,7 +499,6 @@ def not_found(e):
         code=404,
         message="Page introuvable."
     ), 404
-
 
 
 ############################################################
@@ -533,7 +574,6 @@ def dashboard():
     ).fetchone()
 
     total_docs = 0
-
     if not LOCAL_MODE and s3:
         try:
             response = s3.list_objects_v2(Bucket=AWS_BUCKET)
@@ -656,7 +696,6 @@ def search():
         )
 
     return jsonify({"results": results})
-
 
 
 ############################################################
@@ -969,7 +1008,7 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS (sécurisé multi-commerciaux) + COTATIONS
+# 12. CLIENTS (sécurisé multi-commerciaux) + COTATIONS + DOCS
 ############################################################
 
 @app.route("/clients")
@@ -1011,6 +1050,7 @@ def new_client():
             flash("Nom obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
+        # attribution propriétaire
         if user["role"] == "admin":
             commercial = request.form.get("commercial")
             owner_row = conn.execute(
@@ -1071,8 +1111,7 @@ def client_detail(client_id):
 
     cot_rows = conn.execute(
         """
-        SELECT *
-        FROM cotations
+        SELECT * FROM cotations
         WHERE client_id=?
         ORDER BY date_creation DESC, id DESC
         """,
@@ -1087,10 +1126,7 @@ def client_detail(client_id):
     )
 
 
-# ==========================================================
-# ➕ CRÉATION D’UNE DEMANDE DE COTATION (NOUVELLE ROUTE)
-# ==========================================================
-
+# ✅ ROUTE MANQUANTE AVANT : utilisée par ton template client_detail.html
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
 def create_cotation(client_id):
@@ -1131,8 +1167,8 @@ def create_cotation(client_id):
         request.form.get("commentaire"),
         u.get("id"),
     ))
-
     conn.commit()
+
     flash("Demande de cotation enregistrée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
@@ -1172,8 +1208,7 @@ def edit_client(client_id):
         conn.execute(
             """
             UPDATE crm_clients
-            SET name=?, email=?, phone=?, address=?, commercial=?,
-                status=?, notes=?, owner_id=?
+            SET name=?, email=?, phone=?, address=?, commercial=?, status=?, notes=?, owner_id=?
             WHERE id=?
             """,
             (
@@ -1217,7 +1252,6 @@ def delete_client(client_id):
     return redirect(url_for("clients"))
 
 
-
 ############################################################
 # 14. CHAT (BACKEND)
 ############################################################
@@ -1239,7 +1273,6 @@ def _chat_store_file(file_storage):
     if LOCAL_MODE or not s3:
         return (None, None)
 
-    # évite collisions
     rnd = secrets.token_hex(6)
     key = f"chat/{rnd}_{file_name_clean}"
 
