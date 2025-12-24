@@ -6,133 +6,126 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- CSS principal (CHEMIN CORRECT) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
     {% block extra_css %}{% endblock %}
 </head>
 <body>
 
-<div class="app-shell">
+<div class="layout">
 
     <!-- ================= SIDEBAR ================= -->
     <aside class="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-mark">SG</div>
-            <div class="brand-text">
-                <div class="brand-name">SYNERGYGROUP</div>
-                <div class="brand-user">{{ current_user.username if current_user else '' }}</div>
-            </div>
+
+        <div class="sidebar-logo">
+            <strong>SYNERGYGROUP</strong><br>
+            <small>{{ current_user.username if current_user else '' }}</small>
         </div>
 
         {% set ep = request.endpoint or '' %}
 
-        <nav class="sidebar-nav">
-            <a href="{{ url_for('dashboard') }}"
-               class="nav-link {% if ep == 'dashboard' %}active{% endif %}">
-                <span class="nav-ic">▦</span>
-                <span class="nav-txt">Dashboard</span>
-            </a>
+        <a href="{{ url_for('dashboard') }}"
+           class="{% if ep == 'dashboard' %}active{% endif %}">
+            Dashboard
+        </a>
 
-            <a href="{{ url_for('clients') }}"
-               class="nav-link {% if ep in ['clients','new_client','client_detail','edit_client'] %}active{% endif %}">
-                <span class="nav-ic">👥</span>
-                <span class="nav-txt">Clients</span>
-            </a>
+        <a href="{{ url_for('clients') }}"
+           class="{% if ep in ['clients','new_client','client_detail','edit_client'] %}active{% endif %}">
+            Clients
+        </a>
 
-            <a href="{{ url_for('chiffre_affaire') }}"
-               class="nav-link {% if ep in ['chiffre_affaire','delete_revenue'] %}active{% endif %}">
-                <span class="nav-ic">€</span>
-                <span class="nav-txt">Chiffre d’affaires</span>
-            </a>
+        <a href="{{ url_for('chiffre_affaire') }}"
+           class="{% if ep in ['chiffre_affaire','delete_revenue'] %}active{% endif %}">
+            Chiffre d’affaires
+        </a>
 
-            {% if current_user and current_user.role == 'admin' %}
-            <div class="nav-section">Administration</div>
-
-            <a href="{{ url_for('admin_users') }}"
-               class="nav-link {% if ep.startswith('admin') %}active{% endif %}">
-                <span class="nav-ic">⚙</span>
-                <span class="nav-txt">Utilisateurs</span>
-            </a>
-
-            <a href="{{ url_for('documents') }}"
-               class="nav-link {% if ep in ['documents','upload_document','delete_document'] %}active{% endif %}">
-                <span class="nav-ic">📄</span>
-                <span class="nav-txt">Documents</span>
-            </a>
-            {% endif %}
-        </nav>
-
-        <div class="sidebar-footer">
-            <a href="{{ url_for('logout') }}" class="nav-link danger">
-                <span class="nav-ic">⎋</span>
-                <span class="nav-txt">Déconnexion</span>
-            </a>
+        {% if current_user and current_user.role == 'admin' %}
+        <div style="margin-top:16px;font-size:.75rem;opacity:.7;">
+            Administration
         </div>
+
+        <a href="{{ url_for('admin_users') }}"
+           class="{% if ep.startswith('admin') %}active{% endif %}">
+            Utilisateurs
+        </a>
+
+        <a href="{{ url_for('documents') }}"
+           class="{% if ep in ['documents','upload_document','delete_document'] %}active{% endif %}">
+            Documents
+        </a>
+        {% endif %}
+
+        <div style="flex:1"></div>
+
+        <a href="{{ url_for('logout') }}" style="color:#fca5a5;">
+            Déconnexion
+        </a>
+
     </aside>
 
-    <!-- ================= MAIN ================= -->
-    <main class="main">
+    <!-- ================= CONTENT ================= -->
+    <main class="content-wrapper">
 
         <!-- TOPBAR -->
-        <header class="topbar">
-            <div class="page-context">
-                <span class="page-app">CRM</span>
-                <span class="page-sep">/</span>
-                <span class="page-user">
-                    {{ current_user.username if current_user else '' }}
-                    {% if current_user %}
-                        <span class="page-role">({{ current_user.role }})</span>
-                    {% endif %}
-                </span>
+        <div class="topbar">
+            <div>
+                <strong>{{ current_user.username if current_user else '' }}</strong>
+                {% if current_user %}
+                    <span class="text-muted">({{ current_user.role }})</span>
+                {% endif %}
             </div>
 
-            <div class="avatar">
+            <div class="topbar-avatar">
                 {{ current_user.username[0]|upper if current_user else '?' }}
             </div>
-        </header>
+        </div>
 
         <!-- FLASH -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <section class="flash-stack">
             {% for category, message in messages %}
-            <div class="flash flash-{{ category }}">
-                <div class="flash-bar"></div>
-                <div class="flash-msg">{{ message }}</div>
-            </div>
+                <div class="card"
+                     style="margin-bottom:12px;
+                            border-left:4px solid
+                            {% if category=='success' %}#16a34a
+                            {% elif category=='danger' %}#dc2626
+                            {% else %}#f2b233{% endif %};">
+                    {{ message }}
+                </div>
             {% endfor %}
-        </section>
         {% endif %}
         {% endwith %}
 
-        <!-- CONTENT -->
-        <section class="content">
-            {% block content %}{% endblock %}
-        </section>
+        <!-- PAGE CONTENT -->
+        {% block content %}{% endblock %}
 
-        <footer class="footer">
+        <footer style="margin-top:40px;font-size:.75rem;color:#6b7280;">
             SYNERGYGROUP • CRM
         </footer>
 
     </main>
+
 </div>
 
 <!-- ================= CHAT ================= -->
-<button id="chatBubble" type="button" aria-label="Ouvrir le chat">💬</button>
+<button id="chatBubble" type="button">💬</button>
 
-<div id="chatWindow" aria-hidden="true">
-    <div class="chat-header">
+<div id="chatWindow">
+    <div style="padding:10px;border-bottom:1px solid var(--border);
+                display:flex;justify-content:space-between;">
         <strong>Chat interne</strong>
-        <button id="chatClose" class="chat-close" type="button">✕</button>
+        <button id="chatClose" type="button">✕</button>
     </div>
 
-    <div id="chatMessages" class="chat-messages"></div>
+    <div id="chatMessages" style="flex:1;padding:10px;overflow-y:auto;"></div>
 
-    <form id="chatForm" class="chat-form">
-        <input id="chatInput" name="message" class="form-control" placeholder="Votre message…" required>
-        <div class="chat-actions">
+    <form id="chatForm" style="padding:10px;border-top:1px solid var(--border);">
+        <input id="chatInput" name="message" class="form-control"
+               placeholder="Votre message…" required>
+
+        <div style="display:flex;gap:8px;margin-top:8px;">
             <input id="chatFile" name="file" type="file" class="form-control">
-            <button class="btn btn-primary" type="submit">Envoyer</button>
+            <button class="btn btn-success" type="submit">Envoyer</button>
         </div>
     </form>
 </div>
@@ -147,44 +140,42 @@
     const form = document.getElementById("chatForm");
     const input = document.getElementById("chatInput");
     const fileInput = document.getElementById("chatFile");
-    const messagesEl = document.getElementById("chatMessages");
+    const messages = document.getElementById("chatMessages");
 
-    if (!bubble || !windowChat) return;
-
-    let polling = null;
+    let timer = null;
 
     async function loadMessages() {
         try {
-            const r = await fetch("/chat/messages?limit=80");
+            const r = await fetch("/chat/messages?limit=50");
             const data = await r.json();
             if (!data.success) return;
 
-            messagesEl.innerHTML = "";
+            messages.innerHTML = "";
             data.messages.forEach(m => {
-                const div = document.createElement("div");
-                div.className = "chat-bubble";
-                div.innerHTML = `<strong>${m.username}</strong><br>${m.message}`;
-                messagesEl.appendChild(div);
+                const d = document.createElement("div");
+                d.style.marginBottom = "8px";
+                d.innerHTML = "<strong>" + m.username + "</strong><br>" + m.message;
+                messages.appendChild(d);
             });
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            messages.scrollTop = messages.scrollHeight;
         } catch {}
     }
 
     bubble.onclick = () => {
         windowChat.style.display = "flex";
         loadMessages();
-        polling = setInterval(loadMessages, 3000);
+        timer = setInterval(loadMessages, 3000);
     };
 
     closeBtn.onclick = () => {
         windowChat.style.display = "none";
-        clearInterval(polling);
+        clearInterval(timer);
     };
 
     form.onsubmit = async e => {
         e.preventDefault();
         const fd = new FormData(form);
-        await fetch("/chat/send", { method:"POST", body:fd });
+        await fetch("/chat/send", { method: "POST", body: fd });
         input.value = "";
         fileInput.value = "";
         loadMessages();
