@@ -969,7 +969,7 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS (sécurisé multi-commerciaux) + EDIT/DELETE + DOCS
+# 12. CLIENTS (sécurisé multi-commerciaux) + COTATIONS
 ############################################################
 
 @app.route("/clients")
@@ -1011,7 +1011,6 @@ def new_client():
             flash("Nom obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
-        # ===== ATTRIBUTION PROPRE DU DOSSIER =====
         if user["role"] == "admin":
             commercial = request.form.get("commercial")
             owner_row = conn.execute(
@@ -1072,7 +1071,8 @@ def client_detail(client_id):
 
     cot_rows = conn.execute(
         """
-        SELECT * FROM cotations
+        SELECT *
+        FROM cotations
         WHERE client_id=?
         ORDER BY date_creation DESC, id DESC
         """,
@@ -1085,6 +1085,56 @@ def client_detail(client_id):
         cotations=[row_to_obj(r) for r in cot_rows],
         documents=list_client_documents(client_id),
     )
+
+
+# ==========================================================
+# ➕ CRÉATION D’UNE DEMANDE DE COTATION (NOUVELLE ROUTE)
+# ==========================================================
+
+@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
+@login_required
+def create_cotation(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    u = session.get("user") or {}
+
+    conn.execute("""
+        INSERT INTO cotations (
+            client_id,
+            date_negociation,
+            energie_type,
+            entreprise_nom,
+            siret,
+            signataire_nom,
+            signataire_tel,
+            signataire_email,
+            pdl_pce,
+            fournisseur_actuel,
+            date_echeance,
+            commentaire,
+            created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        client_id,
+        request.form.get("date_negociation"),
+        request.form.get("energie_type"),
+        request.form.get("entreprise_nom"),
+        request.form.get("siret"),
+        request.form.get("signataire_nom"),
+        request.form.get("signataire_tel"),
+        request.form.get("signataire_email"),
+        request.form.get("pdl_pce"),
+        request.form.get("fournisseur_actuel"),
+        request.form.get("date_echeance"),
+        request.form.get("commentaire"),
+        u.get("id"),
+    ))
+
+    conn.commit()
+    flash("Demande de cotation enregistrée.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 @app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
@@ -1122,7 +1172,8 @@ def edit_client(client_id):
         conn.execute(
             """
             UPDATE crm_clients
-            SET name=?, email=?, phone=?, address=?, commercial=?, status=?, notes=?, owner_id=?
+            SET name=?, email=?, phone=?, address=?, commercial=?,
+                status=?, notes=?, owner_id=?
             WHERE id=?
             """,
             (
@@ -1158,6 +1209,7 @@ def delete_client(client_id):
         return redirect(url_for("clients"))
 
     conn = get_db()
+    conn.execute("DELETE FROM cotations WHERE client_id=?", (client_id,))
     conn.execute("DELETE FROM crm_clients WHERE id=?", (client_id,))
     conn.commit()
 
