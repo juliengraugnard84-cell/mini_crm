@@ -470,3 +470,326 @@ textarea.form-control {
         margin-left: var(--sidebar-w);
     }
 }
+/* =========================================================
+   UI REFINEMENT — PREMIUM SaaS (COLORS UNCHANGED)
+   ========================================================= */
+
+/* ---------- TYPOGRAPHY ---------- */
+
+body {
+    font-feature-settings: "liga" 1, "kern" 1;
+}
+
+h1, h2, h3 {
+    letter-spacing: -0.025em;
+}
+
+h5 {
+    font-weight: 700;
+    font-size: .95rem;
+}
+
+/* ---------- PAGE TITLE ---------- */
+
+.page-title {
+    font-size: 1.6rem;
+    margin-bottom: 18px;
+    position: relative;
+}
+
+.page-title::after {
+    content: "";
+    display: block;
+    width: 48px;
+    height: 4px;
+    margin-top: 6px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-600));
+}
+
+/* ---------- LAYOUT RHYTHM ---------- */
+
+.content-wrapper > .row {
+    margin-bottom: 20px;
+}
+
+/* ---------- SIDEBAR ---------- */
+
+.sidebar {
+    background: linear-gradient(
+        180deg,
+        var(--primary),
+        var(--primary-700)
+    );
+}
+
+.sidebar-logo {
+    padding-bottom: 18px;
+}
+
+.sidebar-link {
+    font-size: .9rem;
+    opacity: .9;
+}
+
+.sidebar-link.active {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
+}
+
+/* ---------- TOPBAR ---------- */
+
+.topbar {
+    backdrop-filter: saturate(180%) blur(6px);
+}
+
+/* ---------- CARDS ---------- */
+
+.card {
+    border-radius: 16px;
+}
+
+.card-header {
+    padding-bottom: 12px;
+    font-size: .9rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+}
+
+/* ---------- KPI ---------- */
+
+.kpi-tile {
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-tile::after {
+    content: "";
+    position: absolute;
+    right: -30px;
+    top: -30px;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(
+        circle,
+        rgba(242,178,51,.25),
+        transparent 60%
+    );
+}
+
+.kpi-value {
+    font-size: 2.1rem;
+}
+
+/* ---------- FORMS ---------- */
+
+.form-control,
+.form-select {
+    background: linear-gradient(
+        180deg,
+        #ffffff,
+        var(--surface-2)
+    );
+}
+
+.form-label {
+    margin-bottom: 4px;
+}
+
+/* ---------- BUTTONS ---------- */
+
+.btn {
+    transition: all .15s ease;
+}
+
+.btn-primary {
+    box-shadow: 0 8px 18px rgba(5,10,58,.25);
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(5,10,58,.35);
+}
+
+.btn-success {
+    box-shadow: 0 8px 18px rgba(22,163,74,.25);
+}
+
+/* ---------- LISTS ---------- */
+
+.list-group-item {
+    background: transparent;
+}
+
+.list-group-item strong {
+    font-weight: 600;
+}
+
+/* ---------- COTATIONS ---------- */
+
+.cotation-card {
+    padding: 16px;
+}
+
+.cotation-card ul {
+    margin-bottom: 0;
+}
+
+.cotation-card li {
+    color: var(--muted);
+}
+
+/* ---------- FLASH ---------- */
+
+.card[style*="border-left"] {
+    background: linear-gradient(
+        90deg,
+        rgba(242,178,51,.12),
+        transparent 60%
+    );
+}
+
+/* ---------- CHAT ---------- */
+
+#chatBubble {
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+#chatBubble:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 40px rgba(0,0,0,.25);
+}
+/* =========================================================
+   PAGE CA — MIX CRM BUSINESS + MODERNE (OPTION 2 + 3)
+   ========================================================= */
+
+/* ---------- KPI CA ---------- */
+
+.kpi-tile {
+    position: relative;
+    padding: 22px 24px;
+    overflow: hidden;
+}
+
+.kpi-tile::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        circle at top right,
+        rgba(242,178,51,.18),
+        transparent 55%
+    );
+    pointer-events: none;
+}
+
+.kpi-label {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+.kpi-value {
+    font-size: 2.3rem;
+    margin-top: 6px;
+}
+
+/* ---------- SECTION TITLES ---------- */
+
+.card h5 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+/* ---------- FORMULAIRE CA ---------- */
+
+.card form {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    align-items: end;
+}
+
+.card form .btn {
+    grid-column: span 4;
+    margin-top: 6px;
+}
+
+/* inputs */
+.card form .form-control {
+    height: 42px;
+}
+
+/* ---------- CARDS GLOBALES ---------- */
+
+.card {
+    border-radius: 18px;
+}
+
+.card:not(:first-child) {
+    margin-top: 18px;
+}
+
+/* ---------- LISTES CA ---------- */
+
+.card-body p.text-muted {
+    font-size: .9rem;
+    padding: 10px 0;
+}
+
+/* ---------- TABLES SIMULÉES ---------- */
+
+.card-body ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.card-body ul li {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--border);
+    font-size: .9rem;
+}
+
+.card-body ul li:last-child {
+    border-bottom: none;
+}
+
+/* ---------- HOVER PRO ---------- */
+
+.kpi-tile:hover,
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* ---------- VISUAL SEPARATORS ---------- */
+
+.card::before {
+    content: "";
+    display: block;
+    height: 4px;
+    width: 100%;
+    background: linear-gradient(
+        90deg,
+        var(--primary),
+        var(--accent)
+    );
+    border-radius: 999px;
+    margin-bottom: 12px;
+}
+
+/* ---------- MOBILE ---------- */
+
+@media (max-width: 991px) {
+    .card form {
+        grid-template-columns: 1fr;
+    }
+
+    .card form .btn {
+        grid-column: span 1;
+    }
+}
