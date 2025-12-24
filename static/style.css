@@ -297,3 +297,176 @@ h1, h2, h3, h4, h5 {
     .content-wrapper { padding: 16px; }
     .page-title { font-size: 1.3rem; }
 }
+/* =========================================================
+   UI POLISH — CRM PRO (NON DESTRUCTIF)
+   ========================================================= */
+
+/* ---------- GLOBAL RHYTHM ---------- */
+
+.content-wrapper > * + * {
+    margin-top: 18px;
+}
+
+/* ---------- TITRES ---------- */
+
+.page-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.page-title::before {
+    content: "";
+    width: 6px;
+    height: 28px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--accent), var(--accent-600));
+}
+
+/* ---------- SIDEBAR DEPTH ---------- */
+
+.sidebar {
+    box-shadow: 8px 0 30px rgba(5,10,58,.25);
+}
+
+.sidebar-link {
+    position: relative;
+}
+
+.sidebar-link.active::after {
+    content: "";
+    position: absolute;
+    right: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 70%;
+    background: var(--accent);
+    border-radius: 999px;
+}
+
+/* ---------- CARDS ---------- */
+
+.card {
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.card-header {
+    padding: 14px 18px;
+    font-size: .95rem;
+}
+
+/* ---------- KPI ---------- */
+
+.kpi-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.kpi-value {
+    line-height: 1;
+}
+
+.kpi-tile:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+/* ---------- FORMS ---------- */
+
+.form-control,
+.form-select {
+    padding: 10px 12px;
+    background: #fff;
+}
+
+.form-control::placeholder {
+    color: #9ca3af;
+}
+
+textarea.form-control {
+    resize: vertical;
+}
+
+/* ---------- BUTTONS ---------- */
+
+.btn {
+    padding: 9px 16px;
+}
+
+.btn-outline-secondary {
+    border-color: var(--border);
+    color: var(--muted);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+/* ---------- LISTS ---------- */
+
+.list-group-item {
+    border-color: var(--border);
+    padding: 14px 16px;
+}
+
+.list-group-item + .list-group-item {
+    border-top: 1px solid var(--border);
+}
+
+/* ---------- COTATIONS ---------- */
+
+.cotation-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.cotation-card strong {
+    font-size: .95rem;
+}
+
+.cotation-card ul {
+    padding-left: 16px;
+}
+
+.cotation-card li {
+    margin-bottom: 4px;
+}
+
+/* ---------- FLASH MESSAGES ---------- */
+
+.card[style*="border-left"] {
+    border-left-width: 5px !important;
+    font-weight: 600;
+}
+
+/* ---------- CHAT ---------- */
+
+#chatBubble:hover {
+    transform: scale(1.05);
+}
+
+#chatWindow {
+    overflow: hidden;
+}
+
+/* ---------- MOBILE ---------- */
+
+@media (max-width: 767px) {
+    .sidebar {
+        position: fixed;
+        z-index: 1000;
+    }
+
+    .content-wrapper {
+        margin-left: var(--sidebar-w);
+    }
+}
