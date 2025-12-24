@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Client{% endblock %}
 
-{% block content %}
-
+{% block page_title %}
 <h1 class="page-title mb-4">{{ client.name }}</h1>
+{% endblock %}
+
+{% block content %}
 
 <div class="row g-4">
 
-    <!-- ========================= -->
     <!-- INFOS CLIENT -->
-    <!-- ========================= -->
     <div class="col-md-4">
         <div class="card shadow-sm">
             <div class="card-body">
@@ -26,12 +26,10 @@
         </div>
     </div>
 
-    <!-- ========================= -->
-    <!-- DEMANDE DE COTATION + LISTE -->
-    <!-- ========================= -->
+    <!-- COTATIONS -->
     <div class="col-md-8">
 
-        <!-- FORMULAIRE DEMANDE DE COTATION -->
+        <!-- FORM -->
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white">
                 <strong>Demande de cotation</strong>
@@ -42,14 +40,13 @@
                       action="{{ url_for('create_cotation', client_id=client.id) }}">
 
                     <div class="row g-3">
-
                         <div class="col-md-4">
                             <label class="form-label">Date de négociation</label>
                             <input type="date" name="date_negociation" class="form-control">
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label">Type d’énergie</label>
+                            <label class="form-label">Énergie</label>
                             <select name="energie_type" class="form-select">
                                 <option value="">—</option>
                                 <option value="gaz">Gaz</option>
@@ -58,7 +55,7 @@
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label">Nom de l’entreprise</label>
+                            <label class="form-label">Entreprise</label>
                             <input name="entreprise_nom" class="form-control">
                         </div>
 
@@ -68,7 +65,7 @@
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label">Nom du signataire</label>
+                            <label class="form-label">Signataire</label>
                             <input name="signataire_nom" class="form-control">
                         </div>
 
@@ -103,7 +100,6 @@
                                       class="form-control"
                                       rows="3"></textarea>
                         </div>
-
                     </div>
 
                     <div class="text-end mt-4">
@@ -115,49 +111,26 @@
             </div>
         </div>
 
-        <!-- LISTE DES DEMANDES DE COTATION -->
+        <!-- LISTE -->
         <div class="card shadow-sm">
             <div class="card-header bg-light">
                 <strong>Demandes de cotation</strong>
             </div>
 
             <div class="card-body">
-
                 {% for c in cotations %}
-                <div class="border rounded p-3 mb-3 cotation-card">
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <strong>{{ c.entreprise_nom or client.name }}</strong>
-                        {% if c.energie_type %}
-                        <span class="badge bg-secondary">
-                            {{ c.energie_type | capitalize }}
-                        </span>
-                        {% endif %}
+                <div class="border rounded p-3 mb-3">
+                    <strong>{{ c.entreprise_nom or client.name }}</strong>
+                    <div class="small text-muted mb-2">
+                        {{ c.energie_type or "—" }} — échéance {{ c.date_echeance or "—" }}
                     </div>
-
-                    <div class="text-muted small mb-2">
-                        Échéance : {{ c.date_echeance or "—" }}
-                    </div>
-
-                    <ul class="small mb-2">
-                        <li>Signataire : {{ c.signataire_nom or "—" }}</li>
-                        <li>Email : {{ c.signataire_email or "—" }}</li>
-                        <li>Téléphone : {{ c.signataire_tel or "—" }}</li>
-                        <li>SIRET : {{ c.siret or "—" }}</li>
-                        <li>PDL / PCE : {{ c.pdl_pce or "—" }}</li>
-                        <li>Fournisseur : {{ c.fournisseur_actuel or "—" }}</li>
-                    </ul>
-
                     {% if c.commentaire %}
-                    <div class="fst-italic small text-muted">
-                        “{{ c.commentaire }}”
-                    </div>
+                    <div class="fst-italic small">“{{ c.commentaire }}”</div>
                     {% endif %}
                 </div>
                 {% else %}
                 <p class="text-muted">Aucune demande de cotation.</p>
                 {% endfor %}
-
             </div>
         </div>
 

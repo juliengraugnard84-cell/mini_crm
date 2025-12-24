@@ -6,9 +6,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- CSS principal -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -31,7 +29,7 @@
         </a>
 
         <a href="{{ url_for('clients') }}"
-           class="sidebar-link {% if ep.startswith('clients') %}active{% endif %}">
+           class="sidebar-link {% if ep.startswith('client') %}active{% endif %}">
             👥 Clients
         </a>
 
@@ -52,11 +50,11 @@
         </a>
         {% endif %}
 
-        <!-- Spacer -->
         <div style="flex:1"></div>
 
-        <!-- Déconnexion -->
-        <a href="{{ url_for('logout') }}" class="sidebar-link" style="color:#ffb4b4;">
+        <a href="{{ url_for('logout') }}"
+           class="sidebar-link"
+           style="color:#ffb4b4;">
             ⏻ Déconnexion
         </a>
 
@@ -68,27 +66,37 @@
         <!-- TOPBAR -->
         <div class="topbar">
             <div>
-                <strong>{{ current_user.username }}</strong>
-                <small style="color:#6b7280">({{ current_user.role }})</small>
+                {% if current_user %}
+                    <strong>{{ current_user.username }}</strong>
+                    <small style="color:#6b7280">({{ current_user.role }})</small>
+                {% else %}
+                    <strong>Invité</strong>
+                {% endif %}
             </div>
             <div class="topbar-avatar">
                 {{ current_user.username[0]|upper if current_user else '?' }}
             </div>
         </div>
 
-        <!-- FLASH MESSAGES -->
+        <!-- PAGE TITLE -->
+        {% block page_title %}{% endblock %}
+
+        <!-- FLASH -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="card" style="margin-bottom:12px; padding:12px; border-left:4px solid
-                    {% if category=='success' %}#16a34a{% elif category=='danger' %}#dc2626{% else %}#f2b233{% endif %};">
+                <div class="card"
+                     style="margin-bottom:12px; padding:12px;
+                     border-left:4px solid
+                     {% if category=='success' %}#16a34a
+                     {% elif category=='danger' %}#dc2626
+                     {% else %}#f2b233{% endif %};">
                     {{ message }}
                 </div>
             {% endfor %}
         {% endif %}
         {% endwith %}
 
-        <!-- PAGE CONTENT -->
         {% block content %}{% endblock %}
 
     </main>
@@ -96,6 +104,5 @@
 </div>
 
 {% block extra_js %}{% endblock %}
-
 </body>
 </html>

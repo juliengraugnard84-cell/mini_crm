@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-
 {% block title %}Dashboard{% endblock %}
-{% block page_title %}Tableau de bord{% endblock %}
+
+{% block page_title %}
+<h1 class="page-title mb-4">Tableau de bord</h1>
+{% endblock %}
 
 {% block content %}
 
-<!-- KPI -->
 <div class="row g-4 mb-4">
-
     <div class="col-md-4">
         <div class="kpi-tile kpi--blue">
             <div class="kpi-label">Clients</div>
@@ -17,10 +17,8 @@
 
     <div class="col-md-4">
         <div class="kpi-tile kpi--green">
-            <div class="kpi-label">Chiffre d’affaires total</div>
-            <div class="kpi-value">
-                {{ total_ca | round(2) }} €
-            </div>
+            <div class="kpi-label">Chiffre d’affaires</div>
+            <div class="kpi-value">{{ total_ca | round(2) }} €</div>
         </div>
     </div>
 
@@ -30,52 +28,36 @@
             <div class="kpi-value">{{ total_docs }}</div>
         </div>
     </div>
-
 </div>
 
 <div class="row g-4">
 
-    <!-- Derniers clients -->
     <div class="col-md-6">
-        <div class="card p-3 h-100">
-            <h5 class="mb-3">Derniers clients</h5>
-
+        <div class="card p-3">
+            <h5>Derniers clients</h5>
             <ul class="list-group list-group-flush">
                 {% for c in last_clients %}
                 <li class="list-group-item">
                     <strong>{{ c.name }}</strong><br>
-                    <small class="text-muted">
-                        {{ c.email or "—" }}
-                    </small>
+                    <small class="text-muted">{{ c.email or "—" }}</small>
                 </li>
                 {% else %}
-                <li class="list-group-item text-muted">
-                    Aucun client
-                </li>
+                <li class="list-group-item text-muted">Aucun client</li>
                 {% endfor %}
             </ul>
         </div>
     </div>
 
-    <!-- Dernier revenu -->
     <div class="col-md-6">
-        <div class="card p-3 h-100">
-            <h5 class="mb-3">Dernier revenu</h5>
-
+        <div class="card p-3">
+            <h5>Dernier revenu</h5>
             {% if last_rev %}
-                <p class="mb-1">
-                    <strong>{{ last_rev.montant }} €</strong>
-                </p>
-                <p class="mb-1">
-                    Date : {{ last_rev.date }}
-                </p>
-                <p class="mb-0 text-muted">
-                    Commercial : {{ last_rev.commercial }}
-                </p>
+                <strong>{{ last_rev.montant }} €</strong><br>
+                <small class="text-muted">
+                    {{ last_rev.date }} — {{ last_rev.commercial }}
+                </small>
             {% else %}
-                <p class="text-muted">
-                    Aucun revenu enregistré
-                </p>
+                <p class="text-muted">Aucun revenu enregistré</p>
             {% endif %}
         </div>
     </div>
@@ -83,26 +65,19 @@
 </div>
 
 {% if current_user and current_user.role == 'admin' %}
-<!-- Cotations non lues -->
 <div class="card p-3 mt-4">
-    <h5 class="mb-3">
-        Cotations non lues ({{ unread_cotations }})
-    </h5>
-
-    <ul class="list-group list-group-flush">
+    <h5>Cotations non lues ({{ unread_cotations }})</h5>
+    <ul class="list-group">
         {% for c in cotations_admin %}
         <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
            class="list-group-item list-group-item-action">
             <strong>{{ c.client_name }}</strong><br>
             <small class="text-muted">
-                {{ c.energie_type | capitalize if c.energie_type else "—" }}
-                — Échéance : {{ c.date_echeance or "—" }}
+                {{ c.energie_type or "—" }} — échéance {{ c.date_echeance or "—" }}
             </small>
         </a>
         {% else %}
-        <li class="list-group-item text-muted">
-            Aucune cotation en attente
-        </li>
+        <li class="list-group-item text-muted">Aucune cotation</li>
         {% endfor %}
     </ul>
 </div>
