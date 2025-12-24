@@ -3,74 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}CRM{% endblock %}</title>
+
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- CSS principal -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
 
-{% set ep = request.endpoint if request and request.endpoint else '' %}
-
 <div class="layout">
 
+    <!-- ================= SIDEBAR ================= -->
     <aside class="sidebar">
+
         <div class="sidebar-logo">
-            <strong>CRM</strong><br>
-            <small>Synergy Group</small>
+            <strong>SYNERGYGROUP</strong><br>
+            <small>{{ current_user.username if current_user else '' }}</small>
         </div>
+
+        {% set ep = request.endpoint or '' %}
 
         <a href="{{ url_for('dashboard') }}"
            class="sidebar-link {% if ep == 'dashboard' %}active{% endif %}">
-            Dashboard
+            📊 Dashboard
         </a>
 
         <a href="{{ url_for('clients') }}"
-           class="sidebar-link {% if ep == 'clients' %}active{% endif %}">
-            Clients
+           class="sidebar-link {% if ep.startswith('clients') %}active{% endif %}">
+            👥 Clients
         </a>
 
         <a href="{{ url_for('chiffre_affaire') }}"
-           class="sidebar-link {% if ep == 'chiffre_affaire' %}active{% endif %}">
-            Chiffre d’affaires
+           class="sidebar-link {% if ep.startswith('chiffre_affaire') %}active{% endif %}">
+            💶 Chiffre d’affaires
         </a>
 
         {% if current_user and current_user.role == 'admin' %}
         <a href="{{ url_for('admin_users') }}"
            class="sidebar-link {% if ep.startswith('admin') %}active{% endif %}">
-            Utilisateurs
+            ⚙️ Utilisateurs
+        </a>
+
+        <a href="{{ url_for('documents') }}"
+           class="sidebar-link {% if ep.startswith('documents') %}active{% endif %}">
+            📁 Documents
         </a>
         {% endif %}
 
-        <hr style="border-top:1px solid rgba(255,255,255,.15); margin:14px 0">
+        <!-- Spacer -->
+        <div style="flex:1"></div>
 
-        <a href="{{ url_for('logout') }}" class="sidebar-link">
-            Déconnexion
+        <!-- Déconnexion -->
+        <a href="{{ url_for('logout') }}" class="sidebar-link" style="color:#ffb4b4;">
+            ⏻ Déconnexion
         </a>
+
     </aside>
 
+    <!-- ================= CONTENT ================= -->
     <main class="content-wrapper">
 
+        <!-- TOPBAR -->
         <div class="topbar">
             <div>
-                <strong>{{ current_user.username }}</strong><br>
-                <small>{{ current_user.role }}</small>
+                <strong>{{ current_user.username }}</strong>
+                <small style="color:#6b7280">({{ current_user.role }})</small>
             </div>
             <div class="topbar-avatar">
-                {{ current_user.username[0]|upper }}
+                {{ current_user.username[0]|upper if current_user else '?' }}
             </div>
         </div>
 
+        <!-- FLASH MESSAGES -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            {% for cat, msg in messages %}
-                <div class="card p-3 mb-3">{{ msg }}</div>
+            {% for category, message in messages %}
+                <div class="card" style="margin-bottom:12px; padding:12px; border-left:4px solid
+                    {% if category=='success' %}#16a34a{% elif category=='danger' %}#dc2626{% else %}#f2b233{% endif %};">
+                    {{ message }}
+                </div>
             {% endfor %}
         {% endif %}
         {% endwith %}
 
+        <!-- PAGE CONTENT -->
         {% block content %}{% endblock %}
 
     </main>
 
 </div>
+
+{% block extra_js %}{% endblock %}
+
 </body>
 </html>
