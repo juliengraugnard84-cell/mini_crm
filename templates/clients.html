@@ -6,55 +6,56 @@
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
     <h1>Clients</h1>
 
-    <a href="{{ url_for('new_client') }}" class="btn btn-success">
-        + Nouveau client
+    <a href="{{ url_for('new_client') }}" class="btn btn-primary">
+        ➕ Nouveau client
     </a>
 </div>
 
 <div class="card">
 
-    <h5>Liste des clients</h5>
-
     {% if clients %}
 
-    <div class="list-group">
+        {% for c in clients %}
+        <div class="list-group-item"
+             style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
 
-        {% for client in clients %}
-        <div class="list-group-item" style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
-
+            <!-- Infos client -->
             <div>
-                <strong>{{ client.name }}</strong><br>
-                <span class="text-muted">
-                    {{ client.email or "—" }} · {{ client.phone or "—" }}
-                </span><br>
+                <strong>{{ c.name }}</strong><br>
                 <small class="text-muted">
-                    Commercial : {{ client.commercial or "—" }}
-                    {% if client.status %} · Statut : {{ client.status }}{% endif %}
+                    {{ c.email or "—" }} • {{ c.phone or "—" }}
                 </small>
             </div>
 
-            <div style="display:flex;gap:8px;">
-                <a href="{{ url_for('client_detail', client_id=client.id) }}"
-                   class="btn btn-outline-secondary btn-sm">
-                    Voir
-                </a>
+            <!-- Statut + action -->
+            <div style="display:flex;align-items:center;gap:12px;">
 
-                <a href="{{ url_for('edit_client', client_id=client.id) }}"
-                   class="btn btn-primary btn-sm">
-                    Modifier
+                {% set s = (c.status or '').lower() %}
+                {% if s == 'signé' %}
+                    <span class="badge badge-success">Signé</span>
+                {% elif s == 'en cours' %}
+                    <span class="badge badge-warning">En cours</span>
+                {% elif s == 'perdu' %}
+                    <span class="badge badge-danger">Perdu</span>
+                {% else %}
+                    <span class="badge badge-info">Cotation</span>
+                {% endif %}
+
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-secondary">
+                    Ouvrir
                 </a>
             </div>
 
         </div>
         {% endfor %}
 
-    </div>
-
     {% else %}
 
-    <div class="text-muted" style="padding:16px;">
-        Aucun client enregistré.
-    </div>
+        <div class="empty-state">
+            <strong>Aucun client</strong>
+            Commencez par créer votre premier client.
+        </div>
 
     {% endif %}
 

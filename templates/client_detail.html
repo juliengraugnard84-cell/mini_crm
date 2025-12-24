@@ -1,210 +1,176 @@
 {% extends "base.html" %}
-{% block title %}Client – {{ client.name }}{% endblock %}
+{% block title %}Client — {{ client.name }}{% endblock %}
 
 {% block content %}
 
-<h1 class="page-title">
-    {{ client.name }}
-</h1>
+<!-- ================= HEADER ================= -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <h1>{{ client.name }}</h1>
 
-<!-- ================= INFOS CLIENT ================= -->
-<div class="card mb-4">
-
-    <h5>Informations client</h5>
-
-    <div class="row g-3">
-
-        <div class="col-md-6">
-            <strong>Email :</strong><br>
-            {{ client.email or "—" }}
-        </div>
-
-        <div class="col-md-6">
-            <strong>Téléphone :</strong><br>
-            {{ client.phone or "—" }}
-        </div>
-
-        <div class="col-md-6">
-            <strong>Commercial :</strong><br>
-            {{ client.commercial or "—" }}
-        </div>
-
-        <div class="col-md-6">
-            <strong>Statut :</strong><br>
-            {{ client.status or "—" }}
-        </div>
-
-        <div class="col-md-12">
-            <strong>Adresse :</strong><br>
-            {{ client.address or "—" }}
-        </div>
-
-        {% if client.notes %}
-        <div class="col-md-12">
-            <strong>Notes :</strong><br>
-            <div class="text-muted">{{ client.notes }}</div>
-        </div>
-        {% endif %}
-
-    </div>
-
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+    <div class="actions-row">
         <a href="{{ url_for('edit_client', client_id=client.id) }}"
-           class="btn btn-primary">
-            Modifier
+           class="btn btn-secondary">
+            ✏ Modifier
         </a>
 
-        <form method="POST"
+        <form method="post"
               action="{{ url_for('delete_client', client_id=client.id) }}"
               onsubmit="return confirm('Supprimer définitivement ce client ?');">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="btn btn-danger">
-                Supprimer
+            <button type="submit" class="btn btn-danger">
+                🗑 Supprimer
             </button>
         </form>
     </div>
-
 </div>
 
-<!-- ================= DEMANDE DE COTATION ================= -->
-<div class="card mb-4">
+<!-- ================= INFOS CLIENT ================= -->
+<div class="card">
+    <h5>Informations client</h5>
 
-    <h5>Nouvelle demande de cotation</h5>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
 
-    <form method="POST"
-          action="{{ url_for('create_cotation', client_id=client.id) }}">
+        <div>
+            <div class="form-label">Email</div>
+            {{ client.email or "—" }}
+        </div>
 
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div>
+            <div class="form-label">Téléphone</div>
+            {{ client.phone or "—" }}
+        </div>
 
-        <div class="row g-3">
+        <div>
+            <div class="form-label">Commercial</div>
+            {{ client.commercial or "—" }}
+        </div>
 
-            <div class="col-md-4">
-                <label class="form-label">Date de négociation</label>
-                <input type="date" name="date_negociation" class="form-control">
+        <div>
+            <div class="form-label">Statut</div>
+
+            {% set s = (client.status or '').lower() %}
+            {% if s == 'signé' %}
+                <span class="badge badge-success">Signé</span>
+            {% elif s == 'en cours' %}
+                <span class="badge badge-warning">En cours</span>
+            {% elif s == 'perdu' %}
+                <span class="badge badge-danger">Perdu</span>
+            {% else %}
+                <span class="badge badge-info">Cotation</span>
+            {% endif %}
+        </div>
+
+    </div>
+
+    {% if client.notes %}
+    <div style="margin-top:18px;">
+        <div class="form-label">Notes</div>
+        <p>{{ client.notes }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ================= COTATIONS ================= -->
+<div class="card">
+    <h5>Demandes de cotation</h5>
+
+    {% if cotations %}
+
+        {% for cot in cotations %}
+        <div class="list-group-item"
+             style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
+
+            <div>
+                <strong>{{ cot.energie_type or "—" }}</strong><br>
+                <small class="text-muted">
+                    Créée le {{ cot.date_creation[:10] }}
+                </small>
             </div>
 
-            <div class="col-md-4">
+            <span class="badge badge-info">Nouvelle</span>
+        </div>
+        {% endfor %}
+
+    {% else %}
+
+        <div class="empty-state">
+            <strong>Aucune cotation</strong>
+            Aucune demande de cotation pour ce client.
+        </div>
+
+    {% endif %}
+
+    <!-- ===== Nouvelle cotation ===== -->
+    <form method="post"
+          action="{{ url_for('create_cotation', client_id=client.id) }}"
+          style="margin-top:20px;">
+
+        <h5>Nouvelle demande de cotation</h5>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+
+            <div>
                 <label class="form-label">Type d’énergie</label>
-                <select name="energie_type" class="form-select">
-                    <option value="">—</option>
+                <select name="energie_type" class="form-control">
                     <option value="électricité">Électricité</option>
                     <option value="gaz">Gaz</option>
                 </select>
             </div>
 
-            <div class="col-md-4">
+            <div>
                 <label class="form-label">Date d’échéance</label>
                 <input type="date" name="date_echeance" class="form-control">
             </div>
 
-            <div class="col-md-6">
-                <label class="form-label">Entreprise</label>
-                <input type="text" name="entreprise_nom" class="form-control">
-            </div>
-
-            <div class="col-md-6">
-                <label class="form-label">SIRET</label>
-                <input type="text" name="siret" class="form-control">
-            </div>
-
-            <div class="col-md-4">
-                <label class="form-label">Signataire</label>
-                <input type="text" name="signataire_nom" class="form-control">
-            </div>
-
-            <div class="col-md-4">
-                <label class="form-label">Téléphone signataire</label>
-                <input type="text" name="signataire_tel" class="form-control">
-            </div>
-
-            <div class="col-md-4">
-                <label class="form-label">Email signataire</label>
-                <input type="email" name="signataire_email" class="form-control">
-            </div>
-
-            <div class="col-md-6">
+            <div>
                 <label class="form-label">PDL / PCE</label>
                 <input type="text" name="pdl_pce" class="form-control">
             </div>
 
-            <div class="col-md-6">
+            <div>
                 <label class="form-label">Fournisseur actuel</label>
                 <input type="text" name="fournisseur_actuel" class="form-control">
-            </div>
-
-            <div class="col-md-12">
-                <label class="form-label">Commentaire</label>
-                <textarea name="commentaire" class="form-control" rows="3"></textarea>
             </div>
 
         </div>
 
         <div style="margin-top:16px;">
-            <button class="btn btn-success">
-                Enregistrer la demande
-            </button>
+            <label class="form-label">Commentaire</label>
+            <textarea name="commentaire" class="form-control" rows="3"></textarea>
         </div>
 
+        <button type="submit"
+                class="btn btn-primary"
+                style="margin-top:16px;">
+            ➕ Ajouter la cotation
+        </button>
+
     </form>
-
 </div>
 
-<!-- ================= HISTORIQUE DES COTATIONS ================= -->
-<div class="card mb-4">
-
-    <h5>Historique des cotations</h5>
-
-    {% if cotations %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Énergie</th>
-                <th>Entreprise</th>
-                <th>Échéance</th>
-                <th>Statut</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in cotations %}
-            <tr>
-                <td>{{ c.date_negociation or "—" }}</td>
-                <td>{{ c.energie_type or "—" }}</td>
-                <td>{{ c.entreprise_nom or "—" }}</td>
-                <td>{{ c.date_echeance or "—" }}</td>
-                <td>{{ c.status or "nouvelle" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-        <p class="text-muted">Aucune cotation enregistrée.</p>
-    {% endif %}
-
-</div>
-
-<!-- ================= DOCUMENTS CLIENT ================= -->
+<!-- ================= DOCUMENTS ================= -->
 <div class="card">
-
     <h5>Documents</h5>
 
     {% if documents %}
-    <ul class="list-group">
+
         {% for d in documents %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div class="list-group-item"
+             style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
             <span>{{ d.nom }}</span>
-            {% if d.url %}
-            <a href="{{ d.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+            <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
                 Ouvrir
             </a>
-            {% endif %}
-        </li>
+        </div>
         {% endfor %}
-    </ul>
-    {% else %}
-        <p class="text-muted">Aucun document associé.</p>
-    {% endif %}
 
+    {% else %}
+
+        <div class="empty-state">
+            <strong>Aucun document</strong>
+            Aucun document associé à ce client.
+        </div>
+
+    {% endif %}
 </div>
 
 {% endblock %}

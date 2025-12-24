@@ -3,158 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}CRM{% endblock %}</title>
-
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- CSS principal -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
     {% block extra_css %}{% endblock %}
 </head>
 <body>
 
-<div class="layout">
+<div class="app-shell">
 
     <!-- ================= SIDEBAR ================= -->
     <aside class="sidebar">
-
-        <div class="sidebar-logo">
-            <strong>SYNERGYGROUP</strong><br>
-            <small>{{ current_user.username if current_user else '' }}</small>
+        <div class="sidebar-brand">
+            <div class="brand-mark">SG</div>
+            <div class="brand-text">
+                <div class="brand-name">SYNERGYGROUP</div>
+                <div class="brand-user">{{ current_user.username if current_user else '' }}</div>
+            </div>
         </div>
 
         {% set ep = request.endpoint or '' %}
 
-        <a href="{{ url_for('dashboard') }}"
-           class="sidebar-link {% if ep == 'dashboard' %}active{% endif %}">
-            Dashboard
-        </a>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('dashboard') }}"
+               class="nav-link {% if ep == 'dashboard' %}active{% endif %}">
+                <span class="nav-ic">▦</span>
+                <span class="nav-txt">Dashboard</span>
+            </a>
 
-        <a href="{{ url_for('clients') }}"
-           class="sidebar-link {% if ep in ['clients','new_client','client_detail','edit_client'] %}active{% endif %}">
-            Clients
-        </a>
+            <a href="{{ url_for('clients') }}"
+               class="nav-link {% if ep in ['clients','new_client','client_detail','edit_client'] %}active{% endif %}">
+                <span class="nav-ic">👥</span>
+                <span class="nav-txt">Clients</span>
+            </a>
 
-        <a href="{{ url_for('chiffre_affaire') }}"
-           class="sidebar-link {% if ep in ['chiffre_affaire','delete_revenue'] %}active{% endif %}">
-            Chiffre d’affaires
-        </a>
+            <a href="{{ url_for('chiffre_affaire') }}"
+               class="nav-link {% if ep in ['chiffre_affaire','delete_revenue'] %}active{% endif %}">
+                <span class="nav-ic">€</span>
+                <span class="nav-txt">Chiffre d’affaires</span>
+            </a>
 
-        {% if current_user and current_user.role == 'admin' %}
-        <a href="{{ url_for('admin_users') }}"
-           class="sidebar-link {% if ep.startswith('admin') %}active{% endif %}">
-            Utilisateurs
-        </a>
+            {% if current_user and current_user.role == 'admin' %}
+            <div class="nav-section">Administration</div>
 
-        <a href="{{ url_for('documents') }}"
-           class="sidebar-link {% if ep in ['documents','upload_document','delete_document'] %}active{% endif %}">
-            Documents
-        </a>
-        {% endif %}
+            <a href="{{ url_for('admin_users') }}"
+               class="nav-link {% if ep.startswith('admin') %}active{% endif %}">
+                <span class="nav-ic">⚙</span>
+                <span class="nav-txt">Utilisateurs</span>
+            </a>
 
-        <div style="flex:1"></div>
+            <a href="{{ url_for('documents') }}"
+               class="nav-link {% if ep in ['documents','upload_document','delete_document'] %}active{% endif %}">
+                <span class="nav-ic">📄</span>
+                <span class="nav-txt">Documents</span>
+            </a>
+            {% endif %}
+        </nav>
 
-        <a href="{{ url_for('logout') }}"
-           class="sidebar-link"
-           style="color:#fca5a5;">
-            Déconnexion
-        </a>
-
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="nav-link danger">
+                <span class="nav-ic">⎋</span>
+                <span class="nav-txt">Déconnexion</span>
+            </a>
+        </div>
     </aside>
 
-    <!-- ================= CONTENT ================= -->
-    <main class="content-wrapper">
-
+    <!-- ================= MAIN ================= -->
+    <main class="main">
         <!-- TOPBAR -->
-        <div class="topbar">
-            <div>
-                <strong>{{ current_user.username if current_user else '' }}</strong>
-                {% if current_user %}
-                    <span class="text-muted">({{ current_user.role }})</span>
-                {% endif %}
+        <header class="topbar">
+            <div class="topbar-left">
+                <div class="page-context">
+                    <div class="page-app">CRM</div>
+                    <div class="page-sep">/</div>
+                    <div class="page-user">
+                        {{ current_user.username if current_user else '' }}
+                        {% if current_user %}<span class="page-role">({{ current_user.role }})</span>{% endif %}
+                    </div>
+                </div>
             </div>
 
-            <div class="topbar-avatar">
-                {{ current_user.username[0]|upper if current_user else '?' }}
+            <div class="topbar-right">
+                <div class="avatar">
+                    {{ current_user.username[0]|upper if current_user else '?' }}
+                </div>
             </div>
-        </div>
+        </header>
 
         <!-- FLASH -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            {% for category, message in messages %}
-                <div class="card"
-                     style="margin-bottom:12px;padding:12px 16px;
-                            border-left:4px solid
-                            {% if category=='success' %}#16a34a
-                            {% elif category=='danger' %}#dc2626
-                            {% else %}#f2b233{% endif %};">
-                    {{ message }}
-                </div>
-            {% endfor %}
+            <section class="flash-stack">
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">
+                        <div class="flash-bar"></div>
+                        <div class="flash-msg">{{ message }}</div>
+                    </div>
+                {% endfor %}
+            </section>
         {% endif %}
         {% endwith %}
 
-        {% block content %}{% endblock %}
+        <!-- CONTENT -->
+        <section class="content">
+            {% block content %}{% endblock %}
+        </section>
 
+        <footer class="footer">
+            <span>SYNERGYGROUP • CRM</span>
+        </footer>
     </main>
-
 </div>
 
-<!-- ================= CHAT FLOAT (STABLE & SÛR) ================= -->
+<!-- ================= CHAT FLOAT (STABLE & SOBRE) ================= -->
+<button id="chatBubble" type="button" aria-label="Ouvrir le chat">💬</button>
 
-<button id="chatBubble"
-        type="button"
-        style="position:fixed;right:24px;bottom:24px;z-index:1000;">
-    💬
-</button>
-
-<div id="chatWindow"
-     style="display:none;
-            position:fixed;right:24px;bottom:96px;
-            width:360px;height:460px;z-index:1000;
-            background:#fff;
-            border:1px solid var(--border);
-            border-radius:10px;
-            box-shadow:0 10px 30px rgba(0,0,0,.2);
-            display:flex;
-            flex-direction:column;">
-
-    <!-- HEADER -->
-    <div style="padding:10px;border-bottom:1px solid var(--border);
-                display:flex;justify-content:space-between;align-items:center;">
+<div id="chatWindow" aria-hidden="true">
+    <div class="chat-header">
         <strong>Chat interne</strong>
-        <button id="chatClose" type="button" class="btn btn-secondary btn-sm">✕</button>
+        <button id="chatClose" type="button" class="chat-close" aria-label="Fermer">✕</button>
     </div>
 
-    <!-- MESSAGES -->
-    <div id="chatMessages"
-         style="flex:1;padding:10px;overflow-y:auto;font-size:.9rem;">
-    </div>
+    <div id="chatMessages" class="chat-messages"></div>
 
-    <!-- INPUT -->
-    <form id="chatForm"
-          style="padding:10px;border-top:1px solid var(--border);">
-
-        <input id="chatInput"
-               name="message"
-               type="text"
-               class="form-control"
-               placeholder="Votre message…"
-               autocomplete="off"
-               required>
-
-        <div style="display:flex;gap:8px;margin-top:8px;">
+    <form id="chatForm" class="chat-form">
+        <input id="chatInput" name="message" type="text" class="form-control" placeholder="Votre message…" autocomplete="off" required>
+        <div class="chat-actions">
             <input id="chatFile" name="file" type="file" class="form-control">
-            <button type="submit"
-                    class="btn btn-success"
-                    style="min-width:110px;">
-                Envoyer
-            </button>
+            <button type="submit" class="btn btn-primary" style="min-width:120px;">Envoyer</button>
         </div>
-
     </form>
-
 </div>
 
 {% block extra_js %}{% endblock %}
@@ -186,27 +166,22 @@
         messagesEl.innerHTML = "";
         for (const m of items) {
             const wrap = document.createElement("div");
-            wrap.style.marginBottom = "10px";
-            wrap.style.padding = "8px";
-            wrap.style.border = "1px solid var(--border)";
-            wrap.style.borderRadius = "8px";
+            wrap.className = "chat-bubble";
 
             const header = document.createElement("div");
-            header.style.display = "flex";
-            header.style.justifyContent = "space-between";
-            header.style.marginBottom = "6px";
+            header.className = "chat-meta";
 
             const who = document.createElement("strong");
             who.textContent = m.username ? String(m.username) : "—";
 
             const when = document.createElement("small");
-            when.className = "text-muted";
             when.textContent = m.created_at || "";
 
             header.appendChild(who);
             header.appendChild(when);
 
             const body = document.createElement("div");
+            body.className = "chat-text";
             body.innerHTML = escapeHtml(m.message || "");
 
             wrap.appendChild(header);
@@ -217,9 +192,8 @@
                 a.href = m.file_url;
                 a.target = "_blank";
                 a.rel = "noopener";
+                a.className = "chat-file";
                 a.textContent = "📎 " + String(m.file_name);
-                a.style.display = "inline-block";
-                a.style.marginTop = "6px";
                 wrap.appendChild(a);
             }
 
@@ -232,9 +206,7 @@
         try {
             const r = await fetch("/chat/messages?limit=80", { credentials: "same-origin" });
             const data = await r.json();
-            if (data && data.success) {
-                renderMessages(data.messages || []);
-            }
+            if (data && data.success) renderMessages(data.messages || []);
         } catch (e) {}
     }
 
@@ -248,18 +220,21 @@
         pollingTimer = null;
     }
 
-    bubble.addEventListener("click", async () => {
-        windowChat.style.display = "";
-        messagesEl.innerHTML = "<div class='text-muted'>Chargement…</div>";
-        await loadMessages();
-        startPolling();
-    });
+    function openChat() {
+        windowChat.style.display = "flex";
+        windowChat.setAttribute("aria-hidden", "false");
+        messagesEl.innerHTML = "<div class='chat-hint'>Chargement…</div>";
+        loadMessages().then(startPolling);
+    }
 
-    closeBtn.addEventListener("click", () => {
+    function closeChat() {
         windowChat.style.display = "none";
+        windowChat.setAttribute("aria-hidden", "true");
         stopPolling();
-    });
+    }
 
+    bubble.addEventListener("click", openChat);
+    closeBtn.addEventListener("click", closeChat);
     window.addEventListener("beforeunload", stopPolling);
 
     form.addEventListener("submit", async (e) => {
@@ -267,7 +242,6 @@
 
         const text = input.value.trim();
         const file = fileInput.files ? fileInput.files[0] : null;
-
         if (!text && !file) return;
 
         const fd = new FormData();
@@ -275,14 +249,18 @@
         if (file) fd.append("file", file);
 
         try {
-            await fetch("/chat/send", {
+            const r = await fetch("/chat/send", {
                 method: "POST",
                 body: fd,
                 credentials: "same-origin",
             });
-            input.value = "";
-            fileInput.value = "";
-            await loadMessages();
+            if (r.ok) {
+                input.value = "";
+                fileInput.value = "";
+                await loadMessages();
+            } else {
+                alert("Erreur lors de l’envoi du message.");
+            }
         } catch (err) {
             alert("Erreur lors de l’envoi du message.");
         }

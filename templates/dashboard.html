@@ -1,12 +1,13 @@
 {% extends "base.html" %}
+
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
 
-<h1 class="page-title">Tableau de bord</h1>
+<h1>Tableau de bord</h1>
 
-<!-- KPI -->
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+<!-- ================= KPI ================= -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:24px;">
 
     <div class="kpi-tile">
         <div class="kpi-label">Clients</div>
@@ -23,69 +24,101 @@
         <div class="kpi-value">{{ total_docs }}</div>
     </div>
 
-</div>
-
-<!-- CONTENU -->
-<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
-
-    <!-- Derniers clients -->
-    <div class="card">
-        <h5>Derniers clients</h5>
-
-        {% if last_clients %}
-        <div class="list-group">
-            {% for c in last_clients %}
-                <div class="list-group-item">
-                    <strong>{{ c.name }}</strong><br>
-                    <small class="text-muted">{{ c.email or "—" }}</small>
-                </div>
-            {% endfor %}
-        </div>
-        {% else %}
-            <p class="text-muted">Aucun client enregistré.</p>
-        {% endif %}
+    {% if current_user and current_user.role == 'admin' %}
+    <div class="kpi-tile">
+        <div class="kpi-label">Cotations non lues</div>
+        <div class="kpi-value">{{ unread_cotations }}</div>
     </div>
-
-    <!-- Dernier revenu -->
-    <div class="card">
-        <h5>Dernier revenu</h5>
-
-        {% if last_rev %}
-            <div style="font-size:1.6rem;font-weight:700;">
-                {{ last_rev.montant }} €
-            </div>
-            <small class="text-muted">
-                {{ last_rev.date }} — {{ last_rev.commercial }}
-            </small>
-        {% else %}
-            <p class="text-muted">Aucun revenu enregistré.</p>
-        {% endif %}
-    </div>
-
-</div>
-
-<!-- COTATIONS ADMIN -->
-{% if current_user and current_user.role == 'admin' %}
-<div class="card">
-    <h5>Cotations non lues ({{ unread_cotations }})</h5>
-
-    {% if cotations_admin %}
-    <div class="list-group">
-        {% for c in cotations_admin %}
-            <!-- IMPORTANT: passer par open_cotation pour marquer "lu" -->
-            <a href="{{ url_for('open_cotation', cotation_id=c.id) }}"
-               class="list-group-item">
-                <strong>{{ c.client_name }}</strong><br>
-                <small class="text-muted">
-                    {{ c.energie_type or "—" }} — échéance {{ c.date_echeance or "—" }}
-                </small>
-            </a>
-        {% endfor %}
-    </div>
-    {% else %}
-        <p class="text-muted">Aucune cotation non lue.</p>
     {% endif %}
+
 </div>
-{% endif %}
+
+<!-- ================= CONTENU ================= -->
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:24px;align-items:start;">
+
+    <!-- ===== COLONNE GAUCHE ===== -->
+    <div>
+
+        <!-- Derniers clients -->
+        <div class="card">
+            <h5>Derniers clients</h5>
+
+            {% if last_clients %}
+                <div>
+                    {% for c in last_clients %}
+                        <div class="list-group-item">
+                            <strong>{{ c.name }}</strong><br>
+                            <small class="text-muted">
+                                {{ c.email or "—" }} • {{ c.created_at[:10] }}
+                            </small>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted">Aucun client enregistré.</p>
+            {% endif %}
+        </div>
+
+        <!-- Cotations admin -->
+        {% if current_user and current_user.role == 'admin' %}
+        <div class="card">
+            <h5>Cotations non lues</h5>
+
+            {% if cotations_admin %}
+                {% for cot in cotations_admin %}
+                    <div class="list-group-item">
+                        <strong>{{ cot.client_name }}</strong><br>
+                        <small class="text-muted">
+                            Créée le {{ cot.date_creation[:10] }}
+                        </small>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">Aucune cotation non lue.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- ===== COLONNE DROITE ===== -->
+    <div>
+
+        <!-- Dernier revenu -->
+        <div class="card">
+            <h5>Dernier revenu</h5>
+
+            {% if last_rev %}
+                <div>
+                    <strong>{{ last_rev.montant }} €</strong><br>
+                    <small class="text-muted">
+                        {{ last_rev.date }} • {{ last_rev.commercial }}
+                    </small>
+                </div>
+            {% else %}
+                <p class="text-muted">Aucun revenu enregistré.</p>
+            {% endif %}
+        </div>
+
+        <!-- Actions rapides -->
+        <div class="card">
+            <h5>Actions rapides</h5>
+
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <a href="{{ url_for('new_client') }}" class="btn btn-primary">
+                    ➕ Nouveau client
+                </a>
+
+                {% if current_user and current_user.role == 'admin' %}
+                <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">
+                    ⚙ Gérer les utilisateurs
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+</div>
 
 {% endblock %}
