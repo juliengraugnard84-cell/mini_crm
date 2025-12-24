@@ -1,119 +1,117 @@
 {% extends "base.html" %}
+{% block title %}Utilisateurs{% endblock %}
+
 {% block content %}
 
-<h2 class="mb-4">Administration — Utilisateurs</h2>
+<h1 class="page-title">Administration — Utilisateurs</h1>
 
-<!-- ===================== CRÉATION UTILISATEUR ===================== -->
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-primary text-white">
-        Créer un utilisateur
-    </div>
+<!-- ===================================================== -->
+<!-- CRÉATION UTILISATEUR -->
+<!-- ===================================================== -->
+<div class="card admin-card mb-4">
+    <h5>Créer un utilisateur</h5>
 
-    <div class="card-body">
-        <form method="POST" action="{{ url_for('admin_users') }}">
-            <div class="row g-2">
-                <div class="col-md-4">
-                    <input type="text"
-                           name="username"
-                           class="form-control"
-                           placeholder="Nom d'utilisateur"
-                           required>
-                </div>
+    <form method="POST" action="{{ url_for('admin_users') }}">
+        <div>
+            <label class="form-label">Nom d'utilisateur</label>
+            <input type="text" name="username" class="form-control" required>
+        </div>
 
-                <div class="col-md-4">
-                    <input type="password"
-                           name="password"
-                           class="form-control"
-                           placeholder="Mot de passe"
-                           required>
-                </div>
+        <div>
+            <label class="form-label">Mot de passe</label>
+            <input type="password" name="password" class="form-control" required>
+        </div>
 
-                <div class="col-md-2">
-                    <select name="role" class="form-select" required>
-                        <option value="">Rôle</option>
-                        <option value="commercial">Commercial</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
+        <div>
+            <label class="form-label">Rôle</label>
+            <select name="role" class="form-select" required>
+                <option value="">— Sélectionner —</option>
+                <option value="admin">Admin</option>
+                <option value="commercial">Commercial</option>
+            </select>
+        </div>
 
-                <div class="col-md-2">
-                    <button class="btn btn-success w-100">
-                        Créer
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
+        <div></div>
+
+        <button class="btn btn-primary">
+            Créer l'utilisateur
+        </button>
+    </form>
 </div>
 
+<!-- ===================================================== -->
+<!-- LISTE UTILISATEURS -->
+<!-- ===================================================== -->
+<div class="card admin-card">
+    <h5>Utilisateurs existants</h5>
 
-<!-- ===================== LISTE UTILISATEURS ===================== -->
-<div class="card shadow-sm">
-    <div class="card-header bg-secondary text-white">
-        Utilisateurs existants
-    </div>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Utilisateur</th>
+                <th>Rôle</th>
+                <th style="width: 45%">Actions</th>
+            </tr>
+        </thead>
 
-    <div class="card-body p-0">
-        <table class="table table-striped table-hover mb-0 align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>ID</th>
-                    <th>Utilisateur</th>
-                    <th>Rôle</th>
-                    <th style="width: 420px;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
+        <tbody>
+        {% for u in users %}
+            <tr>
+                <td>{{ u.id }}</td>
 
-            {% for u in users %}
-                <tr>
-                    <td>{{ u.id }}</td>
-                    <td>{{ u.username }}</td>
-                    <td>
-                        <span class="badge {% if u.role == 'admin' %}bg-danger{% else %}bg-info{% endif %}">
-                            {{ u.role }}
-                        </span>
-                    </td>
+                <td>
+                    <strong>{{ u.username }}</strong>
+                </td>
 
-                    <td>
+                <td>
+                    <span class="role-badge">{{ u.role }}</span>
+                </td>
 
-                        <!-- ===== RESET MOT DE PASSE ===== -->
+                <td>
+                    <div class="admin-actions">
+
+                        <!-- RESET PASSWORD -->
                         <form method="POST"
-                              action="{{ url_for('admin_reset_password', user_id=u.id) }}"
-                              class="d-inline-flex align-items-center gap-1"
-                              onsubmit="return confirm('Réinitialiser le mot de passe ?');">
-
+                              action="{{ url_for('admin_reset_password', user_id=u.id) }}">
                             <input type="password"
                                    name="new_password"
-                                   class="form-control form-control-sm"
+                                   class="form-control"
                                    placeholder="Nouveau mot de passe"
-                                   required
-                                   style="width: 170px;">
+                                   required>
+                        </form>
 
-                            <button class="btn btn-sm btn-warning">
+                        <form method="POST"
+                              action="{{ url_for('admin_reset_password', user_id=u.id) }}">
+                            <input type="hidden" name="new_password" value="">
+                            <button class="btn btn-outline-secondary">
                                 Réinitialiser
                             </button>
                         </form>
 
-                        <!-- ===== SUPPRESSION ===== -->
-                        {% if u.role != 'admin' %}
+                        <!-- SUPPRESSION (SAUF ADMIN PRINCIPAL) -->
+                        {% if u.id != 1 %}
                         <form method="POST"
                               action="{{ url_for('admin_delete_user', user_id=u.id) }}"
-                              class="d-inline"
                               onsubmit="return confirm('Supprimer cet utilisateur ?');">
-                            <button class="btn btn-sm btn-outline-danger ms-1">
+                            <button class="btn btn-danger">
                                 Supprimer
                             </button>
                         </form>
                         {% endif %}
 
-                    </td>
-                </tr>
-            {% endfor %}
-
-            </tbody>
-        </table>
-    </div>
+                    </div>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4" class="text-muted">
+                    Aucun utilisateur enregistré.
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
 </div>
 
 {% endblock %}

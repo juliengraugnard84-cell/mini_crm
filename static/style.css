@@ -1,39 +1,32 @@
 /* =========================================================
    SYNERGYGROUP — CRM UI
-   Style B : Moderne / Clean (SaaS)
+   OPTION B : Moderne, sérieux, lisible
    ========================================================= */
 
-:root{
-    /* ===== BASE ===== */
+/* ================= VARIABLES ================= */
+
+:root {
     --bg: #f4f6f9;
     --surface: #ffffff;
-    --surface-2: #f8fafc;
+    --surface-soft: #f9fafb;
 
     --text: #0f172a;
-    --title: #050A3A;
     --muted: #6b7280;
 
-    --border: #e5e7eb;
-
-    /* ===== BRAND ===== */
     --primary: #050A3A;
-    --primary-600: #0B1B5E;
-    --primary-700: #0E2275;
+    --primary-light: #e6e9f5;
 
     --accent: #F2B233;
-    --accent-600: #D99A1F;
+
+    --border: #e5e7eb;
 
     --success: #16a34a;
     --danger: #dc2626;
 
-    /* ===== UI ===== */
-    --radius: 14px;
-    --radius-sm: 10px;
+    --radius: 6px;
+    --radius-sm: 4px;
 
-    --shadow-sm: 0 4px 14px rgba(5,10,58,.08);
-    --shadow-md: 0 12px 30px rgba(5,10,58,.18);
-
-    --sidebar-w: 260px;
+    --shadow: 0 2px 10px rgba(0,0,0,.06);
 }
 
 /* ================= RESET ================= */
@@ -48,22 +41,10 @@ body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: "Inter", system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, Arial, sans-serif;
+    font-size: 14px;
     line-height: 1.5;
-}
-
-/* ================= TITRES ================= */
-
-h1, h2, h3, h4, h5 {
-    margin: 0;
-    color: var(--title);
-    font-weight: 700;
-}
-
-.page-title {
-    font-size: 1.55rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
 }
 
 /* ================= LAYOUT ================= */
@@ -73,85 +54,73 @@ h1, h2, h3, h4, h5 {
     min-height: 100vh;
 }
 
+.content-wrapper {
+    flex: 1;
+    padding: 24px 28px;
+}
+
+/* ================= TITRES ================= */
+
+h1, h2, h3 {
+    font-weight: 700;
+    color: var(--text);
+}
+
+.page-title {
+    font-size: 1.4rem;
+    margin-bottom: 20px;
+}
+
 /* ================= SIDEBAR ================= */
 
 .sidebar {
-    width: var(--sidebar-w);
+    width: 250px;
     background: var(--primary);
-    color: #ffffff;
-    padding: 20px 16px;
-    position: sticky;
-    top: 0;
-    height: 100vh;
+    color: #fff;
+    padding: 20px;
 }
 
-.sidebar-logo {
-    padding: 6px 10px 16px;
-    border-bottom: 1px solid rgba(255,255,255,.15);
-    margin-bottom: 12px;
-}
-
-.sidebar-logo strong {
-    font-size: 1.05rem;
-}
-
-.sidebar-logo small {
-    color: rgba(255,255,255,.7);
-}
-
-.sidebar-link {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.sidebar a {
+    display: block;
     padding: 10px 12px;
     margin-bottom: 6px;
+    color: rgba(255,255,255,.9);
     text-decoration: none;
-    color: rgba(255,255,255,.85);
-    font-weight: 600;
     border-radius: var(--radius-sm);
-    transition: all .18s ease;
+    font-weight: 600;
 }
 
-.sidebar-link:hover {
+.sidebar a:hover {
     background: rgba(255,255,255,.08);
-    color: #ffffff;
 }
 
-.sidebar-link.active {
-    background: linear-gradient(135deg, var(--accent), var(--accent-600));
+.sidebar a.active {
+    background: var(--accent);
     color: var(--primary);
-    font-weight: 700;
-}
-
-/* ================= CONTENT ================= */
-
-.content-wrapper {
-    flex: 1;
-    padding: 22px 24px;
 }
 
 /* ================= TOPBAR ================= */
 
 .topbar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    margin-bottom: 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 18px;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow);
 }
 
 .topbar-avatar {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
     display: grid;
     place-items: center;
-    background: linear-gradient(135deg, var(--primary), var(--primary-700));
-    color: #fff;
     font-weight: 700;
 }
 
@@ -161,1045 +130,134 @@ h1, h2, h3, h4, h5 {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow);
 }
 
-.card-header {
-    background: transparent;
-    border-bottom: 1px solid var(--border);
-    font-weight: 700;
-}
-
-/* ================= FORMS ================= */
-
-.form-label {
-    font-size: .85rem;
-    font-weight: 600;
-    color: var(--muted);
-}
-
-.form-control,
-.form-select {
-    border-radius: var(--radius-sm);
-    border-color: var(--border);
-    font-size: .9rem;
-}
-
-.form-control:focus,
-.form-select:focus {
-    box-shadow: 0 0 0 .15rem rgba(5,10,58,.12);
-    border-color: var(--primary);
-}
-
-/* ================= BUTTONS ================= */
-
-.btn {
-    border-radius: var(--radius-sm);
-    font-weight: 600;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary), var(--primary-700));
-    border: none;
-}
-
-.btn-primary:hover {
-    opacity: .95;
-}
-
-.btn-success {
-    background: linear-gradient(135deg, var(--success), #15803d);
-    border: none;
-}
-
-/* ================= BADGES ================= */
-
-.badge {
-    border-radius: 999px;
-    font-size: .7rem;
-    padding: 6px 10px;
-}
-
-/* ================= KPI ================= */
-
-.kpi-tile {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px;
-    box-shadow: var(--shadow-sm);
-}
-
-.kpi-label {
-    color: var(--muted);
-    font-size: .85rem;
-    font-weight: 600;
-}
-
-.kpi-value {
-    font-size: 2rem;
-    font-weight: 800;
-    color: var(--primary);
-}
-
-.kpi--orange { border-left: 4px solid var(--accent); }
-.kpi--blue   { border-left: 4px solid var(--primary); }
-.kpi--green  { border-left: 4px solid var(--success); }
-
-/* ================= COTATIONS ================= */
-
-.cotation-card {
-    background: var(--surface-2);
-    transition: all .2s ease;
-}
-
-.cotation-card:hover {
-    background: #ffffff;
-    box-shadow: var(--shadow-sm);
-}
-
-/* ================= CHAT ================= */
-
-#chatBubble {
-    position: fixed;
-    right: 24px;
-    bottom: 24px;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    border: none;
-    background: linear-gradient(135deg, var(--accent), var(--accent-600));
-    color: var(--primary);
-    display: grid;
-    place-items: center;
-    cursor: pointer;
-    box-shadow: var(--shadow-md);
-}
-
-#chatWindow {
-    position: fixed;
-    right: 24px;
-    bottom: 100px;
-    width: 360px;
-    height: 480px;
-    background: var(--surface);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-md);
-    display: none;
-    flex-direction: column;
-}
-
-/* ================= RESPONSIVE ================= */
-
-@media (max-width: 991.98px) {
-    .sidebar { width: 220px; }
-    .content-wrapper { padding: 16px; }
-    .page-title { font-size: 1.3rem; }
-}
-/* =========================================================
-   UI POLISH — CRM PRO (NON DESTRUCTIF)
-   ========================================================= */
-
-/* ---------- GLOBAL RHYTHM ---------- */
-
-.content-wrapper > * + * {
-    margin-top: 18px;
-}
-
-/* ---------- TITRES ---------- */
-
-.page-title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-}
-
-.page-title::before {
-    content: "";
-    width: 6px;
-    height: 28px;
-    border-radius: 999px;
-    background: linear-gradient(180deg, var(--accent), var(--accent-600));
-}
-
-/* ---------- SIDEBAR DEPTH ---------- */
-
-.sidebar {
-    box-shadow: 8px 0 30px rgba(5,10,58,.25);
-}
-
-.sidebar-link {
-    position: relative;
-}
-
-.sidebar-link.active::after {
-    content: "";
-    position: absolute;
-    right: -16px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 6px;
-    height: 70%;
-    background: var(--accent);
-    border-radius: 999px;
-}
-
-/* ---------- CARDS ---------- */
-
-.card {
-    transition: transform .15s ease, box-shadow .15s ease;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+.card + .card {
+    margin-top: 20px;
 }
 
 .card-header {
     padding: 14px 18px;
-    font-size: .95rem;
-}
-
-/* ---------- KPI ---------- */
-
-.kpi-tile {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.kpi-value {
-    line-height: 1;
-}
-
-.kpi-tile:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-}
-
-/* ---------- FORMS ---------- */
-
-.form-control,
-.form-select {
-    padding: 10px 12px;
-    background: #fff;
-}
-
-.form-control::placeholder {
-    color: #9ca3af;
-}
-
-textarea.form-control {
-    resize: vertical;
-}
-
-/* ---------- BUTTONS ---------- */
-
-.btn {
-    padding: 9px 16px;
-}
-
-.btn-outline-secondary {
-    border-color: var(--border);
-    color: var(--muted);
-}
-
-.btn-outline-secondary:hover {
-    background: var(--surface-2);
-    color: var(--text);
-}
-
-/* ---------- LISTS ---------- */
-
-.list-group-item {
-    border-color: var(--border);
-    padding: 14px 16px;
-}
-
-.list-group-item + .list-group-item {
-    border-top: 1px solid var(--border);
-}
-
-/* ---------- COTATIONS ---------- */
-
-.cotation-card {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-}
-
-.cotation-card strong {
-    font-size: .95rem;
-}
-
-.cotation-card ul {
-    padding-left: 16px;
-}
-
-.cotation-card li {
-    margin-bottom: 4px;
-}
-
-/* ---------- FLASH MESSAGES ---------- */
-
-.card[style*="border-left"] {
-    border-left-width: 5px !important;
-    font-weight: 600;
-}
-
-/* ---------- CHAT ---------- */
-
-#chatBubble:hover {
-    transform: scale(1.05);
-}
-
-#chatWindow {
-    overflow: hidden;
-}
-
-/* ---------- MOBILE ---------- */
-
-@media (max-width: 767px) {
-    .sidebar {
-        position: fixed;
-        z-index: 1000;
-    }
-
-    .content-wrapper {
-        margin-left: var(--sidebar-w);
-    }
-}
-/* =========================================================
-   UI REFINEMENT — PREMIUM SaaS (COLORS UNCHANGED)
-   ========================================================= */
-
-/* ---------- TYPOGRAPHY ---------- */
-
-body {
-    font-feature-settings: "liga" 1, "kern" 1;
-}
-
-h1, h2, h3 {
-    letter-spacing: -0.025em;
-}
-
-h5 {
-    font-weight: 700;
-    font-size: .95rem;
-}
-
-/* ---------- PAGE TITLE ---------- */
-
-.page-title {
-    font-size: 1.6rem;
-    margin-bottom: 18px;
-    position: relative;
-}
-
-.page-title::after {
-    content: "";
-    display: block;
-    width: 48px;
-    height: 4px;
-    margin-top: 6px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--accent), var(--accent-600));
-}
-
-/* ---------- LAYOUT RHYTHM ---------- */
-
-.content-wrapper > .row {
-    margin-bottom: 20px;
-}
-
-/* ---------- SIDEBAR ---------- */
-
-.sidebar {
-    background: linear-gradient(
-        180deg,
-        var(--primary),
-        var(--primary-700)
-    );
-}
-
-.sidebar-logo {
-    padding-bottom: 18px;
-}
-
-.sidebar-link {
-    font-size: .9rem;
-    opacity: .9;
-}
-
-.sidebar-link.active {
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
-}
-
-/* ---------- TOPBAR ---------- */
-
-.topbar {
-    backdrop-filter: saturate(180%) blur(6px);
-}
-
-/* ---------- CARDS ---------- */
-
-.card {
-    border-radius: 16px;
-}
-
-.card-header {
-    padding-bottom: 12px;
-    font-size: .9rem;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    color: var(--muted);
-}
-
-/* ---------- KPI ---------- */
-
-.kpi-tile {
-    position: relative;
-    overflow: hidden;
-}
-
-.kpi-tile::after {
-    content: "";
-    position: absolute;
-    right: -30px;
-    top: -30px;
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(
-        circle,
-        rgba(242,178,51,.25),
-        transparent 60%
-    );
-}
-
-.kpi-value {
-    font-size: 2.1rem;
-}
-
-/* ---------- FORMS ---------- */
-
-.form-control,
-.form-select {
-    background: linear-gradient(
-        180deg,
-        #ffffff,
-        var(--surface-2)
-    );
-}
-
-.form-label {
-    margin-bottom: 4px;
-}
-
-/* ---------- BUTTONS ---------- */
-
-.btn {
-    transition: all .15s ease;
-}
-
-.btn-primary {
-    box-shadow: 0 8px 18px rgba(5,10,58,.25);
-}
-
-.btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 12px 26px rgba(5,10,58,.35);
-}
-
-.btn-success {
-    box-shadow: 0 8px 18px rgba(22,163,74,.25);
-}
-
-/* ---------- LISTS ---------- */
-
-.list-group-item {
-    background: transparent;
-}
-
-.list-group-item strong {
-    font-weight: 600;
-}
-
-/* ---------- COTATIONS ---------- */
-
-.cotation-card {
-    padding: 16px;
-}
-
-.cotation-card ul {
-    margin-bottom: 0;
-}
-
-.cotation-card li {
-    color: var(--muted);
-}
-
-/* ---------- FLASH ---------- */
-
-.card[style*="border-left"] {
-    background: linear-gradient(
-        90deg,
-        rgba(242,178,51,.12),
-        transparent 60%
-    );
-}
-
-/* ---------- CHAT ---------- */
-
-#chatBubble {
-    transition: transform .2s ease, box-shadow .2s ease;
-}
-
-#chatBubble:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 18px 40px rgba(0,0,0,.25);
-}
-/* =========================================================
-   PAGE CA — MIX CRM BUSINESS + MODERNE (OPTION 2 + 3)
-   ========================================================= */
-
-/* ---------- KPI CA ---------- */
-
-.kpi-tile {
-    position: relative;
-    padding: 22px 24px;
-    overflow: hidden;
-}
-
-.kpi-tile::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(
-        circle at top right,
-        rgba(242,178,51,.18),
-        transparent 55%
-    );
-    pointer-events: none;
-}
-
-.kpi-label {
-    font-size: .8rem;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-}
-
-.kpi-value {
-    font-size: 2.3rem;
-    margin-top: 6px;
-}
-
-/* ---------- SECTION TITLES ---------- */
-
-.card h5 {
-    font-size: 1rem;
-    font-weight: 700;
-    margin-bottom: 12px;
-}
-
-/* ---------- FORMULAIRE CA ---------- */
-
-.card form {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    align-items: end;
-}
-
-.card form .btn {
-    grid-column: span 4;
-    margin-top: 6px;
-}
-
-/* inputs */
-.card form .form-control {
-    height: 42px;
-}
-
-/* ---------- CARDS GLOBALES ---------- */
-
-.card {
-    border-radius: 18px;
-}
-
-.card:not(:first-child) {
-    margin-top: 18px;
-}
-
-/* ---------- LISTES CA ---------- */
-
-.card-body p.text-muted {
-    font-size: .9rem;
-    padding: 10px 0;
-}
-
-/* ---------- TABLES SIMULÉES ---------- */
-
-.card-body ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.card-body ul li {
-    display: flex;
-    justify-content: space-between;
-    padding: 12px 4px;
     border-bottom: 1px solid var(--border);
-    font-size: .9rem;
-}
-
-.card-body ul li:last-child {
-    border-bottom: none;
-}
-
-/* ---------- HOVER PRO ---------- */
-
-.kpi-tile:hover,
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-/* ---------- VISUAL SEPARATORS ---------- */
-
-.card::before {
-    content: "";
-    display: block;
-    height: 4px;
-    width: 100%;
-    background: linear-gradient(
-        90deg,
-        var(--primary),
-        var(--accent)
-    );
-    border-radius: 999px;
-    margin-bottom: 12px;
-}
-
-/* ---------- MOBILE ---------- */
-
-@media (max-width: 991px) {
-    .card form {
-        grid-template-columns: 1fr;
-    }
-
-    .card form .btn {
-        grid-column: span 1;
-    }
-}
-/* =========================================================
-   UI RESET PRO — FINANCE / B2B CRM
-   ========================================================= */
-
-/* ---------- TYPOGRAPHIE ---------- */
-
-/* Police plus sérieuse */
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                 Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-size: 14px;
-    letter-spacing: .01em;
-}
-
-h1, h2, h3, h4, h5 {
-    letter-spacing: normal;
-}
-
-/* ---------- PAGE TITLE ---------- */
-
-.page-title {
-    font-size: 1.4rem;
     font-weight: 700;
 }
 
-.page-title::before,
-.page-title::after {
-    display: none;
+.card-body {
+    padding: 18px;
 }
 
-/* ---------- CARDS ---------- */
-
-.card {
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(5,10,58,.06);
-}
-
-.card:hover {
-    transform: none;
-    box-shadow: 0 4px 14px rgba(5,10,58,.08);
-}
-
-/* ---------- KPI ---------- */
-
-.kpi-tile {
-    padding: 18px 20px;
-}
-
-.kpi-value {
-    font-size: 1.9rem;
-    font-weight: 700;
-}
-
-.kpi-tile::after {
-    display: none;
-}
-
-/* ---------- FORMULAIRES (GROS POINT FAIBLE ACTUEL) ---------- */
+/* ================= FORMULAIRES ================= */
 
 .form-label {
     font-size: .75rem;
     font-weight: 600;
-    color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: .05em;
+    color: var(--muted);
+    margin-bottom: 4px;
 }
 
 .form-control,
-.form-select {
-    border-radius: 6px;               /* FINI LES BULLES */
-    font-size: .9rem;
+.form-select,
+textarea {
+    width: 100%;
     padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    font-size: .9rem;
     background: #fff;
 }
 
 .form-control:focus,
-.form-select:focus {
-    box-shadow: none;
+.form-select:focus,
+textarea:focus {
+    outline: none;
     border-color: var(--primary);
 }
 
-/* ---------- FORMULAIRE CA ---------- */
-
-.card form {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
+textarea {
+    resize: vertical;
 }
 
-.card form .btn {
-    grid-column: span 4;
-}
-
-/* ---------- BOUTONS ---------- */
+/* ================= BOUTONS ================= */
 
 .btn {
-    border-radius: 6px;
     font-size: .85rem;
+    font-weight: 600;
     padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
 }
 
-.btn-primary,
+/* 👉 BOUTON PRINCIPAL CLAIR */
+.btn-primary {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.btn-primary:hover {
+    background: #d9def0;
+}
+
+/* 👉 BOUTON SECONDAIRE */
+.btn-secondary {
+    background: #f1f3f5;
+    color: var(--text);
+}
+
+.btn-secondary:hover {
+    background: #e5e7eb;
+}
+
+/* 👉 SUCCESS */
 .btn-success {
-    box-shadow: none;
+    background: #e6f4ea;
+    color: var(--success);
 }
 
-.btn-primary:hover,
-.btn-success:hover {
-    transform: none;
-    opacity: .95;
+/* 👉 DANGER */
+.btn-danger {
+    background: #fee2e2;
+    color: var(--danger);
 }
 
-/* ---------- LISTES / TABLES ---------- */
+/* ================= TABLES ================= */
 
-.card-body ul li {
-    font-size: .85rem;
-    padding: 10px 4px;
-}
-
-/* ---------- SUPPRESSION EFFETS GADGET ---------- */
-
-.sidebar-link.active::after,
-.card::before,
-.kpi-tile::after {
-    display: none !important;
-}
-/* =========================================================
-   ADMIN — UTILISATEURS (MIX FINANCE + CRM STRUCTURÉ)
-   ========================================================= */
-
-/* ---------- TITRES ADMIN ---------- */
-
-.page-title {
-    font-size: 1.45rem;
-    font-weight: 700;
-    margin-bottom: 18px;
-}
-
-/* ---------- CARD ADMIN ---------- */
-
-.admin-card {
-    padding: 20px 22px;
-}
-
-.admin-card h5 {
-    font-size: .9rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    color: var(--muted);
-    margin-bottom: 14px;
-}
-
-/* ---------- FORM CREATE USER ---------- */
-
-.admin-card form {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-}
-
-.admin-card form .btn {
-    grid-column: span 4;
-    justify-self: flex-start;
-}
-
-/* ---------- TABLE UTILISATEURS ---------- */
-
-.admin-table {
+table {
     width: 100%;
     border-collapse: collapse;
     font-size: .9rem;
 }
 
-.admin-table thead th {
+th {
     text-align: left;
     padding: 10px 8px;
     font-size: .75rem;
     text-transform: uppercase;
-    letter-spacing: .05em;
     color: var(--muted);
     border-bottom: 1px solid var(--border);
 }
 
-.admin-table tbody td {
+td {
     padding: 12px 8px;
     border-bottom: 1px solid var(--border);
-    vertical-align: middle;
 }
 
-.admin-table tbody tr:hover {
-    background: var(--surface-2);
+tr:hover {
+    background: var(--surface-soft);
 }
 
-/* ---------- COLONNE ACTIONS ---------- */
+/* ================= UTILITAIRES ================= */
 
-.admin-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.admin-actions input {
-    max-width: 160px;
-}
-
-.admin-actions .btn {
-    font-size: .75rem;
-    padding: 6px 10px;
-}
-
-/* ---------- BADGES ROLE ---------- */
-
-.role-badge {
-    display: inline-block;
-    padding: 4px 8px;
-    font-size: .7rem;
-    font-weight: 600;
-    border-radius: 6px;
-    background: var(--surface-2);
-    color: var(--primary);
-}
-
-/* ---------- BOUTONS ---------- */
-
-.btn-danger {
-    background: #dc2626;
-    border: none;
-    color: #fff;
-}
-
-.btn-danger:hover {
-    opacity: .9;
-}
-
-/* ---------- MOBILE ---------- */
-
-@media (max-width: 991px) {
-    .admin-card form {
-        grid-template-columns: 1fr;
-    }
-
-    .admin-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-}
-/* =========================================================
-   FINAL OVERRIDE — CRM B2B / FINANCE (CLEAN & PRO)
-   ========================================================= */
-
-/* ---------- TYPOGRAPHIE ---------- */
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont,
-                 "Segoe UI", Roboto, Arial, sans-serif;
-    font-size: 14px;
-    line-height: 1.45;
-    letter-spacing: 0;
-}
-
-/* ---------- TITRES ---------- */
-
-.page-title {
-    font-size: 1.45rem;
-    font-weight: 700;
-    margin-bottom: 16px;
-}
-
-.page-title::before,
-.page-title::after {
-    display: none !important;
-}
-
-/* ---------- SIDEBAR ---------- */
-
-.sidebar {
-    background: var(--primary);
-    box-shadow: 4px 0 16px rgba(5,10,58,.18);
-}
-
-.sidebar-link {
-    border-radius: 6px;
-    font-size: .9rem;
-}
-
-.sidebar-link.active {
-    background: rgba(242,178,51,.15);
-    color: #fff;
-}
-
-.sidebar-link.active::after {
-    display: none !important;
-}
-
-/* ---------- TOPBAR ---------- */
-
-.topbar {
-    box-shadow: 0 2px 10px rgba(0,0,0,.06);
-    border-radius: 8px;
-}
-
-/* ---------- CARDS ---------- */
-
-.card {
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    box-shadow: 0 1px 6px rgba(0,0,0,.05);
-}
-
-.card:hover {
-    transform: none;
-    box-shadow: 0 2px 10px rgba(0,0,0,.08);
-}
-
-.card::before {
-    display: none !important;
-}
-
-/* ---------- HEADERS ---------- */
-
-.card-header {
-    font-size: .8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .04em;
+.text-muted {
     color: var(--muted);
 }
 
-/* ---------- KPI ---------- */
-
-.kpi-tile {
-    padding: 16px 18px;
+.text-end {
+    text-align: right;
 }
 
-.kpi-tile::after {
-    display: none !important;
-}
-
-.kpi-value {
-    font-size: 1.8rem;
-    font-weight: 700;
-}
-
-/* ---------- FORMULAIRES ---------- */
-
-.form-label {
-    font-size: .75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-}
-
-.form-control,
-.form-select {
-    border-radius: 4px;
-    font-size: .9rem;
-    padding: 7px 9px;
-    box-shadow: none;
-}
-
-.form-control:focus,
-.form-select:focus {
-    border-color: var(--primary);
-}
-
-/* ---------- BOUTONS ---------- */
-
-.btn {
-    border-radius: 4px;
-    font-size: .85rem;
-    padding: 7px 14px;
-    box-shadow: none;
-}
-
-.btn-primary,
-.btn-success {
-    background: var(--primary);
-}
-
-.btn-primary:hover,
-.btn-success:hover {
-    opacity: .92;
-    transform: none;
-}
-
-/* ---------- TABLES / LISTES ---------- */
-
-.admin-table th,
-.admin-table td {
-    font-size: .85rem;
-}
-
-.admin-table tbody tr:hover {
-    background: var(--surface-2);
-}
-
-/* ---------- BADGES ---------- */
-
-.role-badge {
-    border-radius: 4px;
-    font-size: .7rem;
-}
-
-/* ---------- SUPPRESSION FLUFF ---------- */
-
-.kpi-tile:hover,
-.card:hover,
-.btn:hover {
-    transition: none;
+.mt-4 {
+    margin-top: 20px;
 }
