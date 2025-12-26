@@ -3,34 +3,25 @@
 
 {% block content %}
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-    <h1>{{ client.name }}</h1>
-
-    <a href="{{ url_for('edit_client', client_id=client.id) }}"
-       class="btn btn-secondary">
-        ✏ Modifier
-    </a>
-</div>
+<h1>{{ client.name }}</h1>
 
 <div class="card">
     <h5>Informations client</h5>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+    <div class="grid-3">
         <div>
-            <div class="form-label">Commercial</div>
-            {{ client.commercial or "—" }}
+            <strong>Commercial</strong><br>
+            {{ client.commercial_name or "—" }}
         </div>
 
         <div>
-            <div class="form-label">Date de création</div>
-            {{ client.created_at[:10] if client.created_at else "—" }}
+            <strong>Date de création</strong><br>
+            {{ client.created_at[:10] }}
         </div>
 
         <div>
-            <div class="form-label">Statut</div>
-            <span class="badge badge-info">
-                {{ client.status or "Cotation" }}
-            </span>
+            <strong>Statut</strong><br>
+            {{ client.status or "—" }}
         </div>
     </div>
 </div>
@@ -38,12 +29,14 @@
 <div class="card">
     <h5>Documents</h5>
 
-    <form method="post"
-          action="{{ url_for('upload_client_document', client_id=client.id) }}"
-          enctype="multipart/form-data"
-          style="margin-bottom:16px;">
-        <input type="file" name="documents" multiple required>
-        <button type="submit" class="btn btn-primary" style="margin-top:8px;">
+    <form
+        method="POST"
+        action="{{ url_for('upload_client_documents', client_id=client.id) }}"
+        enctype="multipart/form-data"
+        style="margin-bottom:16px;"
+    >
+        <input type="file" name="documents" multiple>
+        <button type="submit" class="btn btn-primary">
             ➕ Ajouter des documents
         </button>
     </form>
@@ -59,20 +52,18 @@
                     Ouvrir
                 </a>
 
-                <form method="post"
-                      action="{{ url_for('delete_client_document', client_id=client.id) }}"
-                      onsubmit="return confirm('Supprimer ce document ?');">
+                <form
+                    method="POST"
+                    action="{{ url_for('delete_client_document', client_id=client.id) }}"
+                >
                     <input type="hidden" name="key" value="{{ d.key }}">
-                    <button type="submit" class="btn btn-danger">🗑</button>
+                    <button class="btn btn-danger">🗑</button>
                 </form>
             </div>
         </div>
         {% endfor %}
     {% else %}
-        <div class="empty-state">
-            <strong>Aucun document</strong>
-            Aucun document associé à ce dossier.
-        </div>
+        <p class="text-muted">Aucun document.</p>
     {% endif %}
 </div>
 
