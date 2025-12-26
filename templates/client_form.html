@@ -1,59 +1,113 @@
-<!-- ================= DEMANDE DE COTATION ================= -->
+{% extends "base.html" %}
+{% block title %}Nouveau client{% endblock %}
 
-<div class="card">
-    <h5>Informations de négociation</h5>
+{% block content %}
+<h1>Nouveau dossier client</h1>
 
-    <div class="form-row">
+<form method="POST" enctype="multipart/form-data">
+
+    <!-- ================= SECTION 1 : CREATION DOSSIER ================= -->
+    <div class="card">
+        <h5>Création du dossier</h5>
+
         <div class="form-group">
-            <label class="form-label">Date de négociation</label>
-            <input type="date" name="negociation_date" class="form-control">
+            <label class="form-label">Nom du dossier</label>
+            <input
+                type="text"
+                name="dossier_nom"
+                class="form-control"
+                placeholder="Ex : Entreprise Dupont – Site principal"
+                required
+            >
+        </div>
+
+        <div class="form-group" style="margin-top:14px;">
+            <label class="form-label">Documents à joindre</label>
+            <input
+                type="file"
+                name="documents"
+                class="form-control"
+                multiple
+            >
+            <small class="text-muted">
+                PDF, images, Word, Excel autorisés.
+            </small>
         </div>
     </div>
-</div>
 
-<div class="card">
-    <h5>Signataire</h5>
+    <!-- ================= SECTION 2 : DEMANDE DE COTATION ================= -->
+    <div class="card">
+        <h5>Demande de cotation</h5>
 
-    <div class="form-row">
+        <!-- Infos négociation -->
+        <div class="form-group">
+            <label class="form-label">Date de négociation</label>
+            <input type="date" name="date_negociation" class="form-control">
+        </div>
+
+        <hr style="margin:20px 0;">
+
+        <!-- Signataire -->
+        <h5>Signataire</h5>
+
         <div class="form-group">
             <label class="form-label">Nom du signataire</label>
-            <input type="text" name="signataire_nom" class="form-control"
-                   placeholder="Nom et prénom">
+            <input
+                type="text"
+                name="signataire_nom"
+                class="form-control"
+                placeholder="Nom et prénom"
+            >
         </div>
 
         <div class="form-group">
             <label class="form-label">Téléphone</label>
-            <input type="tel" name="signataire_telephone" class="form-control"
-                   placeholder="06 00 00 00 00">
+            <input
+                type="tel"
+                name="signataire_telephone"
+                class="form-control"
+                placeholder="06 00 00 00 00"
+            >
         </div>
 
         <div class="form-group">
             <label class="form-label">Adresse e-mail</label>
-            <input type="email" name="signataire_email" class="form-control"
-                   placeholder="email@entreprise.fr">
+            <input
+                type="email"
+                name="signataire_email"
+                class="form-control"
+                placeholder="email@entreprise.fr"
+            >
         </div>
-    </div>
-</div>
 
-<div class="card">
-    <h5>Entreprise</h5>
+        <hr style="margin:20px 0;">
 
-    <div class="form-row">
+        <!-- Entreprise -->
+        <h5>Entreprise</h5>
+
         <div class="form-group">
             <label class="form-label">SIRET</label>
-            <input type="text" name="siret" class="form-control"
-                   placeholder="14 chiffres">
+            <input
+                type="text"
+                name="siret"
+                class="form-control"
+                placeholder="14 chiffres"
+                maxlength="14"
+            >
         </div>
-    </div>
-</div>
 
-<div class="card">
-    <h5>Point de livraison</h5>
+        <hr style="margin:20px 0;">
 
-    <div class="form-row">
+        <!-- Point de livraison -->
+        <h5>Point de livraison</h5>
+
         <div class="form-group">
             <label class="form-label">Numéro de PDL / PCE</label>
-            <input type="text" name="pdl_pce" class="form-control">
+            <input
+                type="text"
+                name="pdl_pce"
+                class="form-control"
+            >
         </div>
 
         <div class="form-group">
@@ -64,23 +118,42 @@
                 <option value="gaz">Gaz</option>
             </select>
         </div>
-    </div>
-</div>
 
-<div class="card">
-    <h5>Fournisseur actuel</h5>
+        <hr style="margin:20px 0;">
 
-    <div class="form-row">
+        <!-- Fournisseur -->
+        <h5>Fournisseur actuel</h5>
+
         <div class="form-group">
-            <label class="form-label">Fournisseur actuel</label>
-            <input type="text" name="fournisseur_actuel" class="form-control"
-                   placeholder="EDF, Engie, TotalEnergies…">
+            <label class="form-label">Nom du fournisseur</label>
+            <input
+                type="text"
+                name="fournisseur_actuel"
+                class="form-control"
+                placeholder="EDF, Engie, TotalEnergies…"
+            >
         </div>
 
         <div class="form-group">
             <label class="form-label">Date de fin de contrat</label>
-            <input type="date" name="fin_contrat" class="form-control">
+            <input
+                type="date"
+                name="date_fin_contrat"
+                class="form-control"
+            >
         </div>
     </div>
-</div>
 
+    <!-- ================= ACTIONS ================= -->
+    <div class="actions-row">
+        <button type="submit" class="btn btn-primary">
+            Créer le dossier
+        </button>
+
+        <a href="{{ url_for('clients') }}" class="btn btn-secondary">
+            Annuler
+        </a>
+    </div>
+
+</form>
+{% endblock %}
