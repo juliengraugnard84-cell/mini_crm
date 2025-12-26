@@ -5,11 +5,11 @@
 
 <h1>{{ client.name }}</h1>
 
-<!-- ===================== -->
-<!-- INFOS CLIENT -->
-<!-- ===================== -->
+<!-- =========================
+     INFORMATIONS CLIENT
+========================= -->
 <div class="card">
-    <h5>Informations client</h5>
+    <h4>Informations client</h4>
 
     <div class="grid-3">
         <div>
@@ -19,7 +19,7 @@
 
         <div>
             <strong>Date de création</strong><br>
-            {{ client.created_at }}
+            {{ client.created_at[:10] if client.created_at else "—" }}
         </div>
 
         <div>
@@ -29,69 +29,73 @@
     </div>
 </div>
 
-<!-- ===================== -->
-<!-- DEMANDE DE COTATION -->
-<!-- ===================== -->
+<!-- =========================
+     DEMANDE DE COTATION
+========================= -->
 <div class="card" style="margin-top:24px;">
-    <h5>Nouvelle demande de cotation</h5>
+    <h4>Nouvelle demande de cotation</h4>
 
     <form method="POST"
           action="{{ url_for('create_cotation', client_id=client.id) }}">
 
-        <div class="form-group">
-            <label>Date de négociation</label>
-            <input type="date" name="date_negociation" class="form-control">
-        </div>
+        <div class="grid-2">
 
-        <div class="form-group">
-            <label>Nom du signataire</label>
-            <input type="text" name="signataire_nom" class="form-control">
-        </div>
+            <div class="form-group">
+                <label>Date de négociation</label>
+                <input type="date" name="date_negociation" class="form-control">
+            </div>
 
-        <div class="form-group">
-            <label>Téléphone</label>
-            <input type="tel" name="signataire_tel" class="form-control">
-        </div>
+            <div class="form-group">
+                <label>Type d’énergie</label>
+                <select name="energie_type" class="form-select">
+                    <option value="">— Sélectionner —</option>
+                    <option value="electricite">Électricité</option>
+                    <option value="gaz">Gaz</option>
+                </select>
+            </div>
 
-        <div class="form-group">
-            <label>Email</label>
-            <input type="email" name="signataire_email" class="form-control">
-        </div>
+            <div class="form-group">
+                <label>Nom du signataire</label>
+                <input type="text" name="signataire_nom" class="form-control">
+            </div>
 
-        <div class="form-group">
-            <label>SIRET</label>
-            <input type="text" name="siret" maxlength="14" class="form-control">
-        </div>
+            <div class="form-group">
+                <label>Téléphone</label>
+                <input type="tel" name="signataire_tel" class="form-control">
+            </div>
 
-        <div class="form-group">
-            <label>Type d’énergie</label>
-            <select name="energie_type" class="form-select">
-                <option value="">— Sélectionner —</option>
-                <option value="electricite">Électricité</option>
-                <option value="gaz">Gaz</option>
-            </select>
-        </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="signataire_email" class="form-control">
+            </div>
 
-        <div class="form-group">
-            <label>PDL / PCE</label>
-            <input type="text" name="pdl_pce" class="form-control">
-        </div>
+            <div class="form-group">
+                <label>SIRET</label>
+                <input type="text" name="siret" maxlength="14" class="form-control">
+            </div>
 
-        <div class="form-group">
-            <label>Date d’échéance du contrat</label>
-            <input type="date" name="date_echeance" class="form-control">
-        </div>
+            <div class="form-group">
+                <label>PDL / PCE</label>
+                <input type="text" name="pdl_pce" class="form-control">
+            </div>
 
-        <div class="form-group">
-            <label>Fournisseur actuel</label>
-            <input type="text" name="fournisseur_actuel" class="form-control">
+            <div class="form-group">
+                <label>Date d’échéance du contrat</label>
+                <input type="date" name="date_echeance" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label>Fournisseur actuel</label>
+                <input type="text" name="fournisseur_actuel" class="form-control">
+            </div>
+
         </div>
 
         <div class="form-group">
             <label>Commentaires</label>
             <textarea name="commentaire"
-                      class="form-control"
-                      rows="3"></textarea>
+                      rows="4"
+                      class="form-control"></textarea>
         </div>
 
         <button type="submit" class="btn btn-primary">
@@ -100,24 +104,41 @@
     </form>
 </div>
 
-<!-- ===================== -->
-<!-- DOCUMENTS -->
-<!-- ===================== -->
+<!-- =========================
+     LISTE DES COTATIONS
+========================= -->
 <div class="card" style="margin-top:24px;">
-    <h5>Documents</h5>
+    <h4>Demandes de cotation</h4>
+
+    {% if cotations %}
+        {% for c in cotations %}
+            <div class="list-item">
+                <strong>{{ c.energie_type or "—" }}</strong>
+                — {{ c.date_creation[:10] }}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="muted">Aucune demande de cotation.</p>
+    {% endif %}
+</div>
+
+<!-- =========================
+     DOCUMENTS
+========================= -->
+<div class="card" style="margin-top:24px;">
+    <h4>Documents</h4>
 
     {% if documents %}
         {% for d in documents %}
-        <div class="list-group-item"
-             style="display:flex;justify-content:space-between;align-items:center;">
-            {{ d.nom }}
-            <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
-                Ouvrir
-            </a>
-        </div>
+            <div class="doc-row">
+                {{ d.nom }}
+                <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
+                    Ouvrir
+                </a>
+            </div>
         {% endfor %}
     {% else %}
-        <p class="text-muted">Aucun document.</p>
+        <p class="muted">Aucun document.</p>
     {% endif %}
 </div>
 
