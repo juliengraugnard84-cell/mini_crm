@@ -79,7 +79,6 @@ def _connect_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
-    # Robustesse SQLite (optionnel mais safe)
     try:
         conn.execute("PRAGMA foreign_keys=ON;")
         conn.execute("PRAGMA busy_timeout=5000;")
@@ -110,9 +109,6 @@ def row_to_obj(row):
 
 
 def _try_add_column(conn, table, col_def_sql):
-    """
-    Ajoute une colonne si elle n'existe pas (safe prod).
-    """
     try:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def_sql}")
     except sqlite3.OperationalError:
@@ -141,6 +137,19 @@ def init_db():
     """)
 
     # =======================
+    # TABLE DOSSIERS (NOUVEAU)
+    # =======================
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS dossiers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            nom TEXT NOT NULL,
+            created_by INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # =======================
     # TABLE UTILISATEURS
     # =======================
     conn.execute("""
@@ -160,10 +169,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
             commercial TEXT NOT NULL,
-            montant REAL NOT NULL
+            montant REAL NOT NULL,
+            dossier TEXT
         )
     """)
-    _try_add_column(conn, "revenus", "dossier TEXT")
 
     # =======================
     # TABLE AGENDA
@@ -183,7 +192,7 @@ def init_db():
     """)
 
     # =======================
-    # TABLE COTATIONS (BASE)
+    # TABLE COTATIONS
     # =======================
     conn.execute("""
         CREATE TABLE IF NOT EXISTS cotations (
@@ -194,20 +203,18 @@ def init_db():
             created_by INTEGER,
             is_read INTEGER DEFAULT 0,
             status TEXT DEFAULT 'nouvelle',
-            date_creation TEXT DEFAULT CURRENT_TIMESTAMP
+            date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
+            date_negociation TEXT,
+            energie_type TEXT,
+            entreprise_nom TEXT,
+            siret TEXT,
+            signataire_nom TEXT,
+            signataire_tel TEXT,
+            signataire_email TEXT,
+            pdl_pce TEXT,
+            commentaire TEXT
         )
     """)
-
-    # Extensions cotations
-    _try_add_column(conn, "cotations", "date_negociation TEXT")
-    _try_add_column(conn, "cotations", "energie_type TEXT")
-    _try_add_column(conn, "cotations", "entreprise_nom TEXT")
-    _try_add_column(conn, "cotations", "siret TEXT")
-    _try_add_column(conn, "cotations", "signataire_nom TEXT")
-    _try_add_column(conn, "cotations", "signataire_tel TEXT")
-    _try_add_column(conn, "cotations", "signataire_email TEXT")
-    _try_add_column(conn, "cotations", "pdl_pce TEXT")
-    _try_add_column(conn, "cotations", "commentaire TEXT")
 
     # =======================
     # TABLE CHAT
@@ -227,7 +234,10 @@ def init_db():
     # =======================
     # BOOTSTRAP ADMIN
     # =======================
-    admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
+    admin = conn.execute(
+        "SELECT id FROM users WHERE username='admin'"
+    ).fetchone()
+
     if not admin:
         conn.execute(
             "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
@@ -993,7 +1003,7 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS (sécurisé multi-commerciaux) + COTATIONS + DOCS
+# 12. CLIENTS + DOSSIERS + COTATIONS (SÉPARÉS)
 ############################################################
 
 @app.route("/clients")
@@ -1002,125 +1012,77 @@ def clients():
     user = session.get("user") or {}
     conn = get_db()
 
-    if user["role"] == "admin":
+    if user.get("role") == "admin":
         rows = conn.execute(
             "SELECT * FROM crm_clients ORDER BY created_at DESC"
         ).fetchall()
     else:
         rows = conn.execute(
-            """
-            SELECT * FROM crm_clients
-            WHERE owner_id = ?
-            ORDER BY created_at DESC
-            """,
-            (user["id"],),
+            "SELECT * FROM crm_clients WHERE owner_id=? ORDER BY created_at DESC",
+            (user.get("id"),),
         ).fetchall()
 
-    return render_template(
-        "clients.html",
-        clients=[row_to_obj(r) for r in rows]
-    )
-
-
-@app.route("/clients/new", methods=["GET", "POST"])
-@login_required
-def new_client():
-    statuses = ["demande de cotation", "en cours", "signé", "perdu"]
-    user = session.get("user") or {}
-    conn = get_db()
-
-    if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        status = (request.form.get("status") or "").strip()
-
-        if not name:
-            flash("Nom obligatoire.", "danger")
-            return redirect(url_for("new_client"))
-
-        if status and status not in statuses:
-            flash("Statut invalide.", "danger")
-            return redirect(url_for("new_client"))
-
-        if user["role"] == "admin":
-            commercial = (request.form.get("commercial") or "").strip()
-            if not commercial:
-                flash("Le commercial est obligatoire pour un admin.", "danger")
-                return redirect(url_for("new_client"))
-
-            owner_row = conn.execute(
-                "SELECT id FROM users WHERE username=?",
-                (commercial,)
-            ).fetchone()
-            owner_id = owner_row["id"] if owner_row else None
-            if owner_id is None:
-                flash("Commercial introuvable (username).", "danger")
-                return redirect(url_for("new_client"))
-        else:
-            commercial = user["username"]
-            owner_id = user["id"]
-
-        conn.execute(
-            """
-            INSERT INTO crm_clients
-            (name, email, phone, address, commercial, status, notes, owner_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                name,
-                request.form.get("email"),
-                request.form.get("phone"),
-                request.form.get("address"),
-                commercial,
-                status,
-                request.form.get("notes"),
-                owner_id,
-            ),
-        )
-        conn.commit()
-
-        flash("Client créé.", "success")
-        return redirect(url_for("clients"))
-
-    return render_template(
-        "client_form.html",
-        action="new",
-        client=None,
-        statuses=statuses,
-    )
+    return render_template("clients.html", clients=[row_to_obj(r) for r in rows])
 
 
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
     if not can_access_client(client_id):
-        flash("Accès non autorisé à ce dossier.", "danger")
+        flash("Accès refusé.", "danger")
         return redirect(url_for("clients"))
 
     conn = get_db()
-    row = conn.execute(
+
+    client = conn.execute(
         "SELECT * FROM crm_clients WHERE id=?",
         (client_id,),
     ).fetchone()
 
-    if not row:
+    if not client:
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    cot_rows = conn.execute(
-        """
-        SELECT * FROM cotations
-        WHERE client_id=?
-        ORDER BY date_creation DESC, id DESC
-        """,
+    dossiers = conn.execute(
+        "SELECT * FROM dossiers WHERE client_id=? ORDER BY created_at DESC",
+        (client_id,),
+    ).fetchall()
+
+    cotations = conn.execute(
+        "SELECT * FROM cotations WHERE client_id=? ORDER BY date_creation DESC",
         (client_id,),
     ).fetchall()
 
     return render_template(
         "client_detail.html",
-        client=row_to_obj(row),
-        cotations=[row_to_obj(r) for r in cot_rows],
-        documents=list_client_documents(client_id),
+        client=row_to_obj(client),
+        dossiers=[row_to_obj(d) for d in dossiers],
+        cotations=[row_to_obj(c) for c in cotations],
     )
+
+
+@app.route("/clients/<int:client_id>/dossiers/new", methods=["POST"])
+@login_required
+def create_dossier(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    nom = (request.form.get("nom_dossier") or "").strip()
+    if not nom:
+        flash("Nom du dossier obligatoire.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    conn = get_db()
+    u = session.get("user") or {}
+
+    conn.execute(
+        "INSERT INTO dossiers (client_id, nom, created_by) VALUES (?, ?, ?)",
+        (client_id, nom, u.get("id")),
+    )
+    conn.commit()
+
+    flash("Dossier créé avec succès.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
@@ -1167,104 +1129,6 @@ def create_cotation(client_id):
 
     flash("Demande de cotation enregistrée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
-
-
-@app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
-@login_required
-def edit_client(client_id):
-    if not can_access_client(client_id):
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("clients"))
-
-    conn = get_db()
-    user = session.get("user") or {}
-    statuses = ["demande de cotation", "en cours", "signé", "perdu"]
-
-    row = conn.execute(
-        "SELECT * FROM crm_clients WHERE id=?",
-        (client_id,),
-    ).fetchone()
-
-    if not row:
-        flash("Client introuvable.", "danger")
-        return redirect(url_for("clients"))
-
-    if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        status = (request.form.get("status") or "").strip()
-
-        if not name:
-            flash("Nom obligatoire.", "danger")
-            return redirect(url_for("edit_client", client_id=client_id))
-
-        if status and status not in statuses:
-            flash("Statut invalide.", "danger")
-            return redirect(url_for("edit_client", client_id=client_id))
-
-        commercial = row["commercial"]
-        owner_id = row["owner_id"]
-
-        if user["role"] == "admin":
-            commercial = (request.form.get("commercial") or "").strip()
-            if not commercial:
-                flash("Le commercial est obligatoire.", "danger")
-                return redirect(url_for("edit_client", client_id=client_id))
-
-            owner_row = conn.execute(
-                "SELECT id FROM users WHERE username=?",
-                (commercial,)
-            ).fetchone()
-            if not owner_row:
-                flash("Commercial introuvable (username).", "danger")
-                return redirect(url_for("edit_client", client_id=client_id))
-            owner_id = owner_row["id"]
-
-        conn.execute(
-            """
-            UPDATE crm_clients
-            SET name=?, email=?, phone=?, address=?, commercial=?, status=?, notes=?, owner_id=?
-            WHERE id=?
-            """,
-            (
-                name,
-                request.form.get("email"),
-                request.form.get("phone"),
-                request.form.get("address"),
-                commercial,
-                status,
-                request.form.get("notes"),
-                owner_id,
-                client_id,
-            ),
-        )
-        conn.commit()
-
-        flash("Client mis à jour.", "success")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    return render_template(
-        "client_form.html",
-        action="edit",
-        client=row_to_obj(row),
-        statuses=statuses,
-    )
-
-
-@app.route("/clients/<int:client_id>/delete", methods=["POST"])
-@login_required
-def delete_client(client_id):
-    if not can_access_client(client_id):
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("clients"))
-
-    conn = get_db()
-    conn.execute("DELETE FROM cotations WHERE client_id=?", (client_id,))
-    conn.execute("DELETE FROM crm_clients WHERE id=?", (client_id,))
-    conn.commit()
-
-    flash("Client supprimé.", "success")
-    return redirect(url_for("clients"))
-
 
 ############################################################
 # 14. CHAT (BACKEND)
