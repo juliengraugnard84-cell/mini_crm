@@ -52,6 +52,12 @@ ALLOWED_EXTENSIONS = {
 # Max upload (MB) — configurable via Config.MAX_UPLOAD_MB sinon 10MB
 MAX_UPLOAD_MB = getattr(Config, "MAX_UPLOAD_MB", 10)
 
+# Debug pilotable (évite debug=True “par erreur” en prod)
+DEBUG = getattr(Config, "DEBUG", False)
+
+# Mot de passe admin par défaut (optionnel)
+ADMIN_DEFAULT_PASSWORD = getattr(Config, "ADMIN_DEFAULT_PASSWORD", "admin123")
+
 
 ############################################################
 # 2. INITIALISATION FLASK
@@ -64,7 +70,9 @@ app.secret_key = app.config["SECRET_KEY"]
 # Sécurité cookies session (prod-friendly)
 app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
 app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
-if os.environ.get("FLASK_ENV") == "production":
+
+# Détection environnement production (plus robuste que FLASK_ENV, souvent absent/déprécié)
+if os.environ.get("FLASK_ENV") == "production" or os.environ.get("ENV") == "production":
     app.config["SESSION_COOKIE_SECURE"] = True
 
 # Limite upload (évite DOS)
@@ -136,7 +144,7 @@ def init_db():
         )
     """)
 
-    # REVENUS (⚠️ manquait en prod)
+    # REVENUS
     conn.execute("""
         CREATE TABLE IF NOT EXISTS revenus (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -171,6 +179,24 @@ def init_db():
     _try_add_column(conn, "cotations", "pdl_pce TEXT")
     _try_add_column(conn, "cotations", "commentaire TEXT")
 
+    # CHAT MESSAGES (⚠️ table manquante dans votre version)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT,
+            message TEXT,
+            file_key TEXT,
+            file_name TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Index utiles (non bloquants)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_id ON chat_messages(id)")
+    except sqlite3.OperationalError:
+        pass
+
     # ADMIN BOOTSTRAP
     admin = conn.execute(
         "SELECT id FROM users WHERE username='admin'"
@@ -179,7 +205,7 @@ def init_db():
     if not admin:
         conn.execute(
             "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-            ("admin", generate_password_hash("admin123"), "admin")
+            ("admin", generate_password_hash(ADMIN_DEFAULT_PASSWORD), "admin")
         )
 
     conn.commit()
@@ -302,6 +328,36 @@ def s3_presigned_url(key: str, expires_in: int = 3600) -> str:
     except Exception as e:
         print("Erreur presigned url S3 :", repr(e))
         return ""
+
+
+def s3_list_all_objects(bucket: str, prefix: str | None = None):
+    """
+    Itère sur tous les objets S3 (pagination list_objects_v2).
+    Retourne une liste d'items S3 (dictionnaires de Contents).
+    """
+    if not s3:
+        return []
+
+    items = []
+    token = None
+    while True:
+        kwargs = {"Bucket": bucket}
+        if prefix:
+            kwargs["Prefix"] = prefix
+        if token:
+            kwargs["ContinuationToken"] = token
+
+        resp = s3.list_objects_v2(**kwargs)
+        items.extend(resp.get("Contents") or [])
+
+        if resp.get("IsTruncated"):
+            token = resp.get("NextContinuationToken")
+            if not token:
+                break
+        else:
+            break
+
+    return items
 
 
 def list_client_documents(client_id: int):
@@ -514,9 +570,8 @@ def dashboard():
     total_docs = 0
     if not LOCAL_MODE and s3:
         try:
-            response = s3.list_objects_v2(Bucket=AWS_BUCKET)
-            files = response.get("Contents") or []
-            total_docs = len([f for f in files if not f["Key"].endswith("/")])
+            items = s3_list_all_objects(AWS_BUCKET)
+            total_docs = len([f for f in items if not f["Key"].endswith("/")])
         except Exception:
             pass
 
@@ -876,8 +931,8 @@ def documents():
 
     fichiers = []
     try:
-        response = s3.list_objects_v2(Bucket=AWS_BUCKET)
-        for item in (response.get("Contents") or []):
+        items = s3_list_all_objects(AWS_BUCKET)
+        for item in items:
             key = item["Key"]
             if key.endswith("/"):
                 continue
@@ -1022,6 +1077,7 @@ def create_cotation(client_id):
     flash("Demande de cotation enregistrée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
+
 ############################################################
 # 14. CHAT (BACKEND)
 ############################################################
@@ -1140,4 +1196,4 @@ def index():
 ############################################################
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=DEBUG)

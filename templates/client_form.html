@@ -1,12 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Nouveau client{% endblock %}
+{% block title %}Nouveau dossier client{% endblock %}
 
 {% block content %}
 <h1>Nouveau dossier client</h1>
 
-<form method="POST" enctype="multipart/form-data">
+<!-- ======================================================
+     FORMULAIRE 1 — CRÉATION DU DOSSIER (INDÉPENDANT)
+====================================================== -->
+<form method="POST" enctype="multipart/form-data" action="{{ url_for('new_client') }}">
 
-    <!-- ================= SECTION 1 : CREATION DOSSIER ================= -->
     <div class="card">
         <h5>Création du dossier</h5>
 
@@ -14,14 +16,14 @@
             <label class="form-label">Nom du dossier</label>
             <input
                 type="text"
-                name="dossier_nom"
+                name="name"
                 class="form-control"
-                placeholder="Ex : Entreprise Dupont – Site principal"
+                placeholder="Entreprise Dupont – Site principal"
                 required
             >
         </div>
 
-        <div class="form-group" style="margin-top:14px;">
+        <div class="form-group">
             <label class="form-label">Documents à joindre</label>
             <input
                 type="file"
@@ -30,84 +32,72 @@
                 multiple
             >
             <small class="text-muted">
-                PDF, images, Word, Excel autorisés.
+                Vous pouvez créer le dossier sans demande de cotation.
             </small>
         </div>
     </div>
 
-    <!-- ================= SECTION 2 : DEMANDE DE COTATION ================= -->
-    <div class="card">
-        <h5>Demande de cotation</h5>
+    <div class="actions-row">
+        <button type="submit" class="btn btn-primary">
+            Créer le dossier
+        </button>
+    </div>
 
-        <!-- Infos négociation -->
+</form>
+
+<!-- ======================================================
+     FORMULAIRE 2 — DEMANDE DE COTATION (OPTIONNELLE)
+     Visible seulement APRÈS création du client
+====================================================== -->
+
+{% if client %}
+<form method="POST"
+      action="{{ url_for('create_cotation', client_id=client.id) }}"
+      style="margin-top:32px;">
+
+    <div class="card">
+        <h5>Demande de cotation (optionnelle)</h5>
+
         <div class="form-group">
             <label class="form-label">Date de négociation</label>
             <input type="date" name="date_negociation" class="form-control">
         </div>
 
-        <hr style="margin:20px 0;">
+        <hr>
 
-        <!-- Signataire -->
         <h5>Signataire</h5>
 
         <div class="form-group">
             <label class="form-label">Nom du signataire</label>
-            <input
-                type="text"
-                name="signataire_nom"
-                class="form-control"
-                placeholder="Nom et prénom"
-            >
+            <input type="text" name="signataire_nom" class="form-control">
         </div>
 
         <div class="form-group">
             <label class="form-label">Téléphone</label>
-            <input
-                type="tel"
-                name="signataire_telephone"
-                class="form-control"
-                placeholder="06 00 00 00 00"
-            >
+            <input type="tel" name="signataire_tel" class="form-control">
         </div>
 
         <div class="form-group">
             <label class="form-label">Adresse e-mail</label>
-            <input
-                type="email"
-                name="signataire_email"
-                class="form-control"
-                placeholder="email@entreprise.fr"
-            >
+            <input type="email" name="signataire_email" class="form-control">
         </div>
 
-        <hr style="margin:20px 0;">
+        <hr>
 
-        <!-- Entreprise -->
         <h5>Entreprise</h5>
 
         <div class="form-group">
             <label class="form-label">SIRET</label>
-            <input
-                type="text"
-                name="siret"
-                class="form-control"
-                placeholder="14 chiffres"
-                maxlength="14"
-            >
+            <input type="text" name="siret" class="form-control" maxlength="14">
         </div>
 
-        <hr style="margin:20px 0;">
+        <hr>
 
-        <!-- Point de livraison -->
         <h5>Point de livraison</h5>
 
         <div class="form-group">
-            <label class="form-label">Numéro de PDL / PCE</label>
-            <input
-                type="text"
-                name="pdl_pce"
-                class="form-control"
-            >
+            <label class="form-label">PDL / PCE</label>
+            <input type="text" name="pdl_pce" class="form-control">
         </div>
 
         <div class="form-group">
@@ -119,41 +109,28 @@
             </select>
         </div>
 
-        <hr style="margin:20px 0;">
+        <hr>
 
-        <!-- Fournisseur -->
         <h5>Fournisseur actuel</h5>
 
         <div class="form-group">
             <label class="form-label">Nom du fournisseur</label>
-            <input
-                type="text"
-                name="fournisseur_actuel"
-                class="form-control"
-                placeholder="EDF, Engie, TotalEnergies…"
-            >
+            <input type="text" name="fournisseur_actuel" class="form-control">
         </div>
 
         <div class="form-group">
             <label class="form-label">Date de fin de contrat</label>
-            <input
-                type="date"
-                name="date_fin_contrat"
-                class="form-control"
-            >
+            <input type="date" name="date_echeance" class="form-control">
         </div>
     </div>
 
-    <!-- ================= ACTIONS ================= -->
     <div class="actions-row">
-        <button type="submit" class="btn btn-primary">
-            Créer le dossier
+        <button type="submit" class="btn btn-secondary">
+            Enregistrer la demande de cotation
         </button>
-
-        <a href="{{ url_for('clients') }}" class="btn btn-secondary">
-            Annuler
-        </a>
     </div>
 
 </form>
+{% endif %}
+
 {% endblock %}
