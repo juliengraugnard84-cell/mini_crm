@@ -7,19 +7,11 @@
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
     <h1>{{ client.name }}</h1>
 
+    <!-- Actions désactivées tant que les routes n'existent pas -->
     <div class="actions-row">
-        <a href="{{ url_for('edit_client', client_id=client.id) }}"
-           class="btn btn-secondary">
+        <button class="btn btn-secondary" disabled>
             ✏ Modifier
-        </a>
-
-        <form method="post"
-              action="{{ url_for('delete_client', client_id=client.id) }}"
-              onsubmit="return confirm('Supprimer définitivement ce client ?');">
-            <button type="submit" class="btn btn-danger">
-                🗑 Supprimer
-            </button>
-        </form>
+        </button>
     </div>
 </div>
 
@@ -30,18 +22,13 @@
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
 
         <div>
-            <div class="form-label">Email</div>
-            {{ client.email or "—" }}
-        </div>
-
-        <div>
-            <div class="form-label">Téléphone</div>
-            {{ client.phone or "—" }}
-        </div>
-
-        <div>
             <div class="form-label">Commercial</div>
             {{ client.commercial or "—" }}
+        </div>
+
+        <div>
+            <div class="form-label">Date de création</div>
+            {{ client.created_at[:10] if client.created_at else "—" }}
         </div>
 
         <div>
@@ -60,13 +47,6 @@
         </div>
 
     </div>
-
-    {% if client.notes %}
-    <div style="margin-top:18px;">
-        <div class="form-label">Notes</div>
-        <p>{{ client.notes }}</p>
-    </div>
-    {% endif %}
 </div>
 
 <!-- ================= COTATIONS ================= -->
@@ -77,6 +57,7 @@
         {% for cot in cotations %}
         <div class="list-group-item"
              style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
+
             <div>
                 <strong>{{ cot.energie_type or "—" }}</strong><br>
                 <small class="text-muted">
@@ -84,106 +65,37 @@
                 </small>
             </div>
 
-            <span class="badge badge-info">Nouvelle</span>
+            <span class="badge badge-info">
+                {{ cot.status or "Nouvelle" }}
+            </span>
         </div>
         {% endfor %}
     {% else %}
         <div class="empty-state">
             <strong>Aucune cotation</strong>
-            Aucune demande de cotation pour ce client.
+            Aucune demande de cotation pour ce dossier.
         </div>
     {% endif %}
-
-    <!-- ===== Nouvelle cotation ===== -->
-    <form method="post"
-          action="{{ url_for('create_cotation', client_id=client.id) }}"
-          style="margin-top:20px;">
-
-        <h5>Nouvelle demande de cotation</h5>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
-
-            <div>
-                <label class="form-label">Type d’énergie</label>
-                <select name="energie_type" class="form-control">
-                    <option value="électricité">Électricité</option>
-                    <option value="gaz">Gaz</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="form-label">Date d’échéance</label>
-                <input type="date" name="date_echeance" class="form-control">
-            </div>
-
-            <div>
-                <label class="form-label">PDL / PCE</label>
-                <input type="text" name="pdl_pce" class="form-control">
-            </div>
-
-            <div>
-                <label class="form-label">Fournisseur actuel</label>
-                <input type="text" name="fournisseur_actuel" class="form-control">
-            </div>
-
-        </div>
-
-        <div style="margin-top:16px;">
-            <label class="form-label">Commentaire</label>
-            <textarea name="commentaire" class="form-control" rows="3"></textarea>
-        </div>
-
-        <button type="submit"
-                class="btn btn-primary"
-                style="margin-top:16px;">
-            ➕ Ajouter la cotation
-        </button>
-    </form>
 </div>
 
-<!-- ================= DOCUMENTS CLIENT ================= -->
+<!-- ================= DOCUMENTS ================= -->
 <div class="card">
     <h5>Documents</h5>
-
-    <!-- Upload document -->
-    <form method="post"
-          action="{{ url_for('upload_client_document', client_id=client.id) }}"
-          enctype="multipart/form-data"
-          style="margin-bottom:16px;display:flex;gap:12px;align-items:center;">
-
-        <input type="file" name="file" required>
-        <button type="submit" class="btn btn-primary">
-            ➕ Ajouter un document
-        </button>
-    </form>
 
     {% if documents %}
         {% for d in documents %}
         <div class="list-group-item"
              style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
-
             <span>{{ d.nom }}</span>
-
-            <div style="display:flex;gap:8px;">
-                <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
-                    Ouvrir
-                </a>
-
-                <form method="post"
-                      action="{{ url_for('delete_client_document', client_id=client.id) }}"
-                      onsubmit="return confirm('Supprimer ce document ?');">
-                    <input type="hidden" name="key" value="{{ d.key }}">
-                    <button type="submit" class="btn btn-danger">
-                        Supprimer
-                    </button>
-                </form>
-            </div>
+            <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
+                Ouvrir
+            </a>
         </div>
         {% endfor %}
     {% else %}
         <div class="empty-state">
             <strong>Aucun document</strong>
-            Aucun document associé à ce client.
+            Aucun document associé à ce dossier.
         </div>
     {% endif %}
 </div>
