@@ -20,35 +20,42 @@
             <div class="brand-mark">SG</div>
             <div>
                 <div class="brand-name">SYNERGYGROUP</div>
-                <div class="brand-user">{{ current_user.username }}</div>
+                <div class="brand-user">
+                    {{ current_user.username if current_user else "" }}
+                </div>
             </div>
         </div>
 
         {% set ep = request.endpoint or '' %}
 
         <nav class="sidebar-nav">
+
+            <!-- Dashboard -->
             <a href="{{ url_for('dashboard') }}"
                class="nav-link {% if ep == 'dashboard' %}active{% endif %}">
                 ▦ Dashboard
             </a>
 
-            <!-- Clients : redirige vers dashboard (route existante) -->
-            <a href="{{ url_for('dashboard') }}"
-               class="nav-link {% if ep.startswith('client') %}active{% endif %}">
+            <!-- Clients -->
+            <a href="{{ url_for('clients') }}"
+               class="nav-link {% if ep.startswith('clients') %}active{% endif %}">
                 👥 Clients
             </a>
 
-            {% if current_user.role == 'admin' %}
+            <!-- Chiffre d'affaires (admin only) -->
+            {% if current_user and current_user.role == 'admin' %}
             <a href="{{ url_for('chiffre_affaire') }}"
                class="nav-link {% if ep.startswith('chiffre_affaire') %}active{% endif %}">
                 € Chiffre d’affaires
             </a>
 
+            <!-- Documents globaux -->
             <a href="{{ url_for('documents') }}"
                class="nav-link {% if ep.startswith('documents') %}active{% endif %}">
                 📄 Documents
             </a>
 
+            <!-- Utilisateurs -->
             <a href="{{ url_for('admin_users') }}"
                class="nav-link {% if ep.startswith('admin') %}active{% endif %}">
                 ⚙ Utilisateurs
@@ -69,25 +76,29 @@
         <!-- TOPBAR -->
         <header class="topbar">
             <div class="topbar-left">
-                <strong>{{ current_user.username }}</strong>
-                <span class="muted">({{ current_user.role }})</span>
+                {% if current_user %}
+                    <strong>{{ current_user.username }}</strong>
+                    <span class="muted">({{ current_user.role }})</span>
+                {% endif %}
             </div>
 
             <nav class="topbar-nav">
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('dashboard') }}">Clients</a>
+                <a href="{{ url_for('clients') }}">Clients</a>
 
-                {% if current_user.role == 'admin' %}
+                {% if current_user and current_user.role == 'admin' %}
                 <a href="{{ url_for('chiffre_affaire') }}">CA</a>
                 {% endif %}
             </nav>
 
+            {% if current_user %}
             <div class="avatar">
                 {{ current_user.username[0]|upper }}
             </div>
+            {% endif %}
         </header>
 
-        <!-- FLASH -->
+        <!-- FLASH MESSAGES -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         <div class="flash-stack">
@@ -109,6 +120,7 @@
         <footer class="footer">
             SYNERGYGROUP • CRM
         </footer>
+
     </main>
 </div>
 
