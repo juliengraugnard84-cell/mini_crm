@@ -27,28 +27,39 @@
         {% set ep = request.endpoint or '' %}
 
         <nav class="sidebar-nav">
-            <a href="{{ url_for('dashboard') }}" class="nav-link {% if ep=='dashboard' %}active{% endif %}">
+            <a href="{{ url_for('dashboard') }}"
+               class="nav-link {% if ep == 'dashboard' %}active{% endif %}">
                 ▦ Dashboard
             </a>
-            <a href="{{ url_for('clients') }}" class="nav-link {% if ep.startswith('clients') %}active{% endif %}">
+
+            <!-- Clients : redirige vers dashboard (route existante) -->
+            <a href="{{ url_for('dashboard') }}"
+               class="nav-link {% if ep.startswith('client') %}active{% endif %}">
                 👥 Clients
-            </a>
-            <a href="{{ url_for('chiffre_affaire') }}" class="nav-link {% if ep.startswith('chiffre_affaire') %}active{% endif %}">
-                € Chiffre d’affaires
             </a>
 
             {% if current_user.role == 'admin' %}
-            <a href="{{ url_for('documents') }}" class="nav-link {% if ep.startswith('documents') %}active{% endif %}">
+            <a href="{{ url_for('chiffre_affaire') }}"
+               class="nav-link {% if ep.startswith('chiffre_affaire') %}active{% endif %}">
+                € Chiffre d’affaires
+            </a>
+
+            <a href="{{ url_for('documents') }}"
+               class="nav-link {% if ep.startswith('documents') %}active{% endif %}">
                 📄 Documents
             </a>
-            <a href="{{ url_for('admin_users') }}" class="nav-link {% if ep.startswith('admin') %}active{% endif %}">
+
+            <a href="{{ url_for('admin_users') }}"
+               class="nav-link {% if ep.startswith('admin') %}active{% endif %}">
                 ⚙ Utilisateurs
             </a>
             {% endif %}
         </nav>
 
         <div class="sidebar-footer">
-            <a href="{{ url_for('logout') }}" class="nav-link danger">⎋ Déconnexion</a>
+            <a href="{{ url_for('logout') }}" class="nav-link danger">
+                ⎋ Déconnexion
+            </a>
         </div>
     </aside>
 
@@ -64,8 +75,11 @@
 
             <nav class="topbar-nav">
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('clients') }}">Clients</a>
+                <a href="{{ url_for('dashboard') }}">Clients</a>
+
+                {% if current_user.role == 'admin' %}
                 <a href="{{ url_for('chiffre_affaire') }}">CA</a>
+                {% endif %}
             </nav>
 
             <div class="avatar">
