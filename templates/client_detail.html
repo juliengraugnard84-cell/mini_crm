@@ -3,24 +3,19 @@
 
 {% block content %}
 
-<!-- ================= HEADER ================= -->
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
     <h1>{{ client.name }}</h1>
 
-    <!-- Actions désactivées tant que les routes n'existent pas -->
-    <div class="actions-row">
-        <button class="btn btn-secondary" disabled>
-            ✏ Modifier
-        </button>
-    </div>
+    <a href="{{ url_for('edit_client', client_id=client.id) }}"
+       class="btn btn-secondary">
+        ✏ Modifier
+    </a>
 </div>
 
-<!-- ================= INFOS CLIENT ================= -->
 <div class="card">
     <h5>Informations client</h5>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
-
         <div>
             <div class="form-label">Commercial</div>
             {{ client.commercial or "—" }}
@@ -33,63 +28,44 @@
 
         <div>
             <div class="form-label">Statut</div>
-
-            {% set s = (client.status or '').lower() %}
-            {% if s == 'signé' %}
-                <span class="badge badge-success">Signé</span>
-            {% elif s == 'en cours' %}
-                <span class="badge badge-warning">En cours</span>
-            {% elif s == 'perdu' %}
-                <span class="badge badge-danger">Perdu</span>
-            {% else %}
-                <span class="badge badge-info">Cotation</span>
-            {% endif %}
+            <span class="badge badge-info">
+                {{ client.status or "Cotation" }}
+            </span>
         </div>
-
     </div>
 </div>
 
-<!-- ================= COTATIONS ================= -->
-<div class="card">
-    <h5>Demandes de cotation</h5>
-
-    {% if cotations %}
-        {% for cot in cotations %}
-        <div class="list-group-item"
-             style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
-
-            <div>
-                <strong>{{ cot.energie_type or "—" }}</strong><br>
-                <small class="text-muted">
-                    Créée le {{ cot.date_creation[:10] }}
-                </small>
-            </div>
-
-            <span class="badge badge-info">
-                {{ cot.status or "Nouvelle" }}
-            </span>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div class="empty-state">
-            <strong>Aucune cotation</strong>
-            Aucune demande de cotation pour ce dossier.
-        </div>
-    {% endif %}
-</div>
-
-<!-- ================= DOCUMENTS ================= -->
 <div class="card">
     <h5>Documents</h5>
+
+    <form method="post"
+          action="{{ url_for('upload_client_document', client_id=client.id) }}"
+          enctype="multipart/form-data"
+          style="margin-bottom:16px;">
+        <input type="file" name="documents" multiple required>
+        <button type="submit" class="btn btn-primary" style="margin-top:8px;">
+            ➕ Ajouter des documents
+        </button>
+    </form>
 
     {% if documents %}
         {% for d in documents %}
         <div class="list-group-item"
-             style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
+             style="display:flex;justify-content:space-between;align-items:center;">
             <span>{{ d.nom }}</span>
-            <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
-                Ouvrir
-            </a>
+
+            <div style="display:flex;gap:8px;">
+                <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
+                    Ouvrir
+                </a>
+
+                <form method="post"
+                      action="{{ url_for('delete_client_document', client_id=client.id) }}"
+                      onsubmit="return confirm('Supprimer ce document ?');">
+                    <input type="hidden" name="key" value="{{ d.key }}">
+                    <button type="submit" class="btn btn-danger">🗑</button>
+                </form>
+            </div>
         </div>
         {% endfor %}
     {% else %}
