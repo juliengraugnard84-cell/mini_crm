@@ -1,81 +1,86 @@
-{% extends "base.html" %}
-{% block title %}Client{% endblock %}
-
-{% block content %}
-
-<h1 class="page-title">
-    {{ "Nouveau client" if action == "new" else "Modifier client" }}
-</h1>
+<!-- ================= DEMANDE DE COTATION ================= -->
 
 <div class="card">
+    <h5>Informations de négociation</h5>
 
-<form method="POST">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-    <div class="row g-3">
-
-        <div class="col-md-6">
-            <label class="form-label">Nom du client *</label>
-            <input type="text" name="name" class="form-control"
-                   value="{{ client.name if client else '' }}" required>
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Date de négociation</label>
+            <input type="date" name="negociation_date" class="form-control">
         </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Commercial</label>
-            <input type="text" name="commercial" class="form-control"
-                   value="{{ client.commercial if client else (current_user.username if current_user else '') }}"
-                   {% if current_user and current_user.role != 'admin' %}readonly{% endif %}>
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Statut</label>
-            <select name="status" class="form-select">
-                <option value="">—</option>
-                {% for s in statuses %}
-                    <option value="{{ s }}"
-                        {% if client and client.status == s %}selected{% endif %}>
-                        {{ s }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Email</label>
-            <input type="email" name="email" class="form-control"
-                   value="{{ client.email if client else '' }}">
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Téléphone</label>
-            <input type="text" name="phone" class="form-control"
-                   value="{{ client.phone if client else '' }}">
-        </div>
-
-        <div class="col-md-12">
-            <label class="form-label">Adresse</label>
-            <input type="text" name="address" class="form-control"
-                   value="{{ client.address if client else '' }}">
-        </div>
-
-        <div class="col-md-12">
-            <label class="form-label">Notes</label>
-            <textarea name="notes" class="form-control" rows="4">{{ client.notes if client else '' }}</textarea>
-        </div>
-
     </div>
-
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
-        <a href="{{ url_for('clients') }}" class="btn btn-outline-secondary">
-            Annuler
-        </a>
-        <button class="btn btn-success">
-            Enregistrer
-        </button>
-    </div>
-
-</form>
-
 </div>
 
-{% endblock %}
+<div class="card">
+    <h5>Signataire</h5>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Nom du signataire</label>
+            <input type="text" name="signataire_nom" class="form-control"
+                   placeholder="Nom et prénom">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Téléphone</label>
+            <input type="tel" name="signataire_telephone" class="form-control"
+                   placeholder="06 00 00 00 00">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Adresse e-mail</label>
+            <input type="email" name="signataire_email" class="form-control"
+                   placeholder="email@entreprise.fr">
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h5>Entreprise</h5>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">SIRET</label>
+            <input type="text" name="siret" class="form-control"
+                   placeholder="14 chiffres">
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h5>Point de livraison</h5>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Numéro de PDL / PCE</label>
+            <input type="text" name="pdl_pce" class="form-control">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Type d’énergie</label>
+            <select name="energie_type" class="form-select">
+                <option value="">— Sélectionner —</option>
+                <option value="electricite">Électricité</option>
+                <option value="gaz">Gaz</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h5>Fournisseur actuel</h5>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Fournisseur actuel</label>
+            <input type="text" name="fournisseur_actuel" class="form-control"
+                   placeholder="EDF, Engie, TotalEnergies…">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Date de fin de contrat</label>
+            <input type="date" name="fin_contrat" class="form-control">
+        </div>
+    </div>
+</div>
+
