@@ -2,68 +2,65 @@
 {% block title %}Nouveau dossier client{% endblock %}
 
 {% block content %}
+
 <h1>Nouveau dossier client</h1>
 
-<form method="POST"
-      action="{{ url_for('new_client') }}"
-      enctype="multipart/form-data">
+<form method="post"
+      enctype="multipart/form-data"
+      action="{{ url_for('new_client') }}">
 
     <div class="card">
+
         <h5>Création du dossier</h5>
 
-        <!-- Nom du dossier -->
+        <!-- NOM -->
         <div class="form-group">
             <label class="form-label">Nom du dossier</label>
-            <input
-                type="text"
-                name="name"
-                class="form-control"
-                placeholder="Entreprise Dupont – Site principal"
-                required
-            >
+            <input type="text"
+                   name="name"
+                   class="form-control"
+                   required>
         </div>
 
-        <!-- Type d’énergie -->
+        <!-- ENERGIE -->
         <div class="form-group">
             <label class="form-label">Type d’énergie</label>
-            <select name="energie_type" class="form-select" required>
+            <select name="energie_type"
+                    class="form-control"
+                    required>
                 <option value="">— Sélectionner —</option>
-                <option value="electricite">Électricité</option>
+                <option value="électricité">Électricité</option>
                 <option value="gaz">Gaz</option>
+                <option value="électricité + gaz">Électricité + Gaz</option>
             </select>
         </div>
 
-        <!-- Date de création -->
+        <!-- DATE -->
         <div class="form-group">
             <label class="form-label">Date de création du dossier</label>
-            <input
-                type="date"
-                name="date_creation"
-                class="form-control"
-                required
-            >
+            <input type="date"
+                   name="created_at"
+                   class="form-control"
+                   required>
         </div>
 
-        <!-- Documents -->
+        <!-- DOCUMENTS -->
         <div class="form-group">
             <label class="form-label">Documents à joindre</label>
-            <input
-                type="file"
-                name="documents"
-                class="form-control"
-                multiple
-            >
+            <input type="file"
+                   name="documents"
+                   multiple>
             <small class="text-muted">
                 Vous pouvez créer le dossier sans joindre de documents.
             </small>
         </div>
+
     </div>
 
-    <div class="actions-row">
-        <button type="submit" class="btn btn-primary">
-            Créer le dossier
-        </button>
-    </div>
+    <button type="submit" class="btn btn-primary">
+        Créer le dossier
+    </button>
 
 </form>
+
 {% endblock %}
