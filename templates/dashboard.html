@@ -105,7 +105,11 @@
             <h5>Actions rapides</h5>
 
             <div style="display:flex;flex-direction:column;gap:10px;">
-                <a href="{{ url_for('new_client') }}" class="btn btn-primary">
+
+                <!-- Bouton neutralisé (route inexistante) -->
+                <a href="#"
+                   class="btn btn-primary disabled"
+                   onclick="alert('Création de client non encore disponible'); return false;">
                     ➕ Nouveau client
                 </a>
 
