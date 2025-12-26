@@ -78,13 +78,11 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 def _connect_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-
     try:
         conn.execute("PRAGMA foreign_keys=ON;")
         conn.execute("PRAGMA busy_timeout=5000;")
     except Exception:
         pass
-
     return conn
 
 
@@ -98,10 +96,7 @@ def get_db():
 def close_db(exception):
     db = g.pop("db", None)
     if db is not None:
-        try:
-            db.close()
-        except Exception:
-            pass
+        db.close()
 
 
 def row_to_obj(row):
@@ -118,9 +113,7 @@ def _try_add_column(conn, table, col_def_sql):
 def init_db():
     conn = _connect_db()
 
-    # =======================
-    # TABLE CLIENTS
-    # =======================
+    # CLIENTS = DOSSIERS
     conn.execute("""
         CREATE TABLE IF NOT EXISTS crm_clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,22 +129,7 @@ def init_db():
         )
     """)
 
-    # =======================
-    # TABLE DOSSIERS (NOUVEAU)
-    # =======================
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS dossiers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            client_id INTEGER NOT NULL,
-            nom TEXT NOT NULL,
-            created_by INTEGER,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # =======================
-    # TABLE UTILISATEURS
-    # =======================
+    # UTILISATEURS
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,49 +139,11 @@ def init_db():
         )
     """)
 
-    # =======================
-    # TABLE REVENUS
-    # =======================
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS revenus (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT NOT NULL,
-            commercial TEXT NOT NULL,
-            montant REAL NOT NULL,
-            dossier TEXT
-        )
-    """)
-
-    # =======================
-    # TABLE AGENDA
-    # =======================
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS appointments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            date TEXT NOT NULL,
-            start_time TEXT NOT NULL,
-            end_time TEXT NOT NULL,
-            description TEXT,
-            color TEXT,
-            client_id INTEGER,
-            created_by INTEGER NOT NULL
-        )
-    """)
-
-    # =======================
-    # TABLE COTATIONS
-    # =======================
+    # COTATIONS (OPTIONNELLES)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS cotations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id INTEGER NOT NULL,
-            fournisseur_actuel TEXT,
-            date_echeance TEXT,
-            created_by INTEGER,
-            is_read INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'nouvelle',
-            date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
             date_negociation TEXT,
             energie_type TEXT,
             entreprise_nom TEXT,
@@ -212,13 +152,18 @@ def init_db():
             signataire_tel TEXT,
             signataire_email TEXT,
             pdl_pce TEXT,
-            commentaire TEXT
+            fournisseur_actuel TEXT,
+            date_echeance TEXT,
+            commentaire TEXT,
+            created_by INTEGER,
+            is_read INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'nouvelle',
+            date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES crm_clients(id) ON DELETE CASCADE
         )
     """)
 
-    # =======================
-    # TABLE CHAT
-    # =======================
+    # CHAT
     conn.execute("""
         CREATE TABLE IF NOT EXISTS chat_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -231,9 +176,7 @@ def init_db():
         )
     """)
 
-    # =======================
-    # BOOTSTRAP ADMIN
-    # =======================
+    # ADMIN PAR DÉFAUT
     admin = conn.execute(
         "SELECT id FROM users WHERE username='admin'"
     ).fetchone()
@@ -248,8 +191,9 @@ def init_db():
     conn.close()
 
 
-# INITIALISATION AUTOMATIQUE
+# INITIALISATION
 init_db()
+
 
 
 ############################################################
@@ -1003,34 +947,75 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS + DOSSIERS + COTATIONS (SÉPARÉS)
+# 12. CLIENTS = DOSSIERS + DOCUMENTS + COTATIONS OPTIONNELLES
 ############################################################
 
 @app.route("/clients")
 @login_required
 def clients():
-    user = session.get("user") or {}
+    user = session.get("user")
     conn = get_db()
 
-    if user.get("role") == "admin":
+    if user["role"] == "admin":
         rows = conn.execute(
             "SELECT * FROM crm_clients ORDER BY created_at DESC"
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM crm_clients WHERE owner_id=? ORDER BY created_at DESC",
-            (user.get("id"),),
+            """
+            SELECT * FROM crm_clients
+            WHERE owner_id = ?
+            ORDER BY created_at DESC
+            """,
+            (user["id"],),
         ).fetchall()
 
     return render_template("clients.html", clients=[row_to_obj(r) for r in rows])
+
+
+@app.route("/clients/new", methods=["GET", "POST"])
+@login_required
+def new_client():
+    user = session.get("user")
+    conn = get_db()
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        if not name:
+            flash("Nom du dossier obligatoire.", "danger")
+            return redirect(url_for("new_client"))
+
+        owner_id = user["id"]
+        commercial = user["username"]
+
+        if user["role"] == "admin":
+            commercial = request.form.get("commercial")
+            row = conn.execute(
+                "SELECT id FROM users WHERE username=?",
+                (commercial,),
+            ).fetchone()
+            if not row:
+                flash("Commercial invalide.", "danger")
+                return redirect(url_for("new_client"))
+            owner_id = row["id"]
+
+        conn.execute("""
+            INSERT INTO crm_clients (name, commercial, owner_id)
+            VALUES (?, ?, ?)
+        """, (name, commercial, owner_id))
+
+        conn.commit()
+        flash("Dossier client créé.", "success")
+        return redirect(url_for("clients"))
+
+    return render_template("client_form.html", action="new", client=None)
 
 
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
     if not can_access_client(client_id):
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("clients"))
+        abort(403)
 
     conn = get_db()
 
@@ -1038,15 +1023,6 @@ def client_detail(client_id):
         "SELECT * FROM crm_clients WHERE id=?",
         (client_id,),
     ).fetchone()
-
-    if not client:
-        flash("Client introuvable.", "danger")
-        return redirect(url_for("clients"))
-
-    dossiers = conn.execute(
-        "SELECT * FROM dossiers WHERE client_id=? ORDER BY created_at DESC",
-        (client_id,),
-    ).fetchall()
 
     cotations = conn.execute(
         "SELECT * FROM cotations WHERE client_id=? ORDER BY date_creation DESC",
@@ -1056,33 +1032,9 @@ def client_detail(client_id):
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
-        dossiers=[row_to_obj(d) for d in dossiers],
         cotations=[row_to_obj(c) for c in cotations],
+        documents=list_client_documents(client_id),
     )
-
-
-@app.route("/clients/<int:client_id>/dossiers/new", methods=["POST"])
-@login_required
-def create_dossier(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
-    nom = (request.form.get("nom_dossier") or "").strip()
-    if not nom:
-        flash("Nom du dossier obligatoire.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    conn = get_db()
-    u = session.get("user") or {}
-
-    conn.execute(
-        "INSERT INTO dossiers (client_id, nom, created_by) VALUES (?, ?, ?)",
-        (client_id, nom, u.get("id")),
-    )
-    conn.commit()
-
-    flash("Dossier créé avec succès.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
 
 
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
@@ -1092,7 +1044,7 @@ def create_cotation(client_id):
         abort(403)
 
     conn = get_db()
-    u = session.get("user") or {}
+    u = session.get("user")
 
     conn.execute("""
         INSERT INTO cotations (
@@ -1123,12 +1075,13 @@ def create_cotation(client_id):
         request.form.get("fournisseur_actuel"),
         request.form.get("date_echeance"),
         request.form.get("commentaire"),
-        u.get("id"),
+        u["id"],
     ))
-    conn.commit()
 
+    conn.commit()
     flash("Demande de cotation enregistrée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
+
 
 ############################################################
 # 14. CHAT (BACKEND)
