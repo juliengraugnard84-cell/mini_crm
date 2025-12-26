@@ -3,176 +3,119 @@
 
 {% block content %}
 
-<!-- ================= HEADER ================= -->
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-    <h1>{{ client.name }}</h1>
-</div>
+<h1>{{ client.name }}</h1>
+
+<!-- ================= FLASH ================= -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+    {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+{% endwith %}
 
 <!-- ================= INFOS CLIENT ================= -->
 <div class="card">
-    <h5>Informations du dossier</h5>
+    <h5>Informations client</h5>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
-
         <div>
-            <div class="form-label">Commercial</div>
-            {{ client.commercial_name or "—" }}
+            <small class="text-muted">Commercial</small><br>
+            {{ client.created_by.username if client.created_by else "—" }}
         </div>
 
         <div>
-            <div class="form-label">Date de création</div>
-            {{ client.created_at[:10] }}
+            <small class="text-muted">Date de création</small><br>
+            {{ client.created_at.strftime('%Y-%m-%d') if client.created_at else "—" }}
         </div>
 
         <div>
-            <div class="form-label">Statut du dossier</div>
-            {{ client.status or "—" }}
+            <small class="text-muted">Statut</small><br>
+            {{ client.status or "Cotation" }}
         </div>
-
     </div>
 </div>
 
-<!-- ================= DEMANDES DE COTATION ================= -->
-<div class="card">
-    <h5>Demandes de cotation</h5>
-
-    {% if cotations %}
-        {% for cot in cotations %}
-        <div class="list-group-item"
-             style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
-
-            <div>
-                <strong>{{ cot.energie_type or "—" }}</strong><br>
-                <small class="text-muted">
-                    Envoyée le {{ cot.date_creation[:10] }}
-                </small>
-            </div>
-
-            <span class="badge badge-info">
-                {{ cot.status|capitalize }}
-            </span>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div class="empty-state">
-            <strong>Aucune cotation</strong>
-            Aucune demande de cotation pour ce dossier.
-        </div>
-    {% endif %}
-</div>
-
-<!-- ================= NOUVELLE DEMANDE DE COTATION ================= -->
+<!-- ================= DEMANDE DE COTATION ================= -->
 <div class="card">
     <h5>Nouvelle demande de cotation</h5>
 
-    <form method="POST"
-          action="{{ url_for('create_cotation', client_id=client.id) }}">
+    <form method="POST" action="/clients/{{ client.id }}/cotations/new">
 
-        <!-- 1. DATE DE NEGOCIATION -->
         <div class="form-group">
             <label class="form-label">Date de négociation</label>
-            <input type="date"
-                   name="date_negociation"
-                   class="form-control"
-                   required>
+            <input type="date" name="date_negociation" class="form-control" required>
         </div>
 
         <hr>
 
-        <!-- SIGNATAIRE -->
         <h6>Signataire</h6>
 
         <div class="form-group">
             <label class="form-label">Nom du signataire</label>
-            <input type="text"
-                   name="signataire_nom"
-                   class="form-control"
-                   required>
+            <input type="text" name="signataire_nom" class="form-control" required>
         </div>
 
         <div class="form-group">
             <label class="form-label">Téléphone</label>
-            <input type="tel"
-                   name="signataire_tel"
-                   class="form-control">
+            <input type="tel" name="signataire_tel" class="form-control">
         </div>
 
         <div class="form-group">
             <label class="form-label">Adresse e-mail</label>
-            <input type="email"
-                   name="signataire_email"
-                   class="form-control">
+            <input type="email" name="signataire_email" class="form-control">
         </div>
 
         <hr>
 
-        <!-- ENTREPRISE -->
         <h6>Entreprise</h6>
 
         <div class="form-group">
             <label class="form-label">SIRET</label>
-            <input type="text"
-                   name="siret"
-                   maxlength="14"
-                   class="form-control">
+            <input type="text" name="siret" maxlength="14" class="form-control">
         </div>
 
         <hr>
 
-        <!-- ENERGIE -->
         <h6>Énergie</h6>
 
         <div class="form-group">
             <label class="form-label">Type d’énergie</label>
-            <select name="energie_type"
-                    class="form-control"
-                    required>
+            <select name="energie_type" class="form-control" required>
                 <option value="">— Sélectionner —</option>
-                <option value="électricité">Électricité</option>
+                <option value="electricite">Électricité</option>
                 <option value="gaz">Gaz</option>
-                <option value="électricité + gaz">Électricité + Gaz</option>
+                <option value="electricite + gaz">Électricité + Gaz</option>
             </select>
         </div>
 
         <div class="form-group">
             <label class="form-label">Numéro PDL / PCE</label>
-            <input type="text"
-                   name="pdl_pce"
-                   class="form-control">
+            <input type="text" name="pdl_pce" class="form-control">
         </div>
 
         <hr>
 
-        <!-- CONTRAT -->
         <h6>Contrat actuel</h6>
 
         <div class="form-group">
             <label class="form-label">Date d’échéance du contrat</label>
-            <input type="date"
-                   name="date_echeance"
-                   class="form-control">
+            <input type="date" name="date_echeance" class="form-control">
         </div>
 
         <div class="form-group">
             <label class="form-label">Fournisseur actuel</label>
-            <input type="text"
-                   name="fournisseur_actuel"
-                   class="form-control">
+            <input type="text" name="fournisseur_actuel" class="form-control">
         </div>
 
         <hr>
 
-        <!-- COMMENTAIRE -->
         <div class="form-group">
             <label class="form-label">Commentaires</label>
-            <textarea name="commentaire"
-                      class="form-control"
-                      rows="3"></textarea>
+            <textarea name="commentaire" class="form-control" rows="3"></textarea>
         </div>
 
-        <button type="submit"
-                class="btn btn-primary"
-                style="margin-top:16px;">
+        <button type="submit" class="btn btn-primary">
             📤 Envoyer la demande de cotation
         </button>
 
@@ -184,7 +127,7 @@
     <h5>Documents</h5>
 
     <form method="POST"
-          action="{{ url_for('upload_client_documents', client_id=client.id) }}"
+          action="/clients/{{ client.id }}/documents"
           enctype="multipart/form-data"
           style="margin-bottom:16px;">
 
@@ -195,31 +138,30 @@
     </form>
 
     {% if documents %}
-        {% for d in documents %}
+        {% for doc in documents %}
         <div class="list-group-item"
-             style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
-
-            <span>{{ d.nom }}</span>
+             style="display:flex;justify-content:space-between;align-items:center;">
+            <span>{{ doc.filename }}</span>
 
             <div style="display:flex;gap:8px;">
-                <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
+                <a href="/uploads/{{ doc.filename }}"
+                   target="_blank"
+                   class="btn btn-sm btn-secondary">
                     Ouvrir
                 </a>
 
-                <form method="POST"
-                      action="{{ url_for('delete_client_document', client_id=client.id) }}">
-                    <input type="hidden" name="key" value="{{ d.key }}">
-                    <button class="btn btn-danger">🗑</button>
-                </form>
+                {% if current_user.role in ['admin', 'commercial'] %}
+                <a href="/documents/{{ doc.id }}/delete"
+                   class="btn btn-sm btn-danger"
+                   onclick="return confirm('Supprimer ce document ?')">
+                    🗑
+                </a>
+                {% endif %}
             </div>
-
         </div>
         {% endfor %}
     {% else %}
-        <div class="empty-state">
-            <strong>Aucun document</strong>
-            Aucun document associé à ce dossier.
-        </div>
+        <p class="text-muted">Aucun document.</p>
     {% endif %}
 </div>
 
