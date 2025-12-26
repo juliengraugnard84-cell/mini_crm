@@ -74,11 +74,9 @@
     <h5>Demandes de cotation</h5>
 
     {% if cotations %}
-
         {% for cot in cotations %}
         <div class="list-group-item"
              style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
-
             <div>
                 <strong>{{ cot.energie_type or "—" }}</strong><br>
                 <small class="text-muted">
@@ -89,14 +87,11 @@
             <span class="badge badge-info">Nouvelle</span>
         </div>
         {% endfor %}
-
     {% else %}
-
         <div class="empty-state">
             <strong>Aucune cotation</strong>
             Aucune demande de cotation pour ce client.
         </div>
-
     {% endif %}
 
     <!-- ===== Nouvelle cotation ===== -->
@@ -143,33 +138,53 @@
                 style="margin-top:16px;">
             ➕ Ajouter la cotation
         </button>
-
     </form>
 </div>
 
-<!-- ================= DOCUMENTS ================= -->
+<!-- ================= DOCUMENTS CLIENT ================= -->
 <div class="card">
     <h5>Documents</h5>
 
-    {% if documents %}
+    <!-- Upload document -->
+    <form method="post"
+          action="{{ url_for('upload_client_document', client_id=client.id) }}"
+          enctype="multipart/form-data"
+          style="margin-bottom:16px;display:flex;gap:12px;align-items:center;">
 
+        <input type="file" name="file" required>
+        <button type="submit" class="btn btn-primary">
+            ➕ Ajouter un document
+        </button>
+    </form>
+
+    {% if documents %}
         {% for d in documents %}
         <div class="list-group-item"
              style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
+
             <span>{{ d.nom }}</span>
-            <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
-                Ouvrir
-            </a>
+
+            <div style="display:flex;gap:8px;">
+                <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
+                    Ouvrir
+                </a>
+
+                <form method="post"
+                      action="{{ url_for('delete_client_document', client_id=client.id) }}"
+                      onsubmit="return confirm('Supprimer ce document ?');">
+                    <input type="hidden" name="key" value="{{ d.key }}">
+                    <button type="submit" class="btn btn-danger">
+                        Supprimer
+                    </button>
+                </form>
+            </div>
         </div>
         {% endfor %}
-
     {% else %}
-
         <div class="empty-state">
             <strong>Aucun document</strong>
             Aucun document associé à ce client.
         </div>
-
     {% endif %}
 </div>
 
