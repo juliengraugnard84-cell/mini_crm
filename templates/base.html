@@ -5,9 +5,7 @@
     <title>{% block title %}CRM{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -20,9 +18,7 @@
             <div class="brand-mark">SG</div>
             <div>
                 <div class="brand-name">SYNERGYGROUP</div>
-                <div class="brand-user">
-                    {{ current_user.username if current_user else "" }}
-                </div>
+                <div class="brand-user">{{ current_user.username }}</div>
             </div>
         </div>
 
@@ -36,26 +32,23 @@
                 ▦ Dashboard
             </a>
 
-            <!-- Clients -->
-            <a href="{{ url_for('clients') }}"
-               class="nav-link {% if ep.startswith('clients') %}active{% endif %}">
+            <!-- Clients → redirige vers création (route existante) -->
+            <a href="{{ url_for('new_client') }}"
+               class="nav-link {% if ep.startswith('client') %}active{% endif %}">
                 👥 Clients
             </a>
 
-            <!-- Chiffre d'affaires (admin only) -->
-            {% if current_user and current_user.role == 'admin' %}
+            {% if current_user.role == 'admin' %}
             <a href="{{ url_for('chiffre_affaire') }}"
                class="nav-link {% if ep.startswith('chiffre_affaire') %}active{% endif %}">
                 € Chiffre d’affaires
             </a>
 
-            <!-- Documents globaux -->
             <a href="{{ url_for('documents') }}"
                class="nav-link {% if ep.startswith('documents') %}active{% endif %}">
                 📄 Documents
             </a>
 
-            <!-- Utilisateurs -->
             <a href="{{ url_for('admin_users') }}"
                class="nav-link {% if ep.startswith('admin') %}active{% endif %}">
                 ⚙ Utilisateurs
@@ -76,29 +69,25 @@
         <!-- TOPBAR -->
         <header class="topbar">
             <div class="topbar-left">
-                {% if current_user %}
-                    <strong>{{ current_user.username }}</strong>
-                    <span class="muted">({{ current_user.role }})</span>
-                {% endif %}
+                <strong>{{ current_user.username }}</strong>
+                <span class="muted">({{ current_user.role }})</span>
             </div>
 
             <nav class="topbar-nav">
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('clients') }}">Clients</a>
+                <a href="{{ url_for('new_client') }}">Clients</a>
 
-                {% if current_user and current_user.role == 'admin' %}
+                {% if current_user.role == 'admin' %}
                 <a href="{{ url_for('chiffre_affaire') }}">CA</a>
                 {% endif %}
             </nav>
 
-            {% if current_user %}
             <div class="avatar">
                 {{ current_user.username[0]|upper }}
             </div>
-            {% endif %}
         </header>
 
-        <!-- FLASH MESSAGES -->
+        <!-- FLASH -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         <div class="flash-stack">
