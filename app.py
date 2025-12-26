@@ -998,6 +998,62 @@ def delete_document(key):
 # 12. CLIENTS + DOSSIERS + COTATIONS (SÉPARÉS)
 ############################################################
 
+@app.route("/clients/new", methods=["GET", "POST"])
+@login_required
+def new_client():
+    conn = get_db()
+    user = session.get("user")
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        energie_type = (request.form.get("energie_type") or "").strip()
+        date_creation = (request.form.get("date_creation") or "").strip()
+
+        if not name or not energie_type or not date_creation:
+            flash(
+                "Nom du dossier, type d’énergie et date de création sont obligatoires.",
+                "danger"
+            )
+            return redirect(url_for("new_client"))
+
+        # Création du dossier client
+        cur = conn.execute("""
+            INSERT INTO crm_clients (
+                name,
+                status,
+                owner_id,
+                created_at
+            )
+            VALUES (?, ?, ?, ?)
+        """, (
+            name,
+            energie_type,   # stocké dans status (sans migration DB)
+            user["id"],
+            date_creation,
+        ))
+        conn.commit()
+
+        client_id = cur.lastrowid
+
+        # ===== Upload documents optionnels =====
+        files = request.files.getlist("documents")
+        if files and not LOCAL_MODE and s3:
+            prefix = client_s3_prefix(client_id)
+            for f in files:
+                if f and allowed_file(f.filename):
+                    filename = clean_filename(secure_filename(f.filename))
+                    key = f"{prefix}{filename}"
+                    try:
+                        s3_upload_fileobj(f, AWS_BUCKET, key)
+                    except Exception as e:
+                        print("Erreur upload document création client:", repr(e))
+
+        flash("Dossier client créé avec succès.", "success")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    return render_template("client_form.html")
+
+
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
@@ -1076,6 +1132,7 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation enregistrée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
+
 
 
 ############################################################

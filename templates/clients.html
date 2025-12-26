@@ -7,7 +7,7 @@
     <h1>Clients</h1>
 
     <a href="{{ url_for('new_client') }}" class="btn btn-primary">
-        ➕ Nouveau client
+        ➕ Nouveau dossier client
     </a>
 </div>
 
@@ -23,7 +23,7 @@
             <div>
                 <strong>{{ c.name }}</strong><br>
                 <small class="text-muted">
-                    {{ c.email or "—" }} • {{ c.phone or "—" }}
+                    Créé le {{ c.created_at[:10] }}
                 </small>
             </div>
 
@@ -31,14 +31,12 @@
             <div style="display:flex;align-items:center;gap:12px;">
 
                 {% set s = (c.status or '').lower() %}
-                {% if s == 'signé' %}
-                    <span class="badge badge-success">Signé</span>
-                {% elif s == 'en cours' %}
-                    <span class="badge badge-warning">En cours</span>
-                {% elif s == 'perdu' %}
-                    <span class="badge badge-danger">Perdu</span>
+                {% if s == 'electricite' or s == 'électricité' %}
+                    <span class="badge badge-warning">Électricité</span>
+                {% elif s == 'gaz' %}
+                    <span class="badge badge-info">Gaz</span>
                 {% else %}
-                    <span class="badge badge-info">Cotation</span>
+                    <span class="badge badge-secondary">—</span>
                 {% endif %}
 
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
@@ -53,8 +51,8 @@
     {% else %}
 
         <div class="empty-state">
-            <strong>Aucun client</strong>
-            Commencez par créer votre premier client.
+            <strong>Aucun client</strong><br>
+            Commencez par créer votre premier dossier client.
         </div>
 
     {% endif %}

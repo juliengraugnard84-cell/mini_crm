@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
@@ -44,16 +43,14 @@
             <h5>Derniers clients</h5>
 
             {% if last_clients %}
-                <div>
-                    {% for c in last_clients %}
-                        <div class="list-group-item">
-                            <strong>{{ c.name }}</strong><br>
-                            <small class="text-muted">
-                                {{ c.email or "—" }} • {{ c.created_at[:10] }}
-                            </small>
-                        </div>
-                    {% endfor %}
-                </div>
+                {% for c in last_clients %}
+                    <div class="list-group-item">
+                        <strong>{{ c.name }}</strong><br>
+                        <small class="text-muted">
+                            {{ c.email or "—" }} • {{ c.created_at[:10] }}
+                        </small>
+                    </div>
+                {% endfor %}
             {% else %}
                 <p class="text-muted">Aucun client enregistré.</p>
             {% endif %}
@@ -89,12 +86,10 @@
             <h5>Dernier revenu</h5>
 
             {% if last_rev %}
-                <div>
-                    <strong>{{ last_rev.montant }} €</strong><br>
-                    <small class="text-muted">
-                        {{ last_rev.date }} • {{ last_rev.commercial }}
-                    </small>
-                </div>
+                <strong>{{ last_rev.montant }} €</strong><br>
+                <small class="text-muted">
+                    {{ last_rev.date }} • {{ last_rev.commercial }}
+                </small>
             {% else %}
                 <p class="text-muted">Aucun revenu enregistré.</p>
             {% endif %}
@@ -105,12 +100,8 @@
             <h5>Actions rapides</h5>
 
             <div style="display:flex;flex-direction:column;gap:10px;">
-
-                <!-- Bouton neutralisé (route inexistante) -->
-                <a href="#"
-                   class="btn btn-primary disabled"
-                   onclick="alert('Création de client non encore disponible'); return false;">
-                    ➕ Nouveau client
+                <a href="{{ url_for('new_client') }}" class="btn btn-primary">
+                    ➕ Nouveau dossier client
                 </a>
 
                 {% if current_user and current_user.role == 'admin' %}
