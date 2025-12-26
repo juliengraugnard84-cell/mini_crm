@@ -5,157 +5,115 @@
 
 <h1>{{ client.name }}</h1>
 
-<!-- ================= FLASH ================= -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}
-    {% for category, message in messages %}
-        <div class="flash flash-{{ category }}">{{ message }}</div>
-    {% endfor %}
-{% endif %}
-{% endwith %}
-
-<!-- ================= INFOS CLIENT ================= -->
+<!-- ===================== -->
+<!-- INFOS CLIENT -->
+<!-- ===================== -->
 <div class="card">
     <h5>Informations client</h5>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+    <div class="grid-3">
         <div>
-            <small class="text-muted">Commercial</small><br>
-            {{ client.created_by.username if client.created_by else "—" }}
+            <strong>Commercial</strong><br>
+            {{ client.commercial or "—" }}
         </div>
 
         <div>
-            <small class="text-muted">Date de création</small><br>
-            {{ client.created_at or "—" }}
+            <strong>Date de création</strong><br>
+            {{ client.created_at }}
         </div>
 
         <div>
-            <small class="text-muted">Statut</small><br>
+            <strong>Statut</strong><br>
             {{ client.status or "Cotation" }}
         </div>
     </div>
 </div>
 
-<!-- ================= DEMANDE DE COTATION ================= -->
-<div class="card">
+<!-- ===================== -->
+<!-- DEMANDE DE COTATION -->
+<!-- ===================== -->
+<div class="card" style="margin-top:24px;">
     <h5>Nouvelle demande de cotation</h5>
 
-    <form method="POST" action="/clients/{{ client.id }}/cotations/new">
+    <form method="POST"
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
 
         <div class="form-group">
-            <label class="form-label">Date de négociation</label>
-            <input type="date" name="date_negociation" class="form-control" required>
-        </div>
-
-        <hr>
-
-        <h6>Signataire</h6>
-
-        <div class="form-group">
-            <label class="form-label">Nom du signataire</label>
-            <input type="text" name="signataire_nom" class="form-control" required>
+            <label>Date de négociation</label>
+            <input type="date" name="date_negociation" class="form-control">
         </div>
 
         <div class="form-group">
-            <label class="form-label">Téléphone</label>
+            <label>Nom du signataire</label>
+            <input type="text" name="signataire_nom" class="form-control">
+        </div>
+
+        <div class="form-group">
+            <label>Téléphone</label>
             <input type="tel" name="signataire_tel" class="form-control">
         </div>
 
         <div class="form-group">
-            <label class="form-label">Adresse e-mail</label>
+            <label>Email</label>
             <input type="email" name="signataire_email" class="form-control">
         </div>
 
-        <hr>
-
-        <h6>Entreprise</h6>
-
         <div class="form-group">
-            <label class="form-label">SIRET</label>
+            <label>SIRET</label>
             <input type="text" name="siret" maxlength="14" class="form-control">
         </div>
 
-        <hr>
-
-        <h6>Énergie</h6>
-
         <div class="form-group">
-            <label class="form-label">Type d’énergie</label>
-            <select name="energie_type" class="form-control" required>
+            <label>Type d’énergie</label>
+            <select name="energie_type" class="form-select">
                 <option value="">— Sélectionner —</option>
                 <option value="electricite">Électricité</option>
                 <option value="gaz">Gaz</option>
-                <option value="electricite + gaz">Électricité + Gaz</option>
             </select>
         </div>
 
         <div class="form-group">
-            <label class="form-label">Numéro PDL / PCE</label>
+            <label>PDL / PCE</label>
             <input type="text" name="pdl_pce" class="form-control">
         </div>
 
-        <hr>
-
-        <h6>Contrat actuel</h6>
-
         <div class="form-group">
-            <label class="form-label">Date d’échéance du contrat</label>
+            <label>Date d’échéance du contrat</label>
             <input type="date" name="date_echeance" class="form-control">
         </div>
 
         <div class="form-group">
-            <label class="form-label">Fournisseur actuel</label>
+            <label>Fournisseur actuel</label>
             <input type="text" name="fournisseur_actuel" class="form-control">
         </div>
 
-        <hr>
-
         <div class="form-group">
-            <label class="form-label">Commentaires</label>
-            <textarea name="commentaire" class="form-control" rows="3"></textarea>
+            <label>Commentaires</label>
+            <textarea name="commentaire"
+                      class="form-control"
+                      rows="3"></textarea>
         </div>
 
         <button type="submit" class="btn btn-primary">
-            📤 Envoyer la demande de cotation
+            Envoyer la demande de cotation
         </button>
     </form>
 </div>
 
-<!-- ================= DOCUMENTS ================= -->
-<div class="card">
+<!-- ===================== -->
+<!-- DOCUMENTS -->
+<!-- ===================== -->
+<div class="card" style="margin-top:24px;">
     <h5>Documents</h5>
 
-    <form method="POST"
-          action="/clients/{{ client.id }}/documents"
-          enctype="multipart/form-data"
-          style="margin-bottom:16px;">
-        <input type="file" name="documents" multiple>
-        <button type="submit" class="btn btn-secondary">
-            ➕ Ajouter des documents
-        </button>
-    </form>
-
     {% if documents %}
-        {% for doc in documents %}
+        {% for d in documents %}
         <div class="list-group-item"
              style="display:flex;justify-content:space-between;align-items:center;">
-            <span>{{ doc.filename }}</span>
-
-            <div style="display:flex;gap:8px;">
-                <a href="/uploads/{{ doc.filename }}"
-                   target="_blank"
-                   class="btn btn-sm btn-secondary">
-                    Ouvrir
-                </a>
-
-                {% if current_user.role in ['admin', 'commercial'] %}
-                <a href="/documents/{{ doc.id }}/delete"
-                   class="btn btn-sm btn-danger"
-                   onclick="return confirm('Supprimer ce document ?')">
-                    🗑
-                </a>
-                {% endif %}
-            </div>
+            {{ d.nom }}
+            <a href="{{ d.url }}" target="_blank" class="btn btn-secondary">
+                Ouvrir
+            </a>
         </div>
         {% endfor %}
     {% else %}
