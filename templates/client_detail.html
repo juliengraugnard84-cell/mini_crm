@@ -81,6 +81,12 @@
         opacity: 0.9;
     }
 
+    .doc-list {
+        list-style: none;
+        padding-left: 0;
+        margin-top: 15px;
+    }
+
     .doc-list li {
         display: flex;
         justify-content: space-between;
@@ -88,12 +94,46 @@
         padding: 6px 0;
         border-bottom: 1px solid #eee;
         font-size: 14px;
+        gap: 10px;
+    }
+
+    .doc-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
     }
 
     .doc-actions a {
-        margin-left: 10px;
         text-decoration: none;
         font-size: 14px;
+    }
+
+    .doc-actions form {
+        display: inline;
+        margin: 0;
+    }
+
+    .doc-actions button {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 0;
+    }
+
+    h4 {
+        margin-top: 18px;
+        margin-bottom: 8px;
+        font-size: 15px;
+        border-left: 3px solid #f5b301;
+        padding-left: 8px;
+    }
+
+    .muted {
+        color: #777;
+        font-size: 12px;
+        margin-top: 6px;
     }
 </style>
 
@@ -109,7 +149,13 @@
     <div class="info-grid">
         <div class="info-item">
             <span>Commercial</span>
-            <strong>{{ client.created_by or "—" }}</strong>
+            {# Selon ton modèle: client.commercial_name, client.commercial, client.owner_name, etc. #}
+            <strong>
+                {{ client.commercial_name
+                   or client.commercial
+                   or client.created_by
+                   or "—" }}
+            </strong>
         </div>
 
         <div class="info-item">
@@ -128,21 +174,56 @@
 <div class="card">
     <h3>Documents</h3>
 
+    {# Upload documents: conserve ton endpoint si tu l'as. Ajout CSRF. #}
     <form method="POST"
           action="{{ url_for('upload_client_document', client_id=client.id) }}"
           enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="file" name="documents" multiple>
         <button class="btn-primary" type="submit">Ajouter des documents</button>
+        <div class="muted">Formats autorisés : PDF, images, Word/Excel/CSV.</div>
     </form>
 
     <ul class="doc-list">
         {% for doc in documents %}
             <li>
-                {{ doc.filename }}
+                <div>
+                    {# Compat S3: doc.nom ; Compat DB: doc.filename ; fallback: doc.name #}
+                    {{ doc.nom or doc.filename or doc.name or "Document" }}
+                </div>
+
                 <span class="doc-actions">
-                    <a href="{{ url_for('open_document', document_id=doc.id) }}">Ouvrir</a>
-                    <a href="{{ url_for('delete_document', document_id=doc.id) }}"
-                       onclick="return confirm('Supprimer ce document ?')">🗑</a>
+                    {# MODE S3 (recommandé avec ton app.py): doc.url dispo #}
+                    {% if doc.url %}
+                        <a href="{{ doc.url }}" target="_blank" rel="noopener">Ouvrir</a>
+                        {# suppression S3: tu dois avoir une route côté backend.
+                           On propose delete via POST si tu as un endpoint delete_client_document(key=...) #}
+                        {% if doc.key %}
+                            <form method="POST" action="{{ url_for('delete_client_document', client_id=client.id) }}"
+                                  onsubmit="return confirm('Supprimer ce document ?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="key" value="{{ doc.key }}">
+                                <button type="submit">🗑</button>
+                            </form>
+                        {% endif %}
+
+                    {# MODE DB (ton template d'origine): open_document/delete_document via id #}
+                    {% else %}
+                        {% if doc.id %}
+                            <a href="{{ url_for('open_document', document_id=doc.id) }}">Ouvrir</a>
+
+                            {# IMPORTANT: supprimer en POST (sécurité). Si ton backend est encore en GET,
+                               je te conseille fortement de passer en POST et je te fournirai la route. #}
+                            <form method="POST"
+                                  action="{{ url_for('delete_document', document_id=doc.id) }}"
+                                  onsubmit="return confirm('Supprimer ce document ?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit">🗑</button>
+                            </form>
+                        {% else %}
+                            <span class="muted">Lien indisponible</span>
+                        {% endif %}
+                    {% endif %}
                 </span>
             </li>
         {% else %}
@@ -155,86 +236,104 @@
 <div class="card">
     <h3>Nouvelle demande de cotation</h3>
 
+    {# IMPORTANT:
+       - "open_cotation" dans ton app.py (que j'ai vu) est une route GET /cotations/<id>
+         donc ce n'est pas la bonne action pour créer.
+       - Ici, on cible un endpoint de création.
+       Remplace 'create_cotation' par le nom exact de TA route de création si différent.
+    #}
     <form method="POST"
-          action="{{ url_for('open_cotation', client_id=client.id) }}">
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        {# Liaison au commercial:
+           - si tu stockes created_by côté cotation: le backend prendra session.user.id
+           - si tu passes explicitement owner_id/commercial_id: tu peux ajouter un hidden.
+           Je le laisse optionnel, à activer si ton backend l'attend.
+        #}
+        {# <input type="hidden" name="commercial_id" value="{{ current_user.id }}"> #}
 
         <h4>Négociation</h4>
         <div class="form-grid">
             <div>
-                <label>Date de négociation</label>
-                <input type="date" name="negociation_date">
+                <label for="date_negociation">Date de négociation</label>
+                <input type="date" id="date_negociation" name="date_negociation">
             </div>
         </div>
 
         <h4>Signataire</h4>
         <div class="form-grid">
             <div>
-                <label>Nom</label>
-                <input type="text" name="signataire_nom">
+                <label for="signataire_nom">Nom</label>
+                <input type="text" id="signataire_nom" name="signataire_nom" autocomplete="name">
             </div>
             <div>
-                <label>Téléphone</label>
-                <input type="text" name="signataire_tel">
+                <label for="signataire_tel">Téléphone</label>
+                <input type="text" id="signataire_tel" name="signataire_tel" autocomplete="tel">
             </div>
             <div>
-                <label>Email</label>
-                <input type="email" name="signataire_email">
+                <label for="signataire_email">Email</label>
+                <input type="email" id="signataire_email" name="signataire_email" autocomplete="email">
             </div>
         </div>
 
         <h4>Entreprise</h4>
         <div class="form-grid">
             <div>
-                <label>SIRET</label>
-                <input type="text" name="siret">
+                <label for="entreprise_nom">Nom de l’entreprise</label>
+                <input type="text" id="entreprise_nom" name="entreprise_nom">
+            </div>
+            <div>
+                <label for="siret">SIRET</label>
+                <input type="text" id="siret" name="siret" inputmode="numeric" placeholder="14 chiffres">
             </div>
         </div>
 
         <h4>Énergie</h4>
         <div class="form-grid">
             <div>
-                <label>Type d’énergie</label>
-                <select name="energie_type">
+                <label for="energie_type">Type d’énergie</label>
+                <select id="energie_type" name="energie_type">
                     <option value="">— Sélectionner —</option>
                     <option value="electricite">Électricité</option>
                     <option value="gaz">Gaz</option>
                 </select>
             </div>
             <div>
-                <label>Numéro PDL / PCE</label>
-                <input type="text" name="pdl_pce">
+                <label for="pdl_pce">Numéro PDL / PCE</label>
+                <input type="text" id="pdl_pce" name="pdl_pce">
             </div>
         </div>
 
         <h4>Contrat actuel</h4>
         <div class="form-grid">
             <div>
-                <label>Date d’échéance</label>
-                <input type="date" name="echeance_contrat">
+                <label for="date_echeance">Date d’échéance</label>
+                <input type="date" id="date_echeance" name="date_echeance">
             </div>
             <div>
-                <label>Fournisseur actuel</label>
-                <input type="text" name="fournisseur_actuel">
+                <label for="fournisseur_actuel">Fournisseur actuel</label>
+                <input type="text" id="fournisseur_actuel" name="fournisseur_actuel">
             </div>
         </div>
 
         <h4>Commentaires</h4>
-        <textarea name="commentaires" rows="4"></textarea>
+        <textarea name="commentaire" rows="4" placeholder="Précisions sur le besoin, volumes, conditions, contraintes..."></textarea>
 
-        <h4>Mise à jour</h4>
-        <div class="form-grid">
-            <div>
-                <label>Date de mise à jour</label>
-                <input type="date" name="update_date">
-            </div>
-        </div>
-
-        <label>Commentaires de mise à jour</label>
-        <textarea name="update_commentaires" rows="3"></textarea>
+        {# Historisation / mises à jour:
+           On ne met PAS des champs update_* dans le formulaire de création,
+           sinon on mélange création et update.
+           La mise à jour/historique doit être un flux séparé (édition cotation).
+        #}
 
         <button class="btn-primary" type="submit">
             Envoyer la demande de cotation
         </button>
+
+        <div class="muted">
+            La demande sera rattachée au client et au commercial connecté. Vous pourrez la modifier et suivre l’historique.
+        </div>
     </form>
 </div>
 
