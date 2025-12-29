@@ -1149,14 +1149,12 @@ def new_client():
             flash("Le nom du client est obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
-        owner_id = user["id"]
-
         conn.execute(
             """
             INSERT INTO crm_clients (name, owner_id)
             VALUES (?, ?)
             """,
-            (name, owner_id),
+            (name, user["id"]),
         )
         conn.commit()
 
@@ -1189,14 +1187,12 @@ def client_detail(client_id):
         flash("Accès non autorisé.", "danger")
         return redirect(url_for("clients"))
 
-    # Documents client (mode S3 ou vide)
     documents = []
     try:
         documents = list_client_documents(client_id)
     except Exception:
-        documents = []
+        pass
 
-    # Cotations du client (historique simple)
     cotations = conn.execute(
         """
         SELECT *
@@ -1213,6 +1209,57 @@ def client_detail(client_id):
         documents=documents,
         cotations=[row_to_obj(c) for c in cotations],
     )
+
+
+@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
+@login_required
+def create_cotation(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user")
+
+    conn.execute(
+        """
+        INSERT INTO cotations (
+            client_id,
+            created_by,
+            date_negociation,
+            energie_type,
+            pdl_pce,
+            date_echeance,
+            fournisseur_actuel,
+            entreprise_nom,
+            siret,
+            signataire_nom,
+            signataire_tel,
+            signataire_email,
+            commentaire,
+            status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'nouvelle')
+        """,
+        (
+            client_id,
+            user["id"],
+            request.form.get("date_negociation"),
+            request.form.get("energie_type"),
+            request.form.get("pdl_pce"),
+            request.form.get("date_echeance"),
+            request.form.get("fournisseur_actuel"),
+            request.form.get("entreprise_nom"),
+            request.form.get("siret"),
+            request.form.get("signataire_nom"),
+            request.form.get("signataire_tel"),
+            request.form.get("signataire_email"),
+            request.form.get("commentaire"),
+        ),
+    )
+    conn.commit()
+
+    flash("Demande de cotation créée.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
@@ -1277,7 +1324,6 @@ def delete_client_document(client_id):
         flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
-
 
 ############################################################
 # 14. CHAT (BACKEND)
