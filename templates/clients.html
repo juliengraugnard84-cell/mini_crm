@@ -1,62 +1,83 @@
 {% extends "base.html" %}
-{% block title %}Clients{% endblock %}
 
 {% block content %}
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+<!-- ================= HEADER ================= -->
+<div class="page-header">
     <h1>Clients</h1>
-
     <a href="{{ url_for('new_client') }}" class="btn btn-primary">
-        ➕ Nouveau dossier client
+        ➕ Nouveau dossier
     </a>
 </div>
 
+<!-- ================= RECHERCHE ================= -->
 <div class="card">
+    <form method="get" action="{{ url_for('clients') }}" class="search-form">
+        <input
+            type="text"
+            name="q"
+            placeholder="Rechercher par nom de dossier ou commercial…"
+            value="{{ q or '' }}"
+        >
+        <button type="submit" class="btn btn-secondary">
+            Rechercher
+        </button>
+    </form>
+</div>
 
+<!-- ================= LISTE CLIENTS ================= -->
+<div class="card">
     {% if clients %}
-
-        {% for c in clients %}
-        <div class="list-group-item"
-             style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
-
-            <!-- Infos client -->
-            <div>
-                <strong>{{ c.name }}</strong><br>
-                <small class="text-muted">
-                    Créé le {{ c.created_at[:10] }}
-                </small>
-            </div>
-
-            <!-- Statut + action -->
-            <div style="display:flex;align-items:center;gap:12px;">
-
-                {% set s = (c.status or '').lower() %}
-                {% if s == 'electricite' or s == 'électricité' %}
-                    <span class="badge badge-warning">Électricité</span>
-                {% elif s == 'gaz' %}
-                    <span class="badge badge-info">Gaz</span>
-                {% else %}
-                    <span class="badge badge-secondary">—</span>
-                {% endif %}
-
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="btn btn-secondary">
-                    Ouvrir
-                </a>
-            </div>
-
-        </div>
-        {% endfor %}
-
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Dossier</th>
+                    <th>Commercial</th>
+                    <th>Statut</th>
+                    <th>Date de création</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in clients %}
+                <tr>
+                    <td>
+                        <strong>{{ c.name }}</strong>
+                    </td>
+                    <td>
+                        {{ c.commercial_name or "—" }}
+                    </td>
+                    <td>
+                        {% set s = (c.status or '').lower() %}
+                        {% if s == 'signé' %}
+                            <span class="badge badge-success">Signé</span>
+                        {% elif s == 'en cours' %}
+                            <span class="badge badge-warning">En cours</span>
+                        {% elif s == 'perdu' %}
+                            <span class="badge badge-danger">Perdu</span>
+                        {% else %}
+                            <span class="badge badge-info">Cotation</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ c.created_at[:10] if c.created_at else "—" }}
+                    </td>
+                    <td style="text-align:right;">
+                        <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                           class="btn btn-secondary">
+                            Ouvrir
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     {% else %}
-
         <div class="empty-state">
-            <strong>Aucun client</strong><br>
-            Commencez par créer votre premier dossier client.
+            <strong>Aucun dossier trouvé</strong><br>
+            Essayez une autre recherche.
         </div>
-
     {% endif %}
-
 </div>
 
 {% endblock %}
