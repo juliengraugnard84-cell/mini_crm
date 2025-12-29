@@ -3,116 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}CRM{% endblock %}</title>
+
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <!-- CSS principal -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    {% block extra_css %}{% endblock %}
+
 </head>
 <body>
 
-<div class="app-shell">
+<div class="app-layout">
 
-    <!-- ========== SIDEBAR ========== -->
+    <!-- SIDEBAR -->
     <aside class="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-mark">SG</div>
-            <div>
-                <div class="brand-name">SYNERGYGROUP</div>
-                <div class="brand-user">{{ current_user.username }}</div>
+        <div class="sidebar-header">
+            <div class="logo">SG</div>
+            <div class="company">
+                <strong>SYNERGYGROUP</strong><br>
+                <small>{{ current_user.username if current_user else "" }}</small>
             </div>
         </div>
 
-        {% set ep = request.endpoint or '' %}
-
         <nav class="sidebar-nav">
-
-            <!-- Dashboard -->
             <a href="{{ url_for('dashboard') }}"
-               class="nav-link {% if ep == 'dashboard' %}active{% endif %}">
-                ▦ Dashboard
+               class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
+                📊 Dashboard
             </a>
 
-            <!-- Clients → redirige vers création (route existante) -->
-            <a href="{{ url_for('new_client') }}"
-               class="nav-link {% if ep.startswith('client') %}active{% endif %}">
+            <a href="{{ url_for('clients') }}"
+               class="{% if request.endpoint in ['clients','client_detail','new_client'] %}active{% endif %}">
                 👥 Clients
             </a>
 
-            {% if current_user.role == 'admin' %}
-            <a href="{{ url_for('chiffre_affaire') }}"
-               class="nav-link {% if ep.startswith('chiffre_affaire') %}active{% endif %}">
-                € Chiffre d’affaires
-            </a>
+            {% if current_user and current_user.role == 'admin' %}
+                <a href="{{ url_for('chiffre_affaire') }}"
+                   class="{% if request.endpoint == 'chiffre_affaire' %}active{% endif %}">
+                    💰 Chiffre d’affaires
+                </a>
 
-            <a href="{{ url_for('documents') }}"
-               class="nav-link {% if ep.startswith('documents') %}active{% endif %}">
-                📄 Documents
-            </a>
+                <a href="{{ url_for('documents') }}"
+                   class="{% if request.endpoint == 'documents' %}active{% endif %}">
+                    📁 Documents
+                </a>
 
-            <a href="{{ url_for('admin_users') }}"
-               class="nav-link {% if ep.startswith('admin') %}active{% endif %}">
-                ⚙ Utilisateurs
-            </a>
+                <a href="{{ url_for('admin_users') }}"
+                   class="{% if request.endpoint.startswith('admin_') %}active{% endif %}">
+                    ⚙️ Utilisateurs
+                </a>
             {% endif %}
-        </nav>
 
-        <div class="sidebar-footer">
-            <a href="{{ url_for('logout') }}" class="nav-link danger">
-                ⎋ Déconnexion
+            <a href="{{ url_for('logout') }}" class="logout">
+                🚪 Déconnexion
             </a>
-        </div>
+        </nav>
     </aside>
 
-    <!-- ========== MAIN ========== -->
-    <main class="main">
+    <!-- MAIN -->
+    <main class="main-content">
 
-        <!-- TOPBAR -->
+        <!-- TOP BAR -->
         <header class="topbar">
             <div class="topbar-left">
                 <strong>{{ current_user.username }}</strong>
-                <span class="muted">({{ current_user.role }})</span>
+                <span class="role">({{ current_user.role }})</span>
             </div>
 
-            <nav class="topbar-nav">
+            <div class="topbar-right">
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('new_client') }}">Clients</a>
-
-                {% if current_user.role == 'admin' %}
-                <a href="{{ url_for('chiffre_affaire') }}">CA</a>
-                {% endif %}
-            </nav>
-
-            <div class="avatar">
-                {{ current_user.username[0]|upper }}
+                <a href="{{ url_for('clients') }}">Clients</a>
             </div>
         </header>
 
-        <!-- FLASH -->
+        <!-- FLASH MESSAGES -->
         {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="flash-stack">
-            {% for category, message in messages %}
-            <div class="flash flash-{{ category }}">
-                <div class="flash-bar"></div>
-                <div class="flash-msg">{{ message }}</div>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
+            {% if messages %}
+                <div class="flash-container">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
         {% endwith %}
 
-        <!-- CONTENT -->
+        <!-- PAGE CONTENT -->
         <section class="content">
             {% block content %}{% endblock %}
         </section>
 
+        <!-- FOOTER -->
         <footer class="footer">
             SYNERGYGROUP • CRM
         </footer>
 
     </main>
+
 </div>
 
-{% block extra_js %}{% endblock %}
 </body>
 </html>
