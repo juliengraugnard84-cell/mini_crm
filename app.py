@@ -1099,7 +1099,7 @@ def clients():
         like_q = f"%{q}%"
         params.extend([like_q, like_q])
 
-    if user["role"] == "admin":
+    if (user.get("role") or "").strip().lower() == "admin":
         rows = conn.execute(
             f"""
             SELECT crm_clients.*, users.username AS commercial_name
@@ -1136,12 +1136,11 @@ def new_client():
     user = session.get("user")
 
     if request.method == "POST":
-        name = request.form.get("name")
-        energie_type = request.form.get("energie_type")
+        name = request.form.get("name", "").strip()
         created_at = request.form.get("created_at")
 
         if not name:
-            flash("Nom obligatoire.", "danger")
+            flash("Nom du dossier obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
         cur = conn.execute(
@@ -1162,10 +1161,12 @@ def new_client():
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
     conn = get_db()
+    user = session.get("user")
+    role = (user.get("role") or "").strip().lower()
+
+    if role != "admin" and not can_access_client(client_id):
+        abort(403)
 
     client = conn.execute(
         """
@@ -1204,8 +1205,9 @@ def client_detail(client_id):
 @login_required
 def delete_client(client_id):
     user = session.get("user")
+    role = (user.get("role") or "").strip().lower()
 
-    if user["role"] != "admin":
+    if role != "admin":
         abort(403)
 
     conn = get_db()
@@ -1220,13 +1222,13 @@ def delete_client(client_id):
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
 def upload_client_document(client_id):
-    if not can_access_client(client_id):
+    user = session.get("user")
+    role = (user.get("role") or "").strip().lower()
+
+    if role != "admin" and not can_access_client(client_id):
         abort(403)
 
     files = request.files.getlist("documents")
-    if not files:
-        return redirect(url_for("client_detail", client_id=client_id))
-
     prefix = client_s3_prefix(client_id)
 
     for f in files:
@@ -1241,7 +1243,10 @@ def upload_client_document(client_id):
 @app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
 @login_required
 def delete_client_document(client_id):
-    if not can_access_client(client_id):
+    user = session.get("user")
+    role = (user.get("role") or "").strip().lower()
+
+    if role != "admin" and not can_access_client(client_id):
         abort(403)
 
     key = request.form.get("key")
@@ -1258,14 +1263,14 @@ def delete_client_document(client_id):
 @login_required
 def create_cotation(client_id):
     user = session.get("user")
+    role = (user.get("role") or "").strip().lower()
 
-    # admin = accès total
-    if user["role"] != "admin" and not can_access_client(client_id):
+    if role != "admin" and not can_access_client(client_id):
         abort(403)
 
     data = request.form
-
     conn = get_db()
+
     conn.execute(
         """
         INSERT INTO cotations (
