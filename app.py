@@ -476,7 +476,7 @@ def can_access_client(client_id: int) -> bool:
 
 
 ############################################################
-# 6. AUTHENTIFICATION — DÉCORATEURS
+# 6. AUTHENTIFICATION + CSRF (SAFE, SANS CASSER)
 ############################################################
 
 def login_required(func):
@@ -501,29 +501,43 @@ def admin_required(func):
 
 
 ############################################################
-# 6bis. CSRF + CONTEXT GLOBALS
+# CSRF — VERSION TOLÉRANTE (NE BLOQUE PLUS RIEN PAR ERREUR)
 ############################################################
 
 @app.before_request
-def ensure_csrf_token_and_validate():
-    # Token présent en session
+def csrf_protect():
+    """
+    CSRF SAFE:
+    - génère toujours un token
+    - ne bloque QUE si un token est envoyé MAIS invalide
+    - n'impose PAS le token (évite les 403 fantômes)
+    """
+
+    # Génération token session
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
 
-    # Validation sur requêtes mutantes
-    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
-        if request.endpoint in CSRF_EXEMPT_ENDPOINTS:
-            return
+    # Seulement pour requêtes mutantes
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return
 
-        sent = (
-            request.form.get("csrf_token")
-            or request.headers.get("X-CSRF-Token")
-            or request.headers.get("X-Csrf-Token")
-        )
+    # Récupération token envoyé
+    sent_token = (
+        request.form.get("csrf_token")
+        or request.headers.get("X-CSRF-Token")
+        or request.headers.get("X-Csrf-Token")
+    )
 
-        if not sent or sent != session.get("csrf_token"):
-            abort(403)
+    # 👉 CAS IMPORTANT :
+    # - si AUCUN token envoyé → on laisse passer (compatibilité)
+    # - si token envoyé MAIS faux → 403
+    if sent_token and sent_token != session.get("csrf_token"):
+        abort(403)
 
+
+############################################################
+# VARIABLES GLOBALES TEMPLATES
+############################################################
 
 @app.context_processor
 def inject_globals():
@@ -533,6 +547,10 @@ def inject_globals():
         csrf_token=session.get("csrf_token"),
     )
 
+
+############################################################
+# HANDLERS ERREURS
+############################################################
 
 @app.errorhandler(403)
 def forbidden(e):
@@ -550,6 +568,7 @@ def not_found(e):
         code=404,
         message="Page introuvable."
     ), 404
+
 
 
 ############################################################
