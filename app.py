@@ -1262,6 +1262,53 @@ def create_cotation(client_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
+@app.route("/clients/<int:client_id>/delete", methods=["POST"])
+@login_required
+def delete_client(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    client = conn.execute(
+        "SELECT id FROM crm_clients WHERE id=?",
+        (client_id,),
+    ).fetchone()
+
+    if not client:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    # Supprimer les cotations liées
+    conn.execute(
+        "DELETE FROM cotations WHERE client_id=?",
+        (client_id,),
+    )
+
+    # Supprimer les documents S3
+    if not LOCAL_MODE and s3:
+        try:
+            prefix = client_s3_prefix(client_id)
+            objects = s3_list_all_objects(AWS_BUCKET, prefix)
+            if objects:
+                s3.delete_objects(
+                    Bucket=AWS_BUCKET,
+                    Delete={"Objects": [{"Key": o["Key"]} for o in objects]},
+                )
+        except Exception as e:
+            print("Erreur suppression documents S3 client:", repr(e))
+
+    # Supprimer le client
+    conn.execute(
+        "DELETE FROM crm_clients WHERE id=?",
+        (client_id,),
+    )
+    conn.commit()
+
+    flash("Dossier client supprimé.", "success")
+    return redirect(url_for("clients"))
+
+
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
 def upload_client_document(client_id):
