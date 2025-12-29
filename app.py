@@ -1089,6 +1089,7 @@ def delete_document(key):
 def clients():
     conn = get_db()
     user = session.get("user")
+    role = (user.get("role") or "").strip().lower()
     q = (request.args.get("q") or "").strip()
 
     params = []
@@ -1099,7 +1100,7 @@ def clients():
         like_q = f"%{q}%"
         params.extend([like_q, like_q])
 
-    if (user.get("role") or "").strip().lower() == "admin":
+    if role == "admin":
         rows = conn.execute(
             f"""
             SELECT crm_clients.*, users.username AS commercial_name
@@ -1161,12 +1162,10 @@ def new_client():
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
-    conn = get_db()
-    user = session.get("user")
-    role = (user.get("role") or "").strip().lower()
-
-    if role != "admin" and not can_access_client(client_id):
+    if not can_access_client(client_id):
         abort(403)
+
+    conn = get_db()
 
     client = conn.execute(
         """
@@ -1222,10 +1221,7 @@ def delete_client(client_id):
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
 def upload_client_document(client_id):
-    user = session.get("user")
-    role = (user.get("role") or "").strip().lower()
-
-    if role != "admin" and not can_access_client(client_id):
+    if not can_access_client(client_id):
         abort(403)
 
     files = request.files.getlist("documents")
@@ -1243,10 +1239,7 @@ def upload_client_document(client_id):
 @app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
 @login_required
 def delete_client_document(client_id):
-    user = session.get("user")
-    role = (user.get("role") or "").strip().lower()
-
-    if role != "admin" and not can_access_client(client_id):
+    if not can_access_client(client_id):
         abort(403)
 
     key = request.form.get("key")
@@ -1262,15 +1255,13 @@ def delete_client_document(client_id):
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
 def create_cotation(client_id):
-    user = session.get("user")
-    role = (user.get("role") or "").strip().lower()
-
-    if role != "admin" and not can_access_client(client_id):
+    if not can_access_client(client_id):
         abort(403)
 
     data = request.form
-    conn = get_db()
+    user = session.get("user")
 
+    conn = get_db()
     conn.execute(
         """
         INSERT INTO cotations (
@@ -1310,7 +1301,6 @@ def create_cotation(client_id):
 
     flash("Demande de cotation créée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
-
 
 ############################################################
 # 14. CHAT (BACKEND)
