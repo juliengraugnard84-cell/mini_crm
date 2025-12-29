@@ -22,6 +22,7 @@ from flask import (
 
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.exceptions import BadRequest
 
 import boto3
 from botocore.exceptions import ClientError
@@ -58,6 +59,11 @@ DEBUG = getattr(Config, "DEBUG", False)
 # Mot de passe admin par défaut (optionnel)
 ADMIN_DEFAULT_PASSWORD = getattr(Config, "ADMIN_DEFAULT_PASSWORD", "admin123")
 
+# CSRF: endpoints JSON éventuellement exemptés (si vous ne voulez pas gérer le header côté front)
+CSRF_EXEMPT_ENDPOINTS = {
+    "chat_send",  # si vous postez via JS sans CSRF pour l’instant, sinon retirez-le
+}
+
 
 ############################################################
 # 2. INITIALISATION FLASK
@@ -65,15 +71,26 @@ ADMIN_DEFAULT_PASSWORD = getattr(Config, "ADMIN_DEFAULT_PASSWORD", "admin123")
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+if not app.config.get("SECRET_KEY"):
+    raise RuntimeError("SECRET_KEY manquant dans la configuration.")
+
 app.secret_key = app.config["SECRET_KEY"]
 
 # Sécurité cookies session (prod-friendly)
 app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
 app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
 
-# Détection environnement production (plus robuste que FLASK_ENV, souvent absent/déprécié)
-if os.environ.get("FLASK_ENV") == "production" or os.environ.get("ENV") == "production":
-    app.config["SESSION_COOKIE_SECURE"] = True
+# Active SECURE si explicitement demandé, sinon détection d'env minimale
+# (plus fiable que FLASK_ENV, souvent absent/déprécié)
+is_production = (
+    os.environ.get("FLASK_ENV") == "production"
+    or os.environ.get("ENV") == "production"
+    or getattr(Config, "PRODUCTION", False)
+)
+
+if is_production:
+    app.config.setdefault("SESSION_COOKIE_SECURE", True)
 
 # Limite upload (évite DOS)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
@@ -113,6 +130,17 @@ def _try_add_column(conn, table, column_sql):
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column_sql}")
     except sqlite3.OperationalError:
         pass
+
+
+def _is_weak_default_admin_password(pw: str) -> bool:
+    # Heuristique simple
+    if not pw:
+        return True
+    if pw.lower() in {"admin", "admin123", "password", "123456", "12345678"}:
+        return True
+    if len(pw) < 10:
+        return True
+    return False
 
 
 def init_db():
@@ -179,7 +207,7 @@ def init_db():
     _try_add_column(conn, "cotations", "pdl_pce TEXT")
     _try_add_column(conn, "cotations", "commentaire TEXT")
 
-    # CHAT MESSAGES (⚠️ table manquante dans votre version)
+    # CHAT MESSAGES
     conn.execute("""
         CREATE TABLE IF NOT EXISTS chat_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,7 +219,6 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Index utiles (non bloquants)
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_id ON chat_messages(id)")
     except sqlite3.OperationalError:
@@ -203,6 +230,13 @@ def init_db():
     ).fetchone()
 
     if not admin:
+        # En prod, on évite d’initialiser avec un password faible par défaut
+        if is_production and _is_weak_default_admin_password(ADMIN_DEFAULT_PASSWORD):
+            raise RuntimeError(
+                "ADMIN_DEFAULT_PASSWORD trop faible pour un environnement production. "
+                "Définissez un mot de passe fort via Config/ENV."
+            )
+
         conn.execute(
             "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
             ("admin", generate_password_hash(ADMIN_DEFAULT_PASSWORD), "admin")
@@ -242,7 +276,16 @@ else:
 ############################################################
 
 def allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    if not filename or "." not in filename:
+        return False
+
+    # Refus basique des doubles extensions suspectes (.pdf.exe)
+    lowered = filename.lower()
+    if re.search(r"\.(exe|js|bat|cmd|sh|php|pl|py)\b", lowered):
+        return False
+
+    ext = filename.rsplit(".", 1)[1].lower()
+    return ext in ALLOWED_EXTENSIONS
 
 
 def clean_filename(filename: str) -> str:
@@ -382,7 +425,7 @@ def list_client_documents(client_id: int):
 
                 docs.append(
                     {
-                        "nom": key.replace(prefix, ""),
+                        "nom": key.replace(prefix, "", 1),
                         "key": key,
                         "taille": item["Size"],
                         "url": s3_presigned_url(key),
@@ -458,16 +501,28 @@ def admin_required(func):
 
 
 ############################################################
-# 6bis. CSRF + CONTEXT GLOBALS (SAFE / NON BLOQUANT)
+# 6bis. CSRF + CONTEXT GLOBALS
 ############################################################
 
 @app.before_request
-def ensure_csrf_token():
+def ensure_csrf_token_and_validate():
+    # Token présent en session
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
 
+    # Validation sur requêtes mutantes
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        if request.endpoint in CSRF_EXEMPT_ENDPOINTS:
+            return
 
-# ⚠️ CSRF volontairement désactivé (comme ton CRM d’origine)
+        sent = (
+            request.form.get("csrf_token")
+            or request.headers.get("X-CSRF-Token")
+            or request.headers.get("X-Csrf-Token")
+        )
+
+        if not sent or sent != session.get("csrf_token"):
+            abort(403)
 
 
 @app.context_processor
@@ -712,10 +767,16 @@ def chiffre_affaire():
             flash("Tous les champs sont obligatoires.", "danger")
             return redirect(url_for("chiffre_affaire"))
 
+        try:
+            montant_val = float(montant)
+        except Exception:
+            flash("Montant invalide.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
         conn.execute("""
             INSERT INTO revenus (date, commercial, dossier, montant)
             VALUES (?, ?, ?, ?)
-        """, (date_rev, commercial, dossier, montant))
+        """, (date_rev, commercial, dossier, montant_val))
         conn.commit()
 
         flash("Chiffre d’affaires ajouté.", "success")
@@ -801,6 +862,10 @@ def admin_users():
             flash("Champs obligatoires.", "danger")
             return redirect(url_for("admin_users"))
 
+        if len(password) < 10:
+            flash("Mot de passe trop court (min 10 caractères).", "danger")
+            return redirect(url_for("admin_users"))
+
         exists = conn.execute(
             "SELECT COUNT(*) FROM users WHERE username=?",
             (username,),
@@ -858,6 +923,9 @@ def admin_edit_user(user_id):
             return redirect(url_for("admin_edit_user", user_id=user_id))
 
         if password:
+            if len(password) < 10:
+                flash("Mot de passe trop court (min 10 caractères).", "danger")
+                return redirect(url_for("admin_edit_user", user_id=user_id))
             conn.execute(
                 "UPDATE users SET username=?, password=?, role=? WHERE id=?",
                 (username, generate_password_hash(password), role, user_id),
@@ -899,6 +967,10 @@ def admin_reset_password(user_id):
         flash("Le nouveau mot de passe est obligatoire.", "danger")
         return redirect(url_for("admin_users"))
 
+    if len(new_password) < 10:
+        flash("Mot de passe trop court (min 10 caractères).", "danger")
+        return redirect(url_for("admin_users"))
+
     conn = get_db()
     user = conn.execute(
         "SELECT id FROM users WHERE id=?",
@@ -922,6 +994,17 @@ def admin_reset_password(user_id):
 ############################################################
 # 11. DOCUMENTS GLOBAUX S3 (ADMIN UNIQUEMENT)
 ############################################################
+
+def _validate_s3_key_for_admin_delete(key: str) -> str:
+    if not key or key.strip() == "":
+        raise BadRequest("Clé S3 invalide.")
+    key = key.strip()
+    if ".." in key:
+        raise BadRequest("Clé S3 invalide.")
+    # Optionnel: restreindre à certains prefixes seulement
+    # ex: if not (key.startswith("clients/") or key.startswith("chat/") or ...): ...
+    return key
+
 
 @app.route("/documents")
 @admin_required
@@ -985,8 +1068,11 @@ def delete_document(key):
         return redirect(url_for("documents"))
 
     try:
+        key = _validate_s3_key_for_admin_delete(key)
         s3.delete_object(Bucket=AWS_BUCKET, Key=key)
         flash("Document supprimé.", "success")
+    except BadRequest as e:
+        flash(str(e), "danger")
     except Exception as e:
         print("Erreur suppression S3 (admin) :", repr(e))
         flash("Erreur suppression S3.", "danger")
@@ -1048,6 +1134,149 @@ def clients():
         clients=[row_to_obj(r) for r in rows],
         q=q
     )
+
+
+@app.route("/clients/new", methods=["GET", "POST"])
+@login_required
+def new_client():
+    conn = get_db()
+    user = session.get("user")
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+
+        if not name:
+            flash("Le nom du client est obligatoire.", "danger")
+            return redirect(url_for("new_client"))
+
+        owner_id = user["id"]
+
+        conn.execute(
+            """
+            INSERT INTO crm_clients (name, owner_id)
+            VALUES (?, ?)
+            """,
+            (name, owner_id),
+        )
+        conn.commit()
+
+        flash("Dossier client créé.", "success")
+        return redirect(url_for("clients"))
+
+    return render_template("client_form.html")
+
+
+@app.route("/clients/<int:client_id>")
+@login_required
+def client_detail(client_id):
+    conn = get_db()
+
+    client = conn.execute(
+        """
+        SELECT crm_clients.*, users.username AS commercial_name
+        FROM crm_clients
+        LEFT JOIN users ON users.id = crm_clients.owner_id
+        WHERE crm_clients.id = ?
+        """,
+        (client_id,),
+    ).fetchone()
+
+    if not client:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    if not can_access_client(client_id):
+        flash("Accès non autorisé.", "danger")
+        return redirect(url_for("clients"))
+
+    # Documents client (mode S3 ou vide)
+    documents = []
+    try:
+        documents = list_client_documents(client_id)
+    except Exception:
+        documents = []
+
+    # Cotations du client (historique simple)
+    cotations = conn.execute(
+        """
+        SELECT *
+        FROM cotations
+        WHERE client_id = ?
+        ORDER BY date_creation DESC
+        """,
+        (client_id,),
+    ).fetchall()
+
+    return render_template(
+        "client_detail.html",
+        client=row_to_obj(client),
+        documents=documents,
+        cotations=[row_to_obj(c) for c in cotations],
+    )
+
+
+@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
+@login_required
+def upload_client_document(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    if LOCAL_MODE or not s3:
+        flash("Upload désactivé en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    files = request.files.getlist("documents")
+    if not files:
+        flash("Aucun fichier sélectionné.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    prefix = client_s3_prefix(client_id)
+    uploaded = 0
+
+    for f in files:
+        if not f or not allowed_file(f.filename):
+            continue
+
+        filename = clean_filename(secure_filename(f.filename))
+        key = f"{prefix}{filename}"
+
+        try:
+            s3_upload_fileobj(f, AWS_BUCKET, key)
+            uploaded += 1
+        except Exception as e:
+            print("Erreur upload document client:", repr(e))
+
+    if uploaded:
+        flash(f"{uploaded} document(s) ajouté(s).", "success")
+    else:
+        flash("Aucun document valide envoyé.", "warning")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+@app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
+@login_required
+def delete_client_document(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    if LOCAL_MODE or not s3:
+        flash("Suppression désactivée en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    key = (request.form.get("key") or "").strip()
+    if not key:
+        flash("Document invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    try:
+        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+        flash("Document supprimé.", "success")
+    except Exception as e:
+        print("Erreur suppression document client:", repr(e))
+        flash("Erreur lors de la suppression.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 ############################################################
