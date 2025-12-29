@@ -8,14 +8,14 @@
 
     <!-- CSS principal -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
 </head>
 <body>
 
 <div class="app-layout">
 
-    <!-- SIDEBAR -->
+    <!-- ================= SIDEBAR ================= -->
     <aside class="sidebar">
+
         <div class="sidebar-header">
             <div class="logo">SG</div>
             <div class="company">
@@ -27,50 +27,46 @@
         <nav class="sidebar-nav">
             <a href="{{ url_for('dashboard') }}"
                class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
-                📊 Dashboard
+                Tableau de bord
             </a>
 
             <a href="{{ url_for('clients') }}"
                class="{% if request.endpoint in ['clients','client_detail','new_client'] %}active{% endif %}">
-                👥 Clients
+                Clients
             </a>
 
             {% if current_user and current_user.role == 'admin' %}
                 <a href="{{ url_for('chiffre_affaire') }}"
                    class="{% if request.endpoint == 'chiffre_affaire' %}active{% endif %}">
-                    💰 Chiffre d’affaires
+                    Chiffre d’affaires
                 </a>
 
                 <a href="{{ url_for('documents') }}"
                    class="{% if request.endpoint == 'documents' %}active{% endif %}">
-                    📁 Documents
+                    Documents
                 </a>
 
                 <a href="{{ url_for('admin_users') }}"
                    class="{% if request.endpoint.startswith('admin_') %}active{% endif %}">
-                    ⚙️ Utilisateurs
+                    Utilisateurs
                 </a>
             {% endif %}
-
-            <a href="{{ url_for('logout') }}" class="logout">
-                🚪 Déconnexion
-            </a>
         </nav>
+
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}">Déconnexion</a>
+        </div>
+
     </aside>
 
-    <!-- MAIN -->
+    <!-- ================= MAIN ================= -->
     <main class="main-content">
 
         <!-- TOP BAR -->
         <header class="topbar">
             <div class="topbar-left">
                 <strong>{{ current_user.username }}</strong>
-                <span class="role">({{ current_user.role }})</span>
-            </div>
-
-            <div class="topbar-right">
-                <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('clients') }}">Clients</a>
+                <span class="role">{{ current_user.role }}</span>
             </div>
         </header>
 
