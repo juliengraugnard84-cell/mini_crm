@@ -1088,15 +1088,20 @@ def delete_document(key):
 @login_required
 def clients():
     conn = get_db()
-    user = session.get("user")
+    user = session.get("user") or {}
     role = (user.get("role") or "").strip().lower()
     q = (request.args.get("q") or "").strip()
 
     params = []
-    where = ""
+    where_clause = ""
 
     if q:
-        where = "AND (crm_clients.name LIKE ? OR users.username LIKE ?)"
+        where_clause = """
+        AND (
+            crm_clients.name LIKE ?
+            OR users.username LIKE ?
+        )
+        """
         like_q = f"%{q}%"
         params.extend([like_q, like_q])
 
@@ -1106,10 +1111,11 @@ def clients():
             SELECT crm_clients.*, users.username AS commercial_name
             FROM crm_clients
             LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE 1=1 {where}
+            WHERE 1=1
+            {where_clause}
             ORDER BY crm_clients.created_at DESC
             """,
-            params,
+            params
         ).fetchall()
     else:
         rows = conn.execute(
@@ -1117,16 +1123,17 @@ def clients():
             SELECT crm_clients.*, users.username AS commercial_name
             FROM crm_clients
             LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.owner_id = ? {where}
+            WHERE crm_clients.owner_id = ?
+            {where_clause}
             ORDER BY crm_clients.created_at DESC
             """,
-            [user["id"]] + params,
+            [user.get("id")] + params
         ).fetchall()
 
     return render_template(
         "clients.html",
         clients=[row_to_obj(r) for r in rows],
-        q=q,
+        q=q
     )
 
 
@@ -1134,23 +1141,34 @@ def clients():
 @login_required
 def new_client():
     conn = get_db()
-    user = session.get("user")
+    user = session.get("user") or {}
 
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        created_at = request.form.get("created_at")
+        name = (request.form.get("name") or "").strip()
+        created_at = (request.form.get("created_at") or "").strip()  # optionnel
 
         if not name:
-            flash("Nom du dossier obligatoire.", "danger")
+            flash("Le nom du dossier est obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
-        cur = conn.execute(
-            """
-            INSERT INTO crm_clients (name, status, owner_id, created_at)
-            VALUES (?, 'cotation', ?, ?)
-            """,
-            (name, user["id"], created_at),
-        )
+        # Si created_at n'est pas fourni, laisser DEFAULT CURRENT_TIMESTAMP en base
+        if created_at:
+            cur = conn.execute(
+                """
+                INSERT INTO crm_clients (name, status, owner_id, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (name, "cotation", user.get("id"), created_at),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO crm_clients (name, status, owner_id)
+                VALUES (?, ?, ?)
+                """,
+                (name, "cotation", user.get("id")),
+            )
+
         conn.commit()
 
         flash("Dossier client créé.", "success")
@@ -1162,17 +1180,25 @@ def new_client():
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
     conn = get_db()
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+
+    # Contrôle d'accès robuste (admin ok)
+    if role != "admin":
+        row = conn.execute(
+            "SELECT owner_id FROM crm_clients WHERE id=?",
+            (client_id,),
+        ).fetchone()
+        if not row or row["owner_id"] != user.get("id"):
+            abort(403)
 
     client = conn.execute(
         """
         SELECT crm_clients.*, users.username AS commercial_name
         FROM crm_clients
         LEFT JOIN users ON users.id = crm_clients.owner_id
-        WHERE crm_clients.id=?
+        WHERE crm_clients.id = ?
         """,
         (client_id,),
     ).fetchone()
@@ -1180,22 +1206,26 @@ def client_detail(client_id):
     if not client:
         abort(404)
 
-    cotations = conn.execute(
+    cot_rows = conn.execute(
         """
         SELECT *
         FROM cotations
-        WHERE client_id=?
+        WHERE client_id = ?
         ORDER BY date_creation DESC
         """,
         (client_id,),
     ).fetchall()
 
-    documents = list_client_documents(client_id)
+    documents = []
+    try:
+        documents = list_client_documents(client_id)
+    except Exception:
+        documents = []
 
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
-        cotations=[row_to_obj(c) for c in cotations],
+        cotations=[row_to_obj(c) for c in cot_rows],
         documents=documents,
     )
 
@@ -1203,14 +1233,31 @@ def client_detail(client_id):
 @app.route("/clients/<int:client_id>/delete", methods=["POST"])
 @login_required
 def delete_client(client_id):
-    user = session.get("user")
+    conn = get_db()
+    user = session.get("user") or {}
     role = (user.get("role") or "").strip().lower()
 
+    # Suppression dossier : admin uniquement
     if role != "admin":
         abort(403)
 
-    conn = get_db()
+    # Supprimer cotations liées
     conn.execute("DELETE FROM cotations WHERE client_id=?", (client_id,))
+
+    # Supprimer documents S3 liés
+    if not LOCAL_MODE and s3:
+        try:
+            prefix = client_s3_prefix(client_id)
+            objs = s3_list_all_objects(AWS_BUCKET, prefix)
+            if objs:
+                s3.delete_objects(
+                    Bucket=AWS_BUCKET,
+                    Delete={"Objects": [{"Key": o["Key"]} for o in objs]},
+                )
+        except Exception as e:
+            print("Erreur suppression documents S3 client:", repr(e))
+
+    # Supprimer client
     conn.execute("DELETE FROM crm_clients WHERE id=?", (client_id,))
     conn.commit()
 
@@ -1221,47 +1268,106 @@ def delete_client(client_id):
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
 def upload_client_document(client_id):
-    if not can_access_client(client_id):
-        abort(403)
+    conn = get_db()
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+
+    # Contrôle accès robuste (admin ok)
+    if role != "admin":
+        row = conn.execute(
+            "SELECT owner_id FROM crm_clients WHERE id=?",
+            (client_id,),
+        ).fetchone()
+        if not row or row["owner_id"] != user.get("id"):
+            abort(403)
+
+    if LOCAL_MODE or not s3:
+        flash("Upload désactivé en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
 
     files = request.files.getlist("documents")
+    if not files:
+        flash("Aucun fichier sélectionné.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
     prefix = client_s3_prefix(client_id)
+    uploaded = 0
 
     for f in files:
         if f and allowed_file(f.filename):
             filename = clean_filename(secure_filename(f.filename))
-            s3_upload_fileobj(f, AWS_BUCKET, prefix + filename)
+            key = f"{prefix}{filename}"
+            try:
+                s3_upload_fileobj(f, AWS_BUCKET, key)
+                uploaded += 1
+            except Exception as e:
+                print("Erreur upload document client:", repr(e))
 
-    flash("Documents ajoutés.", "success")
+    if uploaded:
+        flash(f"{uploaded} document(s) ajouté(s).", "success")
+    else:
+        flash("Aucun document valide envoyé.", "warning")
+
     return redirect(url_for("client_detail", client_id=client_id))
 
 
 @app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
 @login_required
 def delete_client_document(client_id):
-    if not can_access_client(client_id):
-        abort(403)
+    conn = get_db()
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
 
-    key = request.form.get("key")
+    # Contrôle accès robuste (admin ok)
+    if role != "admin":
+        row = conn.execute(
+            "SELECT owner_id FROM crm_clients WHERE id=?",
+            (client_id,),
+        ).fetchone()
+        if not row or row["owner_id"] != user.get("id"):
+            abort(403)
+
+    if LOCAL_MODE or not s3:
+        flash("Suppression désactivée en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    key = (request.form.get("key") or "").strip()
     if not key:
         abort(400)
 
-    s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+    try:
+        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+        flash("Document supprimé.", "success")
+    except Exception as e:
+        print("Erreur suppression document client:", repr(e))
+        flash("Erreur lors de la suppression.", "danger")
 
-    flash("Document supprimé.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
 
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
 def create_cotation(client_id):
-    if not can_access_client(client_id):
-        abort(403)
+    """
+    Création cotation:
+    - admin: autorisé toujours
+    - commercial: uniquement si owner_id du client == user.id
+    (ne dépend PAS de can_access_client pour éviter les 403 persistants)
+    """
+    conn = get_db()
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+
+    if role != "admin":
+        row = conn.execute(
+            "SELECT owner_id FROM crm_clients WHERE id=?",
+            (client_id,),
+        ).fetchone()
+        if not row or row["owner_id"] != user.get("id"):
+            abort(403)
 
     data = request.form
-    user = session.get("user")
 
-    conn = get_db()
     conn.execute(
         """
         INSERT INTO cotations (
@@ -1277,30 +1383,32 @@ def create_cotation(client_id):
             signataire_email,
             pdl_pce,
             commentaire,
-            created_by
+            created_by,
+            status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'nouvelle')
         """,
         (
             client_id,
-            data.get("fournisseur_actuel"),
-            data.get("date_echeance"),
-            data.get("date_negociation"),
-            data.get("energie_type"),
-            data.get("entreprise_nom"),
-            data.get("siret"),
-            data.get("signataire_nom"),
-            data.get("signataire_tel"),
-            data.get("signataire_email"),
-            data.get("pdl_pce"),
-            data.get("commentaire"),
-            user["id"],
+            (data.get("fournisseur_actuel") or "").strip(),
+            (data.get("date_echeance") or "").strip(),
+            (data.get("date_negociation") or "").strip(),
+            (data.get("energie_type") or "").strip(),
+            (data.get("entreprise_nom") or "").strip(),
+            (data.get("siret") or "").strip(),
+            (data.get("signataire_nom") or "").strip(),
+            (data.get("signataire_tel") or "").strip(),
+            (data.get("signataire_email") or "").strip(),
+            (data.get("pdl_pce") or "").strip(),
+            (data.get("commentaire") or "").strip(),
+            user.get("id"),
         ),
     )
     conn.commit()
 
     flash("Demande de cotation créée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
+
 
 ############################################################
 # 14. CHAT (BACKEND)
