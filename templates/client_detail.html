@@ -1,9 +1,18 @@
 {% extends "base.html" %}
-
 {% block content %}
 
 <div class="page-header">
     <h1>{{ client.name }}</h1>
+
+    {% if current_user and current_user.role == 'admin' %}
+    <form method="post"
+          action="{{ url_for('delete_client', client_id=client.id) }}"
+          onsubmit="return confirm('Supprimer définitivement ce dossier ?');">
+        <button type="submit" class="btn btn-danger">
+            🗑 Supprimer le dossier
+        </button>
+    </form>
+    {% endif %}
 </div>
 
 <!-- ================= INFOS CLIENT ================= -->
@@ -28,19 +37,38 @@
     </div>
 </div>
 
-<!-- ================= DOCUMENTS (LECTURE SEULE) ================= -->
+<!-- ================= DOCUMENTS ================= -->
 <div class="card">
     <h3>Documents</h3>
 
+    <form method="post"
+          action="{{ url_for('upload_client_document', client_id=client.id) }}"
+          enctype="multipart/form-data">
+
+        <input type="file" name="documents" multiple required>
+        <button type="submit" class="btn btn-primary">
+            Ajouter des documents
+        </button>
+    </form>
+
     <ul class="doc-list">
         {% for doc in documents %}
-            <li>
-                <a href="{{ doc.url }}" target="_blank">
-                    {{ doc.nom }}
-                </a>
-            </li>
+        <li>
+            <a href="{{ doc.url }}" target="_blank">{{ doc.nom }}</a>
+
+            <form method="post"
+                  action="{{ url_for('delete_client_document', client_id=client.id) }}"
+                  style="display:inline;"
+                  onsubmit="return confirm('Supprimer ce document ?');">
+
+                <input type="hidden" name="key" value="{{ doc.key }}">
+                <button type="submit" class="btn btn-danger btn-sm">
+                    🗑
+                </button>
+            </form>
+        </li>
         {% else %}
-            <li>Aucun document</li>
+        <li>Aucun document</li>
         {% endfor %}
     </ul>
 </div>
@@ -51,8 +79,6 @@
 
     <form method="post"
           action="{{ url_for('create_cotation', client_id=client.id) }}">
-
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="form-grid">
             <div>
@@ -113,7 +139,7 @@
         <label>Commentaire</label>
         <textarea name="commentaire" rows="4"></textarea>
 
-        <button class="btn btn-primary" type="submit">
+        <button type="submit" class="btn btn-primary">
             Créer la demande
         </button>
     </form>
@@ -124,26 +150,26 @@
     <h3>Historique des cotations</h3>
 
     {% if cotations %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Énergie</th>
-                    <th>Fournisseur</th>
-                    <th>Statut</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in cotations %}
-                <tr>
-                    <td>{{ c.date_creation[:10] if c.date_creation else "—" }}</td>
-                    <td>{{ c.energie_type or "—" }}</td>
-                    <td>{{ c.fournisseur_actuel or "—" }}</td>
-                    <td>{{ c.status or "—" }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Énergie</th>
+                <th>Fournisseur</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cotations %}
+            <tr>
+                <td>{{ c.date_creation[:10] }}</td>
+                <td>{{ c.energie_type or "—" }}</td>
+                <td>{{ c.fournisseur_actuel or "—" }}</td>
+                <td>{{ c.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     {% else %}
         <p>Aucune cotation enregistrée.</p>
     {% endif %}
