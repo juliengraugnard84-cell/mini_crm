@@ -1,124 +1,134 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h1 class="page-title">{{ client.name }}</h1>
+<div class="page-header">
+    <h1>{{ client.name }}</h1>
+</div>
 
 <!-- ================= INFOS CLIENT ================= -->
-<div class="card section">
-    <h2>Informations client</h2>
+<div class="card">
+    <h3>Informations client</h3>
 
     <div class="info-grid">
-        <div>
-            <span class="label">Commercial</span>
+        <div class="info-item">
+            <span>Commercial</span>
             <strong>{{ client.commercial_name or "—" }}</strong>
         </div>
-        <div>
-            <span class="label">Date de création</span>
+
+        <div class="info-item">
+            <span>Date de création</span>
             <strong>{{ client.created_at[:10] if client.created_at else "—" }}</strong>
         </div>
-        <div>
-            <span class="label">Statut</span>
-            <strong class="badge">{{ client.status or "—" }}</strong>
+
+        <div class="info-item">
+            <span>Statut</span>
+            <strong>{{ client.status or "—" }}</strong>
         </div>
     </div>
 </div>
 
 <!-- ================= MISE À JOUR DOSSIER ================= -->
-<div class="card section">
-    <h2>Mise à jour du dossier</h2>
+<div class="card">
+    <h3>Mise à jour du dossier</h3>
 
     <form method="post"
-          action="{{ url_for('update_client', client_id=client.id) }}"
-          class="form-grid">
+          action="{{ url_for('update_client', client_id=client.id) }}">
 
-        <div>
-            <label>Nom du dossier</label>
-            <input type="text" name="update_name" value="{{ client.name }}" required>
+        <div class="form-grid">
+            <div>
+                <label>Nom du dossier</label>
+                <input type="text"
+                       name="update_name"
+                       value="{{ client.name }}"
+                       required>
+            </div>
+
+            <div>
+                <label>Date de mise à jour</label>
+                <input type="date"
+                       name="update_date"
+                       required>
+            </div>
         </div>
 
-        <div>
-            <label>Date de mise à jour</label>
-            <input type="date" name="update_date" required>
-        </div>
+        <label>Commentaire</label>
+        <textarea name="update_commentaire" rows="3"></textarea>
 
-        <div class="full">
-            <label>Commentaire</label>
-            <textarea name="update_commentaire" rows="3"></textarea>
-        </div>
-
-        <div class="full">
-            <button class="btn btn-primary">
-                Enregistrer la mise à jour
-            </button>
-        </div>
+        <button type="submit" class="btn btn-secondary">
+            Enregistrer la mise à jour
+        </button>
     </form>
 </div>
 
 <!-- ================= DOCUMENTS ================= -->
-<div class="card section">
-    <h2>Documents</h2>
+<div class="card">
+    <h3>Documents</h3>
 
     <form method="post"
-          action="{{ url_for('upload_client_document', client_id=client.id) }}"
-          enctype="multipart/form-data"
-          class="inline-form">
+          action="{{ url_for('upload_document') }}"
+          enctype="multipart/form-data">
 
-        <input type="file" name="documents" multiple required>
-        <button class="btn btn-secondary">Ajouter</button>
+        <input type="file" name="file" required>
+        <button type="submit" class="btn btn-primary">
+            Ajouter un document
+        </button>
     </form>
 
     <ul class="doc-list">
         {% for doc in documents %}
         <li>
             <a href="{{ doc.url }}" target="_blank">{{ doc.nom }}</a>
+
+            {% if current_user.role == 'admin' %}
             <form method="post"
-                  action="{{ url_for('delete_client_document', client_id=client.id) }}">
-                <input type="hidden" name="key" value="{{ doc.key }}">
-                <button class="icon-btn">🗑</button>
+                  action="{{ url_for('delete_document', key=doc.key) }}"
+                  style="display:inline;"
+                  onsubmit="return confirm('Supprimer ce document ?');">
+                <button type="submit" class="btn btn-danger btn-sm">🗑</button>
             </form>
+            {% endif %}
         </li>
         {% else %}
-        <li class="muted">Aucun document</li>
+        <li>Aucun document</li>
         {% endfor %}
     </ul>
 </div>
 
 <!-- ================= NOUVELLE COTATION ================= -->
-<div class="card section">
-    <h2>Nouvelle demande de cotation</h2>
+<div class="card">
+    <h3>Nouvelle demande de cotation</h3>
 
     <form method="post"
-          action="{{ url_for('create_cotation', client_id=client.id) }}"
-          class="form-grid">
+          action="{{ url_for('new_cotation', client_id=client.id) }}">
 
-        <input type="date" name="date_negociation">
-        <select name="energie_type">
-            <option value="">— Énergie —</option>
-            <option value="electricite">Électricité</option>
-            <option value="gaz">Gaz</option>
-        </select>
-        <input type="text" name="pdl_pce" placeholder="PDL / PCE">
-        <input type="date" name="date_echeance">
-        <input type="text" name="fournisseur_actuel" placeholder="Fournisseur">
-        <input type="text" name="entreprise_nom" placeholder="Entreprise">
-        <input type="text" name="siret" placeholder="SIRET">
-        <input type="text" name="signataire_nom" placeholder="Signataire">
-        <input type="text" name="signataire_tel" placeholder="Téléphone">
-        <input type="email" name="signataire_email" placeholder="Email">
-
-        <div class="full">
-            <textarea name="commentaire" rows="3" placeholder="Commentaire"></textarea>
+        <div class="form-grid">
+            <input type="date" name="date_negociation">
+            <select name="energie_type">
+                <option value="">— Énergie —</option>
+                <option value="electricite">Électricité</option>
+                <option value="gaz">Gaz</option>
+            </select>
+            <input type="text" name="pdl_pce" placeholder="PDL / PCE">
+            <input type="date" name="date_echeance">
+            <input type="text" name="fournisseur_actuel" placeholder="Fournisseur">
+            <input type="text" name="entreprise_nom" placeholder="Entreprise">
+            <input type="text" name="siret" placeholder="SIRET">
+            <input type="text" name="signataire_nom" placeholder="Signataire">
+            <input type="text" name="signataire_tel" placeholder="Téléphone">
+            <input type="email" name="signataire_email" placeholder="Email">
         </div>
 
-        <div class="full">
-            <button class="btn btn-primary">Créer la demande</button>
-        </div>
+        <textarea name="commentaire" rows="4" placeholder="Commentaire"></textarea>
+
+        <button type="submit" class="btn btn-primary">
+            Créer la demande
+        </button>
     </form>
 </div>
 
 <!-- ================= HISTORIQUE ================= -->
-<div class="card section">
-    <h2>Historique des cotations</h2>
+<div class="card">
+    <h3>Historique des cotations</h3>
 
     {% if cotations %}
     <table class="table">
@@ -142,7 +152,7 @@
         </tbody>
     </table>
     {% else %}
-        <p class="muted">Aucune cotation enregistrée.</p>
+        <p>Aucune cotation enregistrée.</p>
     {% endif %}
 </div>
 

@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block content %}
 
 <div class="page-header">
@@ -11,15 +10,11 @@
 
 <div class="card">
     <form method="get" action="{{ url_for('clients') }}" class="search-form">
-        <input
-            type="text"
-            name="q"
-            placeholder="Rechercher un dossier client…"
-            value="{{ q or '' }}"
-        >
-        <button type="submit" class="btn btn-primary">
-            Rechercher
-        </button>
+        <input type="text"
+               name="q"
+               placeholder="Rechercher un dossier…"
+               value="{{ q or '' }}">
+        <button class="btn btn-secondary">Rechercher</button>
     </form>
 </div>
 
@@ -31,7 +26,7 @@
                 <th>Dossier</th>
                 <th>Commercial</th>
                 <th>Statut</th>
-                <th>Date création</th>
+                <th>Date</th>
                 <th></th>
             </tr>
         </thead>
@@ -40,13 +35,9 @@
             <tr>
                 <td><strong>{{ c.name }}</strong></td>
                 <td>{{ c.commercial_name or "—" }}</td>
-                <td>
-                    <span class="badge badge-info">
-                        {{ c.status or "Cotation" }}
-                    </span>
-                </td>
-                <td>{{ c.created_at[:10] if c.created_at else "—" }}</td>
-                <td style="text-align:right;">
+                <td>{{ c.status or "cotation" }}</td>
+                <td>{{ c.created_at[:10] }}</td>
+                <td style="text-align:right">
                     <a href="{{ url_for('client_detail', client_id=c.id) }}"
                        class="btn btn-secondary">
                         Ouvrir
@@ -57,7 +48,7 @@
         </tbody>
     </table>
     {% else %}
-        <p class="text-muted">Aucun dossier trouvé.</p>
+        <p>Aucun dossier trouvé.</p>
     {% endif %}
 </div>
 
