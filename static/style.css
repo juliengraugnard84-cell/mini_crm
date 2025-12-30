@@ -468,3 +468,95 @@ input, select, textarea {
 .section-title.update::before {
     background: linear-gradient(180deg, #9b59b6, #8e44ad);
 }
+/* ================= DOCUMENTS ================= */
+
+.documents-card {
+    margin-top: 30px;
+}
+
+.documents-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.upload-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.upload-label {
+    background: #f1f5f9;
+    border: 1px dashed #cbd5e1;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s ease;
+}
+
+.upload-label:hover {
+    background: #e2e8f0;
+}
+
+.documents-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 20px;
+}
+
+.document-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: #ffffff;
+    transition: background 0.2s ease;
+}
+
+.document-item:hover {
+    background: #f9fafb;
+}
+
+.doc-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.doc-name {
+    text-decoration: none;
+    color: #1f2937;
+    font-weight: 500;
+}
+
+.doc-name:hover {
+    text-decoration: underline;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+}
+
+.btn-icon.danger {
+    color: #dc2626;
+}
+
+.empty-docs {
+    margin-top: 20px;
+    padding: 20px;
+    text-align: center;
+    color: #6b7280;
+    background: #f9fafb;
+    border-radius: 8px;
+    font-style: italic;
+}

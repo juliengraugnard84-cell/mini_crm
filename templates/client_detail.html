@@ -2,7 +2,7 @@
 {% block content %}
 
 <!-- ================= HEADER + SEARCH ================= -->
-<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;">
     <h1>{{ client.name }}</h1>
 
     <form method="get"
@@ -73,41 +73,58 @@
 </div>
 
 <!-- ================= DOCUMENTS ================= -->
-<div class="card">
-    <h3 class="section-title documents">Documents</h3>
+<div class="card documents-card">
+    <div class="documents-header">
+        <h3 class="section-title documents">Documents</h3>
 
-    <form method="post"
-          action="{{ url_for('upload_client_document', client_id=client.id) }}"
-          enctype="multipart/form-data">
+        <form method="post"
+              action="{{ url_for('upload_client_document', client_id=client.id) }}"
+              enctype="multipart/form-data"
+              class="upload-form">
 
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="file" name="documents" multiple required>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <button type="submit" class="btn btn-primary">
-            Ajouter des documents
-        </button>
-    </form>
+            <label class="upload-label">
+                📎 Ajouter des fichiers
+                <input type="file" name="documents" multiple hidden required>
+            </label>
 
-    <ul class="doc-list">
+            <button type="submit" class="btn btn-primary btn-sm">
+                Envoyer
+            </button>
+        </form>
+    </div>
+
+    {% if documents %}
+    <ul class="documents-list">
         {% for doc in documents %}
-        <li>
-            <a href="{{ doc.url }}" target="_blank">{{ doc.nom }}</a>
+        <li class="document-item">
+            <div class="doc-info">
+                <span class="doc-icon">📄</span>
+                <a href="{{ doc.url }}" target="_blank" class="doc-name">
+                    {{ doc.nom }}
+                </a>
+            </div>
 
             <form method="post"
                   action="{{ url_for('delete_client_document', client_id=client.id) }}"
-                  style="display:inline;"
                   onsubmit="return confirm('Supprimer ce document ?');">
 
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="key" value="{{ doc.key }}">
 
-                <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+                <button type="submit" class="btn-icon danger" title="Supprimer">
+                    🗑
+                </button>
             </form>
         </li>
-        {% else %}
-        <li>Aucun document</li>
         {% endfor %}
     </ul>
+    {% else %}
+        <div class="empty-docs">
+            Aucun document pour ce dossier.
+        </div>
+    {% endif %}
 </div>
 
 <!-- ================= NOUVELLE COTATION ================= -->
