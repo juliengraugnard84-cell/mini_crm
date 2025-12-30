@@ -18,11 +18,18 @@
         <div class="doc-card-sub">Formats autorisés : PDF, images, Word, Excel, CSV.</div>
     </div>
 
-    <form action="{{ url_for('upload_document') }}" method="POST" enctype="multipart/form-data" class="doc-upload">
+    <form action="{{ url_for('upload_document') }}"
+          method="POST"
+          enctype="multipart/form-data"
+          class="doc-upload">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
         <div class="doc-upload-row">
             <input class="form-control" type="file" name="file" required>
             <button class="btn btn-primary" type="submit">Uploader</button>
         </div>
+
         <div class="doc-help">
             Conseil : privilégie des noms de fichiers courts et explicites.
         </div>
@@ -34,7 +41,7 @@
     <div class="doc-card-head">
         <h5 class="doc-card-title">Documents</h5>
         <div class="doc-card-sub">
-            {{ (fichiers|length) if fichiers else 0 }} fichier(s)
+            {{ fichiers|length if fichiers else 0 }} fichier(s)
         </div>
     </div>
 
@@ -58,18 +65,20 @@
                     <tr>
                         <td class="doc-name">
                             {% if f.url %}
-                                <a href="{{ f.url }}" target="_blank" rel="noopener" class="doc-link">
+                                <a href="{{ f.url }}"
+                                   target="_blank"
+                                   rel="noopener"
+                                   class="doc-link">
                                     {{ f.nom }}
                                 </a>
                             {% else %}
                                 <span>{{ f.nom }}</span>
                             {% endif %}
-                            <div class="doc-path text-muted">{{ f.nom }}</div>
+                            <div class="doc-path text-muted">{{ f.key }}</div>
                         </td>
 
                         <td class="doc-size">
-                            {# format simple Ko/Mo #}
-                            {% set s = (f.taille or 0) %}
+                            {% set s = f.taille or 0 %}
                             {% if s >= 1048576 %}
                                 {{ "%.2f"|format(s / 1048576) }} Mo
                             {% elif s >= 1024 %}
@@ -79,18 +88,26 @@
                             {% endif %}
                         </td>
 
-                        <td class="doc-actions">
+                        <td class="doc-actions" style="text-align:right;">
                             {% if f.url %}
-                                <a class="btn btn-secondary btn-icon" href="{{ f.url }}" target="_blank" rel="noopener" title="Ouvrir">
+                                <a class="btn btn-secondary btn-icon"
+                                   href="{{ f.url }}"
+                                   target="_blank"
+                                   rel="noopener">
                                     Ouvrir
                                 </a>
                             {% endif %}
 
-                            <form action="{{ url_for('delete_document', key=f.nom) }}"
+                            <form action="{{ url_for('delete_document', key=f.key) }}"
                                   method="POST"
                                   style="display:inline;"
                                   onsubmit="return confirm('Supprimer ce document ?');">
-                                <button type="submit" class="btn btn-danger btn-icon" title="Supprimer">
+
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                                <button type="submit"
+                                        class="btn btn-danger btn-icon"
+                                        title="Supprimer">
                                     Supprimer
                                 </button>
                             </form>
