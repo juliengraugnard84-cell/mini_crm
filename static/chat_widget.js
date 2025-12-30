@@ -1,15 +1,17 @@
 document.addEventListener("DOMContentLoaded", () => {
 
-    const bubble = document.getElementById("chatBubble");
-    const win = document.getElementById("chatWindow");
-    const closeBtn = document.getElementById("chatClose");
+    /* ================= ELEMENTS ================= */
 
-    const input = document.getElementById("chatInput");
-    const sendBtn = document.getElementById("chatSend");
-    const fileInput = document.getElementById("chatUpload");
-    const messagesBox = document.getElementById("chatMessages");
+    const bubble = document.getElementById("chat-bubble");
+    const panel = document.getElementById("chat-panel");
+    const closeBtn = document.getElementById("chat-close");
 
-    if (!bubble || !win || !input || !sendBtn || !messagesBox) {
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("chat-input");
+    const fileInput = document.getElementById("chat-file");
+    const messagesBox = document.getElementById("chat-messages");
+
+    if (!bubble || !panel || !form || !input || !messagesBox) {
         console.warn("Chat widget incomplet");
         return;
     }
@@ -17,15 +19,21 @@ document.addEventListener("DOMContentLoaded", () => {
     /* ================= TOGGLE ================= */
 
     bubble.addEventListener("click", () => {
-        win.style.display = win.style.display === "flex" ? "none" : "flex";
-        if (win.style.display === "flex") {
+        const isHidden = panel.classList.contains("chat-hidden");
+
+        panel.classList.toggle("chat-hidden", !isHidden);
+
+        if (isHidden) {
             loadMessages();
+            setTimeout(() => input.focus(), 150);
         }
     });
 
-    closeBtn.addEventListener("click", () => {
-        win.style.display = "none";
-    });
+    if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+            panel.classList.add("chat-hidden");
+        });
+    }
 
     /* ================= HELPERS ================= */
 
@@ -54,7 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (m.file_url) {
                     const safeName = escapeHTML(m.file_name || "fichier");
-                    html += ` <a href="${m.file_url}" target="_blank">📎 ${safeName}</a>`;
+                    html += ` <a href="${m.file_url}" target="_blank" rel="noopener">📎 ${safeName}</a>`;
                 }
 
                 div.innerHTML = html;
@@ -73,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function sendMessage() {
 
         const message = input.value.trim();
-        const file = fileInput.files[0];
+        const file = fileInput?.files?.[0];
 
         if (!message && !file) {
             alert("Message ou fichier requis");
@@ -99,7 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             input.value = "";
-            fileInput.value = "";
+            if (fileInput) fileInput.value = "";
 
             loadMessages();
 
@@ -109,10 +117,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    sendBtn.addEventListener("click", sendMessage);
+    /* ================= EVENTS ================= */
+
+    form.addEventListener("submit", e => {
+        e.preventDefault();
+        sendMessage();
+    });
 
     input.addEventListener("keydown", e => {
-        if (e.key === "Enter") {
+        if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
         }

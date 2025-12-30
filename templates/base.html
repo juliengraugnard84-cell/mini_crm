@@ -97,5 +97,47 @@
 
 </div>
 
+<!-- ======================================================
+     CHAT — BULLE FLOTTANTE
+     ====================================================== -->
+<div id="chat-bubble" title="Ouvrir le chat">
+    💬
+</div>
+
+<!-- ======================================================
+     CHAT — PANNEAU
+     ====================================================== -->
+<div id="chat-panel" class="chat-hidden">
+
+    <div class="chat-header">
+        <span>Chat interne</span>
+        <button type="button" id="chat-close">×</button>
+    </div>
+
+    <div id="chat-messages" class="chat-messages"></div>
+
+    <form id="chat-form" class="chat-form" enctype="multipart/form-data">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <input type="text"
+               id="chat-input"
+               name="message"
+               placeholder="Écrire un message…"
+               autocomplete="off">
+
+        <input type="file"
+               id="chat-file"
+               name="file">
+
+        <button type="submit">
+            Envoyer
+        </button>
+    </form>
+</div>
+
+<!-- JS CHAT -->
+<script src="{{ url_for('static', filename='chat_widget.js') }}"></script>
+
 </body>
 </html>
