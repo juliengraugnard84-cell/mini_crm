@@ -609,3 +609,30 @@ input, select, textarea {
     border-radius: 6px;
     line-height: 1;
 }
+/* ===============================
+   FIX BOUTON SUPPRIMER DOCUMENT
+   =============================== */
+
+/* Autorise les boutons dans la colonne Actions */
+.table td:last-child form {
+    display: inline-block !important;
+}
+
+/* Force l'affichage des boutons danger */
+.table td:last-child button,
+.doc-actions button {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Empêche un overflow qui masque les boutons */
+.table td:last-child {
+    overflow: visible !important;
+    white-space: nowrap;
+}
+
+/* Séparation visuelle */
+.table td:last-child form {
+    margin-left: 8px;
+}
