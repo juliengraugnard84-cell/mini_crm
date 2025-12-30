@@ -2,7 +2,7 @@
 {% block content %}
 
 <!-- ================= HEADER + SEARCH ================= -->
-<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;">
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
     <h1>{{ client.name }}</h1>
 
     <form method="get"
@@ -13,7 +13,9 @@
                placeholder="Rechercher un dossier…"
                class="form-control"
                style="min-width:260px;">
-        <button class="btn btn-secondary">Rechercher</button>
+        <button class="btn btn-secondary">
+            Rechercher
+        </button>
     </form>
 </div>
 
@@ -73,58 +75,105 @@
 </div>
 
 <!-- ================= DOCUMENTS ================= -->
-<div class="card documents-card">
-    <div class="documents-header">
-        <h3 class="section-title documents">Documents</h3>
+<div class="card">
+    <h3 class="section-title documents">Documents</h3>
 
+    <!-- ==== UPLOAD BAR ==== -->
+    <div class="docs-upload-wrap" style="margin-top:10px;">
         <form method="post"
               action="{{ url_for('upload_client_document', client_id=client.id) }}"
               enctype="multipart/form-data"
-              class="upload-form">
+              style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
 
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-            <label class="upload-label">
-                📎 Ajouter des fichiers
-                <input type="file" name="documents" multiple hidden required>
-            </label>
-
-            <button type="submit" class="btn btn-primary btn-sm">
-                Envoyer
-            </button>
-        </form>
-    </div>
-
-    {% if documents %}
-    <ul class="documents-list">
-        {% for doc in documents %}
-        <li class="document-item">
-            <div class="doc-info">
-                <span class="doc-icon">📄</span>
-                <a href="{{ doc.url }}" target="_blank" class="doc-name">
-                    {{ doc.nom }}
-                </a>
+            <div class="docs-file" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <input type="file"
+                       name="documents"
+                       multiple
+                       required
+                       class="form-control"
+                       style="max-width:360px;">
             </div>
 
-            <form method="post"
-                  action="{{ url_for('delete_client_document', client_id=client.id) }}"
-                  onsubmit="return confirm('Supprimer ce document ?');">
+            <button type="submit" class="btn btn-primary">
+                Ajouter des documents
+            </button>
+        </form>
 
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="key" value="{{ doc.key }}">
+        <p class="text-muted" style="margin:10px 0 0 0;">
+            Formats autorisés : pdf, jpg, png, doc/docx, xls/xlsx, csv.
+        </p>
+    </div>
 
-                <button type="submit" class="btn-icon danger" title="Supprimer">
-                    🗑
-                </button>
-            </form>
-        </li>
-        {% endfor %}
-    </ul>
-    {% else %}
-        <div class="empty-docs">
-            Aucun document pour ce dossier.
-        </div>
-    {% endif %}
+    <!-- ==== LISTE DOCUMENTS ==== -->
+    <div class="docs-list-wrap" style="margin-top:16px;">
+
+        {% if documents and documents|length > 0 %}
+
+            <div class="docs-grid" style="display:flex;flex-direction:column;gap:10px;">
+
+                {% for doc in documents %}
+                <div class="doc-row"
+                     style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid rgba(0,0,0,0.08);border-radius:10px;">
+
+                    <div class="doc-left" style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+                        <div class="doc-name" style="display:flex;align-items:center;gap:8px;min-width:0;">
+                            <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:520px;">
+                                {{ doc.nom }}
+                            </span>
+                        </div>
+
+                        <div class="doc-meta" style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#666;">
+                            {% if doc.taille is defined %}
+                                <span>Taille : {{ doc.taille }} octets</span>
+                            {% endif %}
+                            <span>Accès : lien sécurisé</span>
+                        </div>
+                    </div>
+
+                    <div class="doc-actions" style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+
+                        <!-- OUVRIR -->
+                        <a class="btn btn-outline-secondary btn-sm"
+                           href="{{ doc.url }}"
+                           target="_blank"
+                           style="display:inline-flex;align-items:center;gap:6px;">
+                            Ouvrir
+                        </a>
+
+                        <!-- SUPPRIMER -->
+                        <form method="post"
+                              action="{{ url_for('delete_client_document', client_id=client.id) }}"
+                              style="display:inline;"
+                              onsubmit="return confirm('Supprimer ce document ?');">
+
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="key" value="{{ doc.key }}">
+
+                            <!-- IMPORTANT : bouton visible (pas d’emoji obligatoire) -->
+                            <button type="submit"
+                                    class="btn btn-danger btn-sm"
+                                    style="display:inline-flex;align-items:center;gap:6px;">
+                                Supprimer
+                            </button>
+                        </form>
+
+                    </div>
+                </div>
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <div class="text-muted" style="padding:12px;border:1px dashed rgba(0,0,0,0.15);border-radius:10px;margin-top:10px;">
+                Aucun document
+            </div>
+
+        {% endif %}
+
+    </div>
 </div>
 
 <!-- ================= NOUVELLE COTATION ================= -->
