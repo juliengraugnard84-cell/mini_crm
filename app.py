@@ -1273,11 +1273,19 @@ def upload_client_document(client_id):
         flash("Aucun fichier sélectionné.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
+    conn = get_db()
+    row = conn.execute(
+        "SELECT name FROM crm_clients WHERE id=?",
+        (client_id,)
+    ).fetchone()
+
+    client_slug = slugify(row["name"]) if row and row["name"] else f"client_{client_id}"
     prefix = client_s3_prefix(client_id)
 
     for f in files:
         if f and allowed_file(f.filename):
-            filename = clean_filename(secure_filename(f.filename))
+            original_name = clean_filename(secure_filename(f.filename))
+            filename = f"{client_slug}_{original_name}"
             key = f"{prefix}{filename}"
             s3_upload_fileobj(f, AWS_BUCKET, key)
 
@@ -1353,6 +1361,7 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation créée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
+
 
 
 ############################################################
