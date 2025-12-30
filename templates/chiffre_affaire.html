@@ -5,28 +5,59 @@
 
 <h1 class="page-title">Chiffre d’affaires</h1>
 
-<!-- KPI CA -->
+<!-- ================= KPI ================= -->
 <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;">
 
     <div class="kpi-tile">
-        <div class="kpi-label">Chiffre d’affaires annuel</div>
-        <div class="kpi-value">{{ ca_annuel }} €</div>
+        <div class="kpi-label">
+            {% if role == 'admin' %}
+                Chiffre d’affaires annuel (global)
+            {% else %}
+                Votre chiffre d’affaires annuel
+            {% endif %}
+        </div>
+        <div class="kpi-value">{{ ca_annuel_perso }} €</div>
     </div>
 
     <div class="kpi-tile">
-        <div class="kpi-label">Chiffre d’affaires mensuel</div>
-        <div class="kpi-value">{{ ca_mensuel }} €</div>
+        <div class="kpi-label">
+            {% if role == 'admin' %}
+                Chiffre d’affaires mensuel (global)
+            {% else %}
+                Votre chiffre d’affaires mensuel
+            {% endif %}
+        </div>
+        <div class="kpi-value">{{ ca_mensuel_perso }} €</div>
     </div>
 
 </div>
 
-<!-- AJOUT CA (ADMIN) -->
-{% if current_user.role == 'admin' %}
+<!-- ================= KPI GLOBAL (COMMERCIAL) ================= -->
+{% if role != 'admin' %}
+<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;">
+
+    <div class="kpi-tile kpi-secondary">
+        <div class="kpi-label">Chiffre d’affaires annuel global</div>
+        <div class="kpi-value">{{ ca_annuel_global }} €</div>
+    </div>
+
+    <div class="kpi-tile kpi-secondary">
+        <div class="kpi-label">Chiffre d’affaires mensuel global</div>
+        <div class="kpi-value">{{ ca_mensuel_global }} €</div>
+    </div>
+
+</div>
+{% endif %}
+
+<!-- ================= AJOUT CA (ADMIN SEULEMENT) ================= -->
+{% if role == 'admin' %}
 <div class="card">
 
     <h5>Ajouter un chiffre d’affaires</h5>
 
     <form method="POST">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="row g-3">
 
@@ -63,7 +94,8 @@
 </div>
 {% endif %}
 
-<!-- LISTES CA -->
+<!-- ================= CA PAR COMMERCIAL (ADMIN) ================= -->
+{% if role == 'admin' %}
 <div class="card">
 
     <h5>Chiffre d’affaires par commercial (année)</h5>
@@ -90,36 +122,9 @@
     {% endif %}
 
 </div>
+{% endif %}
 
-<div class="card">
-
-    <h5>Chiffre d’affaires mensuel par commercial</h5>
-
-    {% if mensuel_par_com %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Mois</th>
-                <th>Commercial</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in mensuel_par_com %}
-            <tr>
-                <td>{{ r.mois }}</td>
-                <td>{{ r.commercial }}</td>
-                <td>{{ r.total }} €</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-        <p class="text-muted">Aucune donnée.</p>
-    {% endif %}
-
-</div>
-
+<!-- ================= CA GLOBAL PAR MOIS ================= -->
 <div class="card">
 
     <h5>Chiffre d’affaires global par mois</h5>
@@ -138,7 +143,7 @@
                 <td>{{ r.mois }}</td>
                 <td><strong>{{ r.total }} €</strong></td>
             </tr>
-        {% endfor %}
+            {% endfor %}
         </tbody>
     </table>
     {% else %}

@@ -5,7 +5,6 @@
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
     <h1>{{ client.name }}</h1>
 
-    <!-- Recherche dossier global -->
     <form method="get"
           action="{{ url_for('clients') }}"
           style="display:flex;gap:10px;align-items:center;">
@@ -14,9 +13,7 @@
                placeholder="Rechercher un dossier…"
                class="form-control"
                style="min-width:260px;">
-        <button class="btn btn-secondary">
-            Rechercher
-        </button>
+        <button class="btn btn-secondary">Rechercher</button>
     </form>
 </div>
 
@@ -42,6 +39,39 @@
     </div>
 </div>
 
+<!-- ================= CHIFFRE D’AFFAIRES DOSSIER ================= -->
+<div class="card">
+    <h3 class="section-title ca">Chiffre d’affaires du dossier</h3>
+
+    <div class="info-grid">
+        <div class="info-item">
+            <span>Total cumulé</span>
+            <strong>{{ ca_total }} €</strong>
+        </div>
+    </div>
+
+    {% if ca_par_mois %}
+    <table class="table" style="margin-top:16px;">
+        <thead>
+            <tr>
+                <th>Mois</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in ca_par_mois %}
+            <tr>
+                <td>{{ r.mois }}</td>
+                <td><strong>{{ r.total }} €</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="text-muted">Aucun chiffre d’affaires enregistré pour ce dossier.</p>
+    {% endif %}
+</div>
+
 <!-- ================= DOCUMENTS ================= -->
 <div class="card">
     <h3 class="section-title documents">Documents</h3>
@@ -51,8 +81,8 @@
           enctype="multipart/form-data">
 
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
         <input type="file" name="documents" multiple required>
+
         <button type="submit" class="btn btn-primary">
             Ajouter des documents
         </button>
@@ -144,7 +174,7 @@
     {% endif %}
 </div>
 
-<!-- ================= MISE À JOUR DOSSIER (EN BAS) ================= -->
+<!-- ================= MISE À JOUR DOSSIER ================= -->
 <div class="card">
     <h3 class="section-title update">Mise à jour du dossier</h3>
 

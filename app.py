@@ -133,7 +133,6 @@ def _try_add_column(conn, table, column_sql):
 
 
 def _is_weak_default_admin_password(pw: str) -> bool:
-    # Heuristique simple
     if not pw:
         return True
     if pw.lower() in {"admin", "admin123", "password", "123456", "12345678"}:
@@ -172,7 +171,7 @@ def init_db():
         )
     """)
 
-    # REVENUS
+    # REVENUS (CA)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS revenus (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -182,6 +181,9 @@ def init_db():
             montant REAL NOT NULL
         )
     """)
+
+    # 🔧 AJOUTS SANS CASSER
+    _try_add_column(conn, "revenus", "client_id INTEGER")
 
     # COTATIONS
     conn.execute("""
@@ -207,7 +209,7 @@ def init_db():
     _try_add_column(conn, "cotations", "pdl_pce TEXT")
     _try_add_column(conn, "cotations", "commentaire TEXT")
 
-    # CHAT MESSAGES
+    # CHAT
     conn.execute("""
         CREATE TABLE IF NOT EXISTS chat_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -219,6 +221,7 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_id ON chat_messages(id)")
     except sqlite3.OperationalError:
@@ -230,11 +233,9 @@ def init_db():
     ).fetchone()
 
     if not admin:
-        # En prod, on évite d’initialiser avec un password faible par défaut
         if is_production and _is_weak_default_admin_password(ADMIN_DEFAULT_PASSWORD):
             raise RuntimeError(
-                "ADMIN_DEFAULT_PASSWORD trop faible pour un environnement production. "
-                "Définissez un mot de passe fort via Config/ENV."
+                "ADMIN_DEFAULT_PASSWORD trop faible pour la production."
             )
 
         conn.execute(
@@ -247,6 +248,7 @@ def init_db():
 
 
 init_db()
+
 
 
 ############################################################
@@ -617,7 +619,9 @@ def logout():
 def dashboard():
     conn = get_db()
 
-    total_clients = conn.execute("SELECT COUNT(*) FROM crm_clients").fetchone()[0]
+    total_clients = conn.execute(
+        "SELECT COUNT(*) FROM crm_clients"
+    ).fetchone()[0]
 
     last_clients = conn.execute(
         """
@@ -711,29 +715,24 @@ def open_cotation(cotation_id):
 @app.route("/search")
 @login_required
 def search():
-    """
-    Recherche clients + documents (safe).
-    - Admin: voit tout
-    - Commercial: voit ses clients
-    """
     q = (request.args.get("q") or "").strip()
     if not q:
         return jsonify({"results": []})
 
     user = session.get("user") or {}
     q_lower = q.lower()
-
     conn = get_db()
+
     if user.get("role") == "admin":
         client_rows = conn.execute(
             """
             SELECT id, name
             FROM crm_clients
-            WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?
+            WHERE name LIKE ?
             ORDER BY created_at DESC
             LIMIT 10
             """,
-            (f"%{q}%", f"%{q}%", f"%{q}%"),
+            (f"%{q}%",),
         ).fetchall()
     else:
         client_rows = conn.execute(
@@ -741,127 +740,161 @@ def search():
             SELECT id, name
             FROM crm_clients
             WHERE owner_id=?
-              AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)
+              AND name LIKE ?
             ORDER BY created_at DESC
             LIMIT 10
             """,
-            (user.get("id"), f"%{q}%", f"%{q}%", f"%{q}%"),
+            (user.get("id"), f"%{q}%"),
         ).fetchall()
 
     results = []
     for c in client_rows:
         docs = list_client_documents(c["id"])
-        filtered_docs = [d for d in docs if q_lower in (d.get("nom") or "").lower()]
+        filtered_docs = [d for d in docs if q_lower in d["nom"].lower()]
         results.append(
             {
                 "client_id": c["id"],
                 "client_name": c["name"],
-                "documents": (filtered_docs or docs)[:10],
+                "documents": filtered_docs[:10],
             }
         )
 
     return jsonify({"results": results})
-
-
 ############################################################
-# 9. CHIFFRE D'AFFAIRES (ADMIN WRITE ONLY)
+# 9. CHIFFRE D’AFFAIRES (ADMIN WRITE / COMMERCIAL READ)
 ############################################################
 
 @app.route("/chiffre_affaire", methods=["GET", "POST"])
 @login_required
 def chiffre_affaire():
-    user = session.get("user")
+    user = session.get("user") or {}
+    role = user.get("role")
+    username = user.get("username")
+
     conn = get_db()
 
-    if request.method == "POST" and user["role"] != "admin":
-        abort(403)
-
+    # ================== AJOUT CA (ADMIN SEULEMENT) ==================
     if request.method == "POST":
-        date_rev = request.form.get("date")
-        commercial = request.form.get("commercial")
-        dossier = request.form.get("dossier")
-        montant = request.form.get("montant")
+        if role != "admin":
+            abort(403)
 
-        if not all([date_rev, commercial, dossier, montant]):
+        date_rev = request.form.get("date")
+        montant = request.form.get("montant")
+        client_id = request.form.get("client_id")
+
+        if not date_rev or not montant or not client_id:
             flash("Tous les champs sont obligatoires.", "danger")
             return redirect(url_for("chiffre_affaire"))
 
         try:
             montant_val = float(montant)
-        except Exception:
+        except ValueError:
             flash("Montant invalide.", "danger")
             return redirect(url_for("chiffre_affaire"))
 
-        conn.execute("""
-            INSERT INTO revenus (date, commercial, dossier, montant)
-            VALUES (?, ?, ?, ?)
-        """, (date_rev, commercial, dossier, montant_val))
+        client = conn.execute(
+            "SELECT name, owner_id FROM crm_clients WHERE id=?",
+            (client_id,)
+        ).fetchone()
+
+        if not client:
+            flash("Dossier client introuvable.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
+        commercial = conn.execute(
+            "SELECT username FROM users WHERE id=?",
+            (client["owner_id"],)
+        ).fetchone()
+
+        conn.execute(
+            """
+            INSERT INTO revenus (date, montant, client_id, commercial, dossier)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                date_rev,
+                montant_val,
+                client_id,
+                commercial["username"] if commercial else None,
+                client["name"],
+            )
+        )
         conn.commit()
 
         flash("Chiffre d’affaires ajouté.", "success")
         return redirect(url_for("chiffre_affaire"))
 
+    # ================== LECTURE ==================
     today = date.today()
     year = str(today.year)
     month = today.strftime("%Y-%m")
 
-    ca_annuel = conn.execute("""
-        SELECT COALESCE(SUM(montant), 0)
-        FROM revenus
-        WHERE substr(date,1,4)=?
-    """, (year,)).fetchone()[0]
+    ca_annuel_global = conn.execute(
+        "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE substr(date,1,4)=?",
+        (year,)
+    ).fetchone()[0]
 
-    ca_mensuel = conn.execute("""
-        SELECT COALESCE(SUM(montant), 0)
-        FROM revenus
-        WHERE substr(date,1,7)=?
-    """, (month,)).fetchone()[0]
+    ca_mensuel_global = conn.execute(
+        "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE substr(date,1,7)=?",
+        (month,)
+    ).fetchone()[0]
 
-    annuel_par_com = conn.execute("""
-        SELECT commercial, SUM(montant) AS total
-        FROM revenus
-        WHERE substr(date,1,4)=?
-        GROUP BY commercial
-        ORDER BY total DESC
-    """, (year,)).fetchall()
+    if role == "admin":
+        ca_annuel_perso = ca_annuel_global
+        ca_mensuel_perso = ca_mensuel_global
 
-    mensuel_par_com = conn.execute("""
-        SELECT substr(date,1,7) AS mois, commercial, SUM(montant) AS total
-        FROM revenus
-        GROUP BY mois, commercial
-        ORDER BY mois DESC
-    """).fetchall()
+        annuel_par_com = conn.execute(
+            """
+            SELECT commercial, SUM(montant) AS total
+            FROM revenus
+            WHERE substr(date,1,4)=?
+            GROUP BY commercial
+            ORDER BY total DESC
+            """,
+            (year,)
+        ).fetchall()
+    else:
+        ca_annuel_perso = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant),0)
+            FROM revenus
+            WHERE substr(date,1,4)=?
+              AND commercial=?
+            """,
+            (year, username)
+        ).fetchone()[0]
 
-    global_par_mois = conn.execute("""
+        ca_mensuel_perso = conn.execute(
+            """
+            SELECT COALESCE(SUM(montant),0)
+            FROM revenus
+            WHERE substr(date,1,7)=?
+              AND commercial=?
+            """,
+            (month, username)
+        ).fetchone()[0]
+
+        annuel_par_com = []
+
+    global_par_mois = conn.execute(
+        """
         SELECT substr(date,1,7) AS mois, SUM(montant) AS total
         FROM revenus
         GROUP BY mois
         ORDER BY mois DESC
-    """).fetchall()
+        """
+    ).fetchall()
 
     return render_template(
         "chiffre_affaire.html",
-        ca_annuel=ca_annuel,
-        ca_mensuel=ca_mensuel,
+        role=role,
+        ca_annuel_perso=ca_annuel_perso,
+        ca_mensuel_perso=ca_mensuel_perso,
+        ca_annuel_global=ca_annuel_global,
+        ca_mensuel_global=ca_mensuel_global,
         annuel_par_com=annuel_par_com,
-        mensuel_par_com=mensuel_par_com,
         global_par_mois=global_par_mois,
     )
-
-
-@app.route("/chiffre_affaire/delete/<int:rev_id>", methods=["POST"])
-@login_required
-def delete_revenue(rev_id):
-    if session["user"]["role"] != "admin":
-        abort(403)
-
-    conn = get_db()
-    conn.execute("DELETE FROM revenus WHERE id=?", (rev_id,))
-    conn.commit()
-
-    flash("Montant supprimé.", "success")
-    return redirect(url_for("chiffre_affaire"))
-
 
 ############################################################
 # 10. ADMIN UTILISATEURS + RESET PASSWORD
@@ -1100,7 +1133,7 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS + DOSSIERS + DOCUMENTS + COTATIONS
+# 12. CLIENTS + DOSSIERS + DOCUMENTS + COTATIONS (+ CA)
 ############################################################
 
 @app.route("/clients")
@@ -1183,13 +1216,8 @@ def client_detail(client_id):
     user = session.get("user") or {}
     role = (user.get("role") or "").lower()
 
-    if role != "admin":
-        owner = conn.execute(
-            "SELECT owner_id FROM crm_clients WHERE id=?",
-            (client_id,)
-        ).fetchone()
-        if not owner or owner["owner_id"] != user.get("id"):
-            abort(403)
+    if not can_access_client(client_id):
+        abort(403)
 
     client = conn.execute(
         """
@@ -1216,11 +1244,34 @@ def client_detail(client_id):
 
     documents = list_client_documents(client_id)
 
+    # ===== CA DU DOSSIER =====
+    ca_total = conn.execute(
+        """
+        SELECT COALESCE(SUM(montant),0)
+        FROM revenus
+        WHERE client_id=?
+        """,
+        (client_id,)
+    ).fetchone()[0]
+
+    ca_par_mois = conn.execute(
+        """
+        SELECT substr(date,1,7) AS mois, SUM(montant) AS total
+        FROM revenus
+        WHERE client_id=?
+        GROUP BY mois
+        ORDER BY mois DESC
+        """,
+        (client_id,)
+    ).fetchall()
+
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
         cotations=[row_to_obj(c) for c in cotations],
-        documents=documents
+        documents=documents,
+        ca_total=ca_total,
+        ca_par_mois=[row_to_obj(r) for r in ca_par_mois],
     )
 
 
@@ -1284,8 +1335,8 @@ def upload_client_document(client_id):
 
     for f in files:
         if f and allowed_file(f.filename):
-            original_name = clean_filename(secure_filename(f.filename))
-            filename = f"{client_slug}_{original_name}"
+            original = clean_filename(secure_filename(f.filename))
+            filename = f"{client_slug}_{original}"
             key = f"{prefix}{filename}"
             s3_upload_fileobj(f, AWS_BUCKET, key)
 
@@ -1361,7 +1412,6 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation créée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
-
 
 
 ############################################################
