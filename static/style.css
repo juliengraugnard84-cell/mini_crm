@@ -753,3 +753,77 @@ input, select, textarea {
     border: none;
     cursor: pointer;
 }
+/* ================= CHAT TOGGLE BEHAVIOR ================= */
+
+/* Chat fermé par défaut */
+.chat-widget {
+    display: none;
+}
+
+/* Chat visible quand ouvert */
+.chat-widget.open {
+    display: flex;
+}
+
+/* Bulle toujours visible */
+.chat-toggle {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,0,0,.25);
+    z-index: 10000;
+}
+/* ================= CHAT BADGE ================= */
+
+.chat-toggle {
+    position: relative;
+}
+
+.chat-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+
+    background: #dc2626;
+    color: #fff;
+
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    box-shadow: 0 2px 6px rgba(0,0,0,.25);
+}
+/* ================= CHAT PULSE ================= */
+
+@keyframes chat-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(242,178,51,0.6);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(242,178,51,0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(242,178,51,0);
+    }
+}
+
+.chat-pulse {
+    animation: chat-pulse 1.6s infinite;
+}

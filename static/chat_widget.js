@@ -2,8 +2,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ================= ELEMENTS ================= */
 
-    const bubble = document.getElementById("chat-bubble");
-    const panel = document.getElementById("chat-panel");
+    const bubble = document.getElementById("chat-toggle");
+    const win = document.getElementById("chat-widget");
     const closeBtn = document.getElementById("chat-close");
 
     const form = document.getElementById("chat-form");
@@ -11,27 +11,57 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("chat-file");
     const messagesBox = document.getElementById("chat-messages");
 
-    if (!bubble || !panel || !form || !input || !messagesBox) {
+    let lastMessageCount = 0;
+    let unreadCount = 0;
+
+    if (!bubble || !win || !form || !input || !messagesBox) {
         console.warn("Chat widget incomplet");
         return;
+    }
+
+    /* ================= BADGE ================= */
+
+    const badge = document.createElement("div");
+    badge.className = "chat-badge";
+    badge.style.display = "none";
+    bubble.appendChild(badge);
+
+    function updateBadge() {
+        if (unreadCount > 0) {
+            badge.textContent = unreadCount;
+            badge.style.display = "flex";
+
+            // 🔥 clignotement actif
+            bubble.classList.add("chat-pulse");
+        } else {
+            badge.style.display = "none";
+
+            // arrêt clignotement
+            bubble.classList.remove("chat-pulse");
+        }
+    }
+
+    function resetBadge() {
+        unreadCount = 0;
+        updateBadge();
     }
 
     /* ================= TOGGLE ================= */
 
     bubble.addEventListener("click", () => {
-        const isHidden = panel.classList.contains("chat-hidden");
+        const isOpen = win.classList.contains("open");
+        win.classList.toggle("open", !isOpen);
 
-        panel.classList.toggle("chat-hidden", !isHidden);
-
-        if (isHidden) {
-            loadMessages();
+        if (!isOpen) {
+            resetBadge();
+            loadMessages(true);
             setTimeout(() => input.focus(), 150);
         }
     });
 
     if (closeBtn) {
         closeBtn.addEventListener("click", () => {
-            panel.classList.add("chat-hidden");
+            win.classList.remove("open");
         });
     }
 
@@ -45,16 +75,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ================= LOAD ================= */
 
-    async function loadMessages() {
+    async function loadMessages(forceOpen = false) {
         try {
             const res = await fetch("/chat/messages?limit=80", {
                 credentials: "same-origin"
             });
 
             const data = await res.json();
+            const messages = data.messages || [];
+
+            if (messages.length > lastMessageCount) {
+                const diff = messages.length - lastMessageCount;
+
+                if (!win.classList.contains("open")) {
+                    unreadCount += diff;
+                    updateBadge();
+                }
+            }
+
+            lastMessageCount = messages.length;
             messagesBox.innerHTML = "";
 
-            (data.messages || []).forEach(m => {
+            messages.forEach(m => {
                 const div = document.createElement("div");
                 div.className = "chat-message";
 
@@ -81,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function sendMessage() {
 
         const message = input.value.trim();
-        const file = fileInput?.files?.[0];
+        const file = fileInput.files[0];
 
         if (!message && !file) {
             alert("Message ou fichier requis");
@@ -107,17 +149,15 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             input.value = "";
-            if (fileInput) fileInput.value = "";
+            fileInput.value = "";
 
-            loadMessages();
+            loadMessages(true);
 
         } catch (e) {
             console.error("Erreur send chat", e);
             alert("Erreur réseau");
         }
     }
-
-    /* ================= EVENTS ================= */
 
     form.addEventListener("submit", e => {
         e.preventDefault();
@@ -130,5 +170,11 @@ document.addEventListener("DOMContentLoaded", () => {
             sendMessage();
         }
     });
+
+    /* ================= AUTO REFRESH ================= */
+
+    setInterval(() => {
+        loadMessages(false);
+    }, 5000);
 
 });
