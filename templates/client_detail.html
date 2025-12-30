@@ -2,146 +2,31 @@
 
 {% block content %}
 
-<style>
-    .page-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-
-    .actions {
-        display: flex;
-        gap: 10px;
-    }
-
-    .card {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-    }
-
-    .card h3 {
-        margin-bottom: 15px;
-        font-size: 18px;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 8px;
-    }
-
-    .info-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 15px;
-    }
-
-    .info-item span {
-        display: block;
-        font-size: 12px;
-        color: #777;
-    }
-
-    .info-item strong {
-        font-size: 14px;
-    }
-
-    form label {
-        font-size: 13px;
-        font-weight: 600;
-        margin-top: 10px;
-        display: block;
-    }
-
-    form input, form select, form textarea {
-        width: 100%;
-        padding: 8px 10px;
-        margin-top: 4px;
-        border-radius: 6px;
-        border: 1px solid #ddd;
-        font-size: 14px;
-    }
-
-    textarea {
-        resize: vertical;
-    }
-
-    .form-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 15px;
-    }
-
-    .btn-primary {
-        background: #f5b301;
-        border: none;
-        padding: 10px 18px;
-        border-radius: 8px;
-        font-weight: bold;
-        cursor: pointer;
-    }
-
-    .btn-danger {
-        background: #dc3545;
-        border: none;
-        padding: 10px 18px;
-        border-radius: 8px;
-        font-weight: bold;
-        color: white;
-        cursor: pointer;
-    }
-
-    .doc-list li {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 6px 0;
-        border-bottom: 1px solid #eee;
-        font-size: 14px;
-    }
-</style>
-
-<!-- ================= HEADER ================= -->
 <div class="page-title">
     <h1>{{ client.name }}</h1>
 
-    <div class="actions">
-        {% if current_user and current_user.role == 'admin' %}
-        <form method="post"
-              action="/clients/{{ client.id }}/delete"
-              onsubmit="return confirm('⚠️ Supprimer définitivement ce dossier client ? Cette action est irréversible.')">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button type="submit" class="btn-danger">
-                🗑 Supprimer le dossier
-            </button>
-        </form>
-        {% endif %}
-    </div>
+    {% if current_user and current_user.role == 'admin' %}
+    <form method="post"
+          action="{{ url_for('delete_client', client_id=client.id) }}"
+          onsubmit="return confirm('⚠️ Supprimer définitivement ce dossier client ?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-danger">
+            🗑 Supprimer le dossier
+        </button>
+    </form>
+    {% endif %}
 </div>
 
-<!-- ================= INFOS CLIENT ================= -->
+<!-- INFOS CLIENT -->
 <div class="card">
     <h3>Informations client</h3>
 
-    <div class="info-grid">
-        <div class="info-item">
-            <span>Commercial</span>
-            <strong>{{ client.commercial_name or "—" }}</strong>
-        </div>
-
-        <div class="info-item">
-            <span>Date de création</span>
-            <strong>{{ client.created_at[:10] if client.created_at else "—" }}</strong>
-        </div>
-
-        <div class="info-item">
-            <span>Statut</span>
-            <strong>{{ client.status or "—" }}</strong>
-        </div>
-    </div>
+    <p><strong>Commercial :</strong> {{ client.commercial_name or "—" }}</p>
+    <p><strong>Date de création :</strong> {{ client.created_at[:10] if client.created_at else "—" }}</p>
+    <p><strong>Statut :</strong> {{ client.status or "—" }}</p>
 </div>
 
-<!-- ================= DOCUMENTS ================= -->
+<!-- DOCUMENTS -->
 <div class="card">
     <h3>Documents</h3>
 
@@ -150,31 +35,32 @@
           enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="file" name="documents" multiple>
-        <button class="btn-primary" type="submit">Ajouter des documents</button>
+        <button type="submit" class="btn btn-primary">Ajouter</button>
     </form>
 
-    <ul class="doc-list">
+    <ul>
         {% for doc in documents %}
-            <li>
-                {{ doc.nom }}
-                <form method="post"
-                      action="{{ url_for('delete_client_document', client_id=client.id) }}"
-                      style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input type="hidden" name="key" value="{{ doc.key }}">
-                    <button type="submit"
-                            onclick="return confirm('Supprimer ce document ?')">
-                        🗑
-                    </button>
-                </form>
-            </li>
+        <li>
+            <a href="{{ doc.url }}" target="_blank">{{ doc.nom }}</a>
+
+            <form method="post"
+                  action="{{ url_for('delete_client_document', client_id=client.id) }}"
+                  style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="key" value="{{ doc.key }}">
+                <button type="submit"
+                        onclick="return confirm('Supprimer ce document ?')">
+                    🗑
+                </button>
+            </form>
+        </li>
         {% else %}
-            <li>Aucun document</li>
+        <li>Aucun document</li>
         {% endfor %}
     </ul>
 </div>
 
-<!-- ================= NOUVELLE COTATION ================= -->
+<!-- NOUVELLE COTATION -->
 <div class="card">
     <h3>Nouvelle demande de cotation</h3>
 
@@ -182,98 +68,76 @@
           action="{{ url_for('create_cotation', client_id=client.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <div class="form-grid">
-            <div>
-                <label>Date de négociation</label>
-                <input type="date" name="date_negociation">
-            </div>
+        <label>Date de négociation</label>
+        <input type="date" name="date_negociation">
 
-            <div>
-                <label>Type d’énergie</label>
-                <select name="energie_type">
-                    <option value="">— Sélectionner —</option>
-                    <option value="electricite">Électricité</option>
-                    <option value="gaz">Gaz</option>
-                </select>
-            </div>
+        <label>Type d’énergie</label>
+        <select name="energie_type">
+            <option value="">—</option>
+            <option value="electricite">Électricité</option>
+            <option value="gaz">Gaz</option>
+        </select>
 
-            <div>
-                <label>PDL / PCE</label>
-                <input type="text" name="pdl_pce">
-            </div>
+        <label>PDL / PCE</label>
+        <input type="text" name="pdl_pce">
 
-            <div>
-                <label>Date d’échéance contrat</label>
-                <input type="date" name="date_echeance">
-            </div>
+        <label>Date d’échéance</label>
+        <input type="date" name="date_echeance">
 
-            <div>
-                <label>Fournisseur actuel</label>
-                <input type="text" name="fournisseur_actuel">
-            </div>
+        <label>Fournisseur actuel</label>
+        <input type="text" name="fournisseur_actuel">
 
-            <div>
-                <label>Entreprise</label>
-                <input type="text" name="entreprise_nom">
-            </div>
+        <label>Entreprise</label>
+        <input type="text" name="entreprise_nom">
 
-            <div>
-                <label>SIRET</label>
-                <input type="text" name="siret">
-            </div>
+        <label>SIRET</label>
+        <input type="text" name="siret">
 
-            <div>
-                <label>Signataire</label>
-                <input type="text" name="signataire_nom">
-            </div>
+        <label>Signataire</label>
+        <input type="text" name="signataire_nom">
 
-            <div>
-                <label>Téléphone signataire</label>
-                <input type="text" name="signataire_tel">
-            </div>
+        <label>Téléphone</label>
+        <input type="text" name="signataire_tel">
 
-            <div>
-                <label>Email signataire</label>
-                <input type="email" name="signataire_email">
-            </div>
-        </div>
+        <label>Email</label>
+        <input type="email" name="signataire_email">
 
         <label>Commentaire</label>
-        <textarea name="commentaire" rows="4"></textarea>
+        <textarea name="commentaire"></textarea>
 
-        <button class="btn-primary" type="submit">
-            Créer la demande de cotation
+        <button type="submit" class="btn btn-primary">
+            Créer la demande
         </button>
     </form>
 </div>
 
-<!-- ================= HISTORIQUE COTATIONS ================= -->
+<!-- HISTORIQUE -->
 <div class="card">
     <h3>Historique des cotations</h3>
 
     {% if cotations %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Énergie</th>
-                    <th>Fournisseur</th>
-                    <th>Statut</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in cotations %}
-                <tr>
-                    <td>{{ c.date_creation[:10] if c.date_creation else "—" }}</td>
-                    <td>{{ c.energie_type or "—" }}</td>
-                    <td>{{ c.fournisseur_actuel or "—" }}</td>
-                    <td>{{ c.status or "—" }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Énergie</th>
+                <th>Fournisseur</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cotations %}
+            <tr>
+                <td>{{ c.date_creation[:10] }}</td>
+                <td>{{ c.energie_type }}</td>
+                <td>{{ c.fournisseur_actuel }}</td>
+                <td>{{ c.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     {% else %}
-        <p>Aucune cotation enregistrée.</p>
+        <p>Aucune cotation.</p>
     {% endif %}
 </div>
 
