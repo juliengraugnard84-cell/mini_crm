@@ -2,7 +2,6 @@
 
 {% block content %}
 
-<!-- ================= HEADER ================= -->
 <div class="page-header">
     <h1>Clients</h1>
     <a href="{{ url_for('new_client') }}" class="btn btn-primary">
@@ -10,85 +9,55 @@
     </a>
 </div>
 
-<!-- ================= RECHERCHE ================= -->
 <div class="card">
-    <form method="get"
-          action="{{ url_for('clients') }}"
-          class="search-form">
-
+    <form method="get" action="{{ url_for('clients') }}" class="search-form">
         <input
             type="text"
             name="q"
-            placeholder="Rechercher par nom de dossier ou commercial…"
+            placeholder="Rechercher un dossier client…"
             value="{{ q or '' }}"
         >
-
-        <button type="submit" class="btn btn-secondary">
+        <button type="submit" class="btn btn-primary">
             Rechercher
         </button>
     </form>
 </div>
 
-<!-- ================= LISTE CLIENTS ================= -->
 <div class="card">
     {% if clients %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Dossier</th>
-                    <th>Commercial</th>
-                    <th>Statut</th>
-                    <th>Date de création</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in clients %}
-                <tr>
-                    <td>
-                        <strong>{{ c.name }}</strong>
-                    </td>
-
-                    <td>
-                        {{ c.commercial_name or "—" }}
-                    </td>
-
-                    <td>
-                        {% set s = (c.status or '').lower() %}
-                        {% if s == 'signé' %}
-                            <span class="badge badge-success">Signé</span>
-                        {% elif s == 'en cours' %}
-                            <span class="badge badge-warning">En cours</span>
-                        {% elif s == 'perdu' %}
-                            <span class="badge badge-danger">Perdu</span>
-                        {% else %}
-                            <span class="badge badge-info">Cotation</span>
-                        {% endif %}
-                    </td>
-
-                    <td>
-                        {% if c.created_at %}
-                            {{ c.created_at[:10] }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </td>
-
-                    <td style="text-align:right;">
-                        <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                           class="btn btn-secondary">
-                            Ouvrir
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Dossier</th>
+                <th>Commercial</th>
+                <th>Statut</th>
+                <th>Date création</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in clients %}
+            <tr>
+                <td><strong>{{ c.name }}</strong></td>
+                <td>{{ c.commercial_name or "—" }}</td>
+                <td>
+                    <span class="badge badge-info">
+                        {{ c.status or "Cotation" }}
+                    </span>
+                </td>
+                <td>{{ c.created_at[:10] if c.created_at else "—" }}</td>
+                <td style="text-align:right;">
+                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                       class="btn btn-secondary">
+                        Ouvrir
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     {% else %}
-        <div class="empty-state">
-            <strong>Aucun dossier trouvé</strong><br>
-            Essayez une autre recherche.
-        </div>
+        <p class="text-muted">Aucun dossier trouvé.</p>
     {% endif %}
 </div>
 
