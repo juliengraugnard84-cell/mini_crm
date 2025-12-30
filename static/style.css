@@ -636,3 +636,26 @@ input, select, textarea {
 .table td:last-child form {
     margin-left: 8px;
 }
+/* ===============================
+   BOUTON SUPPRIMER — VISIBILITÉ
+   =============================== */
+
+.doc-actions .btn-danger {
+    background: #dc2626;          /* rouge franc */
+    color: #ffffff;
+    border: none;
+    margin-left: 10px;
+    padding: 8px 14px;
+    font-weight: 700;
+}
+
+.doc-actions .btn-danger:hover {
+    background: #b91c1c;          /* rouge plus foncé au hover */
+}
+
+.doc-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+}
