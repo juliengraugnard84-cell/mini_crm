@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
             badge.textContent = unreadCount;
             badge.style.display = "flex";
 
-            // 🔥 clignotement actif
+            // clignotement actif
             bubble.classList.add("chat-pulse");
         } else {
             badge.style.display = "none";
@@ -50,12 +50,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     bubble.addEventListener("click", () => {
         const isOpen = win.classList.contains("open");
-        win.classList.toggle("open", !isOpen);
 
-        if (!isOpen) {
+        if (isOpen) {
+            win.classList.remove("open");
+        } else {
+            win.classList.add("open");
             resetBadge();
             loadMessages(true);
-            setTimeout(() => input.focus(), 150);
+
+            setTimeout(() => {
+                input.focus();
+            }, 150);
         }
     });
 
@@ -121,7 +126,6 @@ document.addEventListener("DOMContentLoaded", () => {
     /* ================= SEND ================= */
 
     async function sendMessage() {
-
         const message = input.value.trim();
         const file = fileInput.files[0];
 

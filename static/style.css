@@ -945,3 +945,43 @@ input, select, textarea {
     font-weight: 700;
     border-radius: 8px;
 }
+/* ================= CHAT — ÉTAT PAR DÉFAUT ================= */
+
+/* chat caché par défaut */
+.chat-widget {
+    display: none;
+}
+
+/* chat visible uniquement quand ouvert */
+.chat-widget.open {
+    display: flex;
+}
+/* ================= CHAT BADGE ================= */
+
+.chat-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #dc2626;
+    color: #fff;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px #fff;
+}
+
+/* clignotement léger */
+@keyframes chatPulse {
+    0% { box-shadow: 0 0 0 0 rgba(220,38,38,.6); }
+    70% { box-shadow: 0 0 0 10px rgba(220,38,38,0); }
+    100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+}
+
+.chat-toggle.has-unread {
+    animation: chatPulse 1.8s infinite;
+}
