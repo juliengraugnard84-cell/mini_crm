@@ -1224,6 +1224,38 @@ def client_detail(client_id):
     )
 
 
+# ---------- MISE À JOUR CLIENT ----------
+
+@app.route("/clients/<int:client_id>/update", methods=["POST"])
+@login_required
+def update_client(client_id):
+    conn = get_db()
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    name = (request.form.get("update_name") or "").strip()
+    update_date = request.form.get("update_date")
+    commentaire = (request.form.get("update_commentaire") or "").strip()
+
+    if not name or not update_date:
+        flash("Nom et date obligatoires.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    conn.execute(
+        """
+        UPDATE crm_clients
+        SET name = ?, notes = ?
+        WHERE id = ?
+        """,
+        (name, commentaire, client_id)
+    )
+    conn.commit()
+
+    flash("Dossier mis à jour.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
 # ---------- DOCUMENTS CLIENT ----------
 
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
@@ -1321,7 +1353,6 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation créée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
-
 
 
 ############################################################

@@ -34,6 +34,8 @@
     <form method="post"
           action="{{ url_for('update_client', client_id=client.id) }}">
 
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
         <div class="form-grid">
             <div>
                 <label>Nom du dossier</label>
@@ -52,7 +54,7 @@
         </div>
 
         <label>Commentaire</label>
-        <textarea name="update_commentaire" rows="3"></textarea>
+        <textarea name="update_commentaire" rows="3">{{ client.notes or "" }}</textarea>
 
         <button type="submit" class="btn btn-secondary">
             Enregistrer la mise à jour
@@ -65,12 +67,14 @@
     <h3>Documents</h3>
 
     <form method="post"
-          action="{{ url_for('upload_document') }}"
+          action="{{ url_for('upload_client_document', client_id=client.id) }}"
           enctype="multipart/form-data">
 
-        <input type="file" name="file" required>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <input type="file" name="documents" multiple required>
         <button type="submit" class="btn btn-primary">
-            Ajouter un document
+            Ajouter des documents
         </button>
     </form>
 
@@ -79,14 +83,16 @@
         <li>
             <a href="{{ doc.url }}" target="_blank">{{ doc.nom }}</a>
 
-            {% if current_user.role == 'admin' %}
             <form method="post"
-                  action="{{ url_for('delete_document', key=doc.key) }}"
+                  action="{{ url_for('delete_client_document', client_id=client.id) }}"
                   style="display:inline;"
                   onsubmit="return confirm('Supprimer ce document ?');">
+
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="key" value="{{ doc.key }}">
+
                 <button type="submit" class="btn btn-danger btn-sm">🗑</button>
             </form>
-            {% endif %}
         </li>
         {% else %}
         <li>Aucun document</li>
@@ -99,7 +105,9 @@
     <h3>Nouvelle demande de cotation</h3>
 
     <form method="post"
-          action="{{ url_for('new_cotation', client_id=client.id) }}">
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="form-grid">
             <input type="date" name="date_negociation">
