@@ -108,7 +108,7 @@
     <div class="actions">
         {% if current_user and current_user.role == 'admin' %}
         <form method="post"
-              action="{{ url_for('delete_client', client_id=client.id) }}"
+              action="/clients/{{ client.id }}/delete"
               onsubmit="return confirm('⚠️ Supprimer définitivement ce dossier client ? Cette action est irréversible.')">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit" class="btn-danger">
