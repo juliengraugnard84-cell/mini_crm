@@ -437,3 +437,34 @@ input, select, textarea {
 .muted {
     color: #999;
 }
+/* ===== TITRES DE SECTIONS ===== */
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #0f2a44;
+    margin-bottom: 15px;
+}
+
+.section-title::before {
+    content: "";
+    width: 5px;
+    height: 24px;
+    background: linear-gradient(180deg, #f5a623, #f39c12);
+    border-radius: 3px;
+}
+
+/* Variantes couleurs */
+.section-title.cotation::before {
+    background: linear-gradient(180deg, #4a90e2, #357abd);
+}
+
+.section-title.documents::before {
+    background: linear-gradient(180deg, #2ecc71, #27ae60);
+}
+
+.section-title.update::before {
+    background: linear-gradient(180deg, #9b59b6, #8e44ad);
+}

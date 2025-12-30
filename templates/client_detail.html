@@ -1,13 +1,28 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="page-header">
+<!-- ================= HEADER + SEARCH ================= -->
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
     <h1>{{ client.name }}</h1>
+
+    <!-- Recherche dossier global -->
+    <form method="get"
+          action="{{ url_for('clients') }}"
+          style="display:flex;gap:10px;align-items:center;">
+        <input type="text"
+               name="q"
+               placeholder="Rechercher un dossier…"
+               class="form-control"
+               style="min-width:260px;">
+        <button class="btn btn-secondary">
+            Rechercher
+        </button>
+    </form>
 </div>
 
 <!-- ================= INFOS CLIENT ================= -->
 <div class="card">
-    <h3>Informations client</h3>
+    <h3 class="section-title">Informations client</h3>
 
     <div class="info-grid">
         <div class="info-item">
@@ -27,44 +42,9 @@
     </div>
 </div>
 
-<!-- ================= MISE À JOUR DOSSIER ================= -->
-<div class="card">
-    <h3>Mise à jour du dossier</h3>
-
-    <form method="post"
-          action="{{ url_for('update_client', client_id=client.id) }}">
-
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-        <div class="form-grid">
-            <div>
-                <label>Nom du dossier</label>
-                <input type="text"
-                       name="update_name"
-                       value="{{ client.name }}"
-                       required>
-            </div>
-
-            <div>
-                <label>Date de mise à jour</label>
-                <input type="date"
-                       name="update_date"
-                       required>
-            </div>
-        </div>
-
-        <label>Commentaire</label>
-        <textarea name="update_commentaire" rows="3">{{ client.notes or "" }}</textarea>
-
-        <button type="submit" class="btn btn-secondary">
-            Enregistrer la mise à jour
-        </button>
-    </form>
-</div>
-
 <!-- ================= DOCUMENTS ================= -->
 <div class="card">
-    <h3>Documents</h3>
+    <h3 class="section-title documents">Documents</h3>
 
     <form method="post"
           action="{{ url_for('upload_client_document', client_id=client.id) }}"
@@ -102,7 +82,7 @@
 
 <!-- ================= NOUVELLE COTATION ================= -->
 <div class="card">
-    <h3>Nouvelle demande de cotation</h3>
+    <h3 class="section-title cotation">Nouvelle demande de cotation</h3>
 
     <form method="post"
           action="{{ url_for('create_cotation', client_id=client.id) }}">
@@ -136,7 +116,7 @@
 
 <!-- ================= HISTORIQUE ================= -->
 <div class="card">
-    <h3>Historique des cotations</h3>
+    <h3 class="section-title cotation">Historique des cotations</h3>
 
     {% if cotations %}
     <table class="table">
@@ -162,6 +142,41 @@
     {% else %}
         <p>Aucune cotation enregistrée.</p>
     {% endif %}
+</div>
+
+<!-- ================= MISE À JOUR DOSSIER (EN BAS) ================= -->
+<div class="card">
+    <h3 class="section-title update">Mise à jour du dossier</h3>
+
+    <form method="post"
+          action="{{ url_for('update_client', client_id=client.id) }}">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="form-grid">
+            <div>
+                <label>Nom du dossier</label>
+                <input type="text"
+                       name="update_name"
+                       value="{{ client.name }}"
+                       required>
+            </div>
+
+            <div>
+                <label>Date de mise à jour</label>
+                <input type="date"
+                       name="update_date"
+                       required>
+            </div>
+        </div>
+
+        <label>Commentaire</label>
+        <textarea name="update_commentaire" rows="3">{{ client.notes or "" }}</textarea>
+
+        <button type="submit" class="btn btn-secondary">
+            Enregistrer la mise à jour
+        </button>
+    </form>
 </div>
 
 {% endblock %}
