@@ -3,16 +3,6 @@
 
 <div class="page-header">
     <h1>{{ client.name }}</h1>
-
-    {% if current_user and current_user.role == 'admin' %}
-    <form method="post"
-          action="{{ url_for('delete_client', client_id=client.id) }}"
-          onsubmit="return confirm('Supprimer définitivement ce dossier ?');">
-        <button type="submit" class="btn btn-danger">
-            🗑 Supprimer le dossier
-        </button>
-    </form>
-    {% endif %}
 </div>
 
 <!-- ================= INFOS CLIENT ================= -->
@@ -42,7 +32,7 @@
     <h3>Documents</h3>
 
     <form method="post"
-          action="{{ url_for('upload_client_document', client_id=client.id) }}"
+          action="{{ url_for('upload_document', client_id=client.id) }}"
           enctype="multipart/form-data">
 
         <input type="file" name="documents" multiple required>
@@ -57,7 +47,7 @@
             <a href="{{ doc.url }}" target="_blank">{{ doc.nom }}</a>
 
             <form method="post"
-                  action="{{ url_for('delete_client_document', client_id=client.id) }}"
+                  action="{{ url_for('delete_document', client_id=client.id) }}"
                   style="display:inline;"
                   onsubmit="return confirm('Supprimer ce document ?');">
 
@@ -78,7 +68,7 @@
     <h3>Nouvelle demande de cotation</h3>
 
     <form method="post"
-          action="{{ url_for('create_cotation', client_id=client.id) }}">
+          action="{{ url_for('new_cotation', client_id=client.id) }}">
 
         <div class="form-grid">
             <div>
@@ -162,10 +152,10 @@
         <tbody>
             {% for c in cotations %}
             <tr>
-                <td>{{ c.date_creation[:10] }}</td>
+                <td>{{ c.date_creation[:10] if c.date_creation else "—" }}</td>
                 <td>{{ c.energie_type or "—" }}</td>
                 <td>{{ c.fournisseur_actuel or "—" }}</td>
-                <td>{{ c.status }}</td>
+                <td>{{ c.status or "—" }}</td>
             </tr>
             {% endfor %}
         </tbody>
