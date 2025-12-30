@@ -1156,28 +1156,18 @@ def new_client():
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
-        created_at = (request.form.get("created_at") or "").strip()
 
         if not name:
             flash("Le nom du dossier est obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
-        if created_at:
-            cur = conn.execute(
-                """
-                INSERT INTO crm_clients (name, status, owner_id, created_at)
-                VALUES (?, 'cotation', ?, ?)
-                """,
-                (name, user.get("id"), created_at)
-            )
-        else:
-            cur = conn.execute(
-                """
-                INSERT INTO crm_clients (name, status, owner_id)
-                VALUES (?, 'cotation', ?)
-                """,
-                (name, user.get("id"))
-            )
+        cur = conn.execute(
+            """
+            INSERT INTO crm_clients (name, status, owner_id)
+            VALUES (?, 'cotation', ?)
+            """,
+            (name, user.get("id"))
+        )
 
         conn.commit()
         flash("Dossier client créé.", "success")
@@ -1234,43 +1224,104 @@ def client_detail(client_id):
     )
 
 
-@app.route("/clients/<int:client_id>/update", methods=["POST"])
+# ---------- DOCUMENTS CLIENT ----------
+
+@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
-def update_client(client_id):
-    conn = get_db()
-    user = session.get("user") or {}
-    role = (user.get("role") or "").lower()
-
-    if role != "admin":
-        owner = conn.execute(
-            "SELECT owner_id FROM crm_clients WHERE id=?",
-            (client_id,)
-        ).fetchone()
-        if not owner or owner["owner_id"] != user.get("id"):
-            abort(403)
-
-    name = (request.form.get("update_name") or "").strip()
-    date_update = (request.form.get("update_date") or "").strip()
-    commentaire = (request.form.get("update_commentaire") or "").strip()
-
-    if not name or not date_update:
-        flash("Nom et date de mise à jour obligatoires.", "danger")
+def upload_client_document(client_id):
+    if LOCAL_MODE or not s3:
+        flash("Upload désactivé en local.", "warning")
         return redirect(url_for("client_detail", client_id=client_id))
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    files = request.files.getlist("documents")
+    if not files:
+        flash("Aucun fichier sélectionné.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    prefix = client_s3_prefix(client_id)
+
+    for f in files:
+        if f and allowed_file(f.filename):
+            filename = clean_filename(secure_filename(f.filename))
+            key = f"{prefix}{filename}"
+            s3_upload_fileobj(f, AWS_BUCKET, key)
+
+    flash("Documents ajoutés.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+@app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
+@login_required
+def delete_client_document(client_id):
+    if LOCAL_MODE or not s3:
+        flash("Suppression désactivée en local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    key = (request.form.get("key") or "").strip()
+    if not key:
+        flash("Clé de document invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+    flash("Document supprimé.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# ---------- COTATIONS CLIENT ----------
+
+@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
+@login_required
+def create_cotation(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
 
     conn.execute(
         """
-        UPDATE crm_clients
-        SET name=?,
-            last_update_date=?,
-            last_update_comment=?
-        WHERE id=?
+        INSERT INTO cotations (
+            client_id,
+            date_negociation,
+            energie_type,
+            pdl_pce,
+            date_echeance,
+            fournisseur_actuel,
+            entreprise_nom,
+            siret,
+            signataire_nom,
+            signataire_tel,
+            signataire_email,
+            commentaire,
+            created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (name, date_update, commentaire, client_id)
+        (
+            client_id,
+            request.form.get("date_negociation"),
+            request.form.get("energie_type"),
+            request.form.get("pdl_pce"),
+            request.form.get("date_echeance"),
+            request.form.get("fournisseur_actuel"),
+            request.form.get("entreprise_nom"),
+            request.form.get("siret"),
+            request.form.get("signataire_nom"),
+            request.form.get("signataire_tel"),
+            request.form.get("signataire_email"),
+            request.form.get("commentaire"),
+            session["user"]["id"],
+        )
     )
-    conn.commit()
 
-    flash("Mise à jour enregistrée.", "success")
+    conn.commit()
+    flash("Demande de cotation créée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
+
 
 
 ############################################################
