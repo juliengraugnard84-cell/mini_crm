@@ -2,142 +2,150 @@
 
 {% block content %}
 
-<div class="page-title">
+<div class="page-header">
     <h1>{{ client.name }}</h1>
-
-    {% if current_user and current_user.role == 'admin' %}
-    <form method="post"
-          action="{{ url_for('delete_client', client_id=client.id) }}"
-          onsubmit="return confirm('⚠️ Supprimer définitivement ce dossier client ?')">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit" class="btn btn-danger">
-            🗑 Supprimer le dossier
-        </button>
-    </form>
-    {% endif %}
 </div>
 
-<!-- INFOS CLIENT -->
+<!-- ================= INFOS CLIENT ================= -->
 <div class="card">
     <h3>Informations client</h3>
 
-    <p><strong>Commercial :</strong> {{ client.commercial_name or "—" }}</p>
-    <p><strong>Date de création :</strong> {{ client.created_at[:10] if client.created_at else "—" }}</p>
-    <p><strong>Statut :</strong> {{ client.status or "—" }}</p>
+    <div class="info-grid">
+        <div class="info-item">
+            <span>Commercial</span>
+            <strong>{{ client.commercial_name or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Date de création</span>
+            <strong>{{ client.created_at[:10] if client.created_at else "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Statut</span>
+            <strong>{{ client.status or "—" }}</strong>
+        </div>
+    </div>
 </div>
 
-<!-- DOCUMENTS -->
+<!-- ================= DOCUMENTS (LECTURE SEULE) ================= -->
 <div class="card">
     <h3>Documents</h3>
 
-    <form method="post"
-          action="{{ url_for('upload_client_document', client_id=client.id) }}"
-          enctype="multipart/form-data">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="file" name="documents" multiple>
-        <button type="submit" class="btn btn-primary">Ajouter</button>
-    </form>
-
-    <ul>
+    <ul class="doc-list">
         {% for doc in documents %}
-        <li>
-            <a href="{{ doc.url }}" target="_blank">{{ doc.nom }}</a>
-
-            <form method="post"
-                  action="{{ url_for('delete_client_document', client_id=client.id) }}"
-                  style="display:inline;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="key" value="{{ doc.key }}">
-                <button type="submit"
-                        onclick="return confirm('Supprimer ce document ?')">
-                    🗑
-                </button>
-            </form>
-        </li>
+            <li>
+                <a href="{{ doc.url }}" target="_blank">
+                    {{ doc.nom }}
+                </a>
+            </li>
         {% else %}
-        <li>Aucun document</li>
+            <li>Aucun document</li>
         {% endfor %}
     </ul>
 </div>
 
-<!-- NOUVELLE COTATION -->
+<!-- ================= NOUVELLE COTATION ================= -->
 <div class="card">
     <h3>Nouvelle demande de cotation</h3>
 
     <form method="post"
           action="{{ url_for('create_cotation', client_id=client.id) }}">
+
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <label>Date de négociation</label>
-        <input type="date" name="date_negociation">
+        <div class="form-grid">
+            <div>
+                <label>Date de négociation</label>
+                <input type="date" name="date_negociation">
+            </div>
 
-        <label>Type d’énergie</label>
-        <select name="energie_type">
-            <option value="">—</option>
-            <option value="electricite">Électricité</option>
-            <option value="gaz">Gaz</option>
-        </select>
+            <div>
+                <label>Type d’énergie</label>
+                <select name="energie_type">
+                    <option value="">— Sélectionner —</option>
+                    <option value="electricite">Électricité</option>
+                    <option value="gaz">Gaz</option>
+                </select>
+            </div>
 
-        <label>PDL / PCE</label>
-        <input type="text" name="pdl_pce">
+            <div>
+                <label>PDL / PCE</label>
+                <input type="text" name="pdl_pce">
+            </div>
 
-        <label>Date d’échéance</label>
-        <input type="date" name="date_echeance">
+            <div>
+                <label>Date d’échéance</label>
+                <input type="date" name="date_echeance">
+            </div>
 
-        <label>Fournisseur actuel</label>
-        <input type="text" name="fournisseur_actuel">
+            <div>
+                <label>Fournisseur actuel</label>
+                <input type="text" name="fournisseur_actuel">
+            </div>
 
-        <label>Entreprise</label>
-        <input type="text" name="entreprise_nom">
+            <div>
+                <label>Entreprise</label>
+                <input type="text" name="entreprise_nom">
+            </div>
 
-        <label>SIRET</label>
-        <input type="text" name="siret">
+            <div>
+                <label>SIRET</label>
+                <input type="text" name="siret">
+            </div>
 
-        <label>Signataire</label>
-        <input type="text" name="signataire_nom">
+            <div>
+                <label>Signataire</label>
+                <input type="text" name="signataire_nom">
+            </div>
 
-        <label>Téléphone</label>
-        <input type="text" name="signataire_tel">
+            <div>
+                <label>Téléphone</label>
+                <input type="text" name="signataire_tel">
+            </div>
 
-        <label>Email</label>
-        <input type="email" name="signataire_email">
+            <div>
+                <label>Email</label>
+                <input type="email" name="signataire_email">
+            </div>
+        </div>
 
         <label>Commentaire</label>
-        <textarea name="commentaire"></textarea>
+        <textarea name="commentaire" rows="4"></textarea>
 
-        <button type="submit" class="btn btn-primary">
+        <button class="btn btn-primary" type="submit">
             Créer la demande
         </button>
     </form>
 </div>
 
-<!-- HISTORIQUE -->
+<!-- ================= HISTORIQUE ================= -->
 <div class="card">
     <h3>Historique des cotations</h3>
 
     {% if cotations %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Énergie</th>
-                <th>Fournisseur</th>
-                <th>Statut</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in cotations %}
-            <tr>
-                <td>{{ c.date_creation[:10] }}</td>
-                <td>{{ c.energie_type }}</td>
-                <td>{{ c.fournisseur_actuel }}</td>
-                <td>{{ c.status }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Énergie</th>
+                    <th>Fournisseur</th>
+                    <th>Statut</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in cotations %}
+                <tr>
+                    <td>{{ c.date_creation[:10] if c.date_creation else "—" }}</td>
+                    <td>{{ c.energie_type or "—" }}</td>
+                    <td>{{ c.fournisseur_actuel or "—" }}</td>
+                    <td>{{ c.status or "—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     {% else %}
-        <p>Aucune cotation.</p>
+        <p>Aucune cotation enregistrée.</p>
     {% endif %}
 </div>
 
