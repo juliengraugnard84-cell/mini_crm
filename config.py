@@ -1,5 +1,6 @@
 import os
 
+
 class Config:
     # =========================
     # Flask
@@ -19,12 +20,17 @@ class Config:
     # =========================
     # Instance directory (PERSISTANT)
     # =========================
+    # ⚠️ Dossier local pour DEV uniquement
+    # ⚠️ En prod Render, DB_PATH doit pointer vers /data
     INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
     os.makedirs(INSTANCE_DIR, exist_ok=True)
 
     # =========================
     # DATABASE (SQLite PERSISTANTE)
     # =========================
+    # 🔒 PRIORITÉ :
+    # 1) Variable d'environnement DB_PATH (Render Disk → /data)
+    # 2) Fallback DEV local (instance/crm.db)
     DB_PATH = os.environ.get(
         "DB_PATH",
         os.path.join(INSTANCE_DIR, "crm.db")
@@ -41,4 +47,4 @@ class Config:
     # =========================
     # Upload
     # =========================
-    MAX_UPLOAD_MB = 10
+    MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 10))
