@@ -17,13 +17,17 @@ class Config:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
     # =========================
-    # DATABASE (SQLite simple)
+    # Instance directory (PERSISTANT)
     # =========================
-    # 👉 PAS DE DISK RENDER
-    # 👉 Base stockée dans le dossier projet
+    INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
+    os.makedirs(INSTANCE_DIR, exist_ok=True)
+
+    # =========================
+    # DATABASE (SQLite PERSISTANTE)
+    # =========================
     DB_PATH = os.environ.get(
         "DB_PATH",
-        os.path.join(BASE_DIR, "crm.sqlite3")
+        os.path.join(INSTANCE_DIR, "crm.db")
     )
 
     # =========================
