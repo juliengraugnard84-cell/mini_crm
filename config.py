@@ -18,19 +18,19 @@ class Config:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
     # =========================
-    # Instance directory (PERSISTANT)
+    # Instance directory (DEV / SQLite)
     # =========================
-    # ⚠️ Dossier local pour DEV uniquement
-    # ⚠️ En prod Render, DB_PATH doit pointer vers /data
     INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
     os.makedirs(INSTANCE_DIR, exist_ok=True)
 
     # =========================
-    # DATABASE (SQLite PERSISTANTE)
+    # DATABASE
     # =========================
     # 🔒 PRIORITÉ :
-    # 1) Variable d'environnement DB_PATH (Render Disk → /data)
-    # 2) Fallback DEV local (instance/crm.db)
+    # 1) PostgreSQL via DATABASE_URL (prod)
+    # 2) SQLite via DB_PATH (dev)
+    DATABASE_URL = os.environ.get("DATABASE_URL")
+
     DB_PATH = os.environ.get(
         "DB_PATH",
         os.path.join(INSTANCE_DIR, "crm.db")
