@@ -713,7 +713,14 @@ def open_cotation(cotation_id):
     )
     conn.commit()
 
-    return redirect(url_for("client_detail", client_id=cot["client_id"]))
+    # 🔥 REDIRECTION AVEC L’ID DE LA COTATION
+    return redirect(
+        url_for(
+            "client_detail",
+            client_id=cot["client_id"],
+            cotation_id=cotation_id
+        )
+    )
 
 
 @app.route("/search")
@@ -764,6 +771,7 @@ def search():
         )
 
     return jsonify({"results": results})
+
 ############################################################
 # 9. CHIFFRE D’AFFAIRES (ADMIN WRITE / COMMERCIAL READ)
 ############################################################
@@ -1057,34 +1065,41 @@ def _validate_s3_key_for_admin_delete(key: str) -> str:
     key = key.strip()
     if ".." in key:
         raise BadRequest("Clé S3 invalide.")
-    # Optionnel: restreindre à certains prefixes seulement
-    # ex: if not (key.startswith("clients/") or key.startswith("chat/") or ...): ...
     return key
 
 
 @app.route("/documents")
 @admin_required
 def documents():
+    # Mode local ou S3 indisponible → page vide mais fonctionnelle
     if LOCAL_MODE or not s3:
         return render_template("documents.html", fichiers=[])
 
     fichiers = []
+
     try:
-        items = s3_list_all_objects(AWS_BUCKET)
+        # ✅ CORRECTION CRITIQUE :
+        # On liste UNIQUEMENT les objets sous "clients/"
+        # Compatible IAM existant (évite AccessDenied)
+        items = s3_list_all_objects(AWS_BUCKET, prefix="clients/")
+
         for item in items:
-            key = item["Key"]
-            if key.endswith("/"):
+            key = item.get("Key")
+            if not key or key.endswith("/"):
                 continue
+
             fichiers.append(
                 {
                     "nom": key,
-                    "taille": item["Size"],
+                    "taille": item.get("Size", 0),
                     "url": s3_presigned_url(key),
                 }
             )
+
     except ClientError as e:
         print("Erreur listing S3 (admin documents) :", e.response)
         flash("Erreur lors du listing S3.", "danger")
+
     except Exception as e:
         print("Erreur listing S3 (admin documents) :", repr(e))
         flash("Erreur lors du listing S3.", "danger")
@@ -1105,9 +1120,10 @@ def upload_document():
         return redirect(url_for("documents"))
 
     nom = clean_filename(secure_filename(fichier.filename))
+    key = f"clients/admin/{nom}"
 
     try:
-        s3_upload_fileobj(fichier, AWS_BUCKET, nom)
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
         flash("Document envoyé.", "success")
     except Exception as e:
         print("Erreur upload S3 (admin) :", repr(e))
@@ -1127,8 +1143,10 @@ def delete_document(key):
         key = _validate_s3_key_for_admin_delete(key)
         s3.delete_object(Bucket=AWS_BUCKET, Key=key)
         flash("Document supprimé.", "success")
+
     except BadRequest as e:
         flash(str(e), "danger")
+
     except Exception as e:
         print("Erreur suppression S3 (admin) :", repr(e))
         flash("Erreur suppression S3.", "danger")
@@ -1218,7 +1236,6 @@ def new_client():
 def client_detail(client_id):
     conn = get_db()
     user = session.get("user") or {}
-    role = (user.get("role") or "").lower()
 
     if not can_access_client(client_id):
         abort(403)
@@ -1236,15 +1253,29 @@ def client_detail(client_id):
     if not client:
         abort(404)
 
-    cotations = conn.execute(
-        """
-        SELECT *
-        FROM cotations
-        WHERE client_id=?
-        ORDER BY date_creation DESC
-        """,
-        (client_id,)
-    ).fetchall()
+    # 🔥 COTATION SÉLECTIONNÉE (admin)
+    selected_cotation_id = request.args.get("cotation_id")
+
+    if selected_cotation_id:
+        cotations = conn.execute(
+            """
+            SELECT *
+            FROM cotations
+            WHERE id = ?
+              AND client_id = ?
+            """,
+            (selected_cotation_id, client_id)
+        ).fetchall()
+    else:
+        cotations = conn.execute(
+            """
+            SELECT *
+            FROM cotations
+            WHERE client_id = ?
+            ORDER BY date_creation DESC
+            """,
+            (client_id,)
+        ).fetchall()
 
     documents = list_client_documents(client_id)
 
@@ -1279,8 +1310,6 @@ def client_detail(client_id):
     )
 
 
-# ---------- MISE À JOUR CLIENT ----------
-
 @app.route("/clients/<int:client_id>/update", methods=["POST"])
 @login_required
 def update_client(client_id):
@@ -1311,8 +1340,6 @@ def update_client(client_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-# ---------- DOCUMENTS CLIENT ----------
-
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
 def upload_client_document(client_id):
@@ -1328,19 +1355,11 @@ def upload_client_document(client_id):
         flash("Aucun fichier sélectionné.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    conn = get_db()
-    row = conn.execute(
-        "SELECT name FROM crm_clients WHERE id=?",
-        (client_id,)
-    ).fetchone()
-
-    client_slug = slugify(row["name"]) if row and row["name"] else f"client_{client_id}"
     prefix = client_s3_prefix(client_id)
 
     for f in files:
         if f and allowed_file(f.filename):
-            original = clean_filename(secure_filename(f.filename))
-            filename = f"{client_slug}_{original}"
+            filename = clean_filename(secure_filename(f.filename))
             key = f"{prefix}{filename}"
             s3_upload_fileobj(f, AWS_BUCKET, key)
 
@@ -1367,8 +1386,6 @@ def delete_client_document(client_id):
     flash("Document supprimé.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
-
-# ---------- COTATIONS CLIENT ----------
 
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
