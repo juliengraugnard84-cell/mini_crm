@@ -1,32 +1,56 @@
-<!-- ================= CHAT FLOAT ================= -->
-
-<button id="chatBubble" title="Chat interne">
-    <i class="bi bi-chat-dots-fill fs-4"></i>
+<!-- Chat Floating Button -->
+<button id="chat-toggle" class="chat-toggle" type="button" aria-label="Ouvrir le chat">
+  <span class="chat-toggle-icon">💬</span>
+  <span id="chat-badge" class="chat-badge" style="display:none;">0</span>
 </button>
 
-<div id="chatWindow">
-
-    <div id="chatHeader">
-        <span>Chat interne</span>
-        <button id="chatClose" class="btn btn-sm btn-light">✕</button>
+<!-- Chat Widget -->
+<div id="chat-widget" class="chat-widget" aria-hidden="true">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="chat-title">Chat</div>
+      <div class="chat-subtitle">Support interne</div>
     </div>
+    <button id="chat-close" class="chat-close" type="button" aria-label="Fermer">✕</button>
+  </div>
 
-    <div id="chatMessages"></div>
+  <div id="chat-messages"
+       class="chat-messages"
+       role="log"
+       aria-live="polite"></div>
 
-    <div class="p-2 border-top">
-        <input type="text"
-               id="chatInput"
-               class="form-control mb-2"
-               placeholder="Votre message…">
+  <form id="chat-form"
+        class="chat-inputbar"
+        enctype="multipart/form-data">
 
-        <input type="file"
-               id="chatUpload"
-               class="form-control mb-2">
+    <label class="chat-attach" title="Joindre un fichier">
+      📎
+      <input id="chat-file" name="file" type="file">
+    </label>
 
-        <button id="chatSend"
-                class="btn btn-primary w-100">
-            Envoyer
-        </button>
-    </div>
+    <textarea
+      id="chat-input"
+      name="message"
+      class="chat-input"
+      rows="1"
+      placeholder="Écrire un message…"></textarea>
 
+    <button class="chat-send"
+            type="submit"
+            aria-label="Envoyer">➤</button>
+  </form>
 </div>
+
+<script>
+  /*
+    IMPORTANT
+    ----------
+    - Utilisation systématique de |tojson
+    - Aucun "null" en string
+    - JavaScript toujours valide
+  */
+
+  window.CHAT_CURRENT_USER_ID = {{ (current_user.id if current_user else none) | tojson }};
+  window.CHAT_CURRENT_USERNAME = {{ (current_user.username if current_user else none) | tojson }};
+  window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else none) | tojson }};
+</script>

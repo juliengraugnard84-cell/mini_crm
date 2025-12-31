@@ -2,11 +2,12 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+
     <title>{% block title %}CRM{% endblock %}</title>
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- CSS principal -->
+    <!-- ================= CSS PRINCIPAL ================= -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -62,7 +63,7 @@
     <!-- ================= MAIN ================= -->
     <main class="main-content">
 
-        <!-- TOP BAR -->
+        <!-- ================= TOP BAR ================= -->
         <header class="topbar">
             <div class="topbar-left">
                 <strong>{{ current_user.username }}</strong>
@@ -70,7 +71,7 @@
             </div>
         </header>
 
-        <!-- FLASH MESSAGES -->
+        <!-- ================= FLASH MESSAGES ================= -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-container">
@@ -83,12 +84,12 @@
             {% endif %}
         {% endwith %}
 
-        <!-- PAGE CONTENT -->
+        <!-- ================= PAGE CONTENT ================= -->
         <section class="content">
             {% block content %}{% endblock %}
         </section>
 
-        <!-- FOOTER -->
+        <!-- ================= FOOTER ================= -->
         <footer class="footer">
             SYNERGYGROUP • CRM
         </footer>
@@ -98,46 +99,13 @@
 </div>
 
 <!-- ======================================================
-     CHAT — BULLE FLOTTANTE
+     CHAT — WIDGET FLOTTANT (UNE SEULE FOIS)
      ====================================================== -->
-<div id="chat-bubble" title="Ouvrir le chat">
-    💬
-</div>
 
-<!-- ======================================================
-     CHAT — PANNEAU
-     ====================================================== -->
-<div id="chat-panel" class="chat-hidden">
+{% include "chat_widget.html" %}
 
-    <div class="chat-header">
-        <span>Chat interne</span>
-        <button type="button" id="chat-close">×</button>
-    </div>
-
-    <div id="chat-messages" class="chat-messages"></div>
-
-    <form id="chat-form" class="chat-form" enctype="multipart/form-data">
-
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-        <input type="text"
-               id="chat-input"
-               name="message"
-               placeholder="Écrire un message…"
-               autocomplete="off">
-
-        <input type="file"
-               id="chat-file"
-               name="file">
-
-        <button type="submit">
-            Envoyer
-        </button>
-    </form>
-</div>
-
-<!-- JS CHAT -->
-<script src="{{ url_for('static', filename='chat_widget.js') }}"></script>
+<!-- ================= JS CHAT ================= -->
+<script src="{{ url_for('static', filename='chat_widget.js') }}?v=1"></script>
 
 </body>
 </html>
