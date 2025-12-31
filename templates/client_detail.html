@@ -151,7 +151,6 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <input type="hidden" name="key" value="{{ doc.key }}">
 
-                            <!-- IMPORTANT : bouton visible (pas d’emoji obligatoire) -->
                             <button type="submit"
                                     class="btn btn-danger btn-sm"
                                     style="display:inline-flex;align-items:center;gap:6px;">
@@ -226,8 +225,10 @@
         </thead>
         <tbody>
             {% for c in cotations %}
-            <tr>
-                <td>{{ c.date_creation[:10] }}</td>
+            <tr style="cursor:pointer;"
+                data-href="{{ url_for('open_cotation', cotation_id=c.id) }}"
+                onclick="window.location.href=this.dataset.href;">
+                <td>{{ c.date_creation[:10] if c.date_creation else "—" }}</td>
                 <td>{{ c.energie_type or "—" }}</td>
                 <td>{{ c.fournisseur_actuel or "—" }}</td>
                 <td>{{ c.status }}</td>
