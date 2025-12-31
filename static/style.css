@@ -1,8 +1,13 @@
 /* =========================================================
-   SYNERGYGROUP CRM — BASE CSS PROPRE & PREMIUM
+   SYNERGYGROUP CRM — STYLE CSS GLOBAL & STABLE
+   Compatible CRM COMPLET + Chat
    ========================================================= */
 
-/* ================= VARIABLES ================= */
+
+/* =========================================================
+   1. VARIABLES & RESET
+   ========================================================= */
+
 :root {
     --primary:#050A3A;
     --accent:#F2B233;
@@ -26,8 +31,9 @@
     --sidebar-w:240px;
 }
 
-/* ================= RESET ================= */
-* { box-sizing:border-box; }
+* {
+    box-sizing:border-box;
+}
 
 html, body {
     height:100%;
@@ -42,13 +48,27 @@ body {
     line-height:1.45;
 }
 
-/* ================= LAYOUT ================= */
+
+/* =========================================================
+   2. LAYOUT GLOBAL
+   ========================================================= */
+
 .app-layout {
     display:flex;
     min-height:100vh;
 }
 
-/* ================= SIDEBAR ================= */
+.main-content {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+
+
+/* =========================================================
+   3. SIDEBAR & NAVIGATION
+   ========================================================= */
+
 .sidebar {
     width:var(--sidebar-w);
     background:linear-gradient(180deg,#050A3A,#040833);
@@ -86,7 +106,6 @@ body {
     opacity:.75;
 }
 
-/* Navigation */
 .sidebar-nav {
     display:flex;
     flex-direction:column;
@@ -127,14 +146,11 @@ body {
     text-decoration:none;
 }
 
-/* ================= MAIN ================= */
-.main-content {
-    flex:1;
-    display:flex;
-    flex-direction:column;
-}
 
-/* ================= TOPBAR ================= */
+/* =========================================================
+   4. TOPBAR / CONTENT / FOOTER
+   ========================================================= */
+
 .topbar {
     background:var(--surface);
     border-bottom:1px solid var(--border);
@@ -147,9 +163,28 @@ body {
     margin-left:6px;
 }
 
-/* ================= FLASH ================= */
+.content {
+    padding:22px;
+    flex:1;
+    overflow:auto;
+}
+
+.footer {
+    padding:12px 22px;
+    border-top:1px solid var(--border);
+    font-size:.8rem;
+    color:var(--muted);
+    background:var(--surface);
+    text-align:center;
+}
+
+
+/* =========================================================
+   5. FLASH MESSAGES
+   ========================================================= */
+
 .flash-container {
-    padding:16px 22px 0 22px;
+    padding:16px 22px 0;
 }
 
 .flash {
@@ -176,17 +211,14 @@ body {
     padding:10px 12px;
 }
 
-/* ================= CONTENT ================= */
-.content {
-    padding:22px;
-    flex:1;
-    overflow:auto;
-}
 
-/* ================= TITRES ================= */
+/* =========================================================
+   6. UI CRM — TITRES / CARDS / KPI
+   ========================================================= */
+
 h1 {
     font-size:1.5rem;
-    margin:0 0 18px 0;
+    margin:0 0 18px;
 }
 
 h5 {
@@ -197,7 +229,6 @@ h5 {
     margin-bottom:10px;
 }
 
-/* ================= CARDS ================= */
 .card {
     background:var(--surface);
     border:1px solid var(--border);
@@ -207,7 +238,6 @@ h5 {
     margin-bottom:18px;
 }
 
-/* ================= KPI ================= */
 .kpi-tile {
     background:var(--surface);
     border:1px solid var(--border);
@@ -229,7 +259,11 @@ h5 {
     margin-top:4px;
 }
 
-/* ================= TABLES ================= */
+
+/* =========================================================
+   7. TABLES
+   ========================================================= */
+
 .table {
     width:100%;
     border-collapse:collapse;
@@ -247,18 +281,25 @@ h5 {
 .table td {
     padding:14px 10px;
     border-bottom:1px solid #f0f0f0;
+    vertical-align:middle;
 }
 
-/* ================= FORMS ================= */
+
+/* =========================================================
+   8. FORMULAIRES & BOUTONS
+   ========================================================= */
+
 .form-label {
     font-size:.75rem;
     text-transform:uppercase;
     color:var(--muted);
-    margin-bottom:4px;
 }
 
 .form-control,
-.form-select {
+.form-select,
+input,
+select,
+textarea {
     width:100%;
     padding:9px 11px;
     font-size:.9rem;
@@ -267,13 +308,14 @@ h5 {
 }
 
 .form-control:focus,
-.form-select:focus {
+.form-select:focus,
+input:focus,
+textarea:focus {
     outline:none;
     border-color:var(--primary);
     box-shadow:0 0 0 3px rgba(242,178,51,.2);
 }
 
-/* ================= BUTTONS ================= */
 .btn {
     padding:9px 14px;
     font-size:.85rem;
@@ -283,800 +325,164 @@ h5 {
     font-weight:700;
 }
 
-.btn-primary {
-    background:var(--accent);
-    color:var(--primary);
-}
+.btn-primary { background:var(--accent); color:var(--primary); }
+.btn-secondary { background:#eef0f4; color:var(--text); }
+.btn-success { background:var(--success); color:#fff; }
+.btn-danger { background:var(--danger); color:#fff; }
 
-.btn-secondary {
-    background:#eef0f4;
-    color:var(--text);
-}
+.btn:hover { opacity:.9; }
 
-.btn-success {
-    background:var(--success);
-    color:#fff;
-}
 
-.btn-danger {
-    background:var(--danger);
-    color:#fff;
-}
-
-.btn:hover {
-    opacity:.9;
-}
-
-/* ================= BADGES ================= */
-.badge {
-    padding:5px 10px;
-    border-radius:999px;
-    font-size:.75rem;
-    font-weight:700;
-}
-
-.badge-info {
-    background:#eef2ff;
-    color:#3730a3;
-}
-
-.badge-success {
-    background:#dcfce7;
-    color:#166534;
-}
-
-.badge-warning {
-    background:#fef9c3;
-    color:#854d0e;
-}
-
-.badge-danger {
-    background:#fee2e2;
-    color:#7f1d1d;
-}
-
-/* ================= FOOTER ================= */
-.footer {
-    padding:12px 22px;
-    border-top:1px solid var(--border);
-    font-size:.8rem;
-    color:var(--muted);
-    background:var(--surface);
-    text-align:center;
-}
-
-/* ================= RESPONSIVE ================= */
-@media (max-width:900px){
-    :root { --sidebar-w:200px; }
-}
-
-@media (max-width:720px){
-    .app-layout { flex-direction:column; }
-    .sidebar { width:100%; }
-}
-.page-title {
-    margin-bottom: 20px;
-}
-
-.section {
-    margin-bottom: 30px;
-}
-
-.card {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 20px 24px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-.card h2 {
-    margin-bottom: 15px;
-    font-size: 18px;
-}
-
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 15px;
-}
-
-.label {
-    display: block;
-    font-size: 12px;
-    color: #777;
-}
-
-.badge {
-    background: #f5b942;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-}
-
-.form-grid .full {
-    grid-column: 1 / -1;
-}
-
-input, select, textarea {
-    width: 100%;
-    padding: 8px;
-    border-radius: 6px;
-    border: 1px solid #ddd;
-}
-
-.inline-form {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
-}
+/* =========================================================
+   9. DOCUMENTS / DOSSIERS
+   ========================================================= */
 
 .doc-list {
-    list-style: none;
-    padding: 0;
-}
-
-.doc-list li {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-}
-
-.icon-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #c00;
-}
-
-.muted {
-    color: #999;
-}
-/* ===== TITRES DE SECTIONS ===== */
-.section-title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #0f2a44;
-    margin-bottom: 15px;
-}
-
-.section-title::before {
-    content: "";
-    width: 5px;
-    height: 24px;
-    background: linear-gradient(180deg, #f5a623, #f39c12);
-    border-radius: 3px;
-}
-
-/* Variantes couleurs */
-.section-title.cotation::before {
-    background: linear-gradient(180deg, #4a90e2, #357abd);
-}
-
-.section-title.documents::before {
-    background: linear-gradient(180deg, #2ecc71, #27ae60);
-}
-
-.section-title.update::before {
-    background: linear-gradient(180deg, #9b59b6, #8e44ad);
-}
-/* ================= DOCUMENTS ================= */
-
-.documents-card {
-    margin-top: 30px;
-}
-
-.documents-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 15px;
-    flex-wrap: wrap;
-}
-
-.upload-form {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.upload-label {
-    background: #f1f5f9;
-    border: 1px dashed #cbd5e1;
-    padding: 8px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background 0.2s ease;
-}
-
-.upload-label:hover {
-    background: #e2e8f0;
-}
-
-.documents-list {
-    list-style: none;
-    padding: 0;
-    margin-top: 20px;
-}
-
-.document-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 14px;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    background: #ffffff;
-    transition: background 0.2s ease;
-}
-
-.document-item:hover {
-    background: #f9fafb;
-}
-
-.doc-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.doc-name {
-    text-decoration: none;
-    color: #1f2937;
-    font-weight: 500;
-}
-
-.doc-name:hover {
-    text-decoration: underline;
-}
-
-.btn-icon {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1.1rem;
-}
-
-.btn-icon.danger {
-    color: #dc2626;
-}
-
-.empty-docs {
-    margin-top: 20px;
-    padding: 20px;
-    text-align: center;
-    color: #6b7280;
-    background: #f9fafb;
-    border-radius: 8px;
-    font-style: italic;
-}
-/* ===== Documents client ===== */
-
-.doc-list {
-    list-style: none;
-    padding: 0;
-    margin-top: 16px;
+    list-style:none;
+    padding:0;
+    margin-top:16px;
 }
 
 .doc-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-
-    padding: 12px 14px;
-    border-radius: 10px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    margin-bottom: 10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    padding:12px 14px;
+    border-radius:10px;
+    background:#f9fafb;
+    border:1px solid #e5e7eb;
+    margin-bottom:10px;
 }
 
 .doc-info {
-    flex: 1;
-    overflow: hidden;
+    flex:1;
+    overflow:hidden;
 }
 
 .doc-link {
-    text-decoration: none;
-    font-weight: 500;
-    color: #1f2937;
-    word-break: break-word;
+    text-decoration:none;
+    font-weight:500;
+    color:#1f2937;
 }
 
 .doc-link:hover {
-    text-decoration: underline;
+    text-decoration:underline;
 }
 
 .doc-actions {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
+    display:flex;
+    align-items:center;
+    gap:10px;
 }
-
-/* 🔥 bouton suppression visible et stable */
-.doc-delete-btn {
-    padding: 6px 10px;
-    border-radius: 6px;
-    line-height: 1;
-}
-/* ===============================
-   FIX BOUTON SUPPRIMER DOCUMENT
-   =============================== */
-
-/* Autorise les boutons dans la colonne Actions */
-.table td:last-child form {
-    display: inline-block !important;
-}
-
-/* Force l'affichage des boutons danger */
-.table td:last-child button,
-.doc-actions button {
-    display: inline-flex !important;
-    align-items: center;
-    gap: 6px;
-}
-
-/* Empêche un overflow qui masque les boutons */
-.table td:last-child {
-    overflow: visible !important;
-    white-space: nowrap;
-}
-
-/* Séparation visuelle */
-.table td:last-child form {
-    margin-left: 8px;
-}
-/* ===============================
-   BOUTON SUPPRIMER — VISIBILITÉ
-   =============================== */
 
 .doc-actions .btn-danger {
-    background: #dc2626;          /* rouge franc */
-    color: #ffffff;
-    border: none;
-    margin-left: 10px;
-    padding: 8px 14px;
-    font-weight: 700;
+    background:#dc2626;
+    color:#fff;
 }
 
-.doc-actions .btn-danger:hover {
-    background: #b91c1c;          /* rouge plus foncé au hover */
-}
 
-.doc-actions {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 10px;
-}
-/* ================= CHAT FLOATING ================= */
-
-#chat-bubble {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    cursor: pointer;
-    box-shadow: 0 8px 20px rgba(0,0,0,.25);
-    z-index: 9999;
-}
-
-#chat-panel {
-    position: fixed;
-    bottom: 90px;
-    right: 24px;
-    width: 320px;
-    max-height: 420px;
-    background: var(--surface);
-    border-radius: 14px;
-    box-shadow: 0 12px 30px rgba(0,0,0,.25);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    z-index: 9999;
-}
-
-.chat-hidden {
-    display: none;
-}
-
-.chat-header {
-    background: var(--primary);
-    color: #fff;
-    padding: 12px 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.chat-header button {
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 16px;
-    cursor: pointer;
-}
-
-.chat-messages {
-    flex: 1;
-    padding: 12px;
-    overflow-y: auto;
-    font-size: 13px;
-}
-
-.chat-message {
-    margin-bottom: 8px;
-}
-
-.chat-message strong {
-    font-size: 12px;
-}
-
-.chat-form {
-    display: flex;
-    gap: 6px;
-    padding: 10px;
-    border-top: 1px solid var(--border);
-}
-
-.chat-form input {
-    flex: 1;
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-}
-
-.chat-form button {
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: var(--accent);
-    color: var(--primary);
-    font-weight: 700;
-    border: none;
-    cursor: pointer;
-}
-/* ================= CHAT TOGGLE BEHAVIOR ================= */
-
-/* Chat fermé par défaut */
-.chat-widget {
-    display: none;
-}
-
-/* Chat visible quand ouvert */
-.chat-widget.open {
-    display: flex;
-}
-
-/* Bulle toujours visible */
-.chat-toggle {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    cursor: pointer;
-    box-shadow: 0 8px 20px rgba(0,0,0,.25);
-    z-index: 10000;
-}
-/* ================= CHAT BADGE ================= */
-
-.chat-toggle {
-    position: relative;
-}
-
-.chat-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-
-    background: #dc2626;
-    color: #fff;
-
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 700;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    box-shadow: 0 2px 6px rgba(0,0,0,.25);
-}
-/* ================= CHAT PULSE ================= */
-
-@keyframes chat-pulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(242,178,51,0.6);
-    }
-    70% {
-        box-shadow: 0 0 0 10px rgba(242,178,51,0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(242,178,51,0);
-    }
-}
-
-.chat-pulse {
-    animation: chat-pulse 1.6s infinite;
-}
-/* ================= CHAT — UX AMÉLIORÉ ================= */
-
-/* BULLE */
-.chat-toggle {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    cursor: pointer;
-    box-shadow: 0 10px 25px rgba(0,0,0,.25);
-    z-index: 10000;
-    animation: chatPulse 2.8s infinite;
-}
-
-/* clignotement léger */
-@keyframes chatPulse {
-    0%   { box-shadow: 0 0 0 0 rgba(242,178,51,.5); }
-    70%  { box-shadow: 0 0 0 12px rgba(242,178,51,0); }
-    100% { box-shadow: 0 0 0 0 rgba(242,178,51,0); }
-}
-
-/* BADGE */
-.chat-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: #dc2626;
-    color: #fff;
-    width: 22px;
-    height: 22px;
-    font-size: 12px;
-    font-weight: 700;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* FENÊTRE CHAT */
-.chat-widget {
-    position: fixed;
-    bottom: 90px;
-    right: 24px;
-    width: 320px;
-    height: 420px;
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 20px 40px rgba(0,0,0,.25);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    transform: translateY(30px);
-    opacity: 0;
-    pointer-events: none;
-    transition: all .25s ease;
-    z-index: 9999;
-}
-
-/* OUVERT */
-.chat-widget.open {
-    transform: translateY(0);
-    opacity: 1;
-    pointer-events: auto;
-}
-
-/* HEADER */
-.chat-header {
-    background: linear-gradient(180deg, #050A3A, #040833);
-    color: #fff;
-    padding: 12px 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 700;
-}
-
-.chat-close {
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 18px;
-    cursor: pointer;
-}
-
-/* MESSAGES */
-.chat-messages {
-    flex: 1;
-    padding: 12px;
-    overflow-y: auto;
-    font-size: 13px;
-}
-
-/* FORM */
-.chat-form {
-    display: flex;
-    gap: 6px;
-    padding: 10px;
-    border-top: 1px solid var(--border);
-}
-
-.chat-form input[type="text"] {
-    flex: 1;
-}
-
-.chat-form button {
-    background: var(--accent);
-    color: var(--primary);
-    font-weight: 700;
-    border-radius: 8px;
-}
-/* ================= CHAT — ÉTAT PAR DÉFAUT ================= */
-
-/* chat caché par défaut */
-.chat-widget {
-    display: none;
-}
-
-/* chat visible uniquement quand ouvert */
-.chat-widget.open {
-    display: flex;
-}
-/* ================= CHAT BADGE ================= */
-
-.chat-badge {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    background: #dc2626;
-    color: #fff;
-    min-width: 20px;
-    height: 20px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 0 2px #fff;
-}
-
-/* clignotement léger */
-@keyframes chatPulse {
-    0% { box-shadow: 0 0 0 0 rgba(220,38,38,.6); }
-    70% { box-shadow: 0 0 0 10px rgba(220,38,38,0); }
-    100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
-}
-
-.chat-toggle.has-unread {
-    animation: chatPulse 1.8s infinite;
-}
-/* ================= CHAT — VERSION FINALE ================= */
+/* =========================================================
+   10. CHAT — COMPOSANT GLOBAL ISOLÉ
+   ========================================================= */
 
 /* Bouton flottant */
 .chat-toggle {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    cursor: pointer;
-    box-shadow: 0 10px 25px rgba(0,0,0,.25);
-    z-index: 10000;
+    position:fixed;
+    bottom:24px;
+    right:24px;
+    width:56px;
+    height:56px;
+    border-radius:50%;
+    background:var(--accent);
+    color:var(--primary);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:22px;
+    cursor:pointer;
+    box-shadow:0 10px 25px rgba(0,0,0,.25);
+    z-index:10000;
 }
 
-/* Badge */
+/* Badge non-lus */
 .chat-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-    background: #dc2626;
-    color: #fff;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 700;
-    display: none;
-    align-items: center;
-    justify-content: center;
+    position:absolute;
+    top:-6px;
+    right:-6px;
+    min-width:20px;
+    height:20px;
+    padding:0 6px;
+    background:#dc2626;
+    color:#fff;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    display:none;
+    align-items:center;
+    justify-content:center;
 }
 
 /* Fenêtre chat */
 .chat-widget {
-    position: fixed;
-    bottom: 90px;
-    right: 24px;
-    width: 320px;
-    height: 420px;
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 20px 40px rgba(0,0,0,.25);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-
-    /* état fermé */
-    opacity: 0;
-    transform: translateY(20px);
-    pointer-events: none;
-
-    transition: opacity .25s ease, transform .25s ease;
-    z-index: 9999;
+    position:fixed;
+    bottom:90px;
+    right:24px;
+    width:320px;
+    height:420px;
+    background:#fff;
+    border-radius:16px;
+    box-shadow:0 20px 40px rgba(0,0,0,.25);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    opacity:0;
+    transform:translateY(20px);
+    pointer-events:none;
+    transition:all .25s ease;
+    z-index:9999;
 }
 
-/* état ouvert */
 .chat-widget.open {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
+    opacity:1;
+    transform:translateY(0);
+    pointer-events:auto;
 }
 
-/* Header */
 .chat-header {
-    background: linear-gradient(180deg, #050A3A, #040833);
-    color: #fff;
-    padding: 12px 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 700;
+    background:linear-gradient(180deg,#050A3A,#040833);
+    color:#fff;
+    padding:12px 14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-weight:700;
 }
 
-/* Messages */
 .chat-messages {
-    flex: 1;
-    padding: 12px;
-    overflow-y: auto;
-    font-size: 13px;
+    flex:1;
+    padding:12px;
+    overflow-y:auto;
+    font-size:13px;
 }
 
-/* Input */
 .chat-inputbar {
-    display: flex;
-    gap: 6px;
-    padding: 10px;
-    border-top: 1px solid var(--border);
+    display:flex;
+    gap:6px;
+    padding:10px;
+    border-top:1px solid var(--border);
+}
+
+
+/* =========================================================
+   11. RESPONSIVE
+   ========================================================= */
+
+@media (max-width:900px) {
+    :root { --sidebar-w:200px; }
+}
+
+@media (max-width:720px) {
+    .app-layout { flex-direction:column; }
+    .sidebar { width:100%; }
 }

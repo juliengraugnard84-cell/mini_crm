@@ -2,15 +2,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ================= ELEMENTS ================= */
 
-    const toggleBtn  = document.getElementById("chat-toggle");
-    const widget     = document.getElementById("chat-widget");
-    const closeBtn   = document.getElementById("chat-close");
+    const toggleBtn   = document.getElementById("chat-toggle");
+    const widget      = document.getElementById("chat-widget");
+    const closeBtn    = document.getElementById("chat-close");
 
-    const form       = document.getElementById("chat-form");
-    const input      = document.getElementById("chat-input");
-    const fileInput  = document.getElementById("chat-file");
-    const messagesBox= document.getElementById("chat-messages");
-    const badge      = document.getElementById("chat-badge");
+    const form        = document.getElementById("chat-form");
+    const input       = document.getElementById("chat-input");
+    const fileInput   = document.getElementById("chat-file");
+    const messagesBox = document.getElementById("chat-messages");
+    const badge       = document.getElementById("chat-badge");
 
     const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID;
     const CSRF_TOKEN      = window.CHAT_CSRF_TOKEN;
@@ -76,15 +76,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const bubble = document.createElement("div");
         bubble.className = `chat-bubble ${mine ? "me" : "them"}`;
 
+        /* ===== META (nom + heure) ===== */
         const meta = document.createElement("div");
         meta.className = "chat-meta";
         meta.innerHTML = `
             <span class="chat-user">${escapeHTML(mine ? "Vous" : m.username)}</span>
             <span class="chat-time">${escapeHTML(formatTime(m.created_at))}</span>
         `;
-
         bubble.appendChild(meta);
 
+        /* ===== TEXTE ===== */
         if (m.message) {
             const text = document.createElement("div");
             text.className = "chat-text";
@@ -92,6 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
             bubble.appendChild(text);
         }
 
+        /* ===== FICHIER ===== */
         if (m.file_url) {
             const file = document.createElement("a");
             file.className = "chat-file";
@@ -102,18 +104,33 @@ document.addEventListener("DOMContentLoaded", () => {
             bubble.appendChild(file);
         }
 
+        /* ===== STATUT (✓ / ✓✓) ===== */
+        if (mine) {
+            const status = document.createElement("div");
+            status.className = "chat-status";
+
+            if (m.is_read) {
+                status.innerHTML = `<span class="chat-read read">✓✓</span>`;
+            } else {
+                status.innerHTML = `<span class="chat-read sent">✓</span>`;
+            }
+
+            bubble.appendChild(status);
+        }
+
         row.appendChild(bubble);
         return row;
     }
 
     /* ================= OPEN / CLOSE ================= */
 
-    function setOpen(open) {
+    async function setOpen(open) {
         if (open) {
             widget.classList.add("open");
             widget.setAttribute("aria-hidden", "false");
             resetBadge();
-            loadMessages(true);
+            await loadMessages(true);
+            await markAsRead();
             setTimeout(() => input.focus(), 120);
         } else {
             widget.classList.remove("open");
@@ -157,6 +174,23 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Erreur chargement chat", e);
         } finally {
             isLoading = false;
+        }
+    }
+
+    /* ================= MARK AS READ ================= */
+
+    async function markAsRead() {
+        try {
+            const headers = {};
+            if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
+
+            await fetch("/chat/mark_read", {
+                method: "POST",
+                credentials: "same-origin",
+                headers
+            });
+        } catch (e) {
+            console.error("Erreur mark_read", e);
         }
     }
 
@@ -220,6 +254,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ================= POLLING ================= */
 
-    setInterval(() => loadMessages(false), 3000);
+    setInterval(() => {
+        loadMessages(false);
+        if (isOpen()) markAsRead();
+    }, 3000);
+
     loadMessages(false);
 });

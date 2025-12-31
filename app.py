@@ -222,8 +222,13 @@ def init_db():
         )
     """)
 
+    # ✅ AJOUT STATUT LU / NON LU (SAFE)
+    _try_add_column(conn, "chat_messages", "is_read INTEGER DEFAULT 0")
+
     try:
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_id ON chat_messages(id)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chat_messages_id ON chat_messages(id)"
+        )
     except sqlite3.OperationalError:
         pass
 
@@ -248,7 +253,6 @@ def init_db():
 
 
 init_db()
-
 
 
 ############################################################
@@ -1458,10 +1462,21 @@ def chat_messages():
     except Exception:
         limit_int = 50
 
+    user = session.get("user") or {}
+    user_id = user.get("id")
+
     conn = get_db()
     rows = conn.execute(
         """
-        SELECT id, user_id, username, message, file_key, file_name, created_at
+        SELECT
+            id,
+            user_id,
+            username,
+            message,
+            file_key,
+            file_name,
+            created_at,
+            COALESCE(is_read, 0) AS is_read
         FROM chat_messages
         ORDER BY id DESC
         LIMIT ?
@@ -1485,6 +1500,8 @@ def chat_messages():
                     else None
                 ),
                 "created_at": r["created_at"],
+                "is_read": bool(r["is_read"]),
+                "is_mine": (r["user_id"] == user_id),
             }
         )
 
@@ -1500,20 +1517,69 @@ def chat_send():
     file_key, file_name = _chat_store_file(file_obj)
 
     if not message and not file_key:
-        return jsonify({"success": False, "message": "Message ou fichier requis."}), 400
+        return jsonify(
+            {"success": False, "message": "Message ou fichier requis."}
+        ), 400
 
     u = session.get("user") or {}
     conn = get_db()
+
     cur = conn.execute(
         """
-        INSERT INTO chat_messages (user_id, username, message, file_key, file_name)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO chat_messages (
+            user_id,
+            username,
+            message,
+            file_key,
+            file_name,
+            is_read
+        )
+        VALUES (?, ?, ?, ?, ?, 0)
         """,
-        (u.get("id"), u.get("username"), message, file_key, file_name),
+        (
+            u.get("id"),
+            u.get("username"),
+            message,
+            file_key,
+            file_name,
+        ),
+    )
+
+    conn.commit()
+
+    return jsonify(
+        {
+            "success": True,
+            "id": cur.lastrowid,
+            "user_id": u.get("id"),
+            "username": u.get("username"),
+        }
+    )
+
+
+@app.route("/chat/mark_read", methods=["POST"])
+@login_required
+def chat_mark_read():
+    """
+    Marque tous les messages NON envoyés par l'utilisateur courant comme lus
+    (équivalent WhatsApp quand la fenêtre est ouverte)
+    """
+    u = session.get("user") or {}
+    user_id = u.get("id")
+
+    conn = get_db()
+    conn.execute(
+        """
+        UPDATE chat_messages
+        SET is_read = 1
+        WHERE COALESCE(is_read, 0) = 0
+          AND user_id <> ?
+        """,
+        (user_id,),
     )
     conn.commit()
 
-    return jsonify({"success": True, "id": cur.lastrowid})
+    return jsonify({"success": True})
 
 
 ############################################################
