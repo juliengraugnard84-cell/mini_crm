@@ -1136,7 +1136,7 @@ def admin_edit_user(user_id):
 
     return render_template(
         "admin_edit_user.html",
-        user=row_to_obj(user)
+        user=row_to_obj(user),
     )
 
 
@@ -1187,10 +1187,6 @@ def admin_reset_password(user_id):
     conn.commit()
     flash("Mot de passe réinitialisé.", "success")
     return redirect(url_for("admin_users"))
-@app.route("/admin/users/<int:user_id>/reset_password", methods=["POST"])
-@admin_required
-def admin_reset_password(user_id):
-    ...
 ############################################################
 # 10 BIS. ADMIN — DEMANDES DE COTATION
 ############################################################
@@ -1215,7 +1211,6 @@ def admin_cotations():
         "admin_cotations.html",
         cotations=[row_to_obj(r) for r in rows],
     )
-
 
 
 ############################################################
