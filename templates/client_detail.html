@@ -1,131 +1,179 @@
 {% extends "base.html" %}
+
 {% block content %}
+<div class="container">
 
-<h1>Dossier client – {{ client.name }}</h1>
+  <h1>Dossier client — {{ client.name }}</h1>
 
-<ul class="nav nav-tabs mt-4" role="tablist">
+  <!-- =========================
+       ONGLET NAVIGATION
+  ========================== -->
+  <ul class="nav nav-tabs mb-4" role="tablist">
     <li class="nav-item">
-        <a class="nav-link active" data-bs-toggle="tab" href="#infos">Informations</a>
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cotations">
+        Cotations
+      </button>
     </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#cotations">Cotations</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#documents">Documents</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#updates">Mise à jour</a>
-    </li>
-</ul>
 
-<div class="tab-content mt-3">
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#updates">
+        Mise à jour
+      </button>
+    </li>
+  </ul>
 
-    <!-- INFOS CLIENT -->
-    <div class="tab-pane fade show active" id="infos">
-        <div class="card">
-            <div class="card-body">
-                <p><strong>Email :</strong> {{ client.email or "—" }}</p>
-                <p><strong>Téléphone :</strong> {{ client.phone or "—" }}</p>
-                <p><strong>Adresse :</strong> {{ client.address or "—" }}</p>
-                <p><strong>Commercial :</strong> {{ client.commercial or "—" }}</p>
-                <p><strong>Créé le :</strong> {{ format_date(client.created_at) }}</p>
-            </div>
+  <div class="tab-content">
+
+    <!-- =========================
+         ONGLET COTATIONS
+    ========================== -->
+    <div class="tab-pane fade show active" id="cotations">
+
+      <!-- FORMULAIRE DEMANDE DE COTATION -->
+      {% if current_user.role in ['commercial', 'admin'] %}
+      <div class="card mb-4">
+        <div class="card-header">
+          <strong>Nouvelle demande de cotation</strong>
         </div>
+        <div class="card-body">
+
+          <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="mb-3">
+              <label>Date de négociation</label>
+              <input type="date" name="date_negociation" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+              <label>Énergie</label>
+              <select name="energie_type" class="form-select" required>
+                <option value="">— Choisir —</option>
+                <option value="gaz">Gaz</option>
+                <option value="electricite">Électricité</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label>PDL / PCE</label>
+              <input type="text" name="pdl_pce" class="form-control">
+            </div>
+
+            <div class="mb-3">
+              <label>Date d’échéance</label>
+              <input type="date" name="date_echeance" class="form-control">
+            </div>
+
+            <div class="mb-3">
+              <label>Fournisseur actuel</label>
+              <input type="text" name="fournisseur_actuel" class="form-control">
+            </div>
+
+            <div class="mb-3">
+              <label>Entreprise</label>
+              <input type="text" name="entreprise_nom" class="form-control">
+            </div>
+
+            <div class="mb-3">
+              <label>SIRET</label>
+              <input type="text" name="siret" class="form-control">
+            </div>
+
+            <div class="mb-3">
+              <label>Signataire</label>
+              <input type="text" name="signataire_nom" class="form-control">
+            </div>
+
+            <div class="mb-3">
+              <label>Téléphone</label>
+              <input type="text" name="signataire_tel" class="form-control">
+            </div>
+
+            <div class="mb-3">
+              <label>Email</label>
+              <input type="email" name="signataire_email" class="form-control">
+            </div>
+
+            <div class="mb-3">
+              <label>Commentaire</label>
+              <textarea name="commentaire" class="form-control"></textarea>
+            </div>
+
+            <button class="btn btn-primary">Créer la demande</button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- HISTORIQUE COTATIONS -->
+      <div class="card">
+        <div class="card-header">
+          <strong>Historique des cotations</strong>
+        </div>
+        <div class="card-body">
+          {% if cotations %}
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Énergie</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in cotations %}
+              <tr>
+                <td>{{ format_date(c.date_creation) }}</td>
+                <td>{{ c.energie_type }}</td>
+                <td>{{ c.status }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+            <p>Aucune cotation.</p>
+          {% endif %}
+        </div>
+      </div>
+
     </div>
 
-    <!-- COTATIONS -->
-    <div class="tab-pane fade" id="cotations">
-        <div class="card">
-            <div class="card-body">
-
-                {% if cotations %}
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Énergie</th>
-                                <th>Statut</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% for c in cotations %}
-                            <tr>
-                                <td>{{ format_date(c.date_creation) }}</td>
-                                <td>{{ c.energie_type }}</td>
-                                <td>{{ c.status }}</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p>Aucune cotation.</p>
-                {% endif %}
-
-            </div>
-        </div>
-    </div>
-
-    <!-- DOCUMENTS -->
-    <div class="tab-pane fade" id="documents">
-        <div class="card">
-            <div class="card-body">
-
-                {% if documents %}
-                    <ul class="list-group">
-                        {% for d in documents %}
-                            <li class="list-group-item d-flex justify-content-between">
-                                {{ d.nom }}
-                                <a href="{{ d.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                    Télécharger
-                                </a>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>Aucun document.</p>
-                {% endif %}
-
-            </div>
-        </div>
-    </div>
-
-    <!-- MISE À JOUR -->
+    <!-- =========================
+         ONGLET MISE À JOUR
+    ========================== -->
     <div class="tab-pane fade" id="updates">
 
-        {% if current_user.role != "admin" %}
-        <div class="card">
-            <div class="card-body">
-                <h5>Demande de mise à jour</h5>
-
-                <form method="post"
-                      action="{{ url_for('update_client', client_id=client.id) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-                    <div class="mb-3">
-                        <label class="form-label">Date souhaitée</label>
-                        <input type="date" name="update_date" class="form-control" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Commentaire</label>
-                        <textarea name="update_commentaire"
-                                  class="form-control"
-                                  rows="4"
-                                  placeholder="Explique la mise à jour à effectuer"></textarea>
-                    </div>
-
-                    <button class="btn btn-primary">Envoyer la demande</button>
-                </form>
-            </div>
+      {% if current_user.role == 'commercial' %}
+      <div class="card">
+        <div class="card-header">
+          <strong>Demande de mise à jour du dossier</strong>
         </div>
-        {% else %}
-            <p class="text-muted">
-                Les demandes de mise à jour sont envoyées par les commerciaux.
-            </p>
-        {% endif %}
+        <div class="card-body">
+
+          <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="mb-3">
+              <label>Date de mise à jour souhaitée</label>
+              <input type="date" name="update_date" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+              <label>Commentaire</label>
+              <textarea name="update_commentaire" class="form-control" required></textarea>
+            </div>
+
+            <button class="btn btn-warning">Envoyer à l’administrateur</button>
+          </form>
+
+        </div>
+      </div>
+      {% else %}
+        <p class="text-muted">Les demandes de mise à jour sont visibles dans l’espace administrateur.</p>
+      {% endif %}
 
     </div>
 
+  </div>
 </div>
-
 {% endblock %}
