@@ -99,7 +99,7 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
 
 ############################################################
-# 3. BASE DE DONNÉES (POSTGRESQL, SAFE PROD)
+# 3. BASE DE DONNÉES (POSTGRESQL – PROD SAFE)
 ############################################################
 
 def _connect_db():
@@ -109,7 +109,7 @@ def _connect_db():
     conn = psycopg2.connect(
         DATABASE_URL,
         cursor_factory=psycopg2.extras.DictCursor,
-        sslmode=os.environ.get("PGSSLMODE", "require"),
+        sslmode="require",
     )
     conn.autocommit = False
     return conn
@@ -146,6 +146,16 @@ def init_db():
     conn = _connect_db()
     try:
         with conn.cursor() as cur:
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username TEXT UNIQUE,
+                    password TEXT,
+                    role TEXT
+                )
+            """)
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS crm_clients (
                     id SERIAL PRIMARY KEY,
@@ -158,26 +168,6 @@ def init_db():
                     notes TEXT,
                     owner_id INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    username TEXT UNIQUE,
-                    password TEXT,
-                    role TEXT
-                )
-            """)
-
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS revenus (
-                    id SERIAL PRIMARY KEY,
-                    date TEXT NOT NULL,
-                    commercial TEXT NOT NULL,
-                    dossier TEXT,
-                    montant DOUBLE PRECISION NOT NULL,
-                    client_id INTEGER
                 )
             """)
 
@@ -195,6 +185,17 @@ def init_db():
             """)
 
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS revenus (
+                    id SERIAL PRIMARY KEY,
+                    date TEXT NOT NULL,
+                    commercial TEXT,
+                    dossier TEXT,
+                    client_id INTEGER,
+                    montant DOUBLE PRECISION NOT NULL
+                )
+            """)
+
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS chat_messages (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER,
@@ -207,14 +208,27 @@ def init_db():
                 )
             """)
 
+            # Admin bootstrap (UNE FOIS)
+            cur.execute("SELECT id FROM users WHERE username='admin'")
+            if not cur.fetchone():
+                cur.execute(
+                    "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
+                    (
+                        "admin",
+                        generate_password_hash(ADMIN_DEFAULT_PASSWORD),
+                        "admin",
+                    ),
+                )
+
         conn.commit()
     finally:
         conn.close()
 
 
-# ✅ INITIALISATION CONTRÔLÉE
-if os.environ.get("RUN_INIT_DB") == "1":
-    init_db()
+# 🚨 PRODUCTION SAFE :
+# ❌ NE JAMAIS lancer init_db automatiquement
+# ✅ À exécuter UNIQUEMENT MANUELLEMENT si nécessaire
+
 
 ############################################################
 # 4. S3 — STOCKAGE DOCUMENTS
