@@ -50,7 +50,7 @@
                 </td>
 
                 <td>
-                    {{ c.commercial_name or "—" }}
+                    {{ c.commercial or "—" }}
                 </td>
 
                 <td>
@@ -58,8 +58,7 @@
                 </td>
 
                 <td>
-                    {# ✅ FIX CRITIQUE : created_at peut être une string #}
-                    {{ c.created_at[:10] if c.created_at else "—" }}
+                    {{ format_date(c.created_at) }}
                 </td>
 
                 <td style="text-align:right;">
@@ -80,4 +79,3 @@
 </div>
 
 {% endblock %}
-

@@ -103,18 +103,26 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 ############################################################
 
 def _connect_db():
+    """
+    Connexion PostgreSQL unique.
+    AUCUNE initialisation automatique ici.
+    """
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL manquant dans la configuration.")
+
     conn = psycopg2.connect(
         DATABASE_URL,
         cursor_factory=psycopg2.extras.DictCursor,
-        sslmode=os.environ.get("PGSSLMODE", "require"),
+        sslmode="require",
     )
     conn.autocommit = False
     return conn
 
 
 def get_db():
+    """
+    Connexion stockée dans g (1 par requête)
+    """
     if "db" not in g:
         g.db = _connect_db()
     return g.db
@@ -122,52 +130,59 @@ def get_db():
 
 @app.teardown_appcontext
 def close_db(exception):
+    """
+    Fermeture propre de la connexion
+    """
     db = g.pop("db", None)
     if db is not None:
         db.close()
 
 
 def row_to_obj(row):
-    return SimpleNamespace(**dict(row)) if row else None
+    """
+    Convertit une row PostgreSQL en objet accessible via dot notation.
+    Garde les types natifs (datetime, int, float, etc.)
+    """
+    if not row:
+        return None
+    return SimpleNamespace(**dict(row))
 
 
 def _try_add_column(conn, table, column_sql):
+    """
+    Sécurité : ajout de colonne sans casser une base existante
+    """
     try:
         with conn.cursor() as cur:
-            cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column_sql}")
+            cur.execute(
+                f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column_sql}"
+            )
+        conn.commit()
     except Exception:
-        pass
-
-
-def _is_weak_default_admin_password(pw: str) -> bool:
-    if not pw:
-        return True
-    if pw.lower() in {"admin", "admin123", "password", "123456", "12345678"}:
-        return True
-    if len(pw) < 10:
-        return True
-    return False
+        conn.rollback()
 
 
 def init_db():
     """
-    ⚠️ À exécuter MANUELLEMENT uniquement si vous partez de zéro.
-    ⚠️ NE PAS appeler automatiquement au démarrage (sinon risque d'écrasement / confusion DB).
+    INITIALISATION MANUELLE UNIQUEMENT
+    ⚠️ NE JAMAIS APPELER AUTOMATIQUEMENT EN PROD
     """
     conn = _connect_db()
+
     try:
         with conn.cursor() as cur:
-            # USERS
+
+            # ================= USERS =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
-                    username TEXT UNIQUE,
-                    password TEXT,
-                    role TEXT
+                    username TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    role TEXT NOT NULL
                 )
             """)
 
-            # CLIENTS
+            # ================= CLIENTS =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS crm_clients (
                     id SERIAL PRIMARY KEY,
@@ -183,42 +198,42 @@ def init_db():
                 )
             """)
 
-            # REVENUS (CA)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS revenus (
-                    id SERIAL PRIMARY KEY,
-                    date TEXT NOT NULL,
-                    commercial TEXT,
-                    dossier TEXT,
-                    montant DOUBLE PRECISION NOT NULL
-                )
-            """)
-            _try_add_column(conn, "revenus", "client_id INTEGER")
-
-            # COTATIONS
+            # ================= COTATIONS =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS cotations (
                     id SERIAL PRIMARY KEY,
                     client_id INTEGER,
+                    date_negociation DATE,
+                    energie_type TEXT,
+                    pdl_pce TEXT,
+                    date_echeance DATE,
                     fournisseur_actuel TEXT,
-                    date_echeance TEXT,
+                    entreprise_nom TEXT,
+                    siret TEXT,
+                    signataire_nom TEXT,
+                    signataire_tel TEXT,
+                    signataire_email TEXT,
+                    commentaire TEXT,
                     created_by INTEGER,
                     is_read INTEGER DEFAULT 0,
                     status TEXT DEFAULT 'nouvelle',
                     date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            _try_add_column(conn, "cotations", "date_negociation TEXT")
-            _try_add_column(conn, "cotations", "energie_type TEXT")
-            _try_add_column(conn, "cotations", "entreprise_nom TEXT")
-            _try_add_column(conn, "cotations", "siret TEXT")
-            _try_add_column(conn, "cotations", "signataire_nom TEXT")
-            _try_add_column(conn, "cotations", "signataire_tel TEXT")
-            _try_add_column(conn, "cotations", "signataire_email TEXT")
-            _try_add_column(conn, "cotations", "pdl_pce TEXT")
-            _try_add_column(conn, "cotations", "commentaire TEXT")
 
-            # CHAT
+            # ================= REVENUS =================
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS revenus (
+                    id SERIAL PRIMARY KEY,
+                    date DATE NOT NULL,
+                    commercial TEXT,
+                    dossier TEXT,
+                    client_id INTEGER,
+                    montant DOUBLE PRECISION NOT NULL
+                )
+            """)
+
+            # ================= CHAT =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS chat_messages (
                     id SERIAL PRIMARY KEY,
@@ -227,38 +242,61 @@ def init_db():
                     message TEXT,
                     file_key TEXT,
                     file_name TEXT,
+                    is_read INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            _try_add_column(conn, "chat_messages", "is_read INTEGER DEFAULT 0")
 
-            try:
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_id ON chat_messages(id)")
-            except Exception:
-                pass
+            # ================= MISES À JOUR DOSSIER =================
+            # 👉 NOUVELLE TABLE (notifications admin)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS client_updates (
+                    id SERIAL PRIMARY KEY,
+                    client_id INTEGER NOT NULL,
+                    client_name TEXT NOT NULL,
+                    commercial_id INTEGER NOT NULL,
+                    commercial_name TEXT NOT NULL,
+                    update_date DATE NOT NULL,
+                    commentaire TEXT,
+                    is_read INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
-            # ADMIN BOOTSTRAP (UNE FOIS)
-            cur.execute("SELECT id FROM users WHERE username=%s", ("admin",))
-            admin = cur.fetchone()
-            if not admin:
-                if is_production and _is_weak_default_admin_password(ADMIN_DEFAULT_PASSWORD):
-                    raise RuntimeError("ADMIN_DEFAULT_PASSWORD trop faible pour la production.")
+            # ================= ADMIN BOOTSTRAP =================
+            cur.execute("SELECT id FROM users WHERE username='admin'")
+            if not cur.fetchone():
                 cur.execute(
-                    "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
-                    ("admin", generate_password_hash(ADMIN_DEFAULT_PASSWORD), "admin"),
+                    """
+                    INSERT INTO users (username, password, role)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (
+                        "admin",
+                        generate_password_hash(ADMIN_DEFAULT_PASSWORD),
+                        "admin",
+                    ),
                 )
 
         conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
     finally:
         conn.close()
 
 
-# ✅ IMPORTANT : on NE lance PAS init_db() automatiquement.
-# init_db()
+# 🚨 IMPORTANT
+# ❌ NE PAS APPELER init_db() AUTOMATIQUEMENT
+# ✅ À exécuter UNE SEULE FOIS manuellement si nécessaire
+
+
 
 
 ############################################################
-# 4. S3 — STOCKAGE DOCUMENTS
+# 4. S3 — STOCKAGE DOCUMENTS (PROD SAFE)
 ############################################################
 
 s3 = None
@@ -271,74 +309,91 @@ if not LOCAL_MODE:
             aws_access_key_id=AWS_ACCESS_KEY,
             aws_secret_access_key=AWS_SECRET_KEY,
         )
-        print(f"S3: Connexion OK (bucket={AWS_BUCKET}, region={AWS_REGION})")
+        print(
+            f"S3 connecté | bucket={AWS_BUCKET} | region={AWS_REGION}"
+        )
     except Exception as e:
-        print("Erreur connexion S3 :", repr(e))
+        print("❌ Erreur connexion S3 :", repr(e))
         s3 = None
 else:
-    print("Mode local : S3 désactivé.")
+    print("ℹ️ Mode local actif : S3 désactivé.")
 
-
-############################################################
-# 5. UTILITAIRES
-############################################################
 
 def allowed_file(filename: str) -> bool:
+    """
+    Vérifie extension + bloque doubles extensions dangereuses.
+    """
     if not filename or "." not in filename:
         return False
 
     lowered = filename.lower()
+
+    # Blocage extensions exécutables
     if re.search(r"\.(exe|js|bat|cmd|sh|php|pl|py)\b", lowered):
         return False
 
-    ext = filename.rsplit(".", 1)[1].lower()
+    ext = lowered.rsplit(".", 1)[1]
     return ext in ALLOWED_EXTENSIONS
 
 
 def clean_filename(filename: str) -> str:
+    """
+    Nettoyage nom de fichier (ASCII / safe S3).
+    """
     name, ext = os.path.splitext(filename)
     name = (
         unicodedata.normalize("NFKD", name)
         .encode("ascii", "ignore")
         .decode()
     )
-    name = name.lower()
-    name = re.sub(r"[^a-z0-9]+", "_", name).strip("_")
+    name = re.sub(r"[^a-zA-Z0-9]+", "_", name).strip("_").lower()
     return f"{name}{ext.lower()}"
 
 
 def slugify(text: str) -> str:
+    """
+    Génère un slug stable (clients / dossiers).
+    """
     if not text:
         return ""
+
     text = (
         unicodedata.normalize("NFKD", text)
         .encode("ascii", "ignore")
         .decode()
     )
-    text = text.lower()
-    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    text = re.sub(r"[^a-zA-Z0-9]+", "_", text).strip("_").lower()
     return text
 
 
 def client_s3_prefix(client_id: int) -> str:
+    """
+    Préfixe S3 unique par client :
+    clients/<slug_nom>_<id>/
+    """
     conn = get_db()
-    row = conn.cursor()
-    row.execute("SELECT name FROM crm_clients WHERE id=%s", (client_id,))
-    r = row.fetchone()
-    row.close()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT name FROM crm_clients WHERE id = %s",
+            (client_id,),
+        )
+        row = cur.fetchone()
 
     base = f"client_{client_id}"
-    if r and r["name"]:
-        s = slugify(r["name"])
-        if s:
-            base = f"{s}_{client_id}"
+    if row and row["name"]:
+        slug = slugify(row["name"])
+        if slug:
+            base = f"{slug}_{client_id}"
 
     return f"clients/{base}/"
 
 
 def s3_upload_fileobj(fileobj, bucket: str, key: str):
+    """
+    Upload PRIVÉ S3 (Block Public Access OK).
+    """
     if not s3:
-        raise RuntimeError("Client S3 non initialisé")
+        raise RuntimeError("Client S3 non initialisé.")
 
     stream = getattr(fileobj, "stream", fileobj)
     try:
@@ -351,82 +406,91 @@ def s3_upload_fileobj(fileobj, bucket: str, key: str):
         bucket,
         key,
         ExtraArgs={
-            "ContentType": getattr(fileobj, "mimetype", None) or "application/octet-stream"
+            "ContentType": getattr(
+                fileobj, "mimetype", None
+            ) or "application/octet-stream"
         },
     )
 
 
 def s3_presigned_url(key: str, expires_in: int = 3600) -> str:
+    """
+    Génère une URL signée (lecture privée).
+    """
     if LOCAL_MODE or not s3:
         return ""
+
     try:
         return s3.generate_presigned_url(
             "get_object",
-            Params={"Bucket": AWS_BUCKET, "Key": key},
+            Params={
+                "Bucket": AWS_BUCKET,
+                "Key": key,
+            },
             ExpiresIn=expires_in,
         )
+    except ClientError as e:
+        print("Erreur presigned URL S3 :", e.response)
+        return ""
     except Exception as e:
-        print("Erreur presigned url S3 :", repr(e))
+        print("Erreur presigned URL S3 :", repr(e))
         return ""
 
 
 def s3_list_all_objects(bucket: str, prefix: str | None = None):
+    """
+    Liste complète S3 avec pagination.
+    """
     if not s3:
         return []
+
     items = []
     token = None
-    while True:
-        kwargs = {"Bucket": bucket}
-        if prefix:
-            kwargs["Prefix"] = prefix
-        if token:
-            kwargs["ContinuationToken"] = token
 
-        resp = s3.list_objects_v2(**kwargs)
+    while True:
+        params = {"Bucket": bucket}
+        if prefix:
+            params["Prefix"] = prefix
+        if token:
+            params["ContinuationToken"] = token
+
+        resp = s3.list_objects_v2(**params)
         items.extend(resp.get("Contents") or [])
 
         if resp.get("IsTruncated"):
             token = resp.get("NextContinuationToken")
-            if not token:
-                break
         else:
             break
+
     return items
 
 
 def list_client_documents(client_id: int):
+    """
+    Liste documents d’un client (URL signée incluse).
+    """
     if LOCAL_MODE or not s3:
         return []
+
     prefix = client_s3_prefix(client_id)
     docs = []
 
     try:
-        token = None
-        while True:
-            kwargs = {"Bucket": AWS_BUCKET, "Prefix": prefix}
-            if token:
-                kwargs["ContinuationToken"] = token
+        items = s3_list_all_objects(AWS_BUCKET, prefix=prefix)
 
-            response = s3.list_objects_v2(**kwargs)
-            for item in (response.get("Contents") or []):
-                key = item["Key"]
-                if key.endswith("/"):
-                    continue
-                docs.append(
-                    {
-                        "nom": key.replace(prefix, "", 1),
-                        "key": key,
-                        "taille": item["Size"],
-                        "url": s3_presigned_url(key),
-                    }
-                )
+        for item in items:
+            key = item.get("Key")
+            if not key or key.endswith("/"):
+                continue
 
-            if response.get("IsTruncated"):
-                token = response.get("NextContinuationToken")
-                if not token:
-                    break
-            else:
-                break
+            docs.append(
+                {
+                    "nom": key.replace(prefix, "", 1),
+                    "key": key,
+                    "taille": item.get("Size", 0),
+                    "url": s3_presigned_url(key),
+                }
+            )
 
     except Exception as e:
         print("Erreur list_client_documents :", repr(e))
@@ -434,20 +498,35 @@ def list_client_documents(client_id: int):
     return docs
 
 
+############################################################
+# 5. UTILITAIRES & CONTRÔLES D’ACCÈS
+############################################################
+
 def can_access_client(client_id: int) -> bool:
+    """
+    Détermine si l'utilisateur connecté peut accéder à un dossier client.
+
+    Règles :
+    - Admin : accès total
+    - Commercial : uniquement ses dossiers (owner_id)
+    """
     if not client_id:
         return False
 
-    user = session.get("user") or {}
+    user = session.get("user")
     if not user:
         return False
 
+    # Admin = accès total
     if user.get("role") == "admin":
         return True
 
     conn = get_db()
     with conn.cursor() as cur:
-        cur.execute("SELECT owner_id FROM crm_clients WHERE id=%s", (client_id,))
+        cur.execute(
+            "SELECT owner_id FROM crm_clients WHERE id = %s",
+            (client_id,),
+        )
         row = cur.fetchone()
 
     if not row:
@@ -456,11 +535,44 @@ def can_access_client(client_id: int) -> bool:
     return row["owner_id"] == user.get("id")
 
 
+def get_current_user():
+    """
+    Retourne l'utilisateur courant sous forme d'objet
+    utilisable dans Python ET Jinja.
+    """
+    u = session.get("user")
+    return SimpleNamespace(**u) if u else None
+
+
+def format_date_safe(value):
+    """
+    Sécurise l'affichage des dates dans les templates :
+    - accepte datetime
+    - accepte date
+    - accepte string
+    - empêche les erreurs .strftime sur str
+    """
+    if not value:
+        return "—"
+
+    # datetime / date
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d")
+
+    # string ISO ou autre
+    try:
+        return str(value)[:10]
+    except Exception:
+        return "—"
+
 ############################################################
-# 6. AUTH + CSRF (SAFE)
+# 5 BIS. DÉCORATEURS D’AUTHENTIFICATION & AUTORISATION
 ############################################################
 
 def login_required(func):
+    """
+    Vérifie que l’utilisateur est connecté.
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
         if "user" not in session:
@@ -470,26 +582,43 @@ def login_required(func):
 
 
 def admin_required(func):
+    """
+    Vérifie que l’utilisateur est admin.
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
         if "user" not in session:
             return redirect(url_for("login"))
-        if session["user"]["role"] != "admin":
-            flash("Accès réservé à l'administrateur.", "danger")
+
+        if session["user"].get("role") != "admin":
+            flash("Accès réservé à l’administrateur.", "danger")
             return redirect(url_for("dashboard"))
+
         return func(*args, **kwargs)
     return wrapper
-
+############################################################
+# CSRF — VERSION TOLÉRANTE & CONTRÔLÉE
+############################################################
 
 @app.before_request
 def csrf_protect():
+    """
+    CSRF SAFE :
+    - Génère toujours un token
+    - Ne bloque QUE si un token est envoyé mais invalide
+    - Permet les endpoints explicitement exemptés
+    """
+
+    # Génération du token
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
 
-    if request.endpoint in CSRF_EXEMPT_ENDPOINTS:
+    # Méthodes non mutantes
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
         return
 
-    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+    # Endpoint exempté
+    if request.endpoint in CSRF_EXEMPT_ENDPOINTS:
         return
 
     sent_token = (
@@ -498,28 +627,34 @@ def csrf_protect():
         or request.headers.get("X-Csrf-Token")
     )
 
+    # Si token présent mais invalide → blocage
     if sent_token and sent_token != session.get("csrf_token"):
         abort(403)
 
 
+############################################################
+# 6. VARIABLES GLOBALES POUR LES TEMPLATES
+############################################################
+
 @app.context_processor
 def inject_globals():
+    """
+    Variables et helpers accessibles dans TOUS les templates Jinja.
+    Aucune logique fragile côté HTML.
+    """
+
     u = session.get("user")
+
     return dict(
+        # Utilisateur courant (safe)
         current_user=SimpleNamespace(**u) if u else None,
+
+        # CSRF (toujours présent)
         csrf_token=session.get("csrf_token"),
+
+        # Helper date SAFE (corrige strftime sur string)
+        format_date=format_date_safe,
     )
-
-
-@app.errorhandler(403)
-def forbidden(e):
-    return render_template("error.html", code=403, message="Accès refusé."), 403
-
-
-@app.errorhandler(404)
-def not_found(e):
-    return render_template("error.html", code=404, message="Page introuvable."), 404
-
 
 ############################################################
 # 7. LOGIN / LOGOUT
@@ -705,6 +840,8 @@ def search():
 # 9. CHIFFRE D’AFFAIRES (ADMIN WRITE / COMMERCIAL READ)
 ############################################################
 
+from datetime import date
+
 @app.route("/chiffre_affaire", methods=["GET", "POST"])
 @login_required
 def chiffre_affaire():
@@ -721,16 +858,9 @@ def chiffre_affaire():
 
         date_rev = request.form.get("date")
         montant = request.form.get("montant")
-
-        # Compatibilité 2 formats:
-        # 1) ancien template: commercial + dossier
-        commercial_in = request.form.get("commercial")
-        dossier_in = request.form.get("dossier")
-
-        # 2) nouveau backend: client_id
         client_id = request.form.get("client_id")
 
-        if not date_rev or not montant:
+        if not date_rev or not montant or not client_id:
             flash("Tous les champs sont obligatoires.", "danger")
             return redirect(url_for("chiffre_affaire"))
 
@@ -740,47 +870,40 @@ def chiffre_affaire():
             flash("Montant invalide.", "danger")
             return redirect(url_for("chiffre_affaire"))
 
-        # MODE client_id
-        if client_id:
-            with conn.cursor() as cur:
-                cur.execute("SELECT name, owner_id FROM crm_clients WHERE id=%s", (client_id,))
-                client = cur.fetchone()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT name, owner_id FROM crm_clients WHERE id=%s",
+                (client_id,)
+            )
+            client = cur.fetchone()
 
-            if not client:
-                flash("Dossier client introuvable.", "danger")
-                return redirect(url_for("chiffre_affaire"))
+        if not client:
+            flash("Dossier client introuvable.", "danger")
+            return redirect(url_for("chiffre_affaire"))
 
-            with conn.cursor() as cur:
-                cur.execute("SELECT username FROM users WHERE id=%s", (client["owner_id"],))
-                commercial = cur.fetchone()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT username FROM users WHERE id=%s",
+                (client["owner_id"],)
+            )
+            commercial = cur.fetchone()
 
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO revenus (date, montant, client_id, commercial, dossier)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO revenus (date, montant, client_id, commercial, dossier)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
                     date_rev,
                     montant_val,
                     client_id,
                     commercial["username"] if commercial else None,
                     client["name"],
-                ))
-            conn.commit()
-            flash("Chiffre d’affaires ajouté.", "success")
-            return redirect(url_for("chiffre_affaire"))
+                )
+            )
 
-        # MODE ancien template: commercial + dossier
-        if not commercial_in or not dossier_in:
-            flash("Champs manquants (commercial/dossier).", "danger")
-            return redirect(url_for("chiffre_affaire"))
-
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO revenus (date, montant, commercial, dossier)
-                VALUES (%s, %s, %s, %s)
-            """, (date_rev, montant_val, commercial_in, dossier_in))
         conn.commit()
-
         flash("Chiffre d’affaires ajouté.", "success")
         return redirect(url_for("chiffre_affaire"))
 
@@ -790,10 +913,17 @@ def chiffre_affaire():
     month = today.strftime("%Y-%m")
 
     with conn.cursor() as cur:
-        cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus WHERE substr(date,1,4)=%s", (year,))
+        # Global
+        cur.execute(
+            "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE substr(date,1,4)=%s",
+            (year,)
+        )
         ca_annuel_global = cur.fetchone()[0]
 
-        cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus WHERE substr(date,1,7)=%s", (month,))
+        cur.execute(
+            "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE substr(date,1,7)=%s",
+            (month,)
+        )
         ca_mensuel_global = cur.fetchone()[0]
 
     if role == "admin":
@@ -801,41 +931,53 @@ def chiffre_affaire():
         ca_mensuel_perso = ca_mensuel_global
 
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT commercial, SUM(montant) AS total
                 FROM revenus
                 WHERE substr(date,1,4)=%s
                 GROUP BY commercial
                 ORDER BY total DESC
-            """, (year,))
+                """,
+                (year,)
+            )
             annuel_par_com = cur.fetchall()
+
     else:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE substr(date,1,4)=%s
                   AND commercial=%s
-            """, (year, username))
+                """,
+                (year, username)
+            )
             ca_annuel_perso = cur.fetchone()[0]
 
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE substr(date,1,7)=%s
                   AND commercial=%s
-            """, (month, username))
+                """,
+                (month, username)
+            )
             ca_mensuel_perso = cur.fetchone()[0]
 
         annuel_par_com = []
 
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT substr(date,1,7) AS mois, SUM(montant) AS total
             FROM revenus
             GROUP BY mois
             ORDER BY mois DESC
-        """)
+            """
+        )
         global_par_mois = cur.fetchall()
 
     return render_template(
@@ -873,7 +1015,10 @@ def admin_users():
             return redirect(url_for("admin_users"))
 
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM users WHERE username=%s", (username,))
+            cur.execute(
+                "SELECT COUNT(*) FROM users WHERE username=%s",
+                (username,),
+            )
             exists = cur.fetchone()[0]
 
         if exists > 0:
@@ -881,12 +1026,15 @@ def admin_users():
             return redirect(url_for("admin_users"))
 
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO users (username, password, role)
                 VALUES (%s, %s, %s)
-            """, (username, generate_password_hash(password), role))
-        conn.commit()
+                """,
+                (username, generate_password_hash(password), role),
+            )
 
+        conn.commit()
         flash("Utilisateur créé.", "success")
         return redirect(url_for("admin_users"))
 
@@ -901,6 +1049,7 @@ def admin_users():
 @admin_required
 def admin_edit_user(user_id):
     conn = get_db()
+
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
         user = cur.fetchone()
@@ -919,7 +1068,10 @@ def admin_edit_user(user_id):
             return redirect(url_for("admin_edit_user", user_id=user_id))
 
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM users WHERE username=%s AND id<>%s", (username, user_id))
+            cur.execute(
+                "SELECT COUNT(*) FROM users WHERE username=%s AND id<>%s",
+                (username, user_id),
+            )
             exists = cur.fetchone()[0]
 
         if exists > 0:
@@ -930,25 +1082,35 @@ def admin_edit_user(user_id):
             if len(password) < 10:
                 flash("Mot de passe trop court (min 10 caractères).", "danger")
                 return redirect(url_for("admin_edit_user", user_id=user_id))
+
             with conn.cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE users
                     SET username=%s, password=%s, role=%s
                     WHERE id=%s
-                """, (username, generate_password_hash(password), role, user_id))
+                    """,
+                    (username, generate_password_hash(password), role, user_id),
+                )
         else:
             with conn.cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE users
                     SET username=%s, role=%s
                     WHERE id=%s
-                """, (username, role, user_id))
+                    """,
+                    (username, role, user_id),
+                )
 
         conn.commit()
         flash("Utilisateur mis à jour.", "success")
         return redirect(url_for("admin_users"))
 
-    return render_template("admin_edit_user.html", user=row_to_obj(user))
+    return render_template(
+        "admin_edit_user.html",
+        user=row_to_obj(user)
+    )
 
 
 @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
@@ -961,8 +1123,8 @@ def admin_delete_user(user_id):
     conn = get_db()
     with conn.cursor() as cur:
         cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
-    conn.commit()
 
+    conn.commit()
     flash("Utilisateur supprimé.", "success")
     return redirect(url_for("admin_users"))
 
@@ -990,11 +1152,15 @@ def admin_reset_password(user_id):
         return redirect(url_for("admin_users"))
 
     with conn.cursor() as cur:
-        cur.execute("UPDATE users SET password=%s WHERE id=%s", (generate_password_hash(new_password), user_id))
-    conn.commit()
+        cur.execute(
+            "UPDATE users SET password=%s WHERE id=%s",
+            (generate_password_hash(new_password), user_id),
+        )
 
+    conn.commit()
     flash("Mot de passe réinitialisé.", "success")
     return redirect(url_for("admin_users"))
+
 
 
 ############################################################
@@ -1002,38 +1168,51 @@ def admin_reset_password(user_id):
 ############################################################
 
 def _validate_s3_key_for_admin_delete(key: str) -> str:
-    if not key or key.strip() == "":
+    if not key or not key.strip():
         raise BadRequest("Clé S3 invalide.")
+
     key = key.strip()
+
+    # Sécurité basique
     if ".." in key:
         raise BadRequest("Clé S3 invalide.")
+
     return key
 
 
 @app.route("/documents")
 @admin_required
 def documents():
+    # Mode local ou S3 indisponible → page vide mais fonctionnelle
     if LOCAL_MODE or not s3:
         return render_template("documents.html", fichiers=[])
 
     fichiers = []
+
     try:
+        # On liste UNIQUEMENT les objets sous "clients/"
         items = s3_list_all_objects(AWS_BUCKET, prefix="clients/")
+
         for item in items:
             key = item.get("Key")
             if not key or key.endswith("/"):
                 continue
+
             fichiers.append(
                 {
                     "nom": key,
-                    "key": key,  # ✅ nécessaire pour votre template
                     "taille": item.get("Size", 0),
                     "url": s3_presigned_url(key),
                 }
             )
+
+    except ClientError as e:
+        print("Erreur listing S3 (admin documents) :", e.response)
+        flash("Erreur lors du listing des documents.", "danger")
+
     except Exception as e:
         print("Erreur listing S3 (admin documents) :", repr(e))
-        flash("Erreur lors du listing S3.", "danger")
+        flash("Erreur lors du listing des documents.", "danger")
 
     return render_template("documents.html", fichiers=fichiers)
 
@@ -1046,6 +1225,7 @@ def upload_document():
         return redirect(url_for("documents"))
 
     fichier = request.files.get("file")
+
     if not fichier or not allowed_file(fichier.filename):
         flash("Fichier non valide.", "danger")
         return redirect(url_for("documents"))
@@ -1056,9 +1236,10 @@ def upload_document():
     try:
         s3_upload_fileobj(fichier, AWS_BUCKET, key)
         flash("Document envoyé.", "success")
+
     except Exception as e:
         print("Erreur upload S3 (admin) :", repr(e))
-        flash("Erreur upload S3.", "danger")
+        flash("Erreur lors de l’upload.", "danger")
 
     return redirect(url_for("documents"))
 
@@ -1074,310 +1255,289 @@ def delete_document(key):
         key = _validate_s3_key_for_admin_delete(key)
         s3.delete_object(Bucket=AWS_BUCKET, Key=key)
         flash("Document supprimé.", "success")
+
     except BadRequest as e:
         flash(str(e), "danger")
+
     except Exception as e:
         print("Erreur suppression S3 (admin) :", repr(e))
-        flash("Erreur suppression S3.", "danger")
+        flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("documents"))
 
 
+
 ############################################################
-# 12. CLIENTS + DOSSIERS + DOCUMENTS + COTATIONS (+ CA)
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + DOCUMENTS CLIENT
 ############################################################
 
 @app.route("/clients")
 @login_required
 def clients():
     conn = get_db()
-    user = session.get("user") or {}
-    role = (user.get("role") or "").lower()
     q = (request.args.get("q") or "").strip()
 
-    params = []
-    where = ""
-
-    if q:
-        where = "AND crm_clients.name ILIKE %s"
-        params.append(f"%{q}%")
-
     with conn.cursor() as cur:
-        if role == "admin":
-            # ✅ created_at déjà en string YYYY-MM-DD pour vos templates `[:10]`
-            cur.execute(f"""
-                SELECT
-                    crm_clients.*,
-                    users.username AS commercial_name,
-                    to_char(crm_clients.created_at, 'YYYY-MM-DD') AS created_at
-                FROM crm_clients
-                LEFT JOIN users ON users.id = crm_clients.owner_id
-                WHERE 1=1 {where}
-                ORDER BY crm_clients.created_at DESC
-            """, params)
-            rows = cur.fetchall()
+        if session["user"]["role"] == "admin":
+            if q:
+                cur.execute(
+                    "SELECT * FROM crm_clients WHERE name ILIKE %s ORDER BY created_at DESC",
+                    (f"%{q}%",),
+                )
+            else:
+                cur.execute(
+                    "SELECT * FROM crm_clients ORDER BY created_at DESC"
+                )
         else:
-            cur.execute(f"""
-                SELECT
-                    crm_clients.*,
-                    users.username AS commercial_name,
-                    to_char(crm_clients.created_at, 'YYYY-MM-DD') AS created_at
-                FROM crm_clients
-                LEFT JOIN users ON users.id = crm_clients.owner_id
-                WHERE crm_clients.owner_id = %s {where}
-                ORDER BY crm_clients.created_at DESC
-            """, [user.get("id")] + params)
-            rows = cur.fetchall()
+            if q:
+                cur.execute(
+                    """
+                    SELECT * FROM crm_clients
+                    WHERE owner_id=%s AND name ILIKE %s
+                    ORDER BY created_at DESC
+                    """,
+                    (session["user"]["id"], f"%{q}%"),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT * FROM crm_clients
+                    WHERE owner_id=%s
+                    ORDER BY created_at DESC
+                    """,
+                    (session["user"]["id"],),
+                )
+
+        rows = cur.fetchall()
 
     return render_template(
         "clients.html",
         clients=[row_to_obj(r) for r in rows],
-        q=q
+        q=q,
     )
 
 
 @app.route("/clients/new", methods=["GET", "POST"])
 @login_required
 def new_client():
-    conn = get_db()
-    user = session.get("user") or {}
-
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
 
         if not name:
-            flash("Le nom du dossier est obligatoire.", "danger")
+            flash("Nom du dossier obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
+        conn = get_db()
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO crm_clients (name, status, owner_id)
-                VALUES (%s, 'cotation', %s)
+            cur.execute(
+                """
+                INSERT INTO crm_clients (name, owner_id)
+                VALUES (%s, %s)
                 RETURNING id
-            """, (name, user.get("id")))
-            new_id = cur.fetchone()[0]
+                """,
+                (name, session["user"]["id"]),
+            )
+            client_id = cur.fetchone()[0]
 
         conn.commit()
-
-        # Upload documents éventuels à la création (optionnel)
-        files = request.files.getlist("documents")
-        if files and (not LOCAL_MODE and s3):
-            try:
-                prefix = client_s3_prefix(new_id)
-                for f in files:
-                    if f and f.filename and allowed_file(f.filename):
-                        filename = clean_filename(secure_filename(f.filename))
-                        key = f"{prefix}{filename}"
-                        s3_upload_fileobj(f, AWS_BUCKET, key)
-            except Exception as e:
-                print("Erreur upload documents à la création :", repr(e))
-
         flash("Dossier client créé.", "success")
-        return redirect(url_for("client_detail", client_id=new_id))
+        return redirect(url_for("client_detail", client_id=client_id))
 
-    return render_template("client_form.html")
+    return render_template("new_client.html")
 
 
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
-    conn = get_db()
-
     if not can_access_client(client_id):
         abort(403)
 
+    conn = get_db()
+
     with conn.cursor() as cur:
-        # ✅ created_at déjà en string YYYY-MM-DD
-        cur.execute("""
-            SELECT
-                crm_clients.*,
-                users.username AS commercial_name,
-                to_char(crm_clients.created_at, 'YYYY-MM-DD') AS created_at
-            FROM crm_clients
-            LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.id = %s
-        """, (client_id,))
+        cur.execute("SELECT * FROM crm_clients WHERE id=%s", (client_id,))
         client = cur.fetchone()
 
-    if not client:
-        abort(404)
+        cur.execute(
+            "SELECT * FROM cotations WHERE client_id=%s ORDER BY date_creation DESC",
+            (client_id,),
+        )
+        cotations = cur.fetchall()
 
-    selected_cotation_id = request.args.get("cotation_id")
-
-    with conn.cursor() as cur:
-        if selected_cotation_id:
-            # ✅ date_creation en string pour template `[:10]`
-            cur.execute("""
-                SELECT
-                    cotations.*,
-                    to_char(cotations.date_creation, 'YYYY-MM-DD') AS date_creation
-                FROM cotations
-                WHERE id = %s
-                  AND client_id = %s
-            """, (selected_cotation_id, client_id))
-            cotations = cur.fetchall()
-        else:
-            cur.execute("""
-                SELECT
-                    cotations.*,
-                    to_char(cotations.date_creation, 'YYYY-MM-DD') AS date_creation
-                FROM cotations
-                WHERE client_id = %s
-                ORDER BY cotations.date_creation DESC
-            """, (client_id,))
-            cotations = cur.fetchall()
-
-    documents = list_client_documents(client_id)
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT COALESCE(SUM(montant),0)
-            FROM revenus
-            WHERE client_id=%s
-        """, (client_id,))
-        ca_total = cur.fetchone()[0]
-
-        cur.execute("""
+        cur.execute(
+            """
             SELECT substr(date,1,7) AS mois, SUM(montant) AS total
             FROM revenus
             WHERE client_id=%s
             GROUP BY mois
             ORDER BY mois DESC
-        """, (client_id,))
+            """,
+            (client_id,),
+        )
         ca_par_mois = cur.fetchall()
+
+        cur.execute(
+            "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE client_id=%s",
+            (client_id,),
+        )
+        ca_total = cur.fetchone()[0]
+
+    documents = list_client_documents(client_id)
 
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
-        cotations=[row_to_obj(c) for c in cotations],
         documents=documents,
-        ca_total=ca_total,
+        cotations=[row_to_obj(c) for c in cotations],
         ca_par_mois=[row_to_obj(r) for r in ca_par_mois],
+        ca_total=ca_total,
     )
 
+############################################################
+# 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
+############################################################
 
+# ⚠️ IMPORTANT :
+# - Ce bloc permet aux commerciaux de faire des demandes de mise à jour
+# - Les admins les voient dans une section dédiée
+# - AUCUNE donnée existante n’est écrasée
+
+
+# =========================
+# TABLE client_updates
+# =========================
+# 👉 À AJOUTER DANS init_db() (UNE SEULE FOIS)
+#
+# CREATE TABLE IF NOT EXISTS client_updates (
+#     id SERIAL PRIMARY KEY,
+#     client_id INTEGER NOT NULL,
+#     client_name TEXT NOT NULL,
+#     commercial_id INTEGER NOT NULL,
+#     commercial_name TEXT NOT NULL,
+#     update_date DATE NOT NULL,
+#     commentaire TEXT,
+#     is_read INTEGER DEFAULT 0,
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+# );
+
+
+# =========================
+# COMMERCIAL → DEMANDE DE MISE À JOUR
+# =========================
 @app.route("/clients/<int:client_id>/update", methods=["POST"])
 @login_required
 def update_client(client_id):
-    conn = get_db()
-
     if not can_access_client(client_id):
         abort(403)
 
-    name = (request.form.get("update_name") or "").strip()
+    conn = get_db()
+    user = session.get("user") or {}
+
     update_date = request.form.get("update_date")
     commentaire = (request.form.get("update_commentaire") or "").strip()
 
-    if not name or not update_date:
-        flash("Nom et date obligatoires.", "danger")
+    if not update_date:
+        flash("La date de mise à jour est obligatoire.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    # ✅ On ne casse rien : on conserve notes, mais on garde update_date côté flash (pas stocké en DB ici)
     with conn.cursor() as cur:
-        cur.execute("""
-            UPDATE crm_clients
-            SET name = %s, notes = %s
-            WHERE id = %s
-        """, (name, commentaire, client_id))
+        cur.execute(
+            "SELECT name FROM crm_clients WHERE id=%s",
+            (client_id,)
+        )
+        client = cur.fetchone()
+
+    if not client:
+        flash("Dossier introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO client_updates (
+                client_id,
+                client_name,
+                commercial_id,
+                commercial_name,
+                update_date,
+                commentaire,
+                is_read
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, 0)
+            """,
+            (
+                client_id,
+                client["name"],
+                user["id"],
+                user["username"],
+                update_date,
+                commentaire,
+            )
+        )
+
     conn.commit()
 
-    flash(f"Mise à jour enregistrée ({update_date}).", "success")
+    flash("Demande de mise à jour envoyée à l’administrateur.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
-@login_required
-def upload_client_document(client_id):
-    if LOCAL_MODE or not s3:
-        flash("Upload désactivé en local.", "warning")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    files = request.files.getlist("documents")
-    if not files:
-        flash("Aucun fichier sélectionné.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    prefix = client_s3_prefix(client_id)
-
-    for f in files:
-        if f and allowed_file(f.filename):
-            filename = clean_filename(secure_filename(f.filename))
-            key = f"{prefix}{filename}"
-            s3_upload_fileobj(f, AWS_BUCKET, key)
-
-    flash("Documents ajoutés.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-@app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
-@login_required
-def delete_client_document(client_id):
-    if LOCAL_MODE or not s3:
-        flash("Suppression désactivée en local.", "warning")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    key = (request.form.get("key") or "").strip()
-    if not key:
-        flash("Clé de document invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    s3.delete_object(Bucket=AWS_BUCKET, Key=key)
-    flash("Document supprimé.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
-@login_required
-def create_cotation(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
+# =========================
+# ADMIN → LISTE DES MISES À JOUR
+# =========================
+@app.route("/admin/updates")
+@admin_required
+def admin_updates():
     conn = get_db()
 
     with conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO cotations (
-                client_id,
-                date_negociation,
-                energie_type,
-                pdl_pce,
-                date_echeance,
-                fournisseur_actuel,
-                entreprise_nom,
-                siret,
-                signataire_nom,
-                signataire_tel,
-                signataire_email,
-                commentaire,
-                created_by,
-                is_read,
-                status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 'nouvelle')
-        """, (
-            client_id,
-            request.form.get("date_negociation"),
-            request.form.get("energie_type"),
-            request.form.get("pdl_pce"),
-            request.form.get("date_echeance"),
-            request.form.get("fournisseur_actuel"),
-            request.form.get("entreprise_nom"),
-            request.form.get("siret"),
-            request.form.get("signataire_nom"),
-            request.form.get("signataire_tel"),
-            request.form.get("signataire_email"),
-            request.form.get("commentaire"),
-            session["user"]["id"],
-        ))
+        cur.execute(
+            """
+            SELECT *
+            FROM client_updates
+            ORDER BY is_read ASC, created_at DESC
+            """
+        )
+        rows = cur.fetchall()
 
+    return render_template(
+        "admin_updates.html",
+        updates=[row_to_obj(r) for r in rows]
+    )
+
+
+# =========================
+# ADMIN → OUVERTURE D’UNE MISE À JOUR
+# =========================
+@app.route("/admin/updates/<int:update_id>/open")
+@admin_required
+def open_update(update_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT * FROM client_updates WHERE id=%s",
+            (update_id,)
+        )
+        upd = cur.fetchone()
+
+    if not upd:
+        flash("Mise à jour introuvable.", "danger")
+        return redirect(url_for("admin_updates"))
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE client_updates SET is_read=1 WHERE id=%s",
+            (update_id,)
+        )
     conn.commit()
-    flash("Demande de cotation créée.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
+
+    return redirect(
+        url_for(
+            "client_detail",
+            client_id=upd["client_id"]
+        )
+    )
+
 
 
 ############################################################
@@ -1385,13 +1545,18 @@ def create_cotation(client_id):
 ############################################################
 
 def _chat_store_file(file_storage):
+    """
+    Stockage d’une pièce jointe du chat en S3 PRIVÉ.
+    Retourne (file_key, file_name) ou (None, None)
+    """
     if not file_storage:
         return (None, None)
+
     if not allowed_file(file_storage.filename):
         return (None, None)
 
-    file_name = secure_filename(file_storage.filename)
-    file_name_clean = clean_filename(file_name)
+    file_name_original = secure_filename(file_storage.filename)
+    file_name_clean = clean_filename(file_name_original)
 
     if LOCAL_MODE or not s3:
         return (None, None)
@@ -1401,7 +1566,10 @@ def _chat_store_file(file_storage):
 
     try:
         s3_upload_fileobj(file_storage, AWS_BUCKET, key)
-        return (key, file_name)
+        return (key, file_name_original)
+    except ClientError as e:
+        print("Erreur upload chat S3 (ClientError):", e.response)
+        return (None, None)
     except Exception as e:
         print("Erreur upload chat S3:", repr(e))
         return (None, None)
@@ -1411,6 +1579,7 @@ def _chat_store_file(file_storage):
 @login_required
 def chat_messages():
     limit = request.args.get("limit", "50")
+
     try:
         limit_int = max(1, min(200, int(limit)))
     except Exception:
@@ -1421,7 +1590,8 @@ def chat_messages():
 
     conn = get_db()
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT
                 id,
                 user_id,
@@ -1434,29 +1604,33 @@ def chat_messages():
             FROM chat_messages
             ORDER BY id DESC
             LIMIT %s
-        """, (limit_int,))
+            """,
+            (limit_int,),
+        )
         rows = cur.fetchall()
 
-    items = []
+    messages = []
     for r in reversed(rows):
-        items.append({
-            "id": r["id"],
-            "user_id": r["user_id"],
-            "username": r["username"],
-            "message": r["message"],
-            "file_key": r["file_key"],
-            "file_name": r["file_name"],
-            "file_url": (
-                s3_presigned_url(r["file_key"])
-                if (r["file_key"] and not LOCAL_MODE and s3)
-                else None
-            ),
-            "created_at": str(r["created_at"]) if r["created_at"] else None,
-            "is_read": bool(r["is_read"]),
-            "is_mine": (r["user_id"] == user_id),
-        })
+        messages.append(
+            {
+                "id": r["id"],
+                "user_id": r["user_id"],
+                "username": r["username"],
+                "message": r["message"],
+                "file_key": r["file_key"],
+                "file_name": r["file_name"],
+                "file_url": (
+                    s3_presigned_url(r["file_key"])
+                    if (r["file_key"] and not LOCAL_MODE and s3)
+                    else None
+                ),
+                "created_at": r["created_at"],
+                "is_read": bool(r["is_read"]),
+                "is_mine": r["user_id"] == user_id,
+            }
+        )
 
-    return jsonify({"success": True, "messages": items})
+    return jsonify({"success": True, "messages": messages})
 
 
 @app.route("/chat/send", methods=["POST"])
@@ -1468,13 +1642,16 @@ def chat_send():
     file_key, file_name = _chat_store_file(file_obj)
 
     if not message and not file_key:
-        return jsonify({"success": False, "message": "Message ou fichier requis."}), 400
+        return jsonify(
+            {"success": False, "message": "Message ou fichier requis."}
+        ), 400
 
     u = session.get("user") or {}
-    conn = get_db()
 
+    conn = get_db()
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO chat_messages (
                 user_id,
                 username,
@@ -1485,42 +1662,54 @@ def chat_send():
             )
             VALUES (%s, %s, %s, %s, %s, 0)
             RETURNING id
-        """, (
-            u.get("id"),
-            u.get("username"),
-            message,
-            file_key,
-            file_name,
-        ))
+            """,
+            (
+                u.get("id"),
+                u.get("username"),
+                message,
+                file_key,
+                file_name,
+            ),
+        )
         new_id = cur.fetchone()[0]
 
     conn.commit()
 
-    return jsonify({
-        "success": True,
-        "id": new_id,
-        "user_id": u.get("id"),
-        "username": u.get("username"),
-    })
+    return jsonify(
+        {
+            "success": True,
+            "id": new_id,
+            "user_id": u.get("id"),
+            "username": u.get("username"),
+        }
+    )
 
 
 @app.route("/chat/mark_read", methods=["POST"])
 @login_required
 def chat_mark_read():
+    """
+    Marque tous les messages NON envoyés par l'utilisateur courant comme lus
+    (équivalent WhatsApp quand la fenêtre est ouverte)
+    """
     u = session.get("user") or {}
     user_id = u.get("id")
 
     conn = get_db()
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE chat_messages
             SET is_read = 1
             WHERE COALESCE(is_read, 0) = 0
               AND user_id <> %s
-        """, (user_id,))
-    conn.commit()
+            """,
+            (user_id,),
+        )
 
+    conn.commit()
     return jsonify({"success": True})
+
 
 
 ############################################################
@@ -1529,14 +1718,31 @@ def chat_mark_read():
 
 @app.route("/")
 def index():
+    """
+    Point d’entrée de l’application.
+    - Si non connecté → redirection login
+    - Si connecté → dashboard
+    """
     if "user" not in session:
         return redirect(url_for("login"))
+
     return redirect(url_for("dashboard"))
 
 
+
 ############################################################
-# 16. RUN (LOCAL)
+# 16. RUN (LOCAL / PROD SAFE)
 ############################################################
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=DEBUG)
+    """
+    Lancement de l’application.
+    - En local : debug piloté par Config.DEBUG
+    - En production (Render) : ce bloc n’est PAS utilisé
+      car Gunicorn démarre l’app via `app:app`
+    """
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=DEBUG,
+    )
