@@ -32,7 +32,7 @@
         <div class="info-item">
             <span>Date de création</span>
             <strong>
-                {{ client.created_at.strftime('%Y-%m-%d') if client.created_at else "—" }}
+                {{ client.created_at[:10] if client.created_at else "—" }}
             </strong>
         </div>
 
@@ -87,7 +87,12 @@
 
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <input type="file" name="documents" multiple required class="form-control" style="max-width:360px;">
+        <input type="file"
+               name="documents"
+               multiple
+               required
+               class="form-control"
+               style="max-width:360px;">
 
         <button type="submit" class="btn btn-primary">
             Ajouter des documents
@@ -100,14 +105,20 @@
             <span>{{ doc.nom }}</span>
 
             <div style="display:flex;gap:8px;">
-                <a href="{{ doc.url }}" target="_blank" class="btn btn-secondary btn-sm">Ouvrir</a>
+                <a href="{{ doc.url }}"
+                   target="_blank"
+                   class="btn btn-secondary btn-sm">
+                    Ouvrir
+                </a>
 
                 <form method="post"
                       action="{{ url_for('delete_client_document', client_id=client.id) }}"
                       onsubmit="return confirm('Supprimer ce document ?');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="key" value="{{ doc.key }}">
-                    <button class="btn btn-danger btn-sm">Supprimer</button>
+                    <button class="btn btn-danger btn-sm">
+                        Supprimer
+                    </button>
                 </form>
             </div>
         </div>
@@ -121,7 +132,9 @@
 <div class="card">
     <h3 class="section-title cotation">Nouvelle demande de cotation</h3>
 
-    <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
+    <form method="post"
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
+
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="form-grid">
@@ -165,10 +178,10 @@
         </thead>
         <tbody>
             {% for c in cotations %}
-            <tr onclick="window.location='{{ url_for('open_cotation', cotation_id=c.id) }}'"
-                style="cursor:pointer;">
+            <tr style="cursor:pointer;"
+                onclick="window.location='{{ url_for('open_cotation', cotation_id=c.id) }}'">
                 <td>
-                    {{ c.date_creation.strftime('%Y-%m-%d') if c.date_creation else "—" }}
+                    {{ c.date_creation[:10] if c.date_creation else "—" }}
                 </td>
                 <td>{{ c.energie_type or "—" }}</td>
                 <td>{{ c.fournisseur_actuel or "—" }}</td>
@@ -186,15 +199,24 @@
 <div class="card">
     <h3 class="section-title update">Mise à jour du dossier</h3>
 
-    <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
+    <form method="post"
+          action="{{ url_for('update_client', client_id=client.id) }}">
+
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="form-grid">
-            <input type="text" name="update_name" value="{{ client.name }}" required>
-            <input type="date" name="update_date" required>
+            <input type="text"
+                   name="update_name"
+                   value="{{ client.name }}"
+                   required>
+            <input type="date"
+                   name="update_date"
+                   required>
         </div>
 
-        <textarea name="update_commentaire" rows="3">{{ client.notes or "" }}</textarea>
+        <textarea name="update_commentaire" rows="3">
+{{ client.notes or "" }}
+        </textarea>
 
         <button type="submit" class="btn btn-secondary">
             Enregistrer la mise à jour
