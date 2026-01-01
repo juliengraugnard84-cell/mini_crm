@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Détail demande de cotation{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>Demande de cotation</h1>
+</div>
+
+<div class="card">
+    <h3 class="section-title">Informations générales</h3>
+
+    <div class="info-grid">
+        <div class="info-item">
+            <span>Dossier</span>
+            <strong>{{ cotation.client_name }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Énergie</span>
+            <strong>{{ cotation.energie_type or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Date de création</span>
+            <strong>{{ format_date(cotation.date_creation) }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Statut</span>
+            <strong>{{ cotation.status }}</strong>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="section-title">Détails techniques</h3>
+
+    <div class="info-grid">
+        <div class="info-item">
+            <span>PDL / PCE</span>
+            <strong>{{ cotation.pdl_pce or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Fournisseur actuel</span>
+            <strong>{{ cotation.fournisseur_actuel or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Date d’échéance</span>
+            <strong>{{ format_date(cotation.date_echeance) }}</strong>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="section-title">Entreprise / Signataire</h3>
+
+    <div class="info-grid">
+        <div class="info-item">
+            <span>Entreprise</span>
+            <strong>{{ cotation.entreprise_nom or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>SIRET</span>
+            <strong>{{ cotation.siret or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Signataire</span>
+            <strong>{{ cotation.signataire_nom or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Email</span>
+            <strong>{{ cotation.signataire_email or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Téléphone</span>
+            <strong>{{ cotation.signataire_tel or "—" }}</strong>
+        </div>
+    </div>
+</div>
+
+{% if cotation.commentaire %}
+<div class="card">
+    <h3 class="section-title">Commentaire</h3>
+    <p>{{ cotation.commentaire }}</p>
+</div>
+{% endif %}
+
+<div style="margin-top:20px;">
+    <a href="{{ url_for('admin_cotations') }}" class="btn btn-secondary">
+        ← Retour aux demandes
+    </a>
+</div>
+
+{% endblock %}

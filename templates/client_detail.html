@@ -65,7 +65,8 @@
     {% endif %}
 </div>
 
-<!-- ================= NOUVELLE DEMANDE DE COTATION ================= -->
+<!-- ================= NOUVELLE DEMANDE DE COTATION (COMMERCIAL UNIQUEMENT) ================= -->
+{% if current_user and current_user.role != 'admin' %}
 <div class="card">
     <h3 class="section-title cotation">Nouvelle demande de cotation</h3>
 
@@ -100,6 +101,7 @@
         </button>
     </form>
 </div>
+{% endif %}
 
 <!-- ================= HISTORIQUE DES COTATIONS ================= -->
 <div class="card">
@@ -165,7 +167,7 @@
     {% endif %}
 </div>
 
-<!-- ================= DEMANDE DE MISE À JOUR ================= -->
+<!-- ================= DEMANDE DE MISE À JOUR DOSSIER ================= -->
 <div class="card">
     <h3 class="section-title update">Demande de mise à jour du dossier</h3>
 
