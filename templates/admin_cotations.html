@@ -8,17 +8,16 @@
     <h1>Demandes de cotation</h1>
 </div>
 
-<!-- ================= LISTE ================= -->
+<!-- ================= LISTE DES DEMANDES ================= -->
 <div class="card">
 
 {% if cotations %}
 <table class="table">
     <thead>
         <tr>
-            <th>Client</th>
-            <th>Commercial</th>
-            <th>Énergie</th>
             <th>Date</th>
+            <th>Dossier</th>
+            <th>Énergie</th>
             <th>Statut</th>
             <th></th>
         </tr>
@@ -28,22 +27,16 @@
         {% for c in cotations %}
         <tr class="{% if not c.is_read %}unread{% endif %}"
             style="cursor:pointer;"
-            onclick="window.location='{{ url_for('open_cotation', cotation_id=c.id) }}'">
+            onclick="window.location='{{ url_for('admin_cotation_detail', cotation_id=c.id) }}'">
+
+            <td>{{ format_date(c.date_creation) }}</td>
 
             <td>
                 <strong>{{ c.client_name }}</strong>
             </td>
 
             <td>
-                {{ c.commercial or "—" }}
-            </td>
-
-            <td>
                 {{ c.energie_type or "—" }}
-            </td>
-
-            <td>
-                {{ format_date(c.date_creation) }}
             </td>
 
             <td>
@@ -55,7 +48,7 @@
             </td>
 
             <td style="text-align:right;">
-                <a href="{{ url_for('open_cotation', cotation_id=c.id) }}"
+                <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
                    class="btn btn-secondary btn-sm">
                     Ouvrir
                 </a>
