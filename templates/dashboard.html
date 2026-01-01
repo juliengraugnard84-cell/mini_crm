@@ -111,7 +111,7 @@
                 <td><strong>{{ c.client_name }}</strong></td>
                 <td>{{ c.energie_type or "—" }}</td>
                 <td style="text-align:right;">
-                    <a href="{{ url_for('admin_open_cotation', cotation_id=c.id) }}"
+                    <a href="{{ url_for('open_cotation', cotation_id=c.id) }}"
                        class="btn btn-secondary btn-sm">
                         Ouvrir
                     </a>

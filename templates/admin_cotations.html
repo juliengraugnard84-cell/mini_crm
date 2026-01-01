@@ -28,7 +28,7 @@
         {% for c in cotations %}
         <tr class="{% if not c.is_read %}unread{% endif %}"
             style="cursor:pointer;"
-            onclick="window.location='{{ url_for('admin_cotation_detail', cotation_id=c.id) }}'">
+            onclick="window.location='{{ url_for('open_cotation', cotation_id=c.id) }}'">
 
             <td>
                 <strong>{{ c.client_name }}</strong>
@@ -55,7 +55,7 @@
             </td>
 
             <td style="text-align:right;">
-                <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
+                <a href="{{ url_for('open_cotation', cotation_id=c.id) }}"
                    class="btn btn-secondary btn-sm">
                     Ouvrir
                 </a>
