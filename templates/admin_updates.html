@@ -1,78 +1,38 @@
 {% extends "base.html" %}
-{% block title %}Mises à jour dossiers{% endblock %}
-
 {% block content %}
 
-<!-- ================= HEADER ================= -->
-<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
-    <h1>Mises à jour de dossiers</h1>
-</div>
+<h1>Mises à jour demandées</h1>
 
-<!-- ================= LISTE DES MISES À JOUR ================= -->
 <div class="card">
-
-    {% if updates %}
-
     <table class="table">
         <thead>
             <tr>
-                <th>Date demande</th>
                 <th>Dossier</th>
                 <th>Commercial</th>
-                <th>Date à jour</th>
-                <th>Statut</th>
-                <th></th>
+                <th>Date demandée</th>
+                <th>Action</th>
             </tr>
         </thead>
-
         <tbody>
-            {% for u in updates %}
-            <tr class="{% if not u.is_read %}unread{% endif %}">
-
+        {% for u in updates %}
+            <tr class="{% if not u.is_read %}font-weight-bold{% endif %}">
+                <td>{{ u.client_name }}</td>
+                <td>{{ u.commercial_name }}</td>
+                <td>{{ format_date(u.update_date) }}</td>
                 <td>
-                    {{ format_date(u.created_at) }}
-                </td>
-
-                <td>
-                    <strong>{{ u.client_name }}</strong>
-                </td>
-
-                <td>
-                    {{ u.commercial_name }}
-                </td>
-
-                <td>
-                    {{ format_date(u.update_date) }}
-                </td>
-
-                <td>
-                    {% if not u.is_read %}
-                        <span class="badge badge-warning">Nouvelle</span>
-                    {% else %}
-                        <span class="badge badge-secondary">Vue</span>
-                    {% endif %}
-                </td>
-
-                <td style="text-align:right;">
                     <a href="{{ url_for('open_update', update_id=u.id) }}"
-                       class="btn btn-secondary btn-sm">
+                       class="btn btn-sm btn-primary">
                         Ouvrir
                     </a>
                 </td>
-
             </tr>
-            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="4">Aucune demande</td>
+            </tr>
+        {% endfor %}
         </tbody>
     </table>
-
-    {% else %}
-
-        <p class="text-muted">
-            Aucune demande de mise à jour pour le moment.
-        </p>
-
-    {% endif %}
-
 </div>
 
 {% endblock %}

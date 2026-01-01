@@ -1200,9 +1200,11 @@ def admin_cotations():
         cur.execute("""
             SELECT
                 cotations.*,
-                crm_clients.name AS client_name
+                crm_clients.name AS client_name,
+                users.username AS commercial_name
             FROM cotations
             JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN users ON users.id = cotations.created_by
             ORDER BY cotations.date_creation DESC
         """)
         rows = cur.fetchall()
@@ -1222,9 +1224,11 @@ def admin_cotation_detail(cotation_id):
         cur.execute("""
             SELECT
                 cotations.*,
-                crm_clients.name AS client_name
+                crm_clients.name AS client_name,
+                users.username AS commercial_name
             FROM cotations
             JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN users ON users.id = cotations.created_by
             WHERE cotations.id = %s
         """, (cotation_id,))
         row = cur.fetchone()
@@ -1235,14 +1239,17 @@ def admin_cotation_detail(cotation_id):
 
     # Marquer comme lue
     with conn.cursor() as cur:
-        cur.execute("UPDATE cotations SET is_read=1 WHERE id=%s", (cotation_id,))
+        cur.execute(
+            "UPDATE cotations SET is_read = 1 WHERE id = %s",
+            (cotation_id,)
+        )
     conn.commit()
 
     return render_template(
         "admin_cotation_detail.html",
-        cotation=row_to_obj(row),
-
+        cotation=row_to_obj(row)
     )
+
 
 ############################################################
 # 11. DOCUMENTS GLOBAUX S3 (ADMIN UNIQUEMENT)
