@@ -1,7 +1,9 @@
 {% extends "base.html" %}
+{% block title %}Dossier client{% endblock %}
+
 {% block content %}
 
-<!-- ================= HEADER + SEARCH ================= -->
+<!-- ================= HEADER ================= -->
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
     <h1>{{ client.name }}</h1>
 
@@ -26,7 +28,7 @@
     <div class="info-grid">
         <div class="info-item">
             <span>Commercial</span>
-            <strong>{{ current_user.username }}</strong>
+            <strong>{{ client.commercial or "—" }}</strong>
         </div>
 
         <div class="info-item">
@@ -41,39 +43,6 @@
     </div>
 </div>
 
-<!-- ================= CHIFFRE D’AFFAIRES DOSSIER ================= -->
-<div class="card">
-    <h3 class="section-title ca">Chiffre d’affaires du dossier</h3>
-
-    <div class="info-grid">
-        <div class="info-item">
-            <span>Total cumulé</span>
-            <strong>{{ ca_total }} €</strong>
-        </div>
-    </div>
-
-    {% if ca_par_mois %}
-    <table class="table" style="margin-top:16px;">
-        <thead>
-            <tr>
-                <th>Mois</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in ca_par_mois %}
-            <tr>
-                <td>{{ r.mois }}</td>
-                <td><strong>{{ r.total }} €</strong></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-        <p class="text-muted">Aucun chiffre d’affaires enregistré pour ce dossier.</p>
-    {% endif %}
-</div>
-
 <!-- ================= DOCUMENTS ================= -->
 <div class="card">
     <h3 class="section-title documents">Documents</h3>
@@ -82,12 +51,9 @@
         {% for doc in documents %}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
             <span>{{ doc.nom }}</span>
-
-            <div style="display:flex;gap:8px;">
+            <div>
                 {% if doc.url %}
-                <a href="{{ doc.url }}"
-                   target="_blank"
-                   class="btn btn-secondary btn-sm">
+                <a href="{{ doc.url }}" target="_blank" class="btn btn-secondary btn-sm">
                     Ouvrir
                 </a>
                 {% endif %}
@@ -99,12 +65,12 @@
     {% endif %}
 </div>
 
-<!-- ================= NOUVELLE COTATION ================= -->
+<!-- ================= NOUVELLE DEMANDE DE COTATION ================= -->
 <div class="card">
     <h3 class="section-title cotation">Nouvelle demande de cotation</h3>
 
     <form method="post"
-          action="/clients/{{ client.id }}/cotations/new">
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
 
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
@@ -162,13 +128,46 @@
         </tbody>
     </table>
     {% else %}
-        <p>Aucune cotation enregistrée.</p>
+        <p class="text-muted">Aucune cotation enregistrée.</p>
     {% endif %}
 </div>
 
-<!-- ================= DEMANDE DE MISE À JOUR DOSSIER ================= -->
+<!-- ================= CHIFFRE D’AFFAIRES ================= -->
 <div class="card">
-    <h3 class="section-title update">Mise à jour du dossier</h3>
+    <h3 class="section-title ca">Chiffre d’affaires du dossier</h3>
+
+    <div class="info-grid">
+        <div class="info-item">
+            <span>Total cumulé</span>
+            <strong>{{ ca_total }} €</strong>
+        </div>
+    </div>
+
+    {% if ca_par_mois %}
+    <table class="table" style="margin-top:16px;">
+        <thead>
+            <tr>
+                <th>Mois</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in ca_par_mois %}
+            <tr>
+                <td>{{ r.mois }}</td>
+                <td><strong>{{ r.total }} €</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="text-muted">Aucun chiffre d’affaires enregistré.</p>
+    {% endif %}
+</div>
+
+<!-- ================= DEMANDE DE MISE À JOUR ================= -->
+<div class="card">
+    <h3 class="section-title update">Demande de mise à jour du dossier</h3>
 
     <form method="post"
           action="{{ url_for('update_client', client_id=client.id) }}">
@@ -186,10 +185,11 @@
         </div>
 
         <textarea name="update_commentaire"
-                  rows="3">{{ client.notes or "" }}</textarea>
+                  rows="3"
+                  placeholder="Explique la raison de la mise à jour…">{{ client.notes or "" }}</textarea>
 
         <button type="submit" class="btn btn-secondary">
-            Enregistrer la mise à jour
+            Envoyer la demande
         </button>
     </form>
 </div>
