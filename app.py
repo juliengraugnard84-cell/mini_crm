@@ -1213,6 +1213,38 @@ def admin_cotations():
     )
 
 
+@app.route("/admin/cotations/<int:cotation_id>")
+@admin_required
+def admin_cotation_detail(cotation_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                cotations.*,
+                crm_clients.name AS client_name
+            FROM cotations
+            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            WHERE cotations.id = %s
+        """, (cotation_id,))
+        row = cur.fetchone()
+
+    if not row:
+        flash("Demande de cotation introuvable.", "danger")
+        return redirect(url_for("admin_cotations"))
+
+    # Marquer comme lue
+    with conn.cursor() as cur:
+        cur.execute("UPDATE cotations SET is_read=1 WHERE id=%s", (cotation_id,))
+    conn.commit()
+
+    return render_template(
+        "admin_cotation_detail.html",
+        cotation=row_to_obj(row),
+
+    )
+
+
 ############################################################
 # 11. DOCUMENTS GLOBAUX S3 (ADMIN UNIQUEMENT)
 ############################################################
