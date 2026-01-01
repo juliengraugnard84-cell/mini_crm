@@ -8,6 +8,12 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev_key")
 
     # =========================
+    # Environnement
+    # =========================
+    ENV = os.environ.get("ENV", "development")
+    PRODUCTION = ENV == "production"
+
+    # =========================
     # Mode local / prod
     # =========================
     LOCAL_MODE = os.environ.get("LOCAL_MODE", "0") in ("1", "true", "True")
@@ -26,9 +32,6 @@ class Config:
     # =========================
     # DATABASE
     # =========================
-    # 🔒 PRIORITÉ :
-    # 1) PostgreSQL via DATABASE_URL (prod)
-    # 2) SQLite via DB_PATH (dev)
     DATABASE_URL = os.environ.get("DATABASE_URL")
 
     DB_PATH = os.environ.get(

@@ -47,7 +47,9 @@
                     <div class="list-group-item">
                         <strong>{{ c.name }}</strong><br>
                         <small class="text-muted">
-                            {{ c.email or "—" }} • {{ c.created_at[:10] if c.created_at }}
+                            {{ c.email or "—" }}
+                            •
+                            {{ c.created_at.strftime('%Y-%m-%d') if c.created_at else "—" }}
                         </small>
                     </div>
                 {% endfor %}
@@ -81,7 +83,7 @@
                                 {{ cot.energie_type or "—" }}
                             </td>
                             <td>
-                                {{ cot.date_creation[:10] if cot.date_creation else "—" }}
+                                {{ cot.date_creation.strftime('%Y-%m-%d') if cot.date_creation else "—" }}
                             </td>
                             <td style="text-align:right;">
                                 <a href="{{ url_for('open_cotation', cotation_id=cot.id) }}"

@@ -31,7 +31,9 @@
 
         <div class="info-item">
             <span>Date de création</span>
-            <strong>{{ client.created_at[:10] if client.created_at else "—" }}</strong>
+            <strong>
+                {{ client.created_at.strftime('%Y-%m-%d') if client.created_at else "—" }}
+            </strong>
         </div>
 
         <div class="info-item">
@@ -78,110 +80,48 @@
 <div class="card">
     <h3 class="section-title documents">Documents</h3>
 
-    <!-- ==== UPLOAD BAR ==== -->
-    <div class="docs-upload-wrap" style="margin-top:10px;">
-        <form method="post"
-              action="{{ url_for('upload_client_document', client_id=client.id) }}"
-              enctype="multipart/form-data"
-              style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+    <form method="post"
+          action="{{ url_for('upload_client_document', client_id=client.id) }}"
+          enctype="multipart/form-data"
+          style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
 
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-            <div class="docs-file" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <input type="file"
-                       name="documents"
-                       multiple
-                       required
-                       class="form-control"
-                       style="max-width:360px;">
+        <input type="file" name="documents" multiple required class="form-control" style="max-width:360px;">
+
+        <button type="submit" class="btn btn-primary">
+            Ajouter des documents
+        </button>
+    </form>
+
+    {% if documents %}
+        {% for doc in documents %}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+            <span>{{ doc.nom }}</span>
+
+            <div style="display:flex;gap:8px;">
+                <a href="{{ doc.url }}" target="_blank" class="btn btn-secondary btn-sm">Ouvrir</a>
+
+                <form method="post"
+                      action="{{ url_for('delete_client_document', client_id=client.id) }}"
+                      onsubmit="return confirm('Supprimer ce document ?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="key" value="{{ doc.key }}">
+                    <button class="btn btn-danger btn-sm">Supprimer</button>
+                </form>
             </div>
-
-            <button type="submit" class="btn btn-primary">
-                Ajouter des documents
-            </button>
-        </form>
-
-        <p class="text-muted" style="margin:10px 0 0 0;">
-            Formats autorisés : pdf, jpg, png, doc/docx, xls/xlsx, csv.
-        </p>
-    </div>
-
-    <!-- ==== LISTE DOCUMENTS ==== -->
-    <div class="docs-list-wrap" style="margin-top:16px;">
-
-        {% if documents and documents|length > 0 %}
-
-            <div class="docs-grid" style="display:flex;flex-direction:column;gap:10px;">
-
-                {% for doc in documents %}
-                <div class="doc-row"
-                     style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid rgba(0,0,0,0.08);border-radius:10px;">
-
-                    <div class="doc-left" style="display:flex;flex-direction:column;gap:4px;min-width:0;">
-                        <div class="doc-name" style="display:flex;align-items:center;gap:8px;min-width:0;">
-                            <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:520px;">
-                                {{ doc.nom }}
-                            </span>
-                        </div>
-
-                        <div class="doc-meta" style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#666;">
-                            {% if doc.taille is defined %}
-                                <span>Taille : {{ doc.taille }} octets</span>
-                            {% endif %}
-                            <span>Accès : lien sécurisé</span>
-                        </div>
-                    </div>
-
-                    <div class="doc-actions" style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-
-                        <!-- OUVRIR -->
-                        <a class="btn btn-outline-secondary btn-sm"
-                           href="{{ doc.url }}"
-                           target="_blank"
-                           style="display:inline-flex;align-items:center;gap:6px;">
-                            Ouvrir
-                        </a>
-
-                        <!-- SUPPRIMER -->
-                        <form method="post"
-                              action="{{ url_for('delete_client_document', client_id=client.id) }}"
-                              style="display:inline;"
-                              onsubmit="return confirm('Supprimer ce document ?');">
-
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <input type="hidden" name="key" value="{{ doc.key }}">
-
-                            <button type="submit"
-                                    class="btn btn-danger btn-sm"
-                                    style="display:inline-flex;align-items:center;gap:6px;">
-                                Supprimer
-                            </button>
-                        </form>
-
-                    </div>
-                </div>
-                {% endfor %}
-
-            </div>
-
-        {% else %}
-
-            <div class="text-muted" style="padding:12px;border:1px dashed rgba(0,0,0,0.15);border-radius:10px;margin-top:10px;">
-                Aucun document
-            </div>
-
-        {% endif %}
-
-    </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="text-muted">Aucun document</p>
+    {% endif %}
 </div>
 
 <!-- ================= NOUVELLE COTATION ================= -->
 <div class="card">
     <h3 class="section-title cotation">Nouvelle demande de cotation</h3>
 
-    <form method="post"
-          action="{{ url_for('create_cotation', client_id=client.id) }}">
-
+    <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="form-grid">
@@ -225,10 +165,11 @@
         </thead>
         <tbody>
             {% for c in cotations %}
-            <tr style="cursor:pointer;"
-                data-href="{{ url_for('open_cotation', cotation_id=c.id) }}"
-                onclick="window.location.href=this.dataset.href;">
-                <td>{{ c.date_creation[:10] if c.date_creation else "—" }}</td>
+            <tr onclick="window.location='{{ url_for('open_cotation', cotation_id=c.id) }}'"
+                style="cursor:pointer;">
+                <td>
+                    {{ c.date_creation.strftime('%Y-%m-%d') if c.date_creation else "—" }}
+                </td>
                 <td>{{ c.energie_type or "—" }}</td>
                 <td>{{ c.fournisseur_actuel or "—" }}</td>
                 <td>{{ c.status }}</td>
@@ -245,29 +186,14 @@
 <div class="card">
     <h3 class="section-title update">Mise à jour du dossier</h3>
 
-    <form method="post"
-          action="{{ url_for('update_client', client_id=client.id) }}">
-
+    <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="form-grid">
-            <div>
-                <label>Nom du dossier</label>
-                <input type="text"
-                       name="update_name"
-                       value="{{ client.name }}"
-                       required>
-            </div>
-
-            <div>
-                <label>Date de mise à jour</label>
-                <input type="date"
-                       name="update_date"
-                       required>
-            </div>
+            <input type="text" name="update_name" value="{{ client.name }}" required>
+            <input type="date" name="update_date" required>
         </div>
 
-        <label>Commentaire</label>
         <textarea name="update_commentaire" rows="3">{{ client.notes or "" }}</textarea>
 
         <button type="submit" class="btn btn-secondary">
