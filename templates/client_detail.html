@@ -26,7 +26,7 @@
     <div class="info-grid">
         <div class="info-item">
             <span>Commercial</span>
-            <strong>{{ client.commercial or "—" }}</strong>
+            <strong>{{ current_user.username }}</strong>
         </div>
 
         <div class="info-item">
@@ -104,7 +104,7 @@
     <h3 class="section-title cotation">Nouvelle demande de cotation</h3>
 
     <form method="post"
-          action="{{ url_for('create_cotation', client_id=client.id) }}">
+          action="/clients/{{ client.id }}/cotations/new">
 
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 

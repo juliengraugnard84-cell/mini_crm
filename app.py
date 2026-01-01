@@ -1295,7 +1295,7 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + DOCUMENTS CLIENT
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + COTATIONS + DOCUMENTS CLIENT
 ############################################################
 
 @app.route("/clients")
@@ -1308,7 +1308,12 @@ def clients():
         if session["user"]["role"] == "admin":
             if q:
                 cur.execute(
-                    "SELECT * FROM crm_clients WHERE name ILIKE %s ORDER BY created_at DESC",
+                    """
+                    SELECT *
+                    FROM crm_clients
+                    WHERE name ILIKE %s
+                    ORDER BY created_at DESC
+                    """,
                     (f"%{q}%",),
                 )
             else:
@@ -1319,8 +1324,10 @@ def clients():
             if q:
                 cur.execute(
                     """
-                    SELECT * FROM crm_clients
-                    WHERE owner_id=%s AND name ILIKE %s
+                    SELECT *
+                    FROM crm_clients
+                    WHERE owner_id = %s
+                      AND name ILIKE %s
                     ORDER BY created_at DESC
                     """,
                     (session["user"]["id"], f"%{q}%"),
@@ -1328,8 +1335,9 @@ def clients():
             else:
                 cur.execute(
                     """
-                    SELECT * FROM crm_clients
-                    WHERE owner_id=%s
+                    SELECT *
+                    FROM crm_clients
+                    WHERE owner_id = %s
                     ORDER BY created_at DESC
                     """,
                     (session["user"]["id"],),
@@ -1382,11 +1390,19 @@ def client_detail(client_id):
     conn = get_db()
 
     with conn.cursor() as cur:
-        cur.execute("SELECT * FROM crm_clients WHERE id=%s", (client_id,))
+        cur.execute(
+            "SELECT * FROM crm_clients WHERE id = %s",
+            (client_id,),
+        )
         client = cur.fetchone()
 
         cur.execute(
-            "SELECT * FROM cotations WHERE client_id=%s ORDER BY date_creation DESC",
+            """
+            SELECT *
+            FROM cotations
+            WHERE client_id = %s
+            ORDER BY date_creation DESC
+            """,
             (client_id,),
         )
         cotations = cur.fetchall()
@@ -1395,7 +1411,7 @@ def client_detail(client_id):
             """
             SELECT substr(date,1,7) AS mois, SUM(montant) AS total
             FROM revenus
-            WHERE client_id=%s
+            WHERE client_id = %s
             GROUP BY mois
             ORDER BY mois DESC
             """,
@@ -1404,7 +1420,11 @@ def client_detail(client_id):
         ca_par_mois = cur.fetchall()
 
         cur.execute(
-            "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE client_id=%s",
+            """
+            SELECT COALESCE(SUM(montant), 0)
+            FROM revenus
+            WHERE client_id = %s
+            """,
             (client_id,),
         )
         ca_total = cur.fetchone()[0]
@@ -1419,6 +1439,82 @@ def client_detail(client_id):
         ca_par_mois=[row_to_obj(r) for r in ca_par_mois],
         ca_total=ca_total,
     )
+
+
+# =========================================================
+# CRÉATION D’UNE DEMANDE DE COTATION (COMMERCIAL / ADMIN)
+# =========================================================
+@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
+@login_required
+def create_cotation(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    data = {
+        "date_negociation": request.form.get("date_negociation"),
+        "energie_type": request.form.get("energie_type"),
+        "pdl_pce": request.form.get("pdl_pce"),
+        "date_echeance": request.form.get("date_echeance"),
+        "fournisseur_actuel": request.form.get("fournisseur_actuel"),
+        "entreprise_nom": request.form.get("entreprise_nom"),
+        "siret": request.form.get("siret"),
+        "signataire_nom": request.form.get("signataire_nom"),
+        "signataire_tel": request.form.get("signataire_tel"),
+        "signataire_email": request.form.get("signataire_email"),
+        "commentaire": request.form.get("commentaire"),
+    }
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO cotations (
+                client_id,
+                date_negociation,
+                energie_type,
+                pdl_pce,
+                date_echeance,
+                fournisseur_actuel,
+                entreprise_nom,
+                siret,
+                signataire_nom,
+                signataire_tel,
+                signataire_email,
+                commentaire,
+                created_by,
+                is_read,
+                status
+            )
+            VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, 0, 'nouvelle'
+            )
+            """,
+            (
+                client_id,
+                data["date_negociation"],
+                data["energie_type"],
+                data["pdl_pce"],
+                data["date_echeance"],
+                data["fournisseur_actuel"],
+                data["entreprise_nom"],
+                data["siret"],
+                data["signataire_nom"],
+                data["signataire_tel"],
+                data["signataire_email"],
+                data["commentaire"],
+                user.get("id"),
+            ),
+        )
+
+    conn.commit()
+
+    flash("Demande de cotation créée avec succès.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)

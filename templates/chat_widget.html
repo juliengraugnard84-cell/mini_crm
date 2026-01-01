@@ -50,7 +50,7 @@
     - JavaScript toujours valide
   */
 
-  window.CHAT_CURRENT_USER_ID = {{ (current_user.id if current_user else none) | tojson }};
-  window.CHAT_CURRENT_USERNAME = {{ (current_user.username if current_user else none) | tojson }};
-  window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else none) | tojson }};
+  window.CHAT_CURRENT_USER_ID = {{ (current_user.id if current_user else None) | tojson }};
+  window.CHAT_CURRENT_USERNAME = {{ (current_user.username if current_user else None) | tojson }};
+  window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else None) | tojson }};
 </script>
