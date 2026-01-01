@@ -1,18 +1,22 @@
 {% extends "base.html" %}
+{% block title %}Clients{% endblock %}
 
 {% block content %}
 
-<div class="page-header">
+<!-- ================= HEADER ================= -->
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
     <h1>Clients</h1>
-    <a href="{{ url_for('new_client') }}" class="btn btn-primary">
+
+    <a href="{{ url_for('new_client') }}"
+       class="btn btn-primary">
         ➕ Nouveau dossier
     </a>
 </div>
 
+<!-- ================= SEARCH ================= -->
 <div class="card">
     <form method="get"
           action="{{ url_for('clients') }}"
-          class="search-form"
           style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
 
         <input type="text"
@@ -28,54 +32,56 @@
     </form>
 </div>
 
+<!-- ================= LISTE CLIENTS ================= -->
 <div class="card">
-    {% if clients %}
 
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Dossier</th>
-                <th>Commercial</th>
-                <th>Statut</th>
-                <th>Date</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
+{% if clients %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Dossier</th>
+            <th>Commercial</th>
+            <th>Statut</th>
+            <th>Date de création</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
 
-            {% for c in clients %}
-            <tr>
-                <td>
-                    <strong>{{ c.name }}</strong>
-                </td>
+        {% for c in clients %}
+        <tr>
+            <td>
+                <strong>{{ c.name }}</strong>
+            </td>
 
-                <td>
-                    {{ c.commercial or "—" }}
-                </td>
+            <td>
+                {{ c.commercial or "—" }}
+            </td>
 
-                <td>
-                    {{ c.status or "cotation" }}
-                </td>
+            <td>
+                {{ c.status or "cotation" }}
+            </td>
 
-                <td>
-                    {{ format_date(c.created_at) }}
-                </td>
+            <td>
+                {{ format_date(c.created_at) }}
+            </td>
 
-                <td style="text-align:right;">
-                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                       class="btn btn-secondary">
-                        Ouvrir
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
+            <td style="text-align:right;">
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-secondary btn-sm">
+                    Ouvrir
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
 
-        </tbody>
-    </table>
+    </tbody>
+</table>
 
-    {% else %}
-        <p>Aucun dossier trouvé.</p>
-    {% endif %}
+{% else %}
+    <p class="text-muted">Aucun dossier trouvé.</p>
+{% endif %}
+
 </div>
 
 {% endblock %}

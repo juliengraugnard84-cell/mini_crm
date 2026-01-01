@@ -1,144 +1,129 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Tableau de bord{% endblock %}
 
 {% block content %}
 
-<h1>Tableau de bord</h1>
+<!-- ================= HEADER ================= -->
+<div class="page-header">
+    <h1>Tableau de bord</h1>
+</div>
 
 <!-- ================= KPI ================= -->
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:24px;">
+<div class="kpi-grid">
 
-    <div class="kpi-tile">
-        <div class="kpi-label">Clients</div>
-        <div class="kpi-value">{{ total_clients }}</div>
+    <div class="kpi-card">
+        <span class="kpi-label">Dossiers clients</span>
+        <strong class="kpi-value">{{ total_clients }}</strong>
     </div>
 
-    <div class="kpi-tile">
-        <div class="kpi-label">Chiffre d’affaires</div>
-        <div class="kpi-value">{{ total_ca }} €</div>
+    <div class="kpi-card">
+        <span class="kpi-label">Chiffre d’affaires total</span>
+        <strong class="kpi-value">{{ total_ca }} €</strong>
     </div>
 
-    <div class="kpi-tile">
-        <div class="kpi-label">Documents</div>
-        <div class="kpi-value">{{ total_docs }}</div>
+    <div class="kpi-card">
+        <span class="kpi-label">Documents stockés</span>
+        <strong class="kpi-value">{{ total_docs }}</strong>
     </div>
 
     {% if current_user and current_user.role == 'admin' %}
-    <div class="kpi-tile">
-        <div class="kpi-label">Cotations non lues</div>
-        <div class="kpi-value">{{ unread_cotations }}</div>
+    <div class="kpi-card highlight">
+        <span class="kpi-label">Nouvelles cotations</span>
+        <strong class="kpi-value">{{ unread_cotations }}</strong>
     </div>
     {% endif %}
 
 </div>
 
-<!-- ================= CONTENU ================= -->
-<div style="display:grid;grid-template-columns:2fr 1fr;gap:24px;align-items:start;">
+<!-- ================= DERNIERS DOSSIERS ================= -->
+<div class="card">
+    <h3 class="section-title">Derniers dossiers créés</h3>
 
-    <!-- ===== COLONNE GAUCHE ===== -->
-    <div>
+    {% if last_clients %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Dossier</th>
+                <th>Email</th>
+                <th>Date de création</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in last_clients %}
+            <tr>
+                <td><strong>{{ c.name }}</strong></td>
+                <td>{{ c.email or "—" }}</td>
+                <td>{{ format_date(c.created_at) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="text-muted">Aucun dossier récent.</p>
+    {% endif %}
+</div>
 
-        <!-- Derniers clients -->
-        <div class="card">
-            <h5>Derniers clients</h5>
+<!-- ================= DERNIER CA ================= -->
+<div class="card">
+    <h3 class="section-title ca">Dernier chiffre d’affaires enregistré</h3>
 
-            {% if last_clients %}
-                {% for c in last_clients %}
-                    <div class="list-group-item">
-                        <strong>{{ c.name }}</strong><br>
-                        <small class="text-muted">
-                            {{ c.email or "—" }}
-                            •
-                            {{ c.created_at.strftime('%Y-%m-%d') if c.created_at else "—" }}
-                        </small>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p class="text-muted">Aucun client enregistré.</p>
-            {% endif %}
-        </div>
-
-        <!-- Cotations admin cliquables -->
-        {% if current_user and current_user.role == 'admin' %}
-        <div class="card">
-            <h5>Cotations non lues</h5>
-
-            {% if cotations_admin %}
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Client</th>
-                            <th>Énergie</th>
-                            <th>Date</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for cot in cotations_admin %}
-                        <tr>
-                            <td>
-                                <strong>{{ cot.client_name }}</strong>
-                            </td>
-                            <td>
-                                {{ cot.energie_type or "—" }}
-                            </td>
-                            <td>
-                                {{ cot.date_creation.strftime('%Y-%m-%d') if cot.date_creation else "—" }}
-                            </td>
-                            <td style="text-align:right;">
-                                <a href="{{ url_for('open_cotation', cotation_id=cot.id) }}"
-                                   class="btn btn-secondary">
-                                    Ouvrir
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p class="text-muted">Aucune cotation non lue.</p>
-            {% endif %}
-        </div>
-        {% endif %}
-
-    </div>
-
-    <!-- ===== COLONNE DROITE ===== -->
-    <div>
-
-        <!-- Dernier revenu -->
-        <div class="card">
-            <h5>Dernier revenu</h5>
-
-            {% if last_rev %}
-                <strong>{{ last_rev.montant }} €</strong><br>
-                <small class="text-muted">
-                    {{ last_rev.date }} • {{ last_rev.commercial }}
-                </small>
-            {% else %}
-                <p class="text-muted">Aucun revenu enregistré.</p>
-            {% endif %}
-        </div>
-
-        <!-- Actions rapides -->
-        <div class="card">
-            <h5>Actions rapides</h5>
-
-            <div style="display:flex;flex-direction:column;gap:10px;">
-                <a href="{{ url_for('new_client') }}" class="btn btn-primary">
-                    ➕ Nouveau dossier client
-                </a>
-
-                {% if current_user and current_user.role == 'admin' %}
-                <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">
-                    ⚙ Gérer les utilisateurs
-                </a>
-                {% endif %}
+    {% if last_rev %}
+        <div class="info-grid">
+            <div class="info-item">
+                <span>Date</span>
+                <strong>{{ format_date(last_rev.date) }}</strong>
+            </div>
+            <div class="info-item">
+                <span>Montant</span>
+                <strong>{{ last_rev.montant }} €</strong>
+            </div>
+            <div class="info-item">
+                <span>Commercial</span>
+                <strong>{{ last_rev.commercial or "—" }}</strong>
             </div>
         </div>
-
-    </div>
-
+    {% else %}
+        <p class="text-muted">Aucun chiffre d’affaires enregistré.</p>
+    {% endif %}
 </div>
+
+<!-- ================= NOUVELLES COTATIONS (ADMIN) ================= -->
+{% if current_user and current_user.role == 'admin' %}
+<div class="card">
+    <h3 class="section-title cotation">
+        Dernières demandes de cotation
+    </h3>
+
+    {% if cotations_admin %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Dossier</th>
+                <th>Énergie</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cotations_admin %}
+            <tr class="{% if not c.is_read %}unread{% endif %}">
+                <td>{{ format_date(c.date_creation) }}</td>
+                <td><strong>{{ c.client_name }}</strong></td>
+                <td>{{ c.energie_type or "—" }}</td>
+                <td style="text-align:right;">
+                    <a href="{{ url_for('admin_open_cotation', cotation_id=c.id) }}"
+                       class="btn btn-secondary btn-sm">
+                        Ouvrir
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="text-muted">Aucune nouvelle demande.</p>
+    {% endif %}
+</div>
+{% endif %}
 
 {% endblock %}

@@ -104,7 +104,7 @@
     <h3 class="section-title cotation">Nouvelle demande de cotation</h3>
 
     <form method="post"
-          action="/clients/{{ client.id }}/cotations/new">
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
 
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 

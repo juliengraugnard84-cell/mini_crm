@@ -640,21 +640,48 @@ def csrf_protect():
 def inject_globals():
     """
     Variables et helpers accessibles dans TOUS les templates Jinja.
-    Aucune logique fragile côté HTML.
+    Objectifs :
+    - éviter toute logique fragile côté HTML
+    - centraliser les calculs sensibles (dates, compteurs admin, etc.)
     """
 
     u = session.get("user")
+    current_user = SimpleNamespace(**u) if u else None
 
+    # ===============================
+    # BADGE : cotations non lues (ADMIN)
+    # ===============================
+    unread_cotations = 0
+
+    if current_user and current_user.role == "admin":
+        try:
+            conn = get_db()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read, 0) = 0"
+                )
+                unread_cotations = cur.fetchone()[0]
+        except Exception:
+            # Sécurité absolue : aucun crash template
+            unread_cotations = 0
+
+    # ===============================
+    # INJECTION GLOBALE
+    # ===============================
     return dict(
-        # Utilisateur courant (safe)
-        current_user=SimpleNamespace(**u) if u else None,
+        # Utilisateur courant (safe pour Jinja)
+        current_user=current_user,
 
-        # CSRF (toujours présent)
+        # Token CSRF (toujours présent)
         csrf_token=session.get("csrf_token"),
 
         # Helper date SAFE (corrige strftime sur string)
         format_date=format_date_safe,
+
+        # Badge sidebar admin
+        unread_cotations=unread_cotations,
     )
+
 
 ############################################################
 # 7. LOGIN / LOGOUT

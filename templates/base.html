@@ -21,36 +21,59 @@
             <div class="logo">SG</div>
             <div class="company">
                 <strong>SYNERGYGROUP</strong><br>
-                <small>{{ current_user.username if current_user else "" }}</small>
+                <small>
+                    {{ current_user.username if current_user else "" }}
+                </small>
             </div>
         </div>
 
         <nav class="sidebar-nav">
+
+            <!-- DASHBOARD -->
             <a href="{{ url_for('dashboard') }}"
                class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
                 Tableau de bord
             </a>
 
+            <!-- CLIENTS -->
             <a href="{{ url_for('clients') }}"
                class="{% if request.endpoint in ['clients','client_detail','new_client'] %}active{% endif %}">
                 Clients
             </a>
 
             {% if current_user and current_user.role == 'admin' %}
+
+                <!-- CHIFFRE D’AFFAIRES -->
                 <a href="{{ url_for('chiffre_affaire') }}"
                    class="{% if request.endpoint == 'chiffre_affaire' %}active{% endif %}">
                     Chiffre d’affaires
                 </a>
 
+                <!-- COTATIONS ADMIN (avec badge) -->
+                <a href="{{ url_for('admin_cotations') }}"
+                   class="{% if request.endpoint in ['admin_cotations','admin_open_cotation'] %}active{% endif %}"
+                   style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <span>Demandes de cotation</span>
+
+                    {% if unread_cotations and unread_cotations > 0 %}
+                        <span class="chat-badge" style="display:inline-flex;">
+                            {{ unread_cotations }}
+                        </span>
+                    {% endif %}
+                </a>
+
+                <!-- DOCUMENTS -->
                 <a href="{{ url_for('documents') }}"
                    class="{% if request.endpoint == 'documents' %}active{% endif %}">
                     Documents
                 </a>
 
+                <!-- UTILISATEURS -->
                 <a href="{{ url_for('admin_users') }}"
                    class="{% if request.endpoint.startswith('admin_') %}active{% endif %}">
                     Utilisateurs
                 </a>
+
             {% endif %}
         </nav>
 
@@ -65,10 +88,12 @@
 
         <!-- ================= TOP BAR ================= -->
         <header class="topbar">
-            <div class="topbar-left">
-                <strong>{{ current_user.username }}</strong>
-                <span class="role">{{ current_user.role }}</span>
-            </div>
+            {% if current_user %}
+                <div class="topbar-left">
+                    <strong>{{ current_user.username }}</strong>
+                    <span class="role">{{ current_user.role }}</span>
+                </div>
+            {% endif %}
         </header>
 
         <!-- ================= FLASH MESSAGES ================= -->
@@ -101,7 +126,6 @@
 <!-- ======================================================
      CHAT — WIDGET FLOTTANT (UNE SEULE FOIS)
      ====================================================== -->
-
 {% include "chat_widget.html" %}
 
 <!-- ================= JS CHAT ================= -->
