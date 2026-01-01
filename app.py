@@ -106,7 +106,6 @@ def _connect_db():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL manquant dans la configuration.")
 
-    # DictCursor permet row["col"] ET row[0]
     conn = psycopg2.connect(
         DATABASE_URL,
         cursor_factory=psycopg2.extras.DictCursor,
@@ -134,36 +133,19 @@ def row_to_obj(row):
 
 
 def _try_add_column(conn, table, column_sql):
-    """
-    Ajout tolérant de colonnes (SAFE, ne casse jamais la prod)
-    """
     try:
         with conn.cursor() as cur:
-            cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column_sql}")
+            cur.execute(
+                f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column_sql}"
+            )
     except Exception:
         pass
 
 
-def _is_weak_default_admin_password(pw: str) -> bool:
-    if not pw:
-        return True
-    if pw.lower() in {"admin", "admin123", "password", "123456", "12345678"}:
-        return True
-    if len(pw) < 10:
-        return True
-    return False
-
-
 def init_db():
-    """
-    ⚠️ À N’APPELER QU’UNE SEULE FOIS EN PROD
-    Contrôlé via la variable d’environnement RUN_INIT_DB=1
-    """
     conn = _connect_db()
     try:
         with conn.cursor() as cur:
-
-            # ================= CLIENTS =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS crm_clients (
                     id SERIAL PRIMARY KEY,
@@ -179,7 +161,6 @@ def init_db():
                 )
             """)
 
-            # ================= USERS =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
@@ -189,19 +170,17 @@ def init_db():
                 )
             """)
 
-            # ================= REVENUS =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS revenus (
                     id SERIAL PRIMARY KEY,
                     date TEXT NOT NULL,
                     commercial TEXT NOT NULL,
                     dossier TEXT,
-                    montant DOUBLE PRECISION NOT NULL
+                    montant DOUBLE PRECISION NOT NULL,
+                    client_id INTEGER
                 )
             """)
-            _try_add_column(conn, "revenus", "client_id INTEGER")
 
-            # ================= COTATIONS =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS cotations (
                     id SERIAL PRIMARY KEY,
@@ -215,17 +194,6 @@ def init_db():
                 )
             """)
 
-            _try_add_column(conn, "cotations", "date_negociation TEXT")
-            _try_add_column(conn, "cotations", "energie_type TEXT")
-            _try_add_column(conn, "cotations", "entreprise_nom TEXT")
-            _try_add_column(conn, "cotations", "siret TEXT")
-            _try_add_column(conn, "cotations", "signataire_nom TEXT")
-            _try_add_column(conn, "cotations", "signataire_tel TEXT")
-            _try_add_column(conn, "cotations", "signataire_email TEXT")
-            _try_add_column(conn, "cotations", "pdl_pce TEXT")
-            _try_add_column(conn, "cotations", "commentaire TEXT")
-
-            # ================= CHAT =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS chat_messages (
                     id SERIAL PRIMARY KEY,
@@ -234,54 +202,19 @@ def init_db():
                     message TEXT,
                     file_key TEXT,
                     file_name TEXT,
+                    is_read INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            _try_add_column(conn, "chat_messages", "is_read INTEGER DEFAULT 0")
-
-            try:
-                cur.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_chat_messages_id ON chat_messages(id)"
-                )
-            except Exception:
-                pass
-
-            # ================= ADMIN BOOTSTRAP =================
-            cur.execute("SELECT id FROM users WHERE username=%s", ("admin",))
-            admin = cur.fetchone()
-
-            if not admin:
-                if is_production and _is_weak_default_admin_password(ADMIN_DEFAULT_PASSWORD):
-                    raise RuntimeError(
-                        "ADMIN_DEFAULT_PASSWORD trop faible pour la production."
-                    )
-
-                cur.execute(
-                    """
-                    INSERT INTO users (username, password, role)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (
-                        "admin",
-                        generate_password_hash(ADMIN_DEFAULT_PASSWORD),
-                        "admin",
-                    )
-                )
 
         conn.commit()
-        print("✅ Base de données initialisée avec succès.")
-
     finally:
         conn.close()
 
 
-# 🔐 VERROU DE PRODUCTION — C’EST ICI LA CORRECTION CLÉ
+# ✅ INITIALISATION CONTRÔLÉE
 if os.environ.get("RUN_INIT_DB") == "1":
-    print("⚠️ RUN_INIT_DB=1 → initialisation DB AUTORISÉE")
     init_db()
-else:
-    print("✅ RUN_INIT_DB absent → initialisation DB IGNORÉE (safe prod)")
-
 
 ############################################################
 # 4. S3 — STOCKAGE DOCUMENTS
