@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+
 {% block content %}
 
 <div class="page-header">
@@ -9,17 +10,27 @@
 </div>
 
 <div class="card">
-    <form method="get" action="{{ url_for('clients') }}" class="search-form">
+    <form method="get"
+          action="{{ url_for('clients') }}"
+          class="search-form"
+          style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+
         <input type="text"
                name="q"
                placeholder="Rechercher un dossier…"
-               value="{{ q or '' }}">
-        <button class="btn btn-secondary">Rechercher</button>
+               value="{{ q or '' }}"
+               class="form-control"
+               style="min-width:260px;">
+
+        <button class="btn btn-secondary">
+            Rechercher
+        </button>
     </form>
 </div>
 
 <div class="card">
     {% if clients %}
+
     <table class="table">
         <thead>
             <tr>
@@ -31,15 +42,27 @@
             </tr>
         </thead>
         <tbody>
+
             {% for c in clients %}
             <tr>
-                <td><strong>{{ c.name }}</strong></td>
-                <td>{{ c.commercial_name or "—" }}</td>
-                <td>{{ c.status or "cotation" }}</td>
                 <td>
-                    {{ c.created_at.strftime('%Y-%m-%d') if c.created_at else "—" }}
+                    <strong>{{ c.name }}</strong>
                 </td>
-                <td style="text-align:right">
+
+                <td>
+                    {{ c.commercial_name or "—" }}
+                </td>
+
+                <td>
+                    {{ c.status or "cotation" }}
+                </td>
+
+                <td>
+                    {# ✅ FIX CRITIQUE : created_at peut être une string #}
+                    {{ c.created_at[:10] if c.created_at else "—" }}
+                </td>
+
+                <td style="text-align:right;">
                     <a href="{{ url_for('client_detail', client_id=c.id) }}"
                        class="btn btn-secondary">
                         Ouvrir
@@ -47,11 +70,14 @@
                 </td>
             </tr>
             {% endfor %}
+
         </tbody>
     </table>
+
     {% else %}
         <p>Aucun dossier trouvé.</p>
     {% endif %}
 </div>
 
 {% endblock %}
+
