@@ -1374,7 +1374,8 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + COTATIONS + DOCUMENTS CLIENT
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL)
+#     + COTATIONS + DOCUMENTS CLIENT (UPLOAD COMMERCIAL)
 ############################################################
 
 @app.route("/clients")
@@ -1518,6 +1519,39 @@ def client_detail(client_id):
         ca_par_mois=[row_to_obj(r) for r in ca_par_mois],
         ca_total=ca_total,
     )
+
+
+# =========================================================
+# UPLOAD DOCUMENT CLIENT (ADMIN + COMMERCIAL PROPRIÉTAIRE)
+# =========================================================
+@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
+@login_required
+def upload_client_document(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    if LOCAL_MODE or not s3:
+        flash("Upload désactivé.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    file = request.files.get("file")
+
+    if not file or not allowed_file(file.filename):
+        flash("Fichier non valide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    filename = clean_filename(secure_filename(file.filename))
+    prefix = client_s3_prefix(client_id)
+    key = f"{prefix}{filename}"
+
+    try:
+        s3_upload_fileobj(file, AWS_BUCKET, key)
+        flash("Document ajouté au dossier client.", "success")
+    except Exception as e:
+        print("Erreur upload document client :", repr(e))
+        flash("Erreur lors de l’upload du document.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 # =========================================================
