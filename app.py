@@ -1475,6 +1475,9 @@ def client_detail(client_id):
         )
         client = cur.fetchone()
 
+        if not client:
+            abort(404)
+
         cur.execute(
             """
             SELECT *
@@ -1521,6 +1524,62 @@ def client_detail(client_id):
 
 
 # =========================================================
+# CRÉATION COTATION (COMMERCIAL + ADMIN)
+# =========================================================
+@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
+@login_required
+def create_cotation(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    data = request.form
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO cotations (
+                client_id,
+                date_negociation,
+                energie_type,
+                pdl_pce,
+                date_echeance,
+                fournisseur_actuel,
+                entreprise_nom,
+                siret,
+                signataire_nom,
+                signataire_tel,
+                signataire_email,
+                commentaire,
+                created_by,
+                is_read,
+                status
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
+            """,
+            (
+                client_id,
+                data.get("date_negociation"),
+                data.get("energie_type"),
+                data.get("pdl_pce"),
+                data.get("date_echeance"),
+                data.get("fournisseur_actuel"),
+                data.get("entreprise_nom"),
+                data.get("siret"),
+                data.get("signataire_nom"),
+                data.get("signataire_tel"),
+                data.get("signataire_email"),
+                data.get("commentaire"),
+                session["user"]["id"],
+            ),
+        )
+
+    conn.commit()
+    flash("Demande de cotation créée.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================================================
 # UPLOAD DOCUMENT CLIENT (COMMERCIAL + ADMIN)
 # =========================================================
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
@@ -1564,12 +1623,8 @@ def delete_client_document(client_id):
 
     key = (request.form.get("key") or "").strip()
 
-    if not key:
+    if not key or ".." in key or not key.startswith("clients/"):
         flash("Document invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    if ".." in key or not key.startswith("clients/"):
-        flash("Clé de document invalide.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
     if LOCAL_MODE or not s3:
