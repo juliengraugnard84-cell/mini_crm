@@ -13,7 +13,7 @@
         rel="stylesheet"
     >
 
-    <!-- STYLE GLOBAL CRM (CHEMIN CORRECT) -->
+    <!-- STYLE GLOBAL CRM -->
     <link
         rel="stylesheet"
         href="{{ url_for('static', filename='design.css') }}"
@@ -54,17 +54,23 @@
             </a>
 
             {% if current_user and current_user.role == "admin" %}
+
+                <!-- ===== DEMANDES DE COTATION ===== -->
                 <a href="{{ url_for('admin_cotations') }}"
                    class="{% if request.path.startswith('/admin/cotations') %}active{% endif %}">
                     Demandes de cotation
                     {% if unread_cotations and unread_cotations > 0 %}
-                        <span class="badge">{{ unread_cotations }}</span>
+                        <span class="nav-alert-dot danger"></span>
                     {% endif %}
                 </a>
 
+                <!-- ===== MISES À JOUR ===== -->
                 <a href="{{ url_for('admin_updates') }}"
                    class="{% if request.path.startswith('/admin/updates') %}active{% endif %}">
                     Mises à jour
+                    {% if unread_updates and unread_updates > 0 %}
+                        <span class="nav-alert-dot warning"></span>
+                    {% endif %}
                 </a>
 
                 <a href="{{ url_for('documents') }}"
@@ -76,6 +82,7 @@
                    class="{% if request.path.startswith('/admin/users') %}active{% endif %}">
                     Utilisateurs
                 </a>
+
             {% endif %}
         </nav>
 
