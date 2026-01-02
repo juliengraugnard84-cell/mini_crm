@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Demande de mise à jour{% endblock %}
+
+{% block content %}
+
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
+    <h1>Demande de mise à jour</h1>
+    <p class="text-muted">
+        Dossier : <strong>{{ client.name }}</strong>
+    </p>
+</div>
+
+<!-- ================= INFOS GÉNÉRALES ================= -->
+<div class="card">
+    <h5>Informations générales</h5>
+
+    <div class="info-grid">
+        <div class="info-item">
+            <span>Dossier</span>
+            <strong>{{ client.name }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Commercial</span>
+            <strong>{{ update.commercial_name }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Date demandée</span>
+            <strong>{{ format_date(update.update_date) }}</strong>
+        </div>
+    </div>
+</div>
+
+<!-- ================= COMMENTAIRE ================= -->
+<div class="card">
+    <h5>Commentaire du commercial</h5>
+
+    {% if update.commentaire %}
+        <p style="white-space:pre-line;">
+            {{ update.commentaire }}
+        </p>
+    {% else %}
+        <p class="text-muted">Aucun commentaire fourni.</p>
+    {% endif %}
+</div>
+
+<!-- ================= ACTIONS ================= -->
+<div style="margin-top:24px;">
+    <a href="{{ url_for('admin_updates') }}"
+       class="btn btn-secondary">
+        ← Retour aux mises à jour
+    </a>
+</div>
+
+{% endblock %}

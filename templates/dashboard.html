@@ -3,33 +3,34 @@
 
 {% block content %}
 
-<!-- ================= HEADER ================= -->
-<div class="page-header">
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
     <h1>Tableau de bord</h1>
+    <p class="text-muted">Vue d’ensemble de l’activité</p>
 </div>
 
 <!-- ================= KPI ================= -->
-<div class="kpi-grid">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:32px;">
 
-    <div class="kpi-card">
-        <span class="kpi-label">Dossiers clients</span>
-        <strong class="kpi-value">{{ total_clients }}</strong>
+    <div class="kpi-tile">
+        <div class="kpi-label">Dossiers clients</div>
+        <div class="kpi-value">{{ total_clients }}</div>
     </div>
 
-    <div class="kpi-card">
-        <span class="kpi-label">Chiffre d’affaires total</span>
-        <strong class="kpi-value">{{ total_ca }} €</strong>
+    <div class="kpi-tile">
+        <div class="kpi-label">Chiffre d’affaires total</div>
+        <div class="kpi-value">{{ total_ca }} €</div>
     </div>
 
-    <div class="kpi-card">
-        <span class="kpi-label">Documents stockés</span>
-        <strong class="kpi-value">{{ total_docs }}</strong>
+    <div class="kpi-tile">
+        <div class="kpi-label">Documents stockés</div>
+        <div class="kpi-value">{{ total_docs }}</div>
     </div>
 
     {% if current_user and current_user.role == 'admin' %}
-    <div class="kpi-card highlight">
-        <span class="kpi-label">Nouvelles cotations</span>
-        <strong class="kpi-value">{{ unread_cotations }}</strong>
+    <div class="kpi-tile" style="border-left-color:var(--danger)">
+        <div class="kpi-label">Nouvelles cotations</div>
+        <div class="kpi-value">{{ unread_cotations }}</div>
     </div>
     {% endif %}
 
@@ -37,7 +38,7 @@
 
 <!-- ================= DERNIERS DOSSIERS ================= -->
 <div class="card">
-    <h3 class="section-title">Derniers dossiers créés</h3>
+    <h5>Derniers dossiers créés</h5>
 
     {% if last_clients %}
     <table class="table">
@@ -65,34 +66,32 @@
 
 <!-- ================= DERNIER CA ================= -->
 <div class="card">
-    <h3 class="section-title ca">Dernier chiffre d’affaires enregistré</h3>
+    <h5>Dernier chiffre d’affaires enregistré</h5>
 
     {% if last_rev %}
-        <div class="info-grid">
-            <div class="info-item">
-                <span>Date</span>
-                <strong>{{ format_date(last_rev.date) }}</strong>
-            </div>
-            <div class="info-item">
-                <span>Montant</span>
-                <strong>{{ last_rev.montant }} €</strong>
-            </div>
-            <div class="info-item">
-                <span>Commercial</span>
-                <strong>{{ last_rev.commercial or "—" }}</strong>
-            </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;">
+        <div>
+            <div class="kpi-label">Date</div>
+            <strong>{{ format_date(last_rev.date) }}</strong>
         </div>
+        <div>
+            <div class="kpi-label">Montant</div>
+            <strong>{{ last_rev.montant }} €</strong>
+        </div>
+        <div>
+            <div class="kpi-label">Commercial</div>
+            <strong>{{ last_rev.commercial or "—" }}</strong>
+        </div>
+    </div>
     {% else %}
         <p class="text-muted">Aucun chiffre d’affaires enregistré.</p>
     {% endif %}
 </div>
 
-<!-- ================= NOUVELLES COTATIONS (ADMIN) ================= -->
+<!-- ================= COTATIONS ADMIN ================= -->
 {% if current_user and current_user.role == 'admin' %}
 <div class="card">
-    <h3 class="section-title cotation">
-        Dernières demandes de cotation
-    </h3>
+    <h5>Dernières demandes de cotation</h5>
 
     {% if cotations_admin %}
     <table class="table">
@@ -106,12 +105,12 @@
         </thead>
         <tbody>
             {% for c in cotations_admin %}
-            <tr class="{% if not c.is_read %}unread{% endif %}">
+            <tr>
                 <td>{{ format_date(c.date_creation) }}</td>
                 <td><strong>{{ c.client_name }}</strong></td>
                 <td>{{ c.energie_type or "—" }}</td>
                 <td style="text-align:right;">
-                    <a href="{{ url_for('open_cotation', cotation_id=c.id) }}"
+                    <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
                        class="btn btn-secondary btn-sm">
                         Ouvrir
                     </a>

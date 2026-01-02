@@ -1,122 +1,123 @@
 {% extends "base.html" %}
-
 {% block title %}Documents{% endblock %}
 
 {% block content %}
 
-<div class="page-head">
-    <div>
-        <h1>Documents (Admin)</h1>
-        <div class="text-muted">Gestion des documents stockés sur le serveur (S3).</div>
-    </div>
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
+    <h1>Documents</h1>
+    <p class="text-muted">
+        Gestion des documents stockés sur le serveur (S3)
+    </p>
 </div>
 
-<!-- UPLOAD -->
-<div class="card doc-card">
-    <div class="doc-card-head">
-        <h5 class="doc-card-title">Ajouter un document</h5>
-        <div class="doc-card-sub">Formats autorisés : PDF, images, Word, Excel, CSV.</div>
-    </div>
+<!-- ================= UPLOAD DOCUMENT ================= -->
+<div class="card">
+    <h5>Ajouter un document</h5>
+    <p class="text-muted mb-3">
+        Formats autorisés : PDF, images, Word, Excel, CSV
+    </p>
 
     <form action="{{ url_for('upload_document') }}"
           method="POST"
-          enctype="multipart/form-data"
-          class="doc-upload">
+          enctype="multipart/form-data">
 
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <div class="doc-upload-row">
-            <input class="form-control" type="file" name="file" required>
-            <button class="btn btn-primary" type="submit">Uploader</button>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <input type="file"
+                   name="file"
+                   class="form-control"
+                   required
+                   style="max-width:420px;">
+
+            <button type="submit" class="btn btn-primary">
+                Uploader
+            </button>
         </div>
 
-        <div class="doc-help">
-            Conseil : privilégie des noms de fichiers courts et explicites.
+        <div class="text-muted mt-2" style="font-size:.8rem;">
+            Conseil : utilisez des noms de fichiers courts et explicites.
         </div>
     </form>
 </div>
 
-<!-- LISTE -->
-<div class="card doc-card">
-    <div class="doc-card-head">
-        <h5 class="doc-card-title">Documents</h5>
-        <div class="doc-card-sub">
+<!-- ================= LISTE DOCUMENTS ================= -->
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h5>Documents</h5>
+        <span class="text-muted" style="font-size:.8rem;">
             {{ fichiers|length if fichiers else 0 }} fichier(s)
-        </div>
+        </span>
     </div>
 
     {% if not fichiers %}
-        <div class="empty-state">
-            <strong>Aucun document.</strong>
-            Ajoute un fichier via le formulaire ci-dessus.
+        <div class="text-muted">
+            Aucun document pour le moment.
         </div>
     {% else %}
-        <div class="doc-table-wrap">
-            <table class="table doc-table">
-                <thead>
-                    <tr>
-                        <th>Nom</th>
-                        <th style="width:140px;">Taille</th>
-                        <th style="width:160px;text-align:right;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for f in fichiers %}
-                    <tr>
-                        <td class="doc-name">
-                            {% if f.url %}
-                                <a href="{{ f.url }}"
-                                   target="_blank"
-                                   rel="noopener"
-                                   class="doc-link">
-                                    {{ f.nom }}
-                                </a>
-                            {% else %}
-                                <span>{{ f.nom }}</span>
-                            {% endif %}
-                            <div class="doc-path text-muted">{{ f.nom }}</div>
-                        </td>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th style="width:120px;">Taille</th>
+                    <th style="width:180px;text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for f in fichiers %}
+                <tr>
+                    <td>
+                        {% if f.url %}
+                            <a href="{{ f.url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="doc-link">
+                                <strong>{{ f.nom }}</strong>
+                            </a>
+                        {% else %}
+                            <strong>{{ f.nom }}</strong>
+                        {% endif %}
+                    </td>
 
-                        <td class="doc-size">
-                            {% set s = f.taille or 0 %}
-                            {% if s >= 1048576 %}
-                                {{ "%.2f"|format(s / 1048576) }} Mo
-                            {% elif s >= 1024 %}
-                                {{ "%.0f"|format(s / 1024) }} Ko
-                            {% else %}
-                                {{ s }} o
-                            {% endif %}
-                        </td>
+                    <td class="text-muted">
+                        {% set s = f.taille or 0 %}
+                        {% if s >= 1048576 %}
+                            {{ "%.2f"|format(s / 1048576) }} Mo
+                        {% elif s >= 1024 %}
+                            {{ "%.0f"|format(s / 1024) }} Ko
+                        {% else %}
+                            {{ s }} o
+                        {% endif %}
+                    </td>
 
-                        <td class="doc-actions" style="text-align:right;">
-                            {% if f.url %}
-                                <a class="btn btn-secondary btn-icon"
-                                   href="{{ f.url }}"
-                                   target="_blank"
-                                   rel="noopener">
-                                    Ouvrir
-                                </a>
-                            {% endif %}
+                    <td style="text-align:right;">
+                        {% if f.url %}
+                            <a href="{{ f.url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="btn btn-secondary btn-sm">
+                                Ouvrir
+                            </a>
+                        {% endif %}
 
-                            <form action="{{ url_for('delete_document', key=f.nom) }}"
-                                  method="POST"
-                                  style="display:inline;"
-                                  onsubmit="return confirm('Supprimer ce document ?');">
+                        <form action="{{ url_for('delete_document', key=f.nom) }}"
+                              method="POST"
+                              style="display:inline;"
+                              onsubmit="return confirm('Supprimer ce document ?');">
 
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-                                <button type="submit"
-                                        class="btn btn-danger btn-icon"
-                                        title="Supprimer">
-                                    Supprimer
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                            <button type="submit"
+                                    class="btn btn-danger btn-sm">
+                                Supprimer
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
     {% endif %}
 </div>
 

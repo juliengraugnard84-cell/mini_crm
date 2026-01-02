@@ -3,12 +3,17 @@
 
 {% block content %}
 
-<div class="page-header">
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
     <h1>Demande de cotation</h1>
+    <p class="text-muted">
+        Consultation détaillée de la demande
+    </p>
 </div>
 
+<!-- ================= INFORMATIONS GÉNÉRALES ================= -->
 <div class="card">
-    <h3 class="section-title">Informations générales</h3>
+    <h5>Informations générales</h5>
 
     <div class="info-grid">
         <div class="info-item">
@@ -33,8 +38,9 @@
     </div>
 </div>
 
+<!-- ================= DONNÉES TECHNIQUES ================= -->
 <div class="card">
-    <h3 class="section-title">Détails techniques</h3>
+    <h5>Données techniques</h5>
 
     <div class="info-grid">
         <div class="info-item">
@@ -54,8 +60,9 @@
     </div>
 </div>
 
+<!-- ================= ENTREPRISE / SIGNATAIRE ================= -->
 <div class="card">
-    <h3 class="section-title">Entreprise / Signataire</h3>
+    <h5>Entreprise & signataire</h5>
 
     <div class="info-grid">
         <div class="info-item">
@@ -85,15 +92,20 @@
     </div>
 </div>
 
+<!-- ================= COMMENTAIRE ================= -->
 {% if cotation.commentaire %}
 <div class="card">
-    <h3 class="section-title">Commentaire</h3>
-    <p>{{ cotation.commentaire }}</p>
+    <h5>Commentaire du commercial</h5>
+    <p style="white-space:pre-line;">
+        {{ cotation.commentaire }}
+    </p>
 </div>
 {% endif %}
 
-<div style="margin-top:20px;">
-    <a href="{{ url_for('admin_cotations') }}" class="btn btn-secondary">
+<!-- ================= ACTIONS ================= -->
+<div class="mt-4">
+    <a href="{{ url_for('admin_cotations') }}"
+       class="btn btn-secondary">
         ← Retour aux demandes
     </a>
 </div>

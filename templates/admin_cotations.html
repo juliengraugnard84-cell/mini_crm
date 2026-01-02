@@ -3,9 +3,12 @@
 
 {% block content %}
 
-<!-- ================= HEADER ================= -->
-<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;">
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
     <h1>Demandes de cotation</h1>
+    <p class="text-muted">
+        Liste des demandes envoyées par les commerciaux
+    </p>
 </div>
 
 <!-- ================= LISTE DES DEMANDES ================= -->
@@ -29,7 +32,9 @@
             style="cursor:pointer;"
             onclick="window.location='{{ url_for('admin_cotation_detail', cotation_id=c.id) }}'">
 
-            <td>{{ format_date(c.date_creation) }}</td>
+            <td>
+                {{ format_date(c.date_creation) }}
+            </td>
 
             <td>
                 <strong>{{ c.client_name }}</strong>
@@ -41,13 +46,17 @@
 
             <td>
                 {% if not c.is_read %}
-                    <span class="badge badge-warning">Nouvelle</span>
+                    <span class="badge bg-warning text-dark">
+                        Nouvelle
+                    </span>
                 {% else %}
-                    <span class="badge badge-secondary">Lue</span>
+                    <span class="badge bg-secondary">
+                        Lue
+                    </span>
                 {% endif %}
             </td>
 
-            <td style="text-align:right;">
+            <td class="text-end">
                 <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
                    class="btn btn-secondary btn-sm">
                     Ouvrir
@@ -61,7 +70,9 @@
 </table>
 
 {% else %}
-    <p class="text-muted">Aucune demande de cotation.</p>
+    <p class="text-muted mb-0">
+        Aucune demande de cotation.
+    </p>
 {% endif %}
 
 </div>

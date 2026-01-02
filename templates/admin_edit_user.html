@@ -2,42 +2,71 @@
 {% block title %}Modifier utilisateur{% endblock %}
 
 {% block content %}
-<div class="container mt-4" style="max-width:520px;">
 
-    <h2 class="mb-3">Modifier utilisateur : {{ user.username }}</h2>
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
+    <h1>Modifier un utilisateur</h1>
+    <p class="text-muted">
+        Compte : <strong>{{ user.username }}</strong>
+    </p>
+</div>
 
-    <div class="card">
-        <div class="card-body">
+<!-- ================= FORM CARD ================= -->
+<div class="card" style="max-width:520px;">
 
-            <form method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h5>Informations du compte</h5>
 
-                <div class="mb-3">
-                    <label class="form-label">Nom d’utilisateur</label>
-                    <input class="form-control" name="username" value="{{ user.username }}" required>
-                </div>
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-                <div class="mb-3">
-                    <label class="form-label">Nouveau mot de passe (laisser vide pour ne pas changer)</label>
-                    <input class="form-control" type="password" name="password">
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Rôle</label>
-                    <select name="role" class="form-select" required>
-                        <option value="admin" {% if user.role=='admin' %}selected{% endif %}>Admin</option>
-                        <option value="commercial" {% if user.role=='commercial' %}selected{% endif %}>Commercial</option>
-                    </select>
-                </div>
-
-                <div style="display:flex;gap:10px;justify-content:flex-end;">
-                    <a class="btn btn-secondary" href="{{ url_for('admin_users') }}">Annuler</a>
-                    <button class="btn btn-primary">Enregistrer</button>
-                </div>
-            </form>
-
+        <div class="mb-3">
+            <label class="form-label">Nom d’utilisateur</label>
+            <input type="text"
+                   name="username"
+                   class="form-control"
+                   value="{{ user.username }}"
+                   required>
         </div>
-    </div>
+
+        <div class="mb-3">
+            <label class="form-label">
+                Nouveau mot de passe
+            </label>
+            <input type="password"
+                   name="password"
+                   class="form-control"
+                   placeholder="Laisser vide pour conserver l’actuel">
+        </div>
+
+        <div class="mb-4">
+            <label class="form-label">Rôle</label>
+            <select name="role"
+                    class="form-select"
+                    required>
+                <option value="admin"
+                        {% if user.role == 'admin' %}selected{% endif %}>
+                    Administrateur
+                </option>
+                <option value="commercial"
+                        {% if user.role == 'commercial' %}selected{% endif %}>
+                    Commercial
+                </option>
+            </select>
+        </div>
+
+        <!-- ================= ACTIONS ================= -->
+        <div class="d-flex justify-content-end gap-2">
+            <a href="{{ url_for('admin_users') }}"
+               class="btn btn-secondary">
+                Annuler
+            </a>
+
+            <button class="btn btn-primary">
+                Enregistrer
+            </button>
+        </div>
+    </form>
 
 </div>
+
 {% endblock %}

@@ -1,38 +1,62 @@
 {% extends "base.html" %}
+{% block title %}Mises à jour demandées{% endblock %}
+
 {% block content %}
 
-<h1>Mises à jour demandées</h1>
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
+    <h1>Mises à jour demandées</h1>
+    <p class="text-muted">
+        Demandes de modification envoyées par les commerciaux
+    </p>
+</div>
 
+<!-- ================= LISTE DES DEMANDES ================= -->
 <div class="card">
+
+    {% if updates %}
     <table class="table">
         <thead>
             <tr>
                 <th>Dossier</th>
                 <th>Commercial</th>
                 <th>Date demandée</th>
-                <th>Action</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
+
         {% for u in updates %}
-            <tr class="{% if not u.is_read %}font-weight-bold{% endif %}">
-                <td>{{ u.client_name }}</td>
-                <td>{{ u.commercial_name }}</td>
-                <td>{{ format_date(u.update_date) }}</td>
+            <tr class="{% if not u.is_read %}unread{% endif %}">
                 <td>
+                    <strong>{{ u.client_name }}</strong>
+                </td>
+
+                <td>
+                    {{ u.commercial_name }}
+                </td>
+
+                <td>
+                    {{ format_date(u.update_date) }}
+                </td>
+
+                <td style="text-align:right;">
                     <a href="{{ url_for('open_update', update_id=u.id) }}"
-                       class="btn btn-sm btn-primary">
+                       class="btn btn-secondary btn-sm">
                         Ouvrir
                     </a>
                 </td>
             </tr>
-        {% else %}
-            <tr>
-                <td colspan="4">Aucune demande</td>
-            </tr>
         {% endfor %}
+
         </tbody>
     </table>
+    {% else %}
+        <p class="text-muted">
+            Aucune demande de mise à jour en attente.
+        </p>
+    {% endif %}
+
 </div>
 
 {% endblock %}

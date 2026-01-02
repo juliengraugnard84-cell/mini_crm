@@ -3,10 +3,16 @@
 
 {% block content %}
 
-<h1 class="page-title">Chiffre d’affaires</h1>
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
+    <h1>Chiffre d’affaires</h1>
+    <p class="text-muted">
+        Suivi des performances financières
+    </p>
+</div>
 
-<!-- ================= KPI ================= -->
-<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;">
+<!-- ================= KPI PRINCIPAUX ================= -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-bottom:32px;">
 
     <div class="kpi-tile">
         <div class="kpi-label">
@@ -32,16 +38,16 @@
 
 </div>
 
-<!-- ================= KPI GLOBAL (COMMERCIAL) ================= -->
+<!-- ================= KPI GLOBAUX (COMMERCIAL) ================= -->
 {% if role != 'admin' %}
-<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-bottom:32px;">
 
-    <div class="kpi-tile kpi-secondary">
+    <div class="kpi-tile" style="border-left-color:var(--primary)">
         <div class="kpi-label">Chiffre d’affaires annuel global</div>
         <div class="kpi-value">{{ ca_annuel_global }} €</div>
     </div>
 
-    <div class="kpi-tile kpi-secondary">
+    <div class="kpi-tile" style="border-left-color:var(--primary)">
         <div class="kpi-label">Chiffre d’affaires mensuel global</div>
         <div class="kpi-value">{{ ca_mensuel_global }} €</div>
     </div>
@@ -49,14 +55,12 @@
 </div>
 {% endif %}
 
-<!-- ================= AJOUT CA (ADMIN SEULEMENT) ================= -->
+<!-- ================= AJOUT CA (ADMIN) ================= -->
 {% if role == 'admin' %}
 <div class="card">
-
     <h5>Ajouter un chiffre d’affaires</h5>
 
     <form method="POST">
-
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="row g-3">
@@ -83,21 +87,18 @@
 
         </div>
 
-        <div style="margin-top:16px;">
+        <div class="mt-3 text-end">
             <button class="btn btn-success">
                 Ajouter
             </button>
         </div>
-
     </form>
-
 </div>
 {% endif %}
 
 <!-- ================= CA PAR COMMERCIAL (ADMIN) ================= -->
 {% if role == 'admin' %}
 <div class="card">
-
     <h5>Chiffre d’affaires par commercial (année)</h5>
 
     {% if annuel_par_com %}
@@ -118,15 +119,13 @@
         </tbody>
     </table>
     {% else %}
-        <p class="text-muted">Aucune donnée.</p>
+        <p class="text-muted">Aucune donnée disponible.</p>
     {% endif %}
-
 </div>
 {% endif %}
 
 <!-- ================= CA GLOBAL PAR MOIS ================= -->
 <div class="card">
-
     <h5>Chiffre d’affaires global par mois</h5>
 
     {% if global_par_mois %}
@@ -147,9 +146,8 @@
         </tbody>
     </table>
     {% else %}
-        <p class="text-muted">Aucune donnée.</p>
+        <p class="text-muted">Aucune donnée disponible.</p>
     {% endif %}
-
 </div>
 
 {% endblock %}
