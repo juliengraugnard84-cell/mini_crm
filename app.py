@@ -1377,6 +1377,9 @@ def delete_document(key):
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + COTATIONS + DOCUMENTS CLIENT
 ############################################################
 
+# =========================
+# LISTE DES CLIENTS
+# =========================
 @app.route("/clients")
 @login_required
 def clients():
@@ -1431,6 +1434,9 @@ def clients():
     )
 
 
+# =========================
+# CRÉATION CLIENT
+# =========================
 @app.route("/clients/new", methods=["GET", "POST"])
 @login_required
 def new_client():
@@ -1460,6 +1466,9 @@ def new_client():
     return render_template("new_client.html")
 
 
+# =========================
+# DÉTAIL CLIENT
+# =========================
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
@@ -1474,9 +1483,6 @@ def client_detail(client_id):
             (client_id,),
         )
         client = cur.fetchone()
-
-        if not client:
-            abort(404)
 
         cur.execute(
             """
@@ -1523,17 +1529,24 @@ def client_detail(client_id):
     )
 
 
-# =========================================================
-# CRÉATION COTATION (COMMERCIAL + ADMIN)
-# =========================================================
-@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
+# =========================
+# CRÉATION COTATION (CORRIGÉ)
+# =========================
+@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
 def create_cotation(client_id):
     if not can_access_client(client_id):
         abort(403)
 
-    data = request.form
     conn = get_db()
+    user = session.get("user") or {}
+
+    date_negociation = request.form.get("date_negociation")
+    energie_type = request.form.get("energie_type")
+
+    if not date_negociation or not energie_type:
+        flash("Date et énergie obligatoires.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
 
     with conn.cursor() as cur:
         cur.execute(
@@ -1555,22 +1568,22 @@ def create_cotation(client_id):
                 is_read,
                 status
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 'nouvelle')
             """,
             (
                 client_id,
-                data.get("date_negociation"),
-                data.get("energie_type"),
-                data.get("pdl_pce"),
-                data.get("date_echeance"),
-                data.get("fournisseur_actuel"),
-                data.get("entreprise_nom"),
-                data.get("siret"),
-                data.get("signataire_nom"),
-                data.get("signataire_tel"),
-                data.get("signataire_email"),
-                data.get("commentaire"),
-                session["user"]["id"],
+                date_negociation,
+                energie_type,
+                request.form.get("pdl_pce"),
+                request.form.get("date_echeance"),
+                request.form.get("fournisseur_actuel"),
+                request.form.get("entreprise_nom"),
+                request.form.get("siret"),
+                request.form.get("signataire_nom"),
+                request.form.get("signataire_tel"),
+                request.form.get("signataire_email"),
+                request.form.get("commentaire"),
+                user.get("id"),
             ),
         )
 
@@ -1579,9 +1592,9 @@ def create_cotation(client_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-# =========================================================
-# UPLOAD DOCUMENT CLIENT (COMMERCIAL + ADMIN)
-# =========================================================
+# =========================
+# UPLOAD DOCUMENT CLIENT
+# =========================
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
 def upload_client_document(client_id):
@@ -1599,22 +1612,17 @@ def upload_client_document(client_id):
         return redirect(url_for("client_detail", client_id=client_id))
 
     nom = clean_filename(secure_filename(fichier.filename))
-    prefix = client_s3_prefix(client_id)
-    key = f"{prefix}{nom}"
+    key = f"{client_s3_prefix(client_id)}{nom}"
 
-    try:
-        s3_upload_fileobj(fichier, AWS_BUCKET, key)
-        flash("Document ajouté au dossier.", "success")
-    except Exception as e:
-        print("Erreur upload document client :", repr(e))
-        flash("Erreur lors de l’upload du document.", "danger")
+    s3_upload_fileobj(fichier, AWS_BUCKET, key)
+    flash("Document ajouté.", "success")
 
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-# =========================================================
-# SUPPRESSION DOCUMENT CLIENT (COMMERCIAL + ADMIN)
-# =========================================================
+# =========================
+# SUPPRESSION DOCUMENT CLIENT
+# =========================
 @app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
 @login_required
 def delete_client_document(client_id):
@@ -1623,23 +1631,33 @@ def delete_client_document(client_id):
 
     key = (request.form.get("key") or "").strip()
 
-    if not key or ".." in key or not key.startswith("clients/"):
+    if not key or ".." in key:
         flash("Document invalide.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    if LOCAL_MODE or not s3:
-        flash("Suppression désactivée en mode local.", "warning")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    try:
-        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
-        flash("Document supprimé.", "success")
-    except Exception as e:
-        print("Erreur suppression document client :", repr(e))
-        flash("Erreur lors de la suppression.", "danger")
+    s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+    flash("Document supprimé.", "success")
 
     return redirect(url_for("client_detail", client_id=client_id))
 
+
+# =========================
+# SUPPRESSION CLIENT (ADMIN)
+# =========================
+@app.route("/clients/<int:client_id>/delete", methods=["POST"])
+@admin_required
+def delete_client(client_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
+        cur.execute("DELETE FROM revenus WHERE client_id=%s", (client_id,))
+        cur.execute("DELETE FROM client_updates WHERE client_id=%s", (client_id,))
+        cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
+
+    conn.commit()
+    flash("Dossier client supprimé définitivement.", "success")
+    return redirect(url_for("clients"))
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
