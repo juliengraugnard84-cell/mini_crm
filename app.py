@@ -645,6 +645,7 @@ def inject_globals():
     - centraliser les calculs sensibles (dates, compteurs admin, etc.)
     """
 
+    # Utilisateur courant (safe pour Jinja)
     u = session.get("user")
     current_user = SimpleNamespace(**u) if u else None
 
@@ -653,34 +654,51 @@ def inject_globals():
     # ===============================
     unread_cotations = 0
 
-    if current_user and current_user.role == "admin":
+    # ===============================
+    # BADGE : mises à jour non lues (ADMIN)
+    # ===============================
+    unread_updates = 0
+
+    if hookup := (current_user and current_user.role == "admin"):
         try:
             conn = get_db()
             with conn.cursor() as cur:
+
+                # Cotations non lues
                 cur.execute(
                     "SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read, 0) = 0"
                 )
                 unread_cotations = cur.fetchone()[0]
+
+                # Mises à jour non lues
+                cur.execute(
+                    "SELECT COUNT(*) FROM client_updates WHERE COALESCE(is_read, 0) = 0"
+                )
+                unread_updates = cur.fetchone()[0]
+
         except Exception:
             # Sécurité absolue : aucun crash template
             unread_cotations = 0
+            unread_updates = 0
 
     # ===============================
     # INJECTION GLOBALE
     # ===============================
     return dict(
-        # Utilisateur courant (safe pour Jinja)
+        # Utilisateur courant
         current_user=current_user,
 
         # Token CSRF (toujours présent)
         csrf_token=session.get("csrf_token"),
 
-        # Helper date SAFE (corrige strftime sur string)
+        # Helper date SAFE
         format_date=format_date_safe,
 
-        # Badge sidebar admin
+        # Badges admin
         unread_cotations=unread_cotations,
+        unread_updates=unread_updates,
     )
+
 
 
 ############################################################
