@@ -1374,8 +1374,7 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL)
-#     + COTATIONS + DOCUMENTS CLIENT (UPLOAD COMMERCIAL)
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + COTATIONS + DOCUMENTS CLIENT
 ############################################################
 
 @app.route("/clients")
@@ -1514,15 +1513,15 @@ def client_detail(client_id):
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
-        documents=documents,
         cotations=[row_to_obj(c) for c in cotations],
+        documents=documents,
         ca_par_mois=[row_to_obj(r) for r in ca_par_mois],
         ca_total=ca_total,
     )
 
 
 # =========================================================
-# UPLOAD DOCUMENT CLIENT (ADMIN + COMMERCIAL PROPRIÉTAIRE)
+# UPLOAD DOCUMENT CLIENT (COMMERCIAL + ADMIN)
 # =========================================================
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
@@ -1530,23 +1529,23 @@ def upload_client_document(client_id):
     if not can_access_client(client_id):
         abort(403)
 
-    if LOCAL_MODE or not s3:
-        flash("Upload désactivé.", "warning")
-        return redirect(url_for("client_detail", client_id=client_id))
+    fichier = request.files.get("file")
 
-    file = request.files.get("file")
-
-    if not file or not allowed_file(file.filename):
+    if not fichier or not allowed_file(fichier.filename):
         flash("Fichier non valide.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    filename = clean_filename(secure_filename(file.filename))
+    if LOCAL_MODE or not s3:
+        flash("Upload désactivé en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    nom = clean_filename(secure_filename(fichier.filename))
     prefix = client_s3_prefix(client_id)
-    key = f"{prefix}{filename}"
+    key = f"{prefix}{nom}"
 
     try:
-        s3_upload_fileobj(file, AWS_BUCKET, key)
-        flash("Document ajouté au dossier client.", "success")
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
+        flash("Document ajouté au dossier.", "success")
     except Exception as e:
         print("Erreur upload document client :", repr(e))
         flash("Erreur lors de l’upload du document.", "danger")
@@ -1555,77 +1554,35 @@ def upload_client_document(client_id):
 
 
 # =========================================================
-# CRÉATION D’UNE DEMANDE DE COTATION (COMMERCIAL / ADMIN)
+# SUPPRESSION DOCUMENT CLIENT (COMMERCIAL + ADMIN)
 # =========================================================
-@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
+@app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
 @login_required
-def create_cotation(client_id):
+def delete_client_document(client_id):
     if not can_access_client(client_id):
         abort(403)
 
-    conn = get_db()
-    user = session.get("user") or {}
+    key = (request.form.get("key") or "").strip()
 
-    data = {
-        "date_negociation": request.form.get("date_negociation"),
-        "energie_type": request.form.get("energie_type"),
-        "pdl_pce": request.form.get("pdl_pce"),
-        "date_echeance": request.form.get("date_echeance"),
-        "fournisseur_actuel": request.form.get("fournisseur_actuel"),
-        "entreprise_nom": request.form.get("entreprise_nom"),
-        "siret": request.form.get("siret"),
-        "signataire_nom": request.form.get("signataire_nom"),
-        "signataire_tel": request.form.get("signataire_tel"),
-        "signataire_email": request.form.get("signataire_email"),
-        "commentaire": request.form.get("commentaire"),
-    }
+    if not key:
+        flash("Document invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
 
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO cotations (
-                client_id,
-                date_negociation,
-                energie_type,
-                pdl_pce,
-                date_echeance,
-                fournisseur_actuel,
-                entreprise_nom,
-                siret,
-                signataire_nom,
-                signataire_tel,
-                signataire_email,
-                commentaire,
-                created_by,
-                is_read,
-                status
-            )
-            VALUES (
-                %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s,
-                %s, %s, %s, 0, 'nouvelle'
-            )
-            """,
-            (
-                client_id,
-                data["date_negociation"],
-                data["energie_type"],
-                data["pdl_pce"],
-                data["date_echeance"],
-                data["fournisseur_actuel"],
-                data["entreprise_nom"],
-                data["siret"],
-                data["signataire_nom"],
-                data["signataire_tel"],
-                data["signataire_email"],
-                data["commentaire"],
-                user.get("id"),
-            ),
-        )
+    if ".." in key or not key.startswith("clients/"):
+        flash("Clé de document invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
 
-    conn.commit()
+    if LOCAL_MODE or not s3:
+        flash("Suppression désactivée en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
 
-    flash("Demande de cotation créée avec succès.", "success")
+    try:
+        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+        flash("Document supprimé.", "success")
+    except Exception as e:
+        print("Erreur suppression document client :", repr(e))
+        flash("Erreur lors de la suppression.", "danger")
+
     return redirect(url_for("client_detail", client_id=client_id))
 
 
