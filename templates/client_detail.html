@@ -15,7 +15,8 @@
         <button class="nav-link active"
                 data-bs-toggle="tab"
                 data-bs-target="#cotations"
-                type="button">
+                type="button"
+                role="tab">
             Cotations
         </button>
     </li>
@@ -24,7 +25,8 @@
         <button class="nav-link"
                 data-bs-toggle="tab"
                 data-bs-target="#documents"
-                type="button">
+                type="button"
+                role="tab">
             Documents
         </button>
     </li>
@@ -33,7 +35,8 @@
         <button class="nav-link"
                 data-bs-toggle="tab"
                 data-bs-target="#updates"
-                type="button">
+                type="button"
+                role="tab">
             Mise à jour
         </button>
     </li>
@@ -45,9 +48,9 @@
 <!-- ======================================================
      ONGLET COTATIONS
 ====================================================== -->
-<div class="tab-pane fade show active" id="cotations">
+<div class="tab-pane fade show active" id="cotations" role="tabpanel">
 
-{% if current_user.role in ['commercial', 'admin'] %}
+{% if current_user and current_user.role in ['commercial', 'admin'] %}
 <div class="card mb-4">
     <h5>Nouvelle demande de cotation</h5>
     <p class="text-muted mb-3">
@@ -170,9 +173,9 @@
 <!-- ======================================================
      ONGLET DOCUMENTS
 ====================================================== -->
-<div class="tab-pane fade" id="documents">
+<div class="tab-pane fade" id="documents" role="tabpanel">
 
-{% if current_user.role in ['commercial', 'admin'] %}
+{% if current_user and current_user.role in ['commercial', 'admin'] %}
 <div class="card mb-4">
     <h5>Ajouter un document</h5>
 
@@ -205,7 +208,7 @@
     {% if documents %}
         <ul class="doc-list">
             {% for d in documents %}
-            <li class="doc-item">
+            <li class="doc-item d-flex justify-content-between align-items-center">
 
                 <div class="doc-info">
                     <a href="{{ d.url }}"
@@ -215,7 +218,7 @@
                     </a>
                 </div>
 
-                {% if current_user.role == 'admin' or current_user.id == client.owner_id %}
+                {% if current_user and (current_user.role == 'admin' or current_user.id == client.owner_id) %}
                 <form method="post"
                       action="{{ url_for('delete_client_document', client_id=client.id) }}"
                       onsubmit="return confirm('Supprimer définitivement ce document ?');">
@@ -242,9 +245,9 @@
 <!-- ======================================================
      ONGLET MISE À JOUR
 ====================================================== -->
-<div class="tab-pane fade" id="updates">
+<div class="tab-pane fade" id="updates" role="tabpanel">
 
-{% if current_user.role == 'commercial' %}
+{% if current_user and current_user.role == 'commercial' %}
 <div class="card">
     <h5>Demande de mise à jour du dossier</h5>
 
