@@ -816,7 +816,7 @@ def dashboard():
         cur.execute("""
             SELECT montant, date, commercial
             FROM revenus
-            ORDER BY date DESC, id DESC
+            ORDER BY date::date DESC, id DESC
             LIMIT 1
         """)
         last_rev = cur.fetchone()
@@ -892,21 +892,25 @@ def chiffre_affaire():
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
-                WHERE date_trunc('month', date) = date_trunc('month', CURRENT_DATE)
+                WHERE date_trunc('month', date::date)
+                    = date_trunc('month', CURRENT_DATE)
             """)
             ca_mensuel_perso = cur.fetchone()[0]
+
         else:
-            cur.execute(
-                "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE commercial=%s",
-                (commercial_name,)
-            )
+            cur.execute("""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                WHERE commercial=%s
+            """, (commercial_name,))
             ca_annuel_perso = cur.fetchone()[0]
 
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                  AND date_trunc('month', date) = date_trunc('month', CURRENT_DATE)
+                  AND date_trunc('month', date::date)
+                      = date_trunc('month', CURRENT_DATE)
             """, (commercial_name,))
             ca_mensuel_perso = cur.fetchone()[0]
 
@@ -925,7 +929,7 @@ def chiffre_affaire():
             # ===== CA COMMERCIAL PAR ANNÉE =====
             cur.execute("""
                 SELECT
-                    EXTRACT(YEAR FROM date)::int AS annee,
+                    EXTRACT(YEAR FROM date::date)::int AS annee,
                     SUM(montant) AS total
                 FROM revenus
                 WHERE commercial=%s
@@ -966,7 +970,7 @@ def chiffre_affaire():
                     crm_clients.name AS client_name
                 FROM revenus
                 JOIN crm_clients ON crm_clients.id = revenus.client_id
-                ORDER BY revenus.date DESC, revenus.id DESC
+                ORDER BY date::date DESC, revenus.id DESC
             """)
             historique_ca = cur.fetchall()
 
@@ -1019,7 +1023,7 @@ def add_chiffre_affaire():
 
 
 ############################################################
-# ÉDITION CA — ADMIN (INLINE)
+# ÉDITION CA — ADMIN
 ############################################################
 
 @app.route("/chiffre-affaire/<int:ca_id>/edit", methods=["POST"])
@@ -1060,89 +1064,6 @@ def delete_chiffre_affaire(ca_id):
     conn.commit()
     flash("Chiffre d’affaires supprimé.", "success")
     return redirect(url_for("chiffre_affaire"))
-
-
-############################################################
-# OUVERTURE COTATION
-############################################################
-
-@app.route("/cotations/<int:cotation_id>")
-@login_required
-def open_cotation(cotation_id):
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM cotations WHERE id=%s", (cotation_id,))
-        cot = cur.fetchone()
-
-    if not cot:
-        flash("Demande de cotation introuvable.", "danger")
-        return redirect(url_for("dashboard"))
-
-    if not can_access_client(cot["client_id"]):
-        flash("Accès non autorisé.", "danger")
-        return redirect(url_for("dashboard"))
-
-    with conn.cursor() as cur:
-        cur.execute("UPDATE cotations SET is_read=1 WHERE id=%s", (cotation_id,))
-    conn.commit()
-
-    return redirect(
-        url_for(
-            "client_detail",
-            client_id=cot["client_id"],
-            cotation_id=cotation_id,
-        )
-    )
-
-
-############################################################
-# SEARCH GLOBAL
-############################################################
-
-@app.route("/search")
-@login_required
-def search():
-    q = (request.args.get("q") or "").strip()
-    if not q:
-        return jsonify({"results": []})
-
-    user = session.get("user") or {}
-    q_lower = q.lower()
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        if user.get("role") == "admin":
-            cur.execute("""
-                SELECT id, name
-                FROM crm_clients
-                WHERE name ILIKE %s
-                ORDER BY created_at DESC
-                LIMIT 10
-            """, (f"%{q}%",))
-        else:
-            cur.execute("""
-                SELECT id, name
-                FROM crm_clients
-                WHERE owner_id=%s
-                  AND name ILIKE %s
-                ORDER BY created_at DESC
-                LIMIT 10
-            """, (user.get("id"), f"%{q}%"))
-
-        client_rows = cur.fetchall()
-
-    results = []
-    for c in client_rows:
-        docs = list_client_documents(c["id"])
-        filtered_docs = [d for d in docs if q_lower in d["nom"].lower()]
-        results.append({
-            "client_id": c["id"],
-            "client_name": c["name"],
-            "documents": filtered_docs[:10],
-        })
-
-    return jsonify({"results": results})
 
 
 # ============================
