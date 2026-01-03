@@ -1,79 +1,117 @@
 {% extends "base.html" %}
-{% block title %}Demandes de cotation{% endblock %}
 
 {% block content %}
 
+<!-- ================= PAGE HEADER ================= -->
 <div class="page-header mb-4">
     <h1>Demandes de cotation</h1>
-    <p class="text-muted">
-        Liste des demandes envoyées par les commerciaux
+    <p class="text-muted mb-0">
+        Liste complète des demandes de cotation (administration).
     </p>
 </div>
 
+<!-- ================= TABLE ================= -->
 <div class="card">
 
-{% if cotations %}
-<table class="table">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Dossier</th>
-            <th>Énergie</th>
-            <th>Statut</th>
-            <th></th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Historique des cotations</h5>
+        <div class="text-muted small">
+            Total : {{ cotations|length }}
+        </div>
+    </div>
 
-        {% for c in cotations %}
-        <tr class="{% if not c.is_read %}unread{% endif %}">
+    {% if cotations %}
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Date création</th>
+                    <th>Dossier</th>
+                    <th>Commercial</th>
+                    <th>Énergie</th>
+                    <th>Date négociation</th>
+                    <th>Statut</th>
+                    <th>Lu</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
 
-            <td>{{ format_date(c.date_creation) }}</td>
+            <tbody>
+                {% for c in cotations %}
+                <tr>
 
-            <td>
-                <strong>{{ c.client_name }}</strong>
-            </td>
+                    <td class="text-muted">
+                        #{{ c.id }}
+                    </td>
 
-            <td>{{ c.energie_type or "—" }}</td>
+                    <td>
+                        {{ format_date(c.date_creation) }}
+                    </td>
 
-            <td>
-                {% if not c.is_read %}
-                    <span class="badge bg-warning text-dark">Nouvelle</span>
-                {% else %}
-                    <span class="badge bg-secondary">Lue</span>
-                {% endif %}
-            </td>
+                    <td>
+                        <a href="{{ url_for('client_detail', client_id=c.client_id) }}">
+                            {{ c.client_name or ("Client #" ~ c.client_id) }}
+                        </a>
+                    </td>
 
-            <td class="text-end">
-                <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
-                   class="btn btn-secondary btn-sm">
-                    Ouvrir
-                </a>
-            </td>
+                    <td>
+                        {{ c.commercial_name or "—" }}
+                    </td>
 
-            <td class="text-end">
-                <form method="post"
-                      action="{{ url_for('delete_cotation', cotation_id=c.id) }}"
-                      onsubmit="return confirm('Supprimer définitivement cette cotation ?');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button class="btn btn-danger btn-sm">
-                        Supprimer
-                    </button>
-                </form>
-            </td>
+                    <td>
+                        {{ c.energie_type or "—" }}
+                    </td>
 
-        </tr>
-        {% endfor %}
+                    <td>
+                        {{ format_date(c.date_negociation) }}
+                    </td>
 
-    </tbody>
-</table>
+                    <td>
+                        {{ c.status or "—" }}
+                    </td>
 
-{% else %}
-<p class="text-muted mb-0">
-    Aucune demande de cotation.
-</p>
-{% endif %}
+                    <td>
+                        {% if c.is_read %}
+                            <span class="badge bg-success">Oui</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Non</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-end">
+                        <div class="d-inline-flex gap-2">
+
+                            <!-- OUVRIR -->
+                            <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
+                               class="btn btn-outline-primary btn-sm">
+                                Ouvrir
+                            </a>
+
+                            <!-- SUPPRIMER (ADMIN) -->
+                            <form method="post"
+                                  action="{{ url_for('delete_own_cotation', cotation_id=c.id) }}"
+                                  onsubmit="return confirm('Supprimer définitivement cette cotation ?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button class="btn btn-danger btn-sm">
+                                    Supprimer
+                                </button>
+                            </form>
+
+                        </div>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% else %}
+        <p class="text-muted mb-0">
+            Aucune demande de cotation enregistrée.
+        </p>
+    {% endif %}
 
 </div>
 

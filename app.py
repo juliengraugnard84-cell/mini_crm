@@ -896,7 +896,9 @@ def chiffre_affaire():
 
     conn = get_db()
 
-    # ================== AJOUT CA (ADMIN SEULEMENT) ==================
+    # ======================================================
+    # AJOUT CA (ADMIN UNIQUEMENT)
+    # ======================================================
     if request.method == "POST":
         if role != "admin":
             abort(403)
@@ -917,8 +919,15 @@ def chiffre_affaire():
 
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT name, owner_id FROM crm_clients WHERE id=%s",
-                (client_id,)
+                """
+                SELECT
+                    crm_clients.name,
+                    users.username AS commercial_name
+                FROM crm_clients
+                LEFT JOIN users ON users.id = crm_clients.owner_id
+                WHERE crm_clients.id = %s
+                """,
+                (client_id,),
             )
             client = cur.fetchone()
 
@@ -928,49 +937,51 @@ def chiffre_affaire():
 
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT username FROM users WHERE id=%s",
-                (client["owner_id"],)
-            )
-            commercial = cur.fetchone()
-
-        with conn.cursor() as cur:
-            cur.execute(
                 """
-                INSERT INTO revenus (date, montant, client_id, commercial, dossier)
+                INSERT INTO revenus (
+                    date,
+                    montant,
+                    client_id,
+                    commercial,
+                    dossier
+                )
                 VALUES (%s, %s, %s, %s, %s)
                 """,
                 (
                     date_rev,
                     montant_val,
                     client_id,
-                    commercial["username"] if commercial else None,
+                    client["commercial_name"],
                     client["name"],
-                )
+                ),
             )
 
         conn.commit()
         flash("Chiffre d’affaires ajouté.", "success")
         return redirect(url_for("chiffre_affaire"))
 
-    # ================== LECTURE ==================
+    # ======================================================
+    # LECTURE DES DONNÉES
+    # ======================================================
     today = date.today()
     year = str(today.year)
     month = today.strftime("%Y-%m")
 
+    # -------- GLOBAL --------
     with conn.cursor() as cur:
-        # Global
         cur.execute(
-            "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE substr(date,1,4)=%s",
-            (year,)
+            "SELECT COALESCE(SUM(montant), 0) FROM revenus WHERE substr(date,1,4)=%s",
+            (year,),
         )
         ca_annuel_global = cur.fetchone()[0]
 
         cur.execute(
-            "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE substr(date,1,7)=%s",
-            (month,)
+            "SELECT COALESCE(SUM(montant), 0) FROM revenus WHERE substr(date,1,7)=%s",
+            (month,),
         )
         ca_mensuel_global = cur.fetchone()[0]
 
+    # -------- ADMIN --------
     if role == "admin":
         ca_annuel_perso = ca_annuel_global
         ca_mensuel_perso = ca_mensuel_global
@@ -984,36 +995,38 @@ def chiffre_affaire():
                 GROUP BY commercial
                 ORDER BY total DESC
                 """,
-                (year,)
+                (year,),
             )
             annuel_par_com = cur.fetchall()
 
+    # -------- COMMERCIAL --------
     else:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT COALESCE(SUM(montant),0)
+                SELECT COALESCE(SUM(montant), 0)
                 FROM revenus
                 WHERE substr(date,1,4)=%s
                   AND commercial=%s
                 """,
-                (year, username)
+                (year, username),
             )
             ca_annuel_perso = cur.fetchone()[0]
 
             cur.execute(
                 """
-                SELECT COALESCE(SUM(montant),0)
+                SELECT COALESCE(SUM(montant), 0)
                 FROM revenus
                 WHERE substr(date,1,7)=%s
                   AND commercial=%s
                 """,
-                (month, username)
+                (month, username),
             )
             ca_mensuel_perso = cur.fetchone()[0]
 
         annuel_par_com = []
 
+    # -------- GLOBAL PAR MOIS --------
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1025,6 +1038,17 @@ def chiffre_affaire():
         )
         global_par_mois = cur.fetchall()
 
+    # -------- LISTE CLIENTS (FORM ADMIN) --------
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, name
+            FROM crm_clients
+            ORDER BY name ASC
+            """
+        )
+        clients = cur.fetchall()
+
     return render_template(
         "chiffre_affaire.html",
         role=role,
@@ -1034,7 +1058,9 @@ def chiffre_affaire():
         ca_mensuel_global=ca_mensuel_global,
         annuel_par_com=annuel_par_com,
         global_par_mois=global_par_mois,
+        clients=[row_to_obj(c) for c in clients],
     )
+
 
 
 ############################################################

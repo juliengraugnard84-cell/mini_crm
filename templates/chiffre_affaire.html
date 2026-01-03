@@ -65,24 +65,36 @@
 
         <div class="row g-3">
 
+            <!-- DATE -->
             <div class="col-md-3">
                 <label class="form-label">Date</label>
-                <input type="date" name="date" class="form-control" required>
+                <input type="date"
+                       name="date"
+                       class="form-control"
+                       required>
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">Commercial</label>
-                <input type="text" name="commercial" class="form-control" required>
+            <!-- CLIENT (OBLIGATOIRE BACKEND) -->
+            <div class="col-md-6">
+                <label class="form-label">Dossier client</label>
+                <select name="client_id"
+                        class="form-select"
+                        required>
+                    <option value="">— Sélectionner un dossier —</option>
+                    {% for c in clients %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">Dossier</label>
-                <input type="text" name="dossier" class="form-control" required>
-            </div>
-
+            <!-- MONTANT -->
             <div class="col-md-3">
                 <label class="form-label">Montant (€)</label>
-                <input type="number" step="0.01" name="montant" class="form-control" required>
+                <input type="number"
+                       step="0.01"
+                       name="montant"
+                       class="form-control"
+                       required>
             </div>
 
         </div>

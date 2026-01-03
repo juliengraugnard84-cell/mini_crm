@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Nouveau dossier client{% endblock %}
+
+{% block content %}
+
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
+    <h1>Nouveau dossier client</h1>
+    <p class="text-muted">
+        Création d’un nouveau dossier client
+    </p>
+</div>
+
+<!-- ================= FORMULAIRE ================= -->
+<div class="card">
+
+    <form method="post" action="{{ url_for('new_client') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="row g-3">
+
+            <!-- NOM CLIENT -->
+            <div class="col-md-6">
+                <label class="form-label">Nom du dossier *</label>
+                <input type="text"
+                       name="name"
+                       class="form-control"
+                       required
+                       placeholder="Nom du client ou de l’entreprise">
+            </div>
+
+            <!-- EMAIL (non encore persisté côté backend) -->
+            <div class="col-md-6">
+                <label class="form-label">Email</label>
+                <input type="email"
+                       name="email"
+                       class="form-control"
+                       placeholder="email@exemple.com">
+            </div>
+
+            <!-- TÉLÉPHONE (non encore persisté côté backend) -->
+            <div class="col-md-6">
+                <label class="form-label">Téléphone</label>
+                <input type="text"
+                       name="phone"
+                       class="form-control"
+                       placeholder="06 00 00 00 00">
+            </div>
+
+            <!-- ADRESSE (non encore persistée côté backend) -->
+            <div class="col-md-6">
+                <label class="form-label">Adresse</label>
+                <input type="text"
+                       name="address"
+                       class="form-control"
+                       placeholder="Adresse complète">
+            </div>
+
+            <!-- STATUT (non encore persisté côté backend) -->
+            <div class="col-md-4">
+                <label class="form-label">Statut</label>
+                <select name="status" class="form-select">
+                    <option value="">—</option>
+                    <option value="prospect">Prospect</option>
+                    <option value="client">Client</option>
+                    <option value="inactif">Inactif</option>
+                </select>
+            </div>
+
+            <!-- COMMERCIAL (ADMIN SEULEMENT – non persisté côté backend) -->
+            {% if current_user and current_user.role == 'admin' %}
+            <div class="col-md-4">
+                <label class="form-label">Commercial</label>
+                <input type="text"
+                       name="commercial"
+                       class="form-control"
+                       placeholder="Nom du commercial">
+            </div>
+            {% endif %}
+
+            <!-- NOTES (non encore persistées côté backend) -->
+            <div class="col-md-12">
+                <label class="form-label">Notes</label>
+                <textarea name="notes"
+                          class="form-control"
+                          rows="4"
+                          placeholder="Informations complémentaires sur le client"></textarea>
+            </div>
+
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="mt-4 d-flex justify-content-between">
+
+            <a href="{{ url_for('clients') }}"
+               class="btn btn-secondary">
+                Annuler
+            </a>
+
+            <button class="btn btn-primary">
+                Créer le dossier client
+            </button>
+
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}
