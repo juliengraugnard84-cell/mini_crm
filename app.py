@@ -1374,7 +1374,9 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + COTATIONS + DOCUMENTS CLIENT
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL)
+#     + COTATIONS
+#     + DOCUMENTS CLIENT
 ############################################################
 
 # =========================
@@ -1530,7 +1532,7 @@ def client_detail(client_id):
 
 
 # =========================
-# CRÉATION COTATION (CORRIGÉ)
+# CRÉATION COTATION
 # =========================
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
@@ -1590,6 +1592,54 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation créée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# SUPPRESSION COTATION
+# (ADMIN / COMMERCIAL propriétaire non lue)
+# =========================
+@app.route("/cotations/<int:cotation_id>/delete", methods=["POST"])
+@login_required
+def delete_cotation(cotation_id):
+    user = session.get("user") or {}
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, client_id, created_by, is_read
+            FROM cotations
+            WHERE id = %s
+            """,
+            (cotation_id,),
+        )
+        cot = cur.fetchone()
+
+    if not cot:
+        abort(404)
+
+    # ADMIN : toujours autorisé
+    if user.get("role") == "admin":
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM cotations WHERE id=%s", (cotation_id,))
+        conn.commit()
+        flash("Demande de cotation supprimée.", "success")
+        return redirect(url_for("admin_cotations"))
+
+    # COMMERCIAL : uniquement ses cotations NON lues
+    if (
+        user.get("role") != "commercial"
+        or cot["created_by"] != user.get("id")
+        or cot["is_read"]
+    ):
+        abort(403)
+
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM cotations WHERE id=%s", (cotation_id,))
+
+    conn.commit()
+    flash("Votre demande de cotation a été supprimée.", "success")
+    return redirect(url_for("client_detail", client_id=cot["client_id"]))
 
 
 # =========================
@@ -1664,27 +1714,9 @@ def delete_client(client_id):
 ############################################################
 
 # ⚠️ IMPORTANT :
-# - Ce bloc permet aux commerciaux de faire des demandes de mise à jour
-# - Les admins les voient dans une section dédiée
-# - AUCUNE donnée existante n’est écrasée
-
-
-# =========================
-# TABLE client_updates
-# =========================
-# 👉 À AJOUTER DANS init_db() (UNE SEULE FOIS)
-#
-# CREATE TABLE IF NOT EXISTS client_updates (
-#     id SERIAL PRIMARY KEY,
-#     client_id INTEGER NOT NULL,
-#     client_name TEXT NOT NULL,
-#     commercial_id INTEGER NOT NULL,
-#     commercial_name TEXT NOT NULL,
-#     update_date DATE NOT NULL,
-#     commentaire TEXT,
-#     is_read INTEGER DEFAULT 0,
-#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-# );
+# - Les commerciaux créent des demandes de mise à jour
+# - Les admins les consultent, ouvrent et suppriment
+# - AUCUNE donnée client n’est modifiée automatiquement
 
 
 # =========================
@@ -1706,6 +1738,7 @@ def update_client(client_id):
         flash("La date de mise à jour est obligatoire.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
+    # Vérification dossier
     with conn.cursor() as cur:
         cur.execute(
             "SELECT name FROM crm_clients WHERE id=%s",
@@ -1717,6 +1750,7 @@ def update_client(client_id):
         flash("Dossier introuvable.", "danger")
         return redirect(url_for("clients"))
 
+    # Insertion demande
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1795,6 +1829,7 @@ def open_update(update_id):
             "UPDATE client_updates SET is_read=1 WHERE id=%s",
             (update_id,)
         )
+
     conn.commit()
 
     return redirect(
@@ -1804,6 +1839,46 @@ def open_update(update_id):
         )
     )
 
+
+# =========================
+# ADMIN → SUPPRESSION D’UNE MISE À JOUR
+# =========================
+@app.route("/admin/updates/<int:update_id>/delete", methods=["POST"])
+@admin_required
+def delete_update(update_id):
+    conn = get_db()
+
+    # Récupération avant suppression (journalisation)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT * FROM client_updates WHERE id=%s",
+            (update_id,)
+        )
+        upd = cur.fetchone()
+
+    if not upd:
+        flash("Mise à jour introuvable.", "danger")
+        return redirect(url_for("admin_updates"))
+
+    # Suppression
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM client_updates WHERE id=%s",
+            (update_id,)
+        )
+
+    conn.commit()
+
+    # Journalisation serveur (SAFE, sans DB)
+    admin = session.get("user", {}).get("username")
+    print(
+        f"[AUDIT] UPDATE DELETE | admin={admin} | "
+        f"update_id={update_id} | client_id={upd['client_id']} | "
+        f"commercial={upd['commercial_name']}"
+    )
+
+    flash("Demande de mise à jour supprimée.", "success")
+    return redirect(url_for("admin_updates"))
 
 
 ############################################################

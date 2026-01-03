@@ -41,10 +41,24 @@
                 </td>
 
                 <td style="text-align:right;">
+
                     <a href="{{ url_for('open_update', update_id=u.id) }}"
                        class="btn btn-secondary btn-sm">
                         Ouvrir
                     </a>
+
+                    <!-- ===== AJOUT : SUPPRESSION UPDATE ADMIN ===== -->
+                    <form method="post"
+                          action="{{ url_for('delete_update', update_id=u.id) }}"
+                          style="display:inline;"
+                          onsubmit="return confirm('Supprimer définitivement cette demande de mise à jour ?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="btn btn-danger btn-sm">
+                            Supprimer
+                        </button>
+                    </form>
+                    <!-- ===== FIN AJOUT ===== -->
+
                 </td>
             </tr>
         {% endfor %}

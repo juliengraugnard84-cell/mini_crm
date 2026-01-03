@@ -56,11 +56,25 @@
                 {% endif %}
             </td>
 
-            <td class="text-end">
+            <td class="text-end" onclick="event.stopPropagation();">
+
                 <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
                    class="btn btn-secondary btn-sm">
                     Ouvrir
                 </a>
+
+                <!-- ===== AJOUT : SUPPRESSION COTATION ADMIN ===== -->
+                <form method="post"
+                      action="{{ url_for('delete_own_cotation', cotation_id=c.id) }}"
+                      style="display:inline;"
+                      onsubmit="return confirm('Supprimer définitivement cette demande de cotation ?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="btn btn-danger btn-sm">
+                        Supprimer
+                    </button>
+                </form>
+                <!-- ===== FIN AJOUT ===== -->
+
             </td>
 
         </tr>
