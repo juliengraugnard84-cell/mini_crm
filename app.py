@@ -861,52 +861,210 @@ def dashboard():
 
 
 ############################################################
-# CHIFFRE D’AFFAIRES — PAGE ADMIN
+# CHIFFRE D’AFFAIRES — ADMIN & COMMERCIAL
 ############################################################
 
 @app.route("/chiffre-affaire")
 @login_required
 def chiffre_affaire():
-    if session.get("user", {}).get("role") != "admin":
-        flash("Accès réservé à l’administrateur.", "danger")
-        return redirect(url_for("dashboard"))
-
     conn = get_db()
+    user = session.get("user")
+    role = user["role"]
+    commercial_name = user["username"]
+
+    ca_annuel_perso = 0
+    ca_mensuel_perso = 0
+    ca_perso_par_mois = []
+    ca_perso_par_annee = []
+
+    clients = []
+    annuel_par_com = []
+    global_par_mois = []
+    historique_ca = []
 
     with conn.cursor() as cur:
-        # CA total
-        cur.execute("SELECT COALESCE(SUM(montant), 0) FROM revenus")
-        ca_total = cur.fetchone()[0]
 
-        # CA par mois (GROUP BY SAFE)
-        cur.execute("""
-            SELECT
-                TO_CHAR(date::date, 'YYYY-MM') AS mois,
-                SUM(montant) AS total
-            FROM revenus
-            GROUP BY TO_CHAR(date::date, 'YYYY-MM')
-            ORDER BY mois DESC
-        """)
-        ca_par_mois = cur.fetchall()
+        # ===== CA ANNUEL & MENSUEL =====
+        if role == "admin":
+            cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
+            ca_annuel_perso = cur.fetchone()[0]
 
-        # CA par commercial
-        cur.execute("""
-            SELECT
-                commercial,
-                SUM(montant) AS total
-            FROM revenus
-            GROUP BY commercial
-            ORDER BY total DESC
-        """)
-        ca_par_commercial = cur.fetchall()
+            cur.execute("""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                WHERE date_trunc('month', date) = date_trunc('month', CURRENT_DATE)
+            """)
+            ca_mensuel_perso = cur.fetchone()[0]
+        else:
+            cur.execute(
+                "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE commercial=%s",
+                (commercial_name,)
+            )
+            ca_annuel_perso = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                WHERE commercial=%s
+                  AND date_trunc('month', date) = date_trunc('month', CURRENT_DATE)
+            """, (commercial_name,))
+            ca_mensuel_perso = cur.fetchone()[0]
+
+            # ===== CA COMMERCIAL PAR MOIS =====
+            cur.execute("""
+                SELECT
+                    TO_CHAR(date::date,'YYYY-MM') AS mois,
+                    SUM(montant) AS total
+                FROM revenus
+                WHERE commercial=%s
+                GROUP BY mois
+                ORDER BY mois ASC
+            """, (commercial_name,))
+            ca_perso_par_mois = cur.fetchall()
+
+            # ===== CA COMMERCIAL PAR ANNÉE =====
+            cur.execute("""
+                SELECT
+                    EXTRACT(YEAR FROM date)::int AS annee,
+                    SUM(montant) AS total
+                FROM revenus
+                WHERE commercial=%s
+                GROUP BY annee
+                ORDER BY annee ASC
+            """, (commercial_name,))
+            ca_perso_par_annee = cur.fetchall()
+
+        # ===== DONNÉES ADMIN =====
+        if role == "admin":
+            cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
+            clients = cur.fetchall()
+
+            cur.execute("""
+                SELECT commercial, SUM(montant) AS total
+                FROM revenus
+                GROUP BY commercial
+                ORDER BY total DESC
+            """)
+            annuel_par_com = cur.fetchall()
+
+            cur.execute("""
+                SELECT
+                    TO_CHAR(date::date,'YYYY-MM') AS mois,
+                    SUM(montant) AS total
+                FROM revenus
+                GROUP BY mois
+                ORDER BY mois ASC
+            """)
+            global_par_mois = cur.fetchall()
+
+            cur.execute("""
+                SELECT
+                    revenus.id,
+                    revenus.date,
+                    revenus.montant,
+                    revenus.commercial,
+                    crm_clients.name AS client_name
+                FROM revenus
+                JOIN crm_clients ON crm_clients.id = revenus.client_id
+                ORDER BY revenus.date DESC, revenus.id DESC
+            """)
+            historique_ca = cur.fetchall()
 
     return render_template(
         "chiffre_affaire.html",
-        ca_total=ca_total,
-        ca_par_mois=[row_to_obj(r) for r in ca_par_mois],
-        ca_par_commercial=[row_to_obj(r) for r in ca_par_commercial],
+        ca_annuel_perso=ca_annuel_perso,
+        ca_mensuel_perso=ca_mensuel_perso,
+        ca_perso_par_mois=[row_to_obj(r) for r in ca_perso_par_mois],
+        ca_perso_par_annee=[row_to_obj(r) for r in ca_perso_par_annee],
+        clients=[row_to_obj(c) for c in clients],
+        annuel_par_com=[row_to_obj(r) for r in annuel_par_com],
+        global_par_mois=[row_to_obj(r) for r in global_par_mois],
+        historique_ca=[row_to_obj(r) for r in historique_ca],
     )
 
+
+############################################################
+# AJOUT CA — ADMIN
+############################################################
+
+@app.route("/chiffre-affaire/add", methods=["POST"])
+@admin_required
+def add_chiffre_affaire():
+    conn = get_db()
+
+    date_ca = request.form.get("date")
+    client_id = request.form.get("client_id")
+    commercial = (request.form.get("commercial") or "").strip()
+    montant = request.form.get("montant")
+
+    if not date_ca or not client_id or not commercial or not montant:
+        flash("Tous les champs sont obligatoires.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    try:
+        montant = float(montant)
+    except ValueError:
+        flash("Montant invalide.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO revenus (date, client_id, commercial, montant)
+            VALUES (%s, %s, %s, %s)
+        """, (date_ca, client_id, commercial, montant))
+
+    conn.commit()
+    flash("Chiffre d’affaires ajouté.", "success")
+    return redirect(url_for("chiffre_affaire"))
+
+
+############################################################
+# ÉDITION CA — ADMIN (INLINE)
+############################################################
+
+@app.route("/chiffre-affaire/<int:ca_id>/edit", methods=["POST"])
+@admin_required
+def edit_chiffre_affaire(ca_id):
+    montant = request.form.get("montant")
+
+    try:
+        montant = float(montant)
+    except Exception:
+        flash("Montant invalide.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE revenus SET montant=%s WHERE id=%s",
+            (montant, ca_id)
+        )
+
+    conn.commit()
+    flash("Chiffre d’affaires mis à jour.", "success")
+    return redirect(url_for("chiffre_affaire"))
+
+
+############################################################
+# SUPPRESSION CA — ADMIN
+############################################################
+
+@app.route("/chiffre-affaire/<int:ca_id>/delete", methods=["POST"])
+@admin_required
+def delete_chiffre_affaire(ca_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM revenus WHERE id=%s", (ca_id,))
+
+    conn.commit()
+    flash("Chiffre d’affaires supprimé.", "success")
+    return redirect(url_for("chiffre_affaire"))
+
+
+############################################################
+# OUVERTURE COTATION
+############################################################
 
 @app.route("/cotations/<int:cotation_id>")
 @login_required
@@ -938,6 +1096,10 @@ def open_cotation(cotation_id):
     )
 
 
+############################################################
+# SEARCH GLOBAL
+############################################################
+
 @app.route("/search")
 @login_required
 def search():
@@ -958,7 +1120,6 @@ def search():
                 ORDER BY created_at DESC
                 LIMIT 10
             """, (f"%{q}%",))
-            client_rows = cur.fetchall()
         else:
             cur.execute("""
                 SELECT id, name
@@ -968,19 +1129,18 @@ def search():
                 ORDER BY created_at DESC
                 LIMIT 10
             """, (user.get("id"), f"%{q}%"))
-            client_rows = cur.fetchall()
+
+        client_rows = cur.fetchall()
 
     results = []
     for c in client_rows:
         docs = list_client_documents(c["id"])
         filtered_docs = [d for d in docs if q_lower in d["nom"].lower()]
-        results.append(
-            {
-                "client_id": c["id"],
-                "client_name": c["name"],
-                "documents": filtered_docs[:10],
-            }
-        )
+        results.append({
+            "client_id": c["id"],
+            "client_name": c["name"],
+            "documents": filtered_docs[:10],
+        })
 
     return jsonify({"results": results})
 
