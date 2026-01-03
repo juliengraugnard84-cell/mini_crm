@@ -1081,11 +1081,11 @@ def client_detail(client_id):
         )
         cotations = cur.fetchall()
 
-        # ✅ CA PAR MOIS — VERSION PROPRE (PostgreSQL)
+        # ✅ CA PAR MOIS — CORRIGÉ (cast DATE explicite)
         cur.execute(
             """
             SELECT
-                TO_CHAR(date, 'YYYY-MM') AS mois,
+                TO_CHAR(date::date, 'YYYY-MM') AS mois,
                 SUM(montant) AS total
             FROM revenus
             WHERE client_id = %s
@@ -1230,7 +1230,6 @@ def upload_client_document(client_id):
         return redirect(url_for("client_detail", client_id=client_id))
 
     nom = clean_filename(secure_filename(fichier.filename))
-    # ✅ anti-overwrite silencieux: conserve le nom, suffixe si collision
     key_raw = f"{client_s3_prefix(client_id)}{nom}"
     key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
 
