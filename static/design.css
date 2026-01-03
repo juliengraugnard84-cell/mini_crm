@@ -693,3 +693,87 @@ textarea:focus {
     background:var(--warning);
     color:#1f2937;
 }
+.chat-badge {
+    display: none;
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: red;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 50%;
+    min-width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-badge.mention {
+    background: orange;
+    animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+/* ================= CHAT ADMIN UI ================= */
+
+.chat-admin-input {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-textarea-admin {
+    width: 100%;
+    min-height: 130px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #d0d7de;
+    font-size: 14px;
+    resize: vertical;
+    background: #f9fafb;
+}
+
+.chat-textarea-admin:focus {
+    outline: none;
+    border-color: #0d6efd;
+    background: #fff;
+}
+
+.chat-actions-admin {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-file-btn {
+    background: #eef2f7;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.2s;
+}
+
+.chat-file-btn:hover {
+    background: #e0e7ff;
+}
+
+/* ================= CHAT MESSAGES ================= */
+
+.chat-msg {
+    background: #f5f7fa;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.chat-msg strong {
+    font-size: 12px;
+    color: #0d6efd;
+}

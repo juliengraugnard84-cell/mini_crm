@@ -89,7 +89,6 @@
             <span class="role">connecté</span>
         </div>
 
-        <!-- FLASH -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-container">
@@ -114,7 +113,7 @@
 {% if current_user %}
 <div class="chat-toggle" id="chatToggle">
     💬
-    <span class="chat-badge" id="chatBadge"></span>
+    <span class="chat-badge" id="chatBadge" style="display:none"></span>
 </div>
 
 <div class="chat-widget" id="chatWidget">
@@ -129,10 +128,10 @@
 
         {% if current_user.role == "admin" %}
             <textarea id="chatInput"
-                      rows="4"
+                      rows="6"
                       class="form-control"
-                      placeholder="Message / consignes / documents…"
-                      style="resize:vertical;min-height:90px;"></textarea>
+                      placeholder="Message / consignes / documents à transmettre…"
+                      style="resize:vertical;min-height:140px;"></textarea>
         {% else %}
             <textarea id="chatInput"
                       rows="2"
@@ -149,7 +148,9 @@
                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg">
         {% endif %}
 
-        <button class="btn btn-primary mt-2" type="submit">Envoyer</button>
+        <button class="btn btn-primary mt-2 w-100" type="submit">
+            Envoyer
+        </button>
     </form>
 </div>
 {% endif %}
@@ -170,8 +171,8 @@
     const fileInput = document.getElementById('chatFile');
     const badge = document.getElementById('chatBadge');
 
-    const username = "{{ current_user.username }}";
-    let lastMessageId = 0;
+    const username = "{{ current_user.username|e }}";
+    let lastMessageId = null;
     let unread = 0;
 
     if (!toggle || !widget) return;
@@ -179,22 +180,21 @@
     toggle.addEventListener('click', () => {
         widget.classList.toggle('open');
         unread = 0;
-        badge.textContent = '';
         badge.style.display = 'none';
         badge.classList.remove('mention');
-        loadChat();
+        loadChat(true);
     });
 
     closeBtn?.addEventListener('click', () => widget.classList.remove('open'));
 
-    function loadChat() {
+    function loadChat(reset = false) {
         fetch('/chat/messages?limit=120')
             .then(r => r.json())
             .then(data => {
                 if (!data.messages) return;
                 messagesBox.innerHTML = '';
                 data.messages.forEach(m => {
-                    lastMessageId = Math.max(lastMessageId, m.id);
+                    lastMessageId = m.id;
                     const div = document.createElement('div');
                     div.className = 'chat-msg';
                     div.innerHTML = `
@@ -212,15 +212,20 @@
         fetch('/chat/messages?limit=5')
             .then(r => r.json())
             .then(data => {
-                if (!data.messages) return;
+                if (!data.messages || widget.classList.contains('open')) return;
                 const last = data.messages[data.messages.length - 1];
+                if (!lastMessageId) {
+                    lastMessageId = last.id;
+                    return;
+                }
                 if (last.id > lastMessageId && !last.is_mine) {
                     lastMessageId = last.id;
                     unread++;
                     badge.textContent = unread;
                     badge.style.display = 'inline-flex';
 
-                    if (last.message && new RegExp(`(@${username}|\\b${username}\\b)`, 'i').test(last.message)) {
+                    const mentionRegex = new RegExp(`(@${username}|\\b${username}\\b)`, 'i');
+                    if (last.message && mentionRegex.test(last.message)) {
                         badge.classList.add('mention');
                     }
                 }
