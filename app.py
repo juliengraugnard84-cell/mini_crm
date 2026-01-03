@@ -1567,6 +1567,22 @@ def delete_cotation_admin(cotation_id):
 
 
 ############################################################
+# ALIAS TEMPLATE — delete_cotation (ADMIN)
+# (utilisé par admin_cotations.html)
+############################################################
+
+@app.route("/admin/cotations/<int:cotation_id>/delete-alias", methods=["POST"])
+@admin_required
+def delete_cotation(cotation_id):
+    """
+    Alias historique appelé par les templates admin.
+    NE PAS SUPPRIMER.
+    """
+    return delete_cotation_admin(cotation_id)
+
+
+
+############################################################
 # 11. DOCUMENTS GLOBAUX S3 (ADMIN UNIQUEMENT)
 ############################################################
 
