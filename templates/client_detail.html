@@ -3,29 +3,24 @@
 {% block content %}
 
 <!-- ================= PAGE HEADER ================= -->
-<div class="page-header mb-4">
-    <h1>Dossier client</h1>
-    <p class="text-muted">{{ client.name }}</p>
-</div>
+<div class="page-header mb-4 d-flex justify-content-between align-items-start">
+    <div>
+        <h1>Dossier client</h1>
+        <p class="text-muted">{{ client.name }}</p>
+    </div>
 
-<!-- ===== AJOUT : SUPPRESSION DOSSIER (ADMIN) ===== -->
-{% if current_user and current_user.role == 'admin' %}
-<div class="mb-4 text-end">
+    {% if current_user and current_user.role == "admin" %}
+    <!-- SUPPRESSION DOSSIER CLIENT (ADMIN) -->
     <form method="post"
           action="{{ url_for('delete_client', client_id=client.id) }}"
-          onsubmit="return confirm(
-            'ATTENTION : cette action est définitive.\n\n' +
-            'Le dossier, les cotations, les documents et le chiffre d’affaires seront supprimés.\n\n' +
-            'Confirmer la suppression ?'
-          );">
+          onsubmit="return confirm('⚠️ Supprimer définitivement ce dossier client ? Cette action est irréversible.');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button class="btn btn-danger">
             Supprimer le dossier client
         </button>
     </form>
+    {% endif %}
 </div>
-{% endif %}
-<!-- ===== FIN AJOUT ===== -->
 
 <!-- ================= TABS ================= -->
 <ul class="nav nav-tabs mb-4" role="tablist">
@@ -164,7 +159,7 @@
                     <th>Date</th>
                     <th>Énergie</th>
                     <th>Statut</th>
-                    <th style="text-align:right;"></th>
+                    <th style="text-align:right;">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -177,19 +172,20 @@
                             {{ c.status or "—" }}
                         </span>
                     </td>
-                    <td class="text-end">
-                        {% if current_user
-                              and current_user.role == 'commercial'
-                              and c.created_by == current_user.id
-                              and not c.is_read %}
+                    <td style="text-align:right;">
+                        {% if current_user.role == "admin"
+                              or (current_user.role == "commercial" and c.created_by == current_user.id) %}
                         <form method="post"
                               action="{{ url_for('delete_own_cotation', cotation_id=c.id) }}"
-                              onsubmit="return confirm('Supprimer votre demande de cotation ?');">
+                              onsubmit="return confirm('Supprimer cette cotation ?');"
+                              style="display:inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button class="btn btn-danger btn-sm">
                                 Supprimer
                             </button>
                         </form>
+                        {% else %}
+                            —
                         {% endif %}
                     </td>
                 </tr>

@@ -1374,9 +1374,7 @@ def delete_document(key):
 
 
 ############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL)
-#     + COTATIONS
-#     + DOCUMENTS CLIENT
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + COTATIONS + DOCUMENTS CLIENT
 ############################################################
 
 # =========================
@@ -1480,17 +1478,14 @@ def client_detail(client_id):
     conn = get_db()
 
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT * FROM crm_clients WHERE id = %s",
-            (client_id,),
-        )
+        cur.execute("SELECT * FROM crm_clients WHERE id=%s", (client_id,))
         client = cur.fetchone()
 
         cur.execute(
             """
             SELECT *
             FROM cotations
-            WHERE client_id = %s
+            WHERE client_id=%s
             ORDER BY date_creation DESC
             """,
             (client_id,),
@@ -1501,7 +1496,7 @@ def client_detail(client_id):
             """
             SELECT substr(date,1,7) AS mois, SUM(montant) AS total
             FROM revenus
-            WHERE client_id = %s
+            WHERE client_id=%s
             GROUP BY mois
             ORDER BY mois DESC
             """,
@@ -1510,11 +1505,7 @@ def client_detail(client_id):
         ca_par_mois = cur.fetchall()
 
         cur.execute(
-            """
-            SELECT COALESCE(SUM(montant), 0)
-            FROM revenus
-            WHERE client_id = %s
-            """,
+            "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE client_id=%s",
             (client_id,),
         )
         ca_total = cur.fetchone()[0]
@@ -1570,7 +1561,7 @@ def create_cotation(client_id):
                 is_read,
                 status
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 'nouvelle')
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
             """,
             (
                 client_id,
@@ -1595,50 +1586,35 @@ def create_cotation(client_id):
 
 
 # =========================
-# SUPPRESSION COTATION
-# (ADMIN / COMMERCIAL propriétaire non lue)
+# SUPPRESSION COTATION (COMMERCIAL PROPRIÉTAIRE OU ADMIN)
 # =========================
 @app.route("/cotations/<int:cotation_id>/delete", methods=["POST"])
 @login_required
-def delete_cotation(cotation_id):
-    user = session.get("user") or {}
+def delete_own_cotation(cotation_id):
     conn = get_db()
+    user = session.get("user") or {}
 
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT id, client_id, created_by, is_read
-            FROM cotations
-            WHERE id = %s
-            """,
-            (cotation_id,),
-        )
+        cur.execute("SELECT * FROM cotations WHERE id=%s", (cotation_id,))
         cot = cur.fetchone()
 
     if not cot:
-        abort(404)
+        flash("Cotation introuvable.", "danger")
+        return redirect(url_for("clients"))
 
-    # ADMIN : toujours autorisé
-    if user.get("role") == "admin":
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM cotations WHERE id=%s", (cotation_id,))
-        conn.commit()
-        flash("Demande de cotation supprimée.", "success")
-        return redirect(url_for("admin_cotations"))
-
-    # COMMERCIAL : uniquement ses cotations NON lues
-    if (
-        user.get("role") != "commercial"
-        or cot["created_by"] != user.get("id")
-        or cot["is_read"]
-    ):
+    if not can_access_client(cot["client_id"]):
         abort(403)
+
+    if user["role"] != "admin":
+        if user["role"] != "commercial" or cot["created_by"] != user["id"]:
+            flash("Suppression non autorisée.", "danger")
+            return redirect(url_for("client_detail", client_id=cot["client_id"]))
 
     with conn.cursor() as cur:
         cur.execute("DELETE FROM cotations WHERE id=%s", (cotation_id,))
 
     conn.commit()
-    flash("Votre demande de cotation a été supprimée.", "success")
+    flash("Cotation supprimée.", "success")
     return redirect(url_for("client_detail", client_id=cot["client_id"]))
 
 
@@ -1709,15 +1685,10 @@ def delete_client(client_id):
     flash("Dossier client supprimé définitivement.", "success")
     return redirect(url_for("clients"))
 
+
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
-
-# ⚠️ IMPORTANT :
-# - Les commerciaux créent des demandes de mise à jour
-# - Les admins les consultent, ouvrent et suppriment
-# - AUCUNE donnée client n’est modifiée automatiquement
-
 
 # =========================
 # COMMERCIAL → DEMANDE DE MISE À JOUR
@@ -1738,19 +1709,14 @@ def update_client(client_id):
         flash("La date de mise à jour est obligatoire.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    # Vérification dossier
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT name FROM crm_clients WHERE id=%s",
-            (client_id,)
-        )
+        cur.execute("SELECT name FROM crm_clients WHERE id=%s", (client_id,))
         client = cur.fetchone()
 
     if not client:
         flash("Dossier introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    # Insertion demande
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1763,7 +1729,7 @@ def update_client(client_id):
                 commentaire,
                 is_read
             )
-            VALUES (%s, %s, %s, %s, %s, %s, 0)
+            VALUES (%s,%s,%s,%s,%s,%s,0)
             """,
             (
                 client_id,
@@ -1772,11 +1738,10 @@ def update_client(client_id):
                 user["username"],
                 update_date,
                 commentaire,
-            )
+            ),
         )
 
     conn.commit()
-
     flash("Demande de mise à jour envoyée à l’administrateur.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
@@ -1801,7 +1766,7 @@ def admin_updates():
 
     return render_template(
         "admin_updates.html",
-        updates=[row_to_obj(r) for r in rows]
+        updates=[row_to_obj(r) for r in rows],
     )
 
 
@@ -1814,10 +1779,7 @@ def open_update(update_id):
     conn = get_db()
 
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT * FROM client_updates WHERE id=%s",
-            (update_id,)
-        )
+        cur.execute("SELECT * FROM client_updates WHERE id=%s", (update_id,))
         upd = cur.fetchone()
 
     if not upd:
@@ -1825,19 +1787,10 @@ def open_update(update_id):
         return redirect(url_for("admin_updates"))
 
     with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE client_updates SET is_read=1 WHERE id=%s",
-            (update_id,)
-        )
+        cur.execute("UPDATE client_updates SET is_read=1 WHERE id=%s", (update_id,))
 
     conn.commit()
-
-    return redirect(
-        url_for(
-            "client_detail",
-            client_id=upd["client_id"]
-        )
-    )
+    return redirect(url_for("client_detail", client_id=upd["client_id"]))
 
 
 # =========================
@@ -1847,36 +1800,42 @@ def open_update(update_id):
 @admin_required
 def delete_update(update_id):
     conn = get_db()
+    admin = session.get("user") or {}
 
-    # Récupération avant suppression (journalisation)
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT * FROM client_updates WHERE id=%s",
-            (update_id,)
-        )
+        cur.execute("SELECT * FROM client_updates WHERE id=%s", (update_id,))
         upd = cur.fetchone()
 
     if not upd:
         flash("Mise à jour introuvable.", "danger")
         return redirect(url_for("admin_updates"))
 
-    # Suppression
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO update_deletions_log (
+                    update_id,
+                    client_id,
+                    admin_id,
+                    admin_username
+                )
+                VALUES (%s,%s,%s,%s)
+                """,
+                (
+                    upd["id"],
+                    upd["client_id"],
+                    admin.get("id"),
+                    admin.get("username"),
+                ),
+            )
+    except Exception:
+        pass
+
     with conn.cursor() as cur:
-        cur.execute(
-            "DELETE FROM client_updates WHERE id=%s",
-            (update_id,)
-        )
+        cur.execute("DELETE FROM client_updates WHERE id=%s", (update_id,))
 
     conn.commit()
-
-    # Journalisation serveur (SAFE, sans DB)
-    admin = session.get("user", {}).get("username")
-    print(
-        f"[AUDIT] UPDATE DELETE | admin={admin} | "
-        f"update_id={update_id} | client_id={upd['client_id']} | "
-        f"commercial={upd['commercial_name']}"
-    )
-
     flash("Demande de mise à jour supprimée.", "success")
     return redirect(url_for("admin_updates"))
 
