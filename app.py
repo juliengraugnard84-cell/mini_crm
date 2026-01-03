@@ -790,7 +790,7 @@ def logout():
 
 
 ############################################################
-# 8. DASHBOARD + SEARCH + OUVERTURE COTATION
+# 8. DASHBOARD + SEARCH + OUVERTURE COTATION + CHIFFRE D’AFFAIRES
 ############################################################
 
 @app.route("/dashboard")
@@ -802,7 +802,6 @@ def dashboard():
         cur.execute("SELECT COUNT(*) FROM crm_clients")
         total_clients = cur.fetchone()[0]
 
-        # dashboard : on laisse datetime (template utilise strftime)
         cur.execute("""
             SELECT name, email, created_at
             FROM crm_clients
@@ -861,6 +860,54 @@ def dashboard():
     )
 
 
+############################################################
+# CHIFFRE D’AFFAIRES — PAGE ADMIN
+############################################################
+
+@app.route("/chiffre-affaire")
+@login_required
+def chiffre_affaire():
+    if session.get("user", {}).get("role") != "admin":
+        flash("Accès réservé à l’administrateur.", "danger")
+        return redirect(url_for("dashboard"))
+
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        # CA total
+        cur.execute("SELECT COALESCE(SUM(montant), 0) FROM revenus")
+        ca_total = cur.fetchone()[0]
+
+        # CA par mois (GROUP BY SAFE)
+        cur.execute("""
+            SELECT
+                TO_CHAR(date::date, 'YYYY-MM') AS mois,
+                SUM(montant) AS total
+            FROM revenus
+            GROUP BY TO_CHAR(date::date, 'YYYY-MM')
+            ORDER BY mois DESC
+        """)
+        ca_par_mois = cur.fetchall()
+
+        # CA par commercial
+        cur.execute("""
+            SELECT
+                commercial,
+                SUM(montant) AS total
+            FROM revenus
+            GROUP BY commercial
+            ORDER BY total DESC
+        """)
+        ca_par_commercial = cur.fetchall()
+
+    return render_template(
+        "chiffre_affaire.html",
+        ca_total=ca_total,
+        ca_par_mois=[row_to_obj(r) for r in ca_par_mois],
+        ca_par_commercial=[row_to_obj(r) for r in ca_par_commercial],
+    )
+
+
 @app.route("/cotations/<int:cotation_id>")
 @login_required
 def open_cotation(cotation_id):
@@ -882,8 +929,13 @@ def open_cotation(cotation_id):
         cur.execute("UPDATE cotations SET is_read=1 WHERE id=%s", (cotation_id,))
     conn.commit()
 
-    # route client_detail attend (client_id) + éventuellement cotation_id dans query string
-    return redirect(url_for("client_detail", client_id=cot["client_id"], cotation_id=cotation_id))
+    return redirect(
+        url_for(
+            "client_detail",
+            client_id=cot["client_id"],
+            cotation_id=cotation_id,
+        )
+    )
 
 
 @app.route("/search")
@@ -932,19 +984,6 @@ def search():
 
     return jsonify({"results": results})
 
-############################################################
-# ALIAS TEMPLATE — chiffre_affaire
-# (utilisé dans base.html, conservé volontairement)
-############################################################
-
-@app.route("/chiffre-affaire")
-@login_required
-def chiffre_affaire():
-    """
-    Alias historique utilisé par les templates.
-    NE PAS SUPPRIMER : appelé par base.html
-    """
-    return redirect(url_for("dashboard"))
 
 # ============================
 # FIN PARTIE 1/4
@@ -978,41 +1017,30 @@ def clients():
     with conn.cursor() as cur:
         if session["user"]["role"] == "admin":
             if q:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT *
                     FROM crm_clients
                     WHERE name ILIKE %s
                     ORDER BY created_at DESC
-                    """,
-                    (f"%{q}%",),
-                )
+                """, (f"%{q}%",))
             else:
-                cur.execute(
-                    "SELECT * FROM crm_clients ORDER BY created_at DESC"
-                )
+                cur.execute("SELECT * FROM crm_clients ORDER BY created_at DESC")
         else:
             if q:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT *
                     FROM crm_clients
                     WHERE owner_id = %s
                       AND name ILIKE %s
                     ORDER BY created_at DESC
-                    """,
-                    (session["user"]["id"], f"%{q}%"),
-                )
+                """, (session["user"]["id"], f"%{q}%"))
             else:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT *
                     FROM crm_clients
                     WHERE owner_id = %s
                     ORDER BY created_at DESC
-                    """,
-                    (session["user"]["id"],),
-                )
+                """, (session["user"]["id"],))
 
         rows = cur.fetchall()
 
@@ -1038,14 +1066,11 @@ def new_client():
 
         conn = get_db()
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 INSERT INTO crm_clients (name, owner_id)
                 VALUES (%s, %s)
                 RETURNING id
-                """,
-                (name, session["user"]["id"]),
-            )
+            """, (name, session["user"]["id"]))
             client_id = cur.fetchone()[0]
 
         conn.commit()
@@ -1070,36 +1095,31 @@ def client_detail(client_id):
         cur.execute("SELECT * FROM crm_clients WHERE id=%s", (client_id,))
         client = cur.fetchone()
 
-        cur.execute(
-            """
+        cur.execute("""
             SELECT *
             FROM cotations
             WHERE client_id=%s
             ORDER BY date_creation DESC
-            """,
-            (client_id,),
-        )
+        """, (client_id,))
         cotations = cur.fetchall()
 
-        # ✅ CA PAR MOIS — CORRIGÉ (cast DATE explicite)
-        cur.execute(
-            """
+        # CA par mois — GROUP BY SAFE
+        cur.execute("""
             SELECT
                 TO_CHAR(date::date, 'YYYY-MM') AS mois,
                 SUM(montant) AS total
             FROM revenus
             WHERE client_id = %s
-            GROUP BY mois
+            GROUP BY TO_CHAR(date::date, 'YYYY-MM')
             ORDER BY mois DESC
-            """,
-            (client_id,),
-        )
+        """, (client_id,))
         ca_par_mois = cur.fetchall()
 
-        cur.execute(
-            "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE client_id=%s",
-            (client_id,),
-        )
+        cur.execute("""
+            SELECT COALESCE(SUM(montant),0)
+            FROM revenus
+            WHERE client_id=%s
+        """, (client_id,))
         ca_total = cur.fetchone()[0]
 
     documents = list_client_documents(client_id)
@@ -1134,8 +1154,7 @@ def create_cotation(client_id):
         return redirect(url_for("client_detail", client_id=client_id))
 
     with conn.cursor() as cur:
-        cur.execute(
-            """
+        cur.execute("""
             INSERT INTO cotations (
                 client_id,
                 date_negociation,
@@ -1154,23 +1173,21 @@ def create_cotation(client_id):
                 status
             )
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
-            """,
-            (
-                client_id,
-                date_negociation,
-                energie_type,
-                request.form.get("pdl_pce"),
-                request.form.get("date_echeance"),
-                request.form.get("fournisseur_actuel"),
-                request.form.get("entreprise_nom"),
-                request.form.get("siret"),
-                request.form.get("signataire_nom"),
-                request.form.get("signataire_tel"),
-                request.form.get("signataire_email"),
-                request.form.get("commentaire"),
-                user.get("id"),
-            ),
-        )
+        """, (
+            client_id,
+            date_negociation,
+            energie_type,
+            request.form.get("pdl_pce"),
+            request.form.get("date_echeance"),
+            request.form.get("fournisseur_actuel"),
+            request.form.get("entreprise_nom"),
+            request.form.get("siret"),
+            request.form.get("signataire_nom"),
+            request.form.get("signataire_tel"),
+            request.form.get("signataire_email"),
+            request.form.get("commentaire"),
+            user.get("id"),
+        ))
 
     conn.commit()
     flash("Demande de cotation créée.", "success")
@@ -1240,7 +1257,7 @@ def upload_client_document(client_id):
 
 
 # =========================
-# SUPPRESSION DOCUMENT CLIENT — SAFE
+# SUPPRESSION DOCUMENT CLIENT
 # =========================
 @app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
 @login_required
