@@ -1979,14 +1979,16 @@ def _chat_store_file(file_storage):
     rnd = secrets.token_hex(6)
     key_raw = f"chat/{rnd}_{file_name_clean}"
 
-    # (Normalement rnd rend la collision quasi impossible, mais on reste cohérent)
     key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
 
     try:
         s3_upload_fileobj(file_storage, AWS_BUCKET, key)
         return (key, file_name_original)
     except ClientError as e:
-        logger.error("Erreur upload chat S3 (ClientError): %s", getattr(e, "response", None))
+        logger.error(
+            "Erreur upload chat S3 (ClientError): %s",
+            getattr(e, "response", None)
+        )
         return (None, None)
     except Exception as e:
         logger.exception("Erreur upload chat S3: %r", e)
@@ -2057,14 +2059,23 @@ def chat_send():
     message = (request.form.get("message") or "").strip()
     file_obj = request.files.get("file")
 
+    user = session.get("user") or {}
+
+    # 🔒 SÉCURITÉ : seuls les ADMINS peuvent envoyer des fichiers
+    if file_obj and user.get("role") != "admin":
+        return jsonify(
+            {
+                "success": False,
+                "message": "L’envoi de documents est réservé à l’administrateur."
+            }
+        ), 403
+
     file_key, file_name = _chat_store_file(file_obj)
 
     if not message and not file_key:
         return jsonify(
             {"success": False, "message": "Message ou fichier requis."}
         ), 400
-
-    u = session.get("user") or {}
 
     conn = get_db()
     with conn.cursor() as cur:
@@ -2082,8 +2093,8 @@ def chat_send():
             RETURNING id
             """,
             (
-                u.get("id"),
-                u.get("username"),
+                user.get("id"),
+                user.get("username"),
                 message,
                 file_key,
                 file_name,
@@ -2097,8 +2108,8 @@ def chat_send():
         {
             "success": True,
             "id": new_id,
-            "user_id": u.get("id"),
-            "username": u.get("username"),
+            "user_id": user.get("id"),
+            "username": user.get("username"),
         }
     )
 
