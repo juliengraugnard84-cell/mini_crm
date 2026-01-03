@@ -932,6 +932,19 @@ def search():
 
     return jsonify({"results": results})
 
+############################################################
+# ALIAS TEMPLATE — chiffre_affaire
+# (utilisé dans base.html, conservé volontairement)
+############################################################
+
+@app.route("/chiffre-affaire")
+@login_required
+def chiffre_affaire():
+    """
+    Alias historique utilisé par les templates.
+    NE PAS SUPPRIMER : appelé par base.html
+    """
+    return redirect(url_for("dashboard"))
 
 # ============================
 # FIN PARTIE 1/4
