@@ -19,6 +19,7 @@
             <th>Dossier</th>
             <th>Commercial</th>
             <th>Date demandée</th>
+            <th>Commentaire</th>
             <th>Statut</th>
             <th class="text-end"></th>
             <th class="text-end"></th>
@@ -29,18 +30,27 @@
     {% for u in updates %}
         <tr class="{% if not u.is_read %}unread{% endif %}">
 
+            <!-- DOSSIER -->
             <td>
                 <strong>{{ u.client_name or "—" }}</strong>
             </td>
 
+            <!-- COMMERCIAL -->
             <td>
                 {{ u.commercial_name or "—" }}
             </td>
 
+            <!-- DATE -->
             <td>
                 {{ format_date(u.update_date) }}
             </td>
 
+            <!-- COMMENTAIRE -->
+            <td style="max-width:400px;">
+                {{ u.commentaire or "—" }}
+            </td>
+
+            <!-- STATUT -->
             <td>
                 {% if u.is_read %}
                     <span class="badge bg-secondary">Lue</span>
@@ -49,6 +59,7 @@
                 {% endif %}
             </td>
 
+            <!-- OUVRIR -->
             <td class="text-end">
                 <a href="{{ url_for('open_update', update_id=u.id) }}"
                    class="btn btn-secondary btn-sm">
@@ -56,6 +67,7 @@
                 </a>
             </td>
 
+            <!-- SUPPRIMER -->
             <td class="text-end">
                 <form method="post"
                       action="{{ url_for('delete_update', update_id=u.id) }}"
