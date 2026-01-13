@@ -129,7 +129,6 @@ def _connect_db():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL manquant dans la configuration.")
 
-    # ✅ "require" en prod; "prefer" ailleurs (évite de casser un local sans SSL)
     sslmode = "require" if is_production else "prefer"
 
     conn = psycopg2.connect(
@@ -162,8 +161,7 @@ def close_db(exception):
 
 def row_to_obj(row):
     """
-    Convertit une row PostgreSQL en objet accessible via dot notation.
-    Garde les types natifs (datetime, int, float, etc.)
+    Convertit une row PostgreSQL en objet avec accès par attribut.
     """
     if not row:
         return None
@@ -172,7 +170,7 @@ def row_to_obj(row):
 
 def _try_add_column(conn, table, column_sql):
     """
-    Sécurité : ajout de colonne sans casser une base existante
+    Ajout de colonne SAFE (sans casser une base existante).
     """
     try:
         with conn.cursor() as cur:
@@ -199,7 +197,7 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
                     role TEXT NOT NULL
                 )
             """)
@@ -284,7 +282,7 @@ def init_db():
                 )
             """)
 
-            # ✅ LOG SUPPRESSIONS UPDATES (était utilisé mais non créé)
+            # ================= LOG SUPPRESSION UPDATES =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS update_deletions_log (
                     id SERIAL PRIMARY KEY,
@@ -297,11 +295,11 @@ def init_db():
             """)
 
             # ================= ADMIN BOOTSTRAP =================
-            cur.execute("SELECT id FROM users WHERE username='admin'")
+            cur.execute("SELECT id FROM users WHERE username = 'admin'")
             if not cur.fetchone():
                 cur.execute(
                     """
-                    INSERT INTO users (username, password, role)
+                    INSERT INTO users (username, password_hash, role)
                     VALUES (%s, %s, %s)
                     """,
                     (
