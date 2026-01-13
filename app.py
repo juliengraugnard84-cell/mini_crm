@@ -754,7 +754,7 @@ def inject_globals():
 
 
 ############################################################
-# 7. LOGIN / LOGOUT  ✅ CORRIGÉ (password_hash)
+# 7. LOGIN / LOGOUT
 ############################################################
 
 @app.route("/login", methods=["GET", "POST"])
@@ -763,24 +763,28 @@ def login():
         username = (request.form.get("username", "") or "").strip()
         password = (request.form.get("password", "") or "").strip()
 
-        if not username or not password:
-            flash("Identifiants incorrects.", "danger")
-            return render_template("login.html")
-
         conn = get_db()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, username, password_hash, role FROM users WHERE username = %s",
-                (username,)
+                """
+                SELECT
+                    id,
+                    username,
+                    password_hash,
+                    is_admin
+                FROM users
+                WHERE username = %s
+                """,
+                (username,),
             )
             user = cur.fetchone()
 
-        # ✅ CORRECTION ICI : password_hash (et non password)
         if user and check_password_hash(user["password_hash"], password):
             session["user"] = {
                 "id": user["id"],
                 "username": user["username"],
-                "role": user["role"],
+                # ✅ rôle reconstruit depuis is_admin (COMPORTEMENT HISTORIQUE)
+                "role": "admin" if user["is_admin"] else "commercial",
             }
             flash("Connexion réussie.", "success")
             return redirect(url_for("dashboard"))
@@ -795,6 +799,7 @@ def logout():
     session.clear()
     flash("Déconnexion effectuée.", "info")
     return redirect(url_for("login"))
+
 
 
 
