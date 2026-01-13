@@ -3,7 +3,6 @@
    Compatible CRM COMPLET + Chat
    ========================================================= */
 
-
 /* =========================================================
    1. VARIABLES & RESET
    ========================================================= */
@@ -31,13 +30,9 @@
     --sidebar-w:240px;
 }
 
-* {
-    box-sizing:border-box;
-}
+* { box-sizing:border-box; }
 
-html, body {
-    height:100%;
-}
+html, body { height:100%; }
 
 body {
     margin:0;
@@ -47,7 +42,6 @@ body {
     font-size:14px;
     line-height:1.45;
 }
-
 
 /* =========================================================
    2. LAYOUT GLOBAL
@@ -63,7 +57,6 @@ body {
     display:flex;
     flex-direction:column;
 }
-
 
 /* =========================================================
    3. SIDEBAR & NAVIGATION
@@ -96,15 +89,8 @@ body {
     font-weight:800;
 }
 
-.company strong {
-    font-weight:800;
-    letter-spacing:.3px;
-}
-
-.company small {
-    font-size:.8rem;
-    opacity:.75;
-}
+.company strong { font-weight:800; letter-spacing:.3px; }
+.company small { font-size:.8rem; opacity:.75; }
 
 .sidebar-nav {
     display:flex;
@@ -121,17 +107,15 @@ body {
     color:#e5e7eb;
     font-weight:500;
     transition:background .15s ease,color .15s ease;
+    position:relative;
 }
 
-.sidebar-nav a:hover {
-    background:rgba(242,178,51,.15);
-}
+.sidebar-nav a:hover { background:rgba(242,178,51,.15); }
 
 .sidebar-nav a.active {
     background:var(--accent);
     color:var(--primary);
     font-weight:700;
-    box-shadow:0 6px 14px rgba(242,178,51,.35);
 }
 
 .sidebar-footer {
@@ -145,7 +129,6 @@ body {
     font-size:.85rem;
     text-decoration:none;
 }
-
 
 /* =========================================================
    4. TOPBAR / CONTENT / FOOTER
@@ -178,14 +161,11 @@ body {
     text-align:center;
 }
 
-
 /* =========================================================
    5. FLASH MESSAGES
    ========================================================= */
 
-.flash-container {
-    padding:16px 22px 0;
-}
+.flash-container { padding:16px 22px 0; }
 
 .flash {
     display:flex;
@@ -207,19 +187,13 @@ body {
 .flash-danger::before  { background:var(--danger); }
 .flash-warning::before { background:var(--warning); }
 
-.flash > * {
-    padding:10px 12px;
-}
-
+.flash > * { padding:10px 12px; }
 
 /* =========================================================
    6. UI CRM — TITRES / CARDS / KPI
    ========================================================= */
 
-h1 {
-    font-size:1.5rem;
-    margin:0 0 18px;
-}
+h1 { font-size:1.5rem; margin:0 0 18px; }
 
 h5 {
     font-size:.75rem;
@@ -259,15 +233,11 @@ h5 {
     margin-top:4px;
 }
 
-
 /* =========================================================
    7. TABLES
    ========================================================= */
 
-.table {
-    width:100%;
-    border-collapse:collapse;
-}
+.table { width:100%; border-collapse:collapse; }
 
 .table th {
     text-align:left;
@@ -284,21 +254,13 @@ h5 {
     vertical-align:middle;
 }
 
-
 /* =========================================================
    8. FORMULAIRES & BOUTONS
    ========================================================= */
 
-.form-label {
-    font-size:.75rem;
-    text-transform:uppercase;
-    color:var(--muted);
-}
-
 .form-control,
 .form-select,
 input,
-select,
 textarea {
     width:100%;
     padding:9px 11px;
@@ -309,7 +271,6 @@ textarea {
 
 .form-control:focus,
 .form-select:focus,
-input:focus,
 textarea:focus {
     outline:none;
     border-color:var(--primary);
@@ -326,67 +287,14 @@ textarea:focus {
 }
 
 .btn-primary { background:var(--accent); color:var(--primary); }
-.btn-secondary { background:#eef0f4; color:var(--text); }
+.btn-secondary { background:#eef0f4; }
 .btn-success { background:var(--success); color:#fff; }
 .btn-danger { background:var(--danger); color:#fff; }
 
-.btn:hover { opacity:.9; }
-
-
 /* =========================================================
-   9. DOCUMENTS / DOSSIERS
+   9. CHAT — COMPOSANT
    ========================================================= */
 
-.doc-list {
-    list-style:none;
-    padding:0;
-    margin-top:16px;
-}
-
-.doc-item {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:16px;
-    padding:12px 14px;
-    border-radius:10px;
-    background:#f9fafb;
-    border:1px solid #e5e7eb;
-    margin-bottom:10px;
-}
-
-.doc-info {
-    flex:1;
-    overflow:hidden;
-}
-
-.doc-link {
-    text-decoration:none;
-    font-weight:500;
-    color:#1f2937;
-}
-
-.doc-link:hover {
-    text-decoration:underline;
-}
-
-.doc-actions {
-    display:flex;
-    align-items:center;
-    gap:10px;
-}
-
-.doc-actions .btn-danger {
-    background:#dc2626;
-    color:#fff;
-}
-
-
-/* =========================================================
-   10. CHAT — COMPOSANT GLOBAL ISOLÉ
-   ========================================================= */
-
-/* Bouton flottant */
 .chat-toggle {
     position:fixed;
     bottom:24px;
@@ -405,31 +313,42 @@ textarea:focus {
     z-index:10000;
 }
 
-/* Badge non-lus */
+/* ✅ VERSION UNIQUE & CORRIGÉE */
 .chat-badge {
     position:absolute;
     top:-6px;
     right:-6px;
-    min-width:20px;
-    height:20px;
+    min-width:18px;
+    height:18px;
     padding:0 6px;
-    background:#dc2626;
+    background:var(--danger);
     color:#fff;
-    border-radius:999px;
-    font-size:12px;
+    font-size:11px;
     font-weight:700;
+    border-radius:999px;
     display:none;
     align-items:center;
     justify-content:center;
 }
 
-/* Fenêtre chat */
+.chat-badge.mention {
+    background:var(--warning);
+    color:#1f2937;
+    animation:pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform:scale(1); }
+    50% { transform:scale(1.25); }
+    100% { transform:scale(1); }
+}
+
 .chat-widget {
     position:fixed;
     bottom:90px;
     right:24px;
-    width:320px;
-    height:420px;
+    width:380px;
+    height:520px;
     background:#fff;
     border-radius:16px;
     box-shadow:0 20px 40px rgba(0,0,0,.25);
@@ -439,7 +358,7 @@ textarea:focus {
     opacity:0;
     transform:translateY(20px);
     pointer-events:none;
-    transition:all .25s ease;
+    transition:.25s;
     z-index:9999;
 }
 
@@ -466,16 +385,28 @@ textarea:focus {
     font-size:13px;
 }
 
-.chat-inputbar {
-    display:flex;
-    gap:6px;
-    padding:10px;
-    border-top:1px solid var(--border);
+.chat-msg {
+    background:#f5f7fa;
+    padding:8px 10px;
+    border-radius:6px;
+    margin-bottom:6px;
 }
 
+.chat-msg strong {
+    font-size:12px;
+    color:#0d6efd;
+}
+
+.chat-inputbar {
+    padding:10px;
+    border-top:1px solid var(--border);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
 
 /* =========================================================
-   11. RESPONSIVE
+   10. RESPONSIVE
    ========================================================= */
 
 @media (max-width:900px) {
@@ -485,295 +416,4 @@ textarea:focus {
 @media (max-width:720px) {
     .app-layout { flex-direction:column; }
     .sidebar { width:100%; }
-}
-.sidebar-nav a {
-    position: relative;
-}
-
-.sidebar-nav .badge {
-    background: #e53935;
-    color: white;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 10px;
-    margin-left: 8px;
-    vertical-align: middle;
-}
-/* =========================================================
-   12. SAAS PREMIUM UI — SURCOUCHE MODERNE & STABLE
-   (aucune régression, 100 % compatible existant)
-   ========================================================= */
-
-/* -------------------------------
-   FOND GLOBAL PLUS DOUX
--------------------------------- */
-body {
-    background: #f6f8fc;
-}
-
-/* -------------------------------
-   SIDEBAR — SOBRIÉTÉ SAAS
--------------------------------- */
-.sidebar {
-    background: #050A3A;
-}
-
-.sidebar-nav a {
-    font-weight: 500;
-    opacity: .92;
-}
-
-.sidebar-nav a:hover {
-    background: rgba(242,178,51,.12);
-}
-
-.sidebar-nav a.active {
-    background: rgba(242,178,51,.22);
-    color: var(--primary);
-    box-shadow: none;
-}
-
-/* -------------------------------
-   TOPBAR — AÉRATION
--------------------------------- */
-.topbar {
-    padding: 18px 28px;
-}
-
-/* -------------------------------
-   CONTENT — RESPIRATION
--------------------------------- */
-.content {
-    padding: 28px;
-}
-
-/* -------------------------------
-   CARDS — STYLE SAAS
--------------------------------- */
-.card {
-    border: none;
-    border-radius: 14px;
-    background: #ffffff;
-    box-shadow:
-        0 1px 2px rgba(0,0,0,.04),
-        0 10px 28px rgba(5,10,58,.06);
-}
-
-/* -------------------------------
-   KPI — LECTURE IMMÉDIATE
--------------------------------- */
-.kpi-tile {
-    border: none;
-    border-left: 4px solid var(--accent);
-    border-radius: 14px;
-    padding: 18px 20px;
-    box-shadow:
-        0 1px 2px rgba(0,0,0,.04),
-        0 12px 30px rgba(5,10,58,.08);
-}
-
-.kpi-label {
-    font-size: .7rem;
-    letter-spacing: .14em;
-}
-
-.kpi-value {
-    font-size: 1.9rem;
-    font-weight: 800;
-}
-
-/* -------------------------------
-   TABLES — SAAS PRO
--------------------------------- */
-.table th {
-    font-size: .7rem;
-    letter-spacing: .14em;
-}
-
-.table td {
-    padding: 16px 12px;
-}
-
-.table tbody tr:hover td {
-    background: #fafbff;
-}
-
-/* -------------------------------
-   FORMULAIRES — MODERNES
--------------------------------- */
-.form-control,
-.form-select,
-input,
-textarea {
-    border-radius: 10px;
-    border: 1px solid #e3e6ee;
-}
-
-.form-control:focus,
-.form-select:focus,
-textarea:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(242,178,51,.18);
-}
-
-/* -------------------------------
-   BOUTONS — PREMIUM
--------------------------------- */
-.btn {
-    border-radius: 10px;
-    font-weight: 600;
-}
-
-.btn-primary {
-    background: var(--accent);
-    color: var(--primary);
-}
-
-.btn-secondary {
-    background: #eef1f7;
-}
-
-/* -------------------------------
-   TABS — DISCRETS & MODERNES
--------------------------------- */
-.nav-tabs {
-    border-bottom: 1px solid #e6e9f2;
-}
-
-.nav-tabs .nav-link {
-    border: none;
-    color: #6b7280;
-    font-weight: 600;
-}
-
-.nav-tabs .nav-link.active {
-    color: var(--primary);
-    border-bottom: 3px solid var(--accent);
-}
-
-/* -------------------------------
-   FOOTER — SOBRE
--------------------------------- */
-.footer {
-    background: #ffffff;
-    border-top: 1px solid #e6e9f2;
-} 
-/* =========================================================
-   3.b ALERTES VISUELLES — NAV ADMIN
-   (cotations / mises à jour non lues)
-   ========================================================= */
-
-.nav-alert-badge {
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    min-width:18px;
-    height:18px;
-    padding:0 6px;
-    margin-left:8px;
-
-    font-size:11px;
-    font-weight:700;
-    line-height:1;
-
-    border-radius:999px;
-    color:#fff;
-
-    position:relative;
-    top:-1px;
-}
-
-/* Couleurs selon type */
-.nav-alert-badge.danger {
-    background:var(--danger);
-}
-
-.nav-alert-badge.warning {
-    background:var(--warning);
-    color:#1f2937;
-}
-.chat-badge {
-    display: none;
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: red;
-    color: white;
-    font-size: 11px;
-    font-weight: bold;
-    border-radius: 50%;
-    min-width: 18px;
-    height: 18px;
-    align-items: center;
-    justify-content: center;
-}
-
-.chat-badge.mention {
-    background: orange;
-    animation: pulse 1.2s infinite;
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.25); }
-    100% { transform: scale(1); }
-}
-/* ================= CHAT ADMIN UI ================= */
-
-.chat-admin-input {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.chat-textarea-admin {
-    width: 100%;
-    min-height: 130px;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #d0d7de;
-    font-size: 14px;
-    resize: vertical;
-    background: #f9fafb;
-}
-
-.chat-textarea-admin:focus {
-    outline: none;
-    border-color: #0d6efd;
-    background: #fff;
-}
-
-.chat-actions-admin {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.chat-file-btn {
-    background: #eef2f7;
-    padding: 8px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    transition: background 0.2s;
-}
-
-.chat-file-btn:hover {
-    background: #e0e7ff;
-}
-
-/* ================= CHAT MESSAGES ================= */
-
-.chat-msg {
-    background: #f5f7fa;
-    padding: 8px 10px;
-    border-radius: 6px;
-    margin-bottom: 6px;
-    font-size: 13px;
-}
-
-.chat-msg strong {
-    font-size: 12px;
-    color: #0d6efd;
 }

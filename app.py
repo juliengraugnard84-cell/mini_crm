@@ -754,14 +754,18 @@ def inject_globals():
 
 
 ############################################################
-# 7. LOGIN / LOGOUT
+# 7. LOGIN / LOGOUT — VERSION ROBUSTE & ALIGNÉE DB
 ############################################################
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = (request.form.get("username", "") or "").strip()
-        password = (request.form.get("password", "") or "").strip()
+        username = (request.form.get("username") or "").strip()
+        password = (request.form.get("password") or "").strip()
+
+        if not username or not password:
+            flash("Identifiants manquants.", "danger")
+            return render_template("login.html")
 
         conn = get_db()
         with conn.cursor() as cur:
@@ -771,7 +775,7 @@ def login():
                     id,
                     username,
                     password_hash,
-                    is_admin
+                    role
                 FROM users
                 WHERE username = %s
                 """,
@@ -779,17 +783,25 @@ def login():
             )
             user = cur.fetchone()
 
-        if user and check_password_hash(user["password_hash"], password):
-            session["user"] = {
-                "id": user["id"],
-                "username": user["username"],
-                # ✅ rôle reconstruit depuis is_admin (COMPORTEMENT HISTORIQUE)
-                "role": "admin" if user["is_admin"] else "commercial",
-            }
-            flash("Connexion réussie.", "success")
-            return redirect(url_for("dashboard"))
+        # Sécurité : aucun crash possible ici
+        if not user:
+            flash("Identifiants incorrects.", "danger")
+            return render_template("login.html")
 
-        flash("Identifiants incorrects.", "danger")
+        if not check_password_hash(user["password_hash"], password):
+            flash("Identifiants incorrects.", "danger")
+            return render_template("login.html")
+
+        # Session SAFE
+        session.clear()
+        session["user"] = {
+            "id": user["id"],
+            "username": user["username"],
+            "role": user["role"],
+        }
+
+        flash("Connexion réussie.", "success")
+        return redirect(url_for("dashboard"))
 
     return render_template("login.html")
 
@@ -799,7 +811,6 @@ def logout():
     session.clear()
     flash("Déconnexion effectuée.", "info")
     return redirect(url_for("login"))
-
 
 
 
