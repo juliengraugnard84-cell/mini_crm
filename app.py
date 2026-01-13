@@ -754,7 +754,7 @@ def inject_globals():
 
 
 ############################################################
-# 7. LOGIN / LOGOUT
+# 7. LOGIN / LOGOUT  ✅ CORRIGÉ (password_hash)
 ############################################################
 
 @app.route("/login", methods=["GET", "POST"])
@@ -763,12 +763,19 @@ def login():
         username = (request.form.get("username", "") or "").strip()
         password = (request.form.get("password", "") or "").strip()
 
+        if not username or not password:
+            flash("Identifiants incorrects.", "danger")
+            return render_template("login.html")
+
         conn = get_db()
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM users WHERE username=%s", (username,))
+            cur.execute(
+                "SELECT id, username, password_hash, role FROM users WHERE username = %s",
+                (username,)
+            )
             user = cur.fetchone()
 
-        # ✅ CORRECTION ICI : password_hash au lieu de password
+        # ✅ CORRECTION ICI : password_hash (et non password)
         if user and check_password_hash(user["password_hash"], password):
             session["user"] = {
                 "id": user["id"],
