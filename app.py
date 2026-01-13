@@ -768,7 +768,8 @@ def login():
             cur.execute("SELECT * FROM users WHERE username=%s", (username,))
             user = cur.fetchone()
 
-        if user and check_password_hash(user["password"], password):
+        # ✅ CORRECTION ICI : password_hash au lieu de password
+        if user and check_password_hash(user["password_hash"], password):
             session["user"] = {
                 "id": user["id"],
                 "username": user["username"],
@@ -787,6 +788,7 @@ def logout():
     session.clear()
     flash("Déconnexion effectuée.", "info")
     return redirect(url_for("login"))
+
 
 
 ############################################################
