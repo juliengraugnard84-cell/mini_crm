@@ -1449,7 +1449,7 @@ def admin_users():
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO users (username, password, role)
+                INSERT INTO users (username, password_hash, role)
                 VALUES (%s, %s, %s)
                 """,
                 (username, generate_password_hash(password), role),
@@ -1508,7 +1508,7 @@ def admin_edit_user(user_id):
                 cur.execute(
                     """
                     UPDATE users
-                    SET username=%s, password=%s, role=%s
+                    SET username=%s, password_hash=%s, role=%s
                     WHERE id=%s
                     """,
                     (username, generate_password_hash(password), role, user_id),
@@ -1574,7 +1574,7 @@ def admin_reset_password(user_id):
 
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE users SET password=%s WHERE id=%s",
+            "UPDATE users SET password_hash=%s WHERE id=%s",
             (generate_password_hash(new_password), user_id),
         )
 
@@ -1582,21 +1582,6 @@ def admin_reset_password(user_id):
     flash("Mot de passe réinitialisé.", "success")
     return redirect(url_for("admin_users"))
 
-
-# ============================
-# FIN PARTIE 2/4
-# La PARTIE 3/4 continue avec:
-# - ADMIN cotations (list/detail/delete)
-# - DOCUMENTS S3 globaux admin
-# - Updates (create/list/open/delete)
-# ============================
-# ============================
-# app.py — VERSION COMPLÈTE CORRIGÉE (PARTIE 3/4)
-# Contenu:
-# - ADMIN → DEMANDES DE COTATION (liste / détail / suppression)
-# - DOCUMENTS S3 GLOBAUX (ADMIN)
-# - DEMANDES DE MISE À JOUR DOSSIER (COMMERCIAL / ADMIN)
-# ============================
 
 ############################################################
 # 10 BIS. ADMIN — DEMANDES DE COTATION
