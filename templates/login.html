@@ -101,36 +101,43 @@
         <!-- FLASH -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }} small">
+                <div class="alert alert-{{ category }} small mb-2">
                     {{ message }}
                 </div>
             {% endfor %}
         {% endwith %}
 
         <!-- FORM -->
-        <form method="POST">
+        <form method="POST" action="{{ url_for('login') }}">
+
+            <!-- CSRF TOKEN -->
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
             <div class="mb-3">
                 <label class="form-label">Utilisateur</label>
-                <input type="text"
-                       name="username"
-                       class="form-control"
-                       required
-                       autofocus>
+                <input
+                    type="text"
+                    name="username"
+                    class="form-control"
+                    required
+                    autofocus
+                >
             </div>
 
             <div class="mb-4">
                 <label class="form-label">Mot de passe</label>
-                <input type="password"
-                       name="password"
-                       class="form-control"
-                       required>
+                <input
+                    type="password"
+                    name="password"
+                    class="form-control"
+                    required
+                >
             </div>
 
-            <button class="btn btn-login w-100">
+            <button type="submit" class="btn btn-login w-100">
                 Se connecter
             </button>
+
         </form>
 
     </div>
