@@ -104,6 +104,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="row g-3">
+
             <div class="col-md-4">
                 <label class="form-label">Date de négociation</label>
                 <input type="date" name="date_negociation" class="form-control" required>
@@ -115,6 +116,19 @@
                     <option value="">— Choisir —</option>
                     <option value="gaz">Gaz</option>
                     <option value="electricite">Électricité</option>
+                </select>
+            </div>
+
+            <!-- ✅ TYPE DE COMPTEUR (AJOUTÉ) -->
+            <div class="col-md-4">
+                <label class="form-label">Type de compteur</label>
+                <select name="type_compteur" class="form-select" required>
+                    <option value="">— Choisir —</option>
+                    <option value="monophase">Monophasé</option>
+                    <option value="triphase">Triphasé</option>
+                    <option value="linky">Linky</option>
+                    <option value="gaz">Gaz</option>
+                    <option value="autre">Autre</option>
                 </select>
             </div>
 
@@ -162,6 +176,7 @@
                 <label class="form-label">Commentaire</label>
                 <textarea name="commentaire" rows="3" class="form-control"></textarea>
             </div>
+
         </div>
 
         <div class="mt-4 text-end">
