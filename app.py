@@ -1599,7 +1599,7 @@ def admin_reset_password(user_id):
     return redirect(url_for("admin_users"))
 
 
-############################################################
+###########################################################
 # 10 BIS. ADMIN — DEMANDES DE COTATION
 ############################################################
 
@@ -1634,7 +1634,7 @@ def admin_cotation_detail(cotation_id):
 
     with conn.cursor() as cur:
         cur.execute("""
-            SELECTA
+            SELECT
                 cotations.*,
                 crm_clients.name AS client_name,
                 users.username AS commercial_name
@@ -1655,12 +1655,14 @@ def admin_cotation_detail(cotation_id):
             "UPDATE cotations SET is_read = 1 WHERE id = %s",
             (cotation_id,)
         )
+
     conn.commit()
 
     return render_template(
         "admin_cotation_detail.html",
         cotation=row_to_obj(row)
     )
+
 # =========================
 # ADMIN → ÉDITION COTATION
 # =========================
