@@ -29,7 +29,7 @@
 </div>
 
 <!-- ================= SEARCH ================= -->
-<div class="card">
+<div class="card mb-4">
     <form
         method="get"
         action="{{ url_for('clients') }}"
@@ -62,7 +62,7 @@
 <div class="card">
 
 {% if clients %}
-    <table class="table">
+    <table class="table align-middle">
         <thead>
             <tr>
                 <th>Dossier</th>
@@ -84,10 +84,40 @@
                     {{ c.commercial or "—" }}
                 </td>
 
-                <td>
-                    <span class="text-muted">
-                        {{ c.status or "cotation" }}
-                    </span>
+                <!-- ✅ STATUT MODIFIABLE (commercial + admin) -->
+                <td style="max-width:180px;">
+                    <form
+                        method="post"
+                        action="{{ url_for('update_client_status', client_id=c.id) }}"
+                    >
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                        <select
+                            name="dossier_status"
+                            class="form-select form-select-sm"
+                            onchange="this.form.submit()"
+                        >
+                            <option value="en_cours"
+                                {% if c.dossier_status == 'en_cours' %}selected{% endif %}>
+                                En cours
+                            </option>
+
+                            <option value="gagne"
+                                {% if c.dossier_status == 'gagne' %}selected{% endif %}>
+                                Gagné
+                            </option>
+
+                            <option value="perdu"
+                                {% if c.dossier_status == 'perdu' %}selected{% endif %}>
+                                Perdu
+                            </option>
+
+                            <option value="demande_maj"
+                                {% if c.dossier_status == 'demande_maj' %}selected{% endif %}>
+                                Demande de MAJ
+                            </option>
+                        </select>
+                    </form>
                 </td>
 
                 <td>
