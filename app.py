@@ -1268,9 +1268,10 @@ def create_cotation(client_id):
     date_negociation = request.form.get("date_negociation")
     heure_negociation = request.form.get("heure_negociation")
     energie_type = request.form.get("energie_type")
+    type_compteur = request.form.get("type_compteur")
 
-    if not date_negociation or not heure_negociation or not energie_type:
-        flash("Date, heure et énergie sont obligatoires.", "danger")
+    if not date_negociation or not heure_negociation or not energie_type or not type_compteur:
+        flash("Date, heure, énergie et type de compteur obligatoires.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
     with conn.cursor() as cur:
@@ -1280,6 +1281,7 @@ def create_cotation(client_id):
                 date_negociation,
                 heure_negociation,
                 energie_type,
+                type_compteur,
                 pdl_pce,
                 date_echeance,
                 fournisseur_actuel,
@@ -1293,12 +1295,13 @@ def create_cotation(client_id):
                 is_read,
                 status
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
         """, (
             client_id,
             date_negociation,
             heure_negociation,
             energie_type,
+            type_compteur,
             request.form.get("pdl_pce"),
             request.form.get("date_echeance"),
             request.form.get("fournisseur_actuel"),
@@ -1314,6 +1317,7 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation créée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
+
 
 
 # =========================
