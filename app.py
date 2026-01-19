@@ -1122,32 +1122,44 @@ def clients():
         if session["user"]["role"] == "admin":
             if q:
                 cur.execute("""
-                    SELECT *
+                    SELECT
+                        crm_clients.*,
+                        users.username AS commercial
                     FROM crm_clients
-                    WHERE name ILIKE %s
-                    ORDER BY created_at DESC
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.name ILIKE %s
+                    ORDER BY crm_clients.created_at DESC
                 """, (f"%{q}%",))
             else:
                 cur.execute("""
-                    SELECT *
+                    SELECT
+                        crm_clients.*,
+                        users.username AS commercial
                     FROM crm_clients
-                    ORDER BY created_at DESC
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    ORDER BY crm_clients.created_at DESC
                 """)
         else:
             if q:
                 cur.execute("""
-                    SELECT *
+                    SELECT
+                        crm_clients.*,
+                        users.username AS commercial
                     FROM crm_clients
-                    WHERE owner_id = %s
-                      AND name ILIKE %s
-                    ORDER BY created_at DESC
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.owner_id = %s
+                      AND crm_clients.name ILIKE %s
+                    ORDER BY crm_clients.created_at DESC
                 """, (session["user"]["id"], f"%{q}%"))
             else:
                 cur.execute("""
-                    SELECT *
+                    SELECT
+                        crm_clients.*,
+                        users.username AS commercial
                     FROM crm_clients
-                    WHERE owner_id = %s
-                    ORDER BY created_at DESC
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.owner_id = %s
+                    ORDER BY crm_clients.created_at DESC
                 """, (session["user"]["id"],))
 
         rows = cur.fetchall()
