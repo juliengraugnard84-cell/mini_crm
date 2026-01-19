@@ -1128,7 +1128,11 @@ def clients():
                     ORDER BY created_at DESC
                 """, (f"%{q}%",))
             else:
-                cur.execute("SELECT * FROM crm_clients ORDER BY created_at DESC")
+                cur.execute("""
+                    SELECT *
+                    FROM crm_clients
+                    ORDER BY created_at DESC
+                """)
         else:
             if q:
                 cur.execute("""
@@ -1156,6 +1160,38 @@ def clients():
 
 
 # =========================
+# MISE À JOUR STATUT CLIENT
+# (ADMIN + COMMERCIAL AUTORISÉS)
+# =========================
+@app.route("/clients/<int:client_id>/status", methods=["POST"])
+@login_required
+def update_client_status(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    new_status = (request.form.get("status") or "").strip()
+
+    if not new_status:
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("clients"))
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE crm_clients
+            SET status = %s
+            WHERE id = %s
+            """,
+            (new_status, client_id),
+        )
+
+    conn.commit()
+    flash("Statut du dossier mis à jour.", "success")
+    return redirect(url_for("clients"))
+
+
+# =========================
 # CRÉATION CLIENT
 # =========================
 @app.route("/clients/new", methods=["GET", "POST"])
@@ -1164,7 +1200,6 @@ def new_client():
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
 
-        # Sécurité minimale : nom obligatoire
         if not name:
             flash("Nom du dossier obligatoire.", "danger")
             return redirect(url_for("new_client"))
@@ -1192,7 +1227,6 @@ def new_client():
             client_id = cur.fetchone()[0]
 
         conn.commit()
-
         flash("Dossier client créé.", "success")
         return redirect(url_for("client_detail", client_id=client_id))
 
