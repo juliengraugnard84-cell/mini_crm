@@ -31,6 +31,18 @@
             <strong>{{ format_date(cotation.date_creation) }}</strong>
         </div>
 
+        <!-- ✅ AJOUT : DATE DE NÉGOCIATION -->
+        <div class="info-item">
+            <span>Date de négociation</span>
+            <strong>{{ format_date(cotation.date_negociation) }}</strong>
+        </div>
+
+        <!-- ✅ AJOUT : HEURE DE NÉGOCIATION -->
+        <div class="info-item">
+            <span>Heure de négociation</span>
+            <strong>{{ cotation.heure_negociation or "—" }}</strong>
+        </div>
+
         <div class="info-item">
             <span>Statut</span>
             <strong>{{ cotation.status }}</strong>
@@ -46,6 +58,12 @@
         <div class="info-item">
             <span>PDL / PCE</span>
             <strong>{{ cotation.pdl_pce or "—" }}</strong>
+        </div>
+
+        <!-- ✅ AJOUT : TYPE DE COMPTEUR -->
+        <div class="info-item">
+            <span>Type de compteur</span>
+            <strong>{{ cotation.type_compteur or "—" }}</strong>
         </div>
 
         <div class="info-item">
