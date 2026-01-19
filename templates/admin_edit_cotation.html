@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>Modifier la cotation</h1>
+<p class="text-muted mb-4">
+    Client : {{ cotation.client_name }}
+</p>
+
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="row g-3">
+
+        <div class="col-md-4">
+            <label class="form-label">Énergie</label>
+            <select name="energie_type" class="form-select">
+                <option value="gaz" {% if cotation.energie_type == 'gaz' %}selected{% endif %}>Gaz</option>
+                <option value="electricite" {% if cotation.energie_type == 'electricite' %}selected{% endif %}>Électricité</option>
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Type de compteur</label>
+            <select name="type_compteur" class="form-select">
+                <option value="">—</option>
+                <option value="monophase" {% if cotation.type_compteur == 'monophase' %}selected{% endif %}>Monophasé</option>
+                <option value="triphase" {% if cotation.type_compteur == 'triphase' %}selected{% endif %}>Triphasé</option>
+                <option value="linky" {% if cotation.type_compteur == 'linky' %}selected{% endif %}>Linky</option>
+                <option value="gaz" {% if cotation.type_compteur == 'gaz' %}selected{% endif %}>Gaz</option>
+                <option value="autre" {% if cotation.type_compteur == 'autre' %}selected{% endif %}>Autre</option>
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Statut</label>
+            <select name="status" class="form-select">
+                <option value="nouvelle" {% if cotation.status == 'nouvelle' %}selected{% endif %}>Nouvelle</option>
+                <option value="envoyee" {% if cotation.status == 'envoyee' %}selected{% endif %}>Envoyée</option>
+                <option value="acceptee" {% if cotation.status == 'acceptee' %}selected{% endif %}>Acceptée</option>
+                <option value="refusee" {% if cotation.status == 'refusee' %}selected{% endif %}>Refusée</option>
+            </select>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">PDL / PCE</label>
+            <input type="text"
+                   name="pdl_pce"
+                   class="form-control"
+                   value="{{ cotation.pdl_pce }}">
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Date d’échéance</label>
+            <input type="date"
+                   name="date_echeance"
+                   class="form-control"
+                   value="{{ format_date(cotation.date_echeance) }}">
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Entreprise</label>
+            <input type="text"
+                   name="entreprise_nom"
+                   class="form-control"
+                   value="{{ cotation.entreprise_nom }}">
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Fournisseur actuel</label>
+            <input type="text"
+                   name="fournisseur_actuel"
+                   class="form-control"
+                   value="{{ cotation.fournisseur_actuel }}">
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">SIRET</label>
+            <input type="text"
+                   name="siret"
+                   class="form-control"
+                   value="{{ cotation.siret }}">
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Signataire</label>
+            <input type="text"
+                   name="signataire_nom"
+                   class="form-control"
+                   value="{{ cotation.signataire_nom }}">
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Téléphone</label>
+            <input type="text"
+                   name="signataire_tel"
+                   class="form-control"
+                   value="{{ cotation.signataire_tel }}">
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Email</label>
+            <input type="email"
+                   name="signataire_email"
+                   class="form-control"
+                   value="{{ cotation.signataire_email }}">
+        </div>
+
+        <div class="col-md-12">
+            <label class="form-label">Commentaire</label>
+            <textarea name="commentaire"
+                      rows="4"
+                      class="form-control">{{ cotation.commentaire }}</textarea>
+        </div>
+
+    </div>
+
+    <div class="mt-4 text-end">
+        <a href="{{ url_for('admin_cotation_detail', cotation_id=cotation.id) }}"
+           class="btn btn-secondary">
+            Annuler
+        </a>
+        <button class="btn btn-primary">
+            Enregistrer
+        </button>
+    </div>
+
+</form>
+
+{% endblock %}

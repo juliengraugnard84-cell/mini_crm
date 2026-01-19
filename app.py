@@ -1164,24 +1164,40 @@ def new_client():
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
 
+        # Sécurité minimale : nom obligatoire
         if not name:
             flash("Nom du dossier obligatoire.", "danger")
             return redirect(url_for("new_client"))
 
         conn = get_db()
+
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO crm_clients (name, owner_id)
-                VALUES (%s, %s)
+            cur.execute(
+                """
+                INSERT INTO crm_clients (
+                    name,
+                    owner_id,
+                    status,
+                    created_at
+                )
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
                 RETURNING id
-            """, (name, session["user"]["id"]))
+                """,
+                (
+                    name,
+                    session["user"]["id"],
+                    "nouveau",
+                ),
+            )
             client_id = cur.fetchone()[0]
 
         conn.commit()
+
         flash("Dossier client créé.", "success")
         return redirect(url_for("client_detail", client_id=client_id))
 
     return render_template("new_client.html")
+
 
 
 # =========================
@@ -1618,7 +1634,7 @@ def admin_cotation_detail(cotation_id):
 
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT
+            SELECTA
                 cotations.*,
                 crm_clients.name AS client_name,
                 users.username AS commercial_name
@@ -1644,6 +1660,71 @@ def admin_cotation_detail(cotation_id):
     return render_template(
         "admin_cotation_detail.html",
         cotation=row_to_obj(row)
+    )
+# =========================
+# ADMIN → ÉDITION COTATION
+# =========================
+@app.route("/admin/cotations/<int:cotation_id>/edit", methods=["GET", "POST"])
+@admin_required
+def admin_edit_cotation(cotation_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                cotations.*,
+                crm_clients.name AS client_name
+            FROM cotations
+            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            WHERE cotations.id = %s
+        """, (cotation_id,))
+        cotation = cur.fetchone()
+
+    if not cotation:
+        flash("Cotation introuvable.", "danger")
+        return redirect(url_for("admin_cotations"))
+
+    if request.method == "POST":
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE cotations
+                SET
+                    energie_type = %s,
+                    type_compteur = %s,
+                    pdl_pce = %s,
+                    date_echeance = %s,
+                    fournisseur_actuel = %s,
+                    entreprise_nom = %s,
+                    siret = %s,
+                    signataire_nom = %s,
+                    signataire_tel = %s,
+                    signataire_email = %s,
+                    commentaire = %s,
+                    status = %s
+                WHERE id = %s
+            """, (
+                request.form.get("energie_type"),
+                request.form.get("type_compteur"),
+                request.form.get("pdl_pce"),
+                request.form.get("date_echeance"),
+                request.form.get("fournisseur_actuel"),
+                request.form.get("entreprise_nom"),
+                request.form.get("siret"),
+                request.form.get("signataire_nom"),
+                request.form.get("signataire_tel"),
+                request.form.get("signataire_email"),
+                request.form.get("commentaire"),
+                request.form.get("status"),
+                cotation_id,
+            ))
+
+        conn.commit()
+        flash("Cotation mise à jour.", "success")
+        return redirect(url_for("admin_cotation_detail", cotation_id=cotation_id))
+
+    return render_template(
+        "admin_edit_cotation.html",
+        cotation=row_to_obj(cotation),
     )
 
 
