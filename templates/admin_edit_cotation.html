@@ -12,24 +12,43 @@
 
     <div class="row g-3">
 
+        <!-- DATE DE NÉGOCIATION -->
+        <div class="col-md-4">
+            <label class="form-label">Date de négociation</label>
+            <input type="date"
+                   name="date_negociation"
+                   class="form-control"
+                   value="{{ format_date(cotation.date_negociation) }}"
+                   required>
+        </div>
+
+        <!-- HEURE DE NÉGOCIATION -->
+        <div class="col-md-4">
+            <label class="form-label">Heure de négociation</label>
+            <input type="time"
+                   name="heure_negociation"
+                   class="form-control"
+                   value="{{ cotation.heure_negociation or '' }}"
+                   required>
+        </div>
+
         <div class="col-md-4">
             <label class="form-label">Énergie</label>
-            <select name="energie_type" class="form-select">
+            <select name="energie_type" class="form-select" required>
                 <option value="gaz" {% if cotation.energie_type == 'gaz' %}selected{% endif %}>Gaz</option>
                 <option value="electricite" {% if cotation.energie_type == 'electricite' %}selected{% endif %}>Électricité</option>
             </select>
         </div>
 
+        <!-- TYPE DE COMPTEUR : SAISIE MANUELLE -->
         <div class="col-md-4">
             <label class="form-label">Type de compteur</label>
-            <select name="type_compteur" class="form-select">
-                <option value="">—</option>
-                <option value="monophase" {% if cotation.type_compteur == 'monophase' %}selected{% endif %}>Monophasé</option>
-                <option value="triphase" {% if cotation.type_compteur == 'triphase' %}selected{% endif %}>Triphasé</option>
-                <option value="linky" {% if cotation.type_compteur == 'linky' %}selected{% endif %}>Linky</option>
-                <option value="gaz" {% if cotation.type_compteur == 'gaz' %}selected{% endif %}>Gaz</option>
-                <option value="autre" {% if cotation.type_compteur == 'autre' %}selected{% endif %}>Autre</option>
-            </select>
+            <input type="text"
+                   name="type_compteur"
+                   class="form-control"
+                   placeholder="C2 / C4 / C5 / T1 / T2 / T3"
+                   value="{{ cotation.type_compteur }}"
+                   required>
         </div>
 
         <div class="col-md-4">

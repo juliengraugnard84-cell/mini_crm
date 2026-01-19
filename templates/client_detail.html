@@ -57,7 +57,6 @@
 
 <!-- ================= TABS ================= -->
 <ul class="nav nav-tabs mb-4" role="tablist">
-
     <li class="nav-item">
         <button class="nav-link active"
                 data-bs-toggle="tab"
@@ -84,7 +83,6 @@
             Mise à jour
         </button>
     </li>
-
 </ul>
 
 <div class="tab-content">
@@ -105,9 +103,22 @@
 
         <div class="row g-3">
 
+            <!-- ✅ DATE DE NÉGOCIATION -->
             <div class="col-md-4">
                 <label class="form-label">Date de négociation</label>
-                <input type="date" name="date_negociation" class="form-control" required>
+                <input type="date"
+                       name="date_negociation"
+                       class="form-control"
+                       required>
+            </div>
+
+            <!-- ✅ HEURE DE NÉGOCIATION (AJOUTÉ) -->
+            <div class="col-md-4">
+                <label class="form-label">Heure de négociation</label>
+                <input type="time"
+                       name="heure_negociation"
+                       class="form-control"
+                       required>
             </div>
 
             <div class="col-md-4">
@@ -119,7 +130,7 @@
                 </select>
             </div>
 
-            <!-- TYPE DE COMPTEUR : SAISIE MANUELLE -->
+            <!-- TYPE DE COMPTEUR -->
             <div class="col-md-4">
                 <label class="form-label">Type de compteur</label>
                 <input type="text"
@@ -171,7 +182,9 @@
 
             <div class="col-md-12">
                 <label class="form-label">Commentaire</label>
-                <textarea name="commentaire" rows="3" class="form-control"></textarea>
+                <textarea name="commentaire"
+                          rows="3"
+                          class="form-control"></textarea>
             </div>
 
         </div>
@@ -185,9 +198,9 @@
 </div>
 {% endif %}
 
+<!-- HISTORIQUE COTATIONS INCHANGÉ -->
 <div class="card">
     <h5>Historique des cotations</h5>
-
     {% if cotations %}
     <table class="table">
         <thead>
@@ -225,102 +238,6 @@
         <p class="text-muted mb-0">Aucune cotation.</p>
     {% endif %}
 </div>
-
-</div>
-
-<!-- ======================================================
-     ONGLET DOCUMENTS
-====================================================== -->
-<div class="tab-pane fade" id="documents">
-
-{% if current_user and current_user.role in ['commercial','admin'] %}
-<div class="card mb-4">
-    <h5>Ajouter un document</h5>
-
-    <form method="post"
-          action="{{ url_for('upload_client_document', client_id=client.id) }}"
-          enctype="multipart/form-data">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="row g-3 align-items-end">
-            <div class="col-md-8">
-                <input type="file" name="file" class="form-control" required>
-            </div>
-            <div class="col-md-4 text-end">
-                <button class="btn btn-primary">Ajouter</button>
-            </div>
-        </div>
-    </form>
-</div>
-{% endif %}
-
-<div class="card">
-    <h5>Documents du dossier</h5>
-
-    {% if documents %}
-    <ul class="doc-list">
-        {% for d in documents %}
-        <li class="doc-item d-flex justify-content-between align-items-center">
-            <a href="{{ d.url }}" target="_blank">{{ d.nom }}</a>
-
-            {% if current_user and (current_user.role == 'admin' or current_user.id == client.owner_id) %}
-            <form method="post"
-                  action="{{ url_for('delete_client_document', client_id=client.id) }}"
-                  onsubmit="return confirm('Supprimer ce document ?');">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="key" value="{{ d.key }}">
-                <button class="btn btn-danger btn-sm">Supprimer</button>
-            </form>
-            {% endif %}
-        </li>
-        {% endfor %}
-    </ul>
-    {% else %}
-        <p class="text-muted">Aucun document.</p>
-    {% endif %}
-</div>
-
-</div>
-
-<!-- ======================================================
-     ONGLET MISE À JOUR
-====================================================== -->
-<div class="tab-pane fade" id="updates">
-
-{% if current_user and current_user.role == 'commercial' %}
-<div class="card">
-    <h5>Demande de mise à jour</h5>
-
-    <form method="post"
-          action="{{ url_for('update_client', client_id=client.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-        <div class="row g-3">
-            <div class="col-md-4">
-                <label class="form-label">Date souhaitée</label>
-                <input type="date" name="update_date" class="form-control" required>
-            </div>
-
-            <div class="col-md-12">
-                <label class="form-label">Commentaire</label>
-                <textarea name="update_commentaire"
-                          class="form-control"
-                          rows="4"
-                          required></textarea>
-            </div>
-        </div>
-
-        <div class="mt-4 text-end">
-            <button class="btn btn-warning">
-                Envoyer à l’administrateur
-            </button>
-        </div>
-    </form>
-</div>
-{% else %}
-<p class="text-muted">
-    Les demandes de mise à jour sont visibles côté administrateur.
-</p>
-{% endif %}
 
 </div>
 

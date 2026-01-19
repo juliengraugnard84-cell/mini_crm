@@ -1253,7 +1253,6 @@ def client_detail(client_id):
         ca_total=ca_total,
     )
 
-
 # =========================
 # CRÉATION COTATION
 # =========================
@@ -1267,10 +1266,11 @@ def create_cotation(client_id):
     user = session.get("user") or {}
 
     date_negociation = request.form.get("date_negociation")
+    heure_negociation = request.form.get("heure_negociation")
     energie_type = request.form.get("energie_type")
 
-    if not date_negociation or not energie_type:
-        flash("Date et énergie obligatoires.", "danger")
+    if not date_negociation or not heure_negociation or not energie_type:
+        flash("Date, heure et énergie sont obligatoires.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
     with conn.cursor() as cur:
@@ -1278,6 +1278,7 @@ def create_cotation(client_id):
             INSERT INTO cotations (
                 client_id,
                 date_negociation,
+                heure_negociation,
                 energie_type,
                 pdl_pce,
                 date_echeance,
@@ -1292,10 +1293,11 @@ def create_cotation(client_id):
                 is_read,
                 status
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
         """, (
             client_id,
             date_negociation,
+            heure_negociation,
             energie_type,
             request.form.get("pdl_pce"),
             request.form.get("date_echeance"),
@@ -1691,6 +1693,8 @@ def admin_edit_cotation(cotation_id):
             cur.execute("""
                 UPDATE cotations
                 SET
+                    date_negociation = %s,
+                    heure_negociation = %s,
                     energie_type = %s,
                     type_compteur = %s,
                     pdl_pce = %s,
@@ -1705,6 +1709,8 @@ def admin_edit_cotation(cotation_id):
                     status = %s
                 WHERE id = %s
             """, (
+                request.form.get("date_negociation"),
+                request.form.get("heure_negociation"),
                 request.form.get("energie_type"),
                 request.form.get("type_compteur"),
                 request.form.get("pdl_pce"),
@@ -1728,6 +1734,7 @@ def admin_edit_cotation(cotation_id):
         "admin_edit_cotation.html",
         cotation=row_to_obj(cotation),
     )
+
 
 
 # =========================
