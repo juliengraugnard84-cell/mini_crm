@@ -119,17 +119,14 @@
                 </select>
             </div>
 
-            <!-- ✅ TYPE DE COMPTEUR (AJOUTÉ) -->
+            <!-- ✅ TYPE DE COMPTEUR : SAISIE MANUELLE -->
             <div class="col-md-4">
                 <label class="form-label">Type de compteur</label>
-                <select name="type_compteur" class="form-select" required>
-                    <option value="">— Choisir —</option>
-                    <option value="monophase">Monophasé</option>
-                    <option value="triphase">Triphasé</option>
-                    <option value="linky">Linky</option>
-                    <option value="gaz">Gaz</option>
-                    <option value="autre">Autre</option>
-                </select>
+                <input type="text"
+                       name="type_compteur"
+                       class="form-control"
+                       placeholder="Ex : Linky, Triphasé 36 kVA, Gaz G4…"
+                       required>
             </div>
 
             <div class="col-md-4">
