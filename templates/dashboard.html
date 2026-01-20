@@ -3,22 +3,112 @@
 
 {% block content %}
 
-<!-- ================= PAGE HEADER ================= -->
+{% if current_user and current_user.role == 'commercial' %}
+
+<!-- ================= DASHBOARD COMMERCIAL ================= -->
+<div class="page-header" style="margin-bottom:24px;">
+    <h1>Mon tableau de bord</h1>
+    <p class="text-muted">Suivi de mon activité commerciale</p>
+</div>
+
+<!-- KPI COMMERCIAL -->
+<div class="kpi-grid"
+     style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:32px;">
+    <div class="kpi-tile">
+        <div class="kpi-label">Mes dossiers</div>
+        <div class="kpi-value">{{ commercial_stats.nb_clients }}</div>
+    </div>
+
+    <div class="kpi-tile">
+        <div class="kpi-label">Mon CA total</div>
+        <div class="kpi-value">{{ "%.2f"|format(commercial_stats.ca_total) }} €</div>
+    </div>
+
+    <div class="kpi-tile">
+        <div class="kpi-label">Mon CA du mois</div>
+        <div class="kpi-value">{{ "%.2f"|format(commercial_stats.ca_mois) }} €</div>
+    </div>
+
+    <div class="kpi-tile">
+        <div class="kpi-label">Cotations en attente</div>
+        <div class="kpi-value">{{ commercial_stats.cotations_attente }}</div>
+    </div>
+</div>
+
+<!-- MES DOSSIERS -->
+<div class="card">
+    <h5>Mes dossiers récents</h5>
+
+    {% if commercial_clients %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Dossier</th>
+                <th>Statut</th>
+                <th>Date</th>
+                <th style="text-align:right;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in commercial_clients %}
+            <tr>
+                <td><strong>{{ c.name }}</strong></td>
+                <td>{{ c.status or "—" }}</td>
+                <td>{{ format_date(c.created_at) }}</td>
+                <td style="text-align:right;">
+                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                       class="btn btn-secondary btn-sm">
+                        Ouvrir
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="text-muted">Aucun dossier.</p>
+    {% endif %}
+</div>
+
+<!-- MES COTATIONS -->
+<div class="card">
+    <h5>Mes dernières cotations</h5>
+
+    {% if commercial_cotations %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Énergie</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in commercial_cotations %}
+            <tr>
+                <td>{{ format_date(c.date_creation) }}</td>
+                <td>{{ c.energie_type or "—" }}</td>
+                <td>{{ c.status or "—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="text-muted">Aucune cotation récente.</p>
+    {% endif %}
+</div>
+
+{% else %}
+
+<!-- ================= DASHBOARD ADMIN (INCHANGÉ) ================= -->
+
 <div class="page-header" style="margin-bottom:24px;">
     <h1>Tableau de bord</h1>
     <p class="text-muted">Vue d’ensemble de l’activité</p>
 </div>
 
-<!-- ================= KPI ================= -->
-<div
-    class="kpi-grid"
-    style="
-        display:grid;
-        grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-        gap:18px;
-        margin-bottom:32px;
-    "
->
+<div class="kpi-grid"
+     style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:32px;">
     <div class="kpi-tile">
         <div class="kpi-label">Dossiers clients</div>
         <div class="kpi-value">{{ total_clients }}</div>
@@ -26,9 +116,7 @@
 
     <div class="kpi-tile">
         <div class="kpi-label">Chiffre d’affaires total</div>
-        <div class="kpi-value">
-            {{ "%.2f"|format(total_ca) }} €
-        </div>
+        <div class="kpi-value">{{ "%.2f"|format(total_ca) }} €</div>
     </div>
 
     <div class="kpi-tile">
@@ -36,115 +124,96 @@
         <div class="kpi-value">{{ total_docs }}</div>
     </div>
 
-    {% if current_user and current_user.role == 'admin' %}
     <div class="kpi-tile" style="border-left-color:var(--danger);">
         <div class="kpi-label">Nouvelles cotations</div>
         <div class="kpi-value">{{ unread_cotations }}</div>
     </div>
-    {% endif %}
 </div>
 
-<!-- ================= DERNIERS DOSSIERS ================= -->
 <div class="card">
     <h5>Derniers dossiers créés</h5>
 
     {% if last_clients %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Dossier</th>
-                    <th>Email</th>
-                    <th>Date de création</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in last_clients %}
-                <tr>
-                    <td>
-                        <strong>{{ c.name }}</strong>
-                    </td>
-                    <td>{{ c.email or "—" }}</td>
-                    <td>{{ format_date(c.created_at) }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Dossier</th>
+                <th>Email</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in last_clients %}
+            <tr>
+                <td><strong>{{ c.name }}</strong></td>
+                <td>{{ c.email or "—" }}</td>
+                <td>{{ format_date(c.created_at) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     {% else %}
         <p class="text-muted">Aucun dossier récent.</p>
     {% endif %}
 </div>
 
-<!-- ================= DERNIER CA ================= -->
 <div class="card">
     <h5>Dernier chiffre d’affaires enregistré</h5>
 
     {% if last_rev %}
-        <div
-            style="
-                display:grid;
-                grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-                gap:18px;
-            "
-        >
-            <div>
-                <div class="kpi-label">Date</div>
-                <strong>{{ format_date(last_rev.date) }}</strong>
-            </div>
-
-            <div>
-                <div class="kpi-label">Montant</div>
-                <strong>{{ "%.2f"|format(last_rev.montant) }} €</strong>
-            </div>
-
-            <div>
-                <div class="kpi-label">Commercial</div>
-                <strong>{{ last_rev.commercial or "—" }}</strong>
-            </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;">
+        <div>
+            <div class="kpi-label">Date</div>
+            <strong>{{ format_date(last_rev.date) }}</strong>
         </div>
+        <div>
+            <div class="kpi-label">Montant</div>
+            <strong>{{ "%.2f"|format(last_rev.montant) }} €</strong>
+        </div>
+        <div>
+            <div class="kpi-label">Commercial</div>
+            <strong>{{ last_rev.commercial or "—" }}</strong>
+        </div>
+    </div>
     {% else %}
-        <p class="text-muted">Aucun chiffre d’affaires enregistré.</p>
+        <p class="text-muted">Aucun chiffre d’affaires.</p>
     {% endif %}
 </div>
 
-<!-- ================= COTATIONS ADMIN ================= -->
-{% if current_user and current_user.role == 'admin' %}
 <div class="card">
     <h5>Dernières demandes de cotation</h5>
 
     {% if cotations_admin %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Dossier</th>
-                    <th>Énergie</th>
-                    <th style="text-align:right;">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in cotations_admin %}
-                <tr>
-                    <td>{{ format_date(c.date_creation) }}</td>
-                    <td>
-                        <strong>{{ c.client_name }}</strong>
-                    </td>
-                    <td>{{ c.energie_type or "—" }}</td>
-                    <td style="text-align:right;">
-                        <a
-                            href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
-                            class="btn btn-secondary btn-sm"
-                        >
-                            Ouvrir
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Dossier</th>
+                <th>Énergie</th>
+                <th style="text-align:right;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cotations_admin %}
+            <tr>
+                <td>{{ format_date(c.date_creation) }}</td>
+                <td><strong>{{ c.client_name }}</strong></td>
+                <td>{{ c.energie_type or "—" }}</td>
+                <td style="text-align:right;">
+                    <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
+                       class="btn btn-secondary btn-sm">
+                        Ouvrir
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     {% else %}
         <p class="text-muted">Aucune nouvelle demande.</p>
     {% endif %}
 </div>
+
 {% endif %}
 
 {% endblock %}
