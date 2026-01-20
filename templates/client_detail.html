@@ -207,7 +207,7 @@
 </div>
 
 <!-- ======================================================
-     ONGLET DOCUMENTS (AJOUTÉ – COMMERCIAL + ADMIN)
+     ONGLET DOCUMENTS (OUVRIR + TÉLÉCHARGER)
 ====================================================== -->
 <div class="tab-pane fade" id="documents">
 
@@ -220,7 +220,8 @@
           enctype="multipart/form-data"
           class="mb-3">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="file" name="file"
+        <input type="file"
+               name="file"
                accept=".pdf,.xls,.xlsx,.csv,.doc,.docx"
                required>
         <button class="btn btn-primary btn-sm">Ajouter un document</button>
@@ -232,17 +233,27 @@
         <thead>
             <tr>
                 <th>Nom</th>
-                <th>Action</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
         {% for doc in documents %}
             <tr>
                 <td>{{ doc.nom }}</td>
-                <td>
+                <td class="d-flex gap-2">
+                    <!-- OUVRIR : aperçu navigateur (PDF) -->
                     <a href="{{ doc.url }}"
                        target="_blank"
-                       class="btn btn-secondary btn-sm">
+                       class="btn btn-success btn-sm"
+                       title="Ouvrir le document">
+                        Ouvrir
+                    </a>
+
+                    <!-- TÉLÉCHARGER : téléchargement forcé -->
+                    <a href="{{ doc.url }}&response-content-disposition=attachment"
+                       class="btn btn-primary btn-sm"
+                       title="Télécharger le document"
+                       download>
                         Télécharger
                     </a>
                 </td>

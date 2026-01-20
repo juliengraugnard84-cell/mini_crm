@@ -16,7 +16,9 @@ class Config:
     # =========================
     # Mode local / prod
     # =========================
-    LOCAL_MODE = os.environ.get("LOCAL_MODE", "0") in ("1", "true", "True")
+    # LOCAL_MODE = True  -> coupe S3 (DEV)
+    # LOCAL_MODE = False -> active S3 (PROD)
+    LOCAL_MODE = os.environ.get("LOCAL_MODE", "0").lower() in ("1", "true")
 
     # =========================
     # Base directory
