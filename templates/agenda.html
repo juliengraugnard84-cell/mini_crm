@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block page_title %}
+Agenda
+{% endblock %}
+
+{% block content %}
+
+<!-- Conteneur du calendrier -->
+<div id="calendar" class="card-modern p-4"></div>
+
+<!-- Modal création d'événement -->
+<div class="modal fade" id="eventModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form id="eventForm" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouveau rendez-vous</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <input type="hidden" id="eventDate">
+
+                <div class="mb-3">
+                    <label class="form-label">Titre</label>
+                    <input type="text" id="eventTitle" class="form-control" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea id="eventDescription" class="form-control"></textarea>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Annuler
+                </button>
+
+                <button type="submit" class="btn btn-primary">
+                    Enregistrer
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<!-- FullCalendar -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<!-- Script personnalisé -->
+<script src="{{ url_for('static', filename='calendar.js') }}"></script>
+{% endblock %}
