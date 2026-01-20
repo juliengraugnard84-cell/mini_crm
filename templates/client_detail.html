@@ -88,7 +88,7 @@
 <div class="tab-content">
 
 <!-- ======================================================
-     ONGLET COTATIONS
+     ONGLET COTATIONS (INCHANGÉ)
 ====================================================== -->
 <div class="tab-pane fade show active" id="cotations">
 
@@ -102,23 +102,14 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="row g-3">
-
-            <!-- ✅ DATE DE NÉGOCIATION -->
             <div class="col-md-4">
                 <label class="form-label">Date de négociation</label>
-                <input type="date"
-                       name="date_negociation"
-                       class="form-control"
-                       required>
+                <input type="date" name="date_negociation" class="form-control" required>
             </div>
 
-            <!-- ✅ HEURE DE NÉGOCIATION (AJOUTÉ) -->
             <div class="col-md-4">
                 <label class="form-label">Heure de négociation</label>
-                <input type="time"
-                       name="heure_negociation"
-                       class="form-control"
-                       required>
+                <input type="time" name="heure_negociation" class="form-control" required>
             </div>
 
             <div class="col-md-4">
@@ -130,14 +121,9 @@
                 </select>
             </div>
 
-            <!-- TYPE DE COMPTEUR -->
             <div class="col-md-4">
                 <label class="form-label">Type de compteur</label>
-                <input type="text"
-                       name="type_compteur"
-                       class="form-control"
-                       placeholder="C2 / C4 / C5 / T1 / T2 / T3"
-                       required>
+                <input type="text" name="type_compteur" class="form-control" required>
             </div>
 
             <div class="col-md-4">
@@ -165,40 +151,19 @@
                 <input type="text" name="siret" class="form-control">
             </div>
 
-            <div class="col-md-4">
-                <label class="form-label">Signataire</label>
-                <input type="text" name="signataire_nom" class="form-control">
-            </div>
-
-            <div class="col-md-4">
-                <label class="form-label">Téléphone</label>
-                <input type="text" name="signataire_tel" class="form-control">
-            </div>
-
-            <div class="col-md-6">
-                <label class="form-label">Email</label>
-                <input type="email" name="signataire_email" class="form-control">
-            </div>
-
             <div class="col-md-12">
                 <label class="form-label">Commentaire</label>
-                <textarea name="commentaire"
-                          rows="3"
-                          class="form-control"></textarea>
+                <textarea name="commentaire" rows="3" class="form-control"></textarea>
             </div>
-
         </div>
 
         <div class="mt-4 text-end">
-            <button class="btn btn-primary">
-                Créer la demande
-            </button>
+            <button class="btn btn-primary">Créer la demande</button>
         </div>
     </form>
 </div>
 {% endif %}
 
-<!-- HISTORIQUE COTATIONS INCHANGÉ -->
 <div class="card">
     <h5>Historique des cotations</h5>
     {% if cotations %}
@@ -236,6 +201,57 @@
     </table>
     {% else %}
         <p class="text-muted mb-0">Aucune cotation.</p>
+    {% endif %}
+</div>
+
+</div>
+
+<!-- ======================================================
+     ONGLET DOCUMENTS (AJOUTÉ – COMMERCIAL + ADMIN)
+====================================================== -->
+<div class="tab-pane fade" id="documents">
+
+<div class="card mb-4">
+    <h5>Documents du dossier</h5>
+
+    {% if current_user %}
+    <form method="post"
+          action="{{ url_for('upload_client_document', client_id=client.id) }}"
+          enctype="multipart/form-data"
+          class="mb-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="file" name="file"
+               accept=".pdf,.xls,.xlsx,.csv,.doc,.docx"
+               required>
+        <button class="btn btn-primary btn-sm">Ajouter un document</button>
+    </form>
+    {% endif %}
+
+    {% if documents %}
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for doc in documents %}
+            <tr>
+                <td>{{ doc.nom }}</td>
+                <td>
+                    <a href="{{ doc.url }}"
+                       target="_blank"
+                       class="btn btn-secondary btn-sm">
+                        Télécharger
+                    </a>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="text-muted">Aucun document.</p>
     {% endif %}
 </div>
 
