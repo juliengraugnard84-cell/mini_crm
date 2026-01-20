@@ -436,3 +436,33 @@ textarea:focus {
 .btn-ouvrir:active {
     transform: translateY(0);
 }
+/* Bouton Ouvrir – action principale */
+.btn-ouvrir {
+    background-color: #2563eb; /* bleu vif */
+    color: #ffffff;
+    border: none;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 18px;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-ouvrir:hover {
+    background-color: #1e40af;
+    transform: translateY(-1px);
+}
+/* Bouton Rechercher */
+.btn-rechercher {
+    background-color: #f59e0b; /* orange CRM */
+    color: #111827;
+    border: none;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 18px;
+    transition: background-color 0.2s ease;
+}
+
+.btn-rechercher:hover {
+    background-color: #d97706;
+    color: #ffffff;
+}

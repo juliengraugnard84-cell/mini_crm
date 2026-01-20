@@ -51,7 +51,7 @@
 
         <button
             type="submit"
-            class="btn btn-secondary"
+            class="btn btn-rechercher"
         >
             Rechercher
         </button>
@@ -93,27 +93,27 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
                         <select
-                            name="dossier_status"
+                            name="status"
                             class="form-select form-select-sm"
                             onchange="this.form.submit()"
                         >
                             <option value="en_cours"
-                                {% if c.dossier_status == 'en_cours' %}selected{% endif %}>
+                                {% if c.status == 'en_cours' %}selected{% endif %}>
                                 En cours
                             </option>
 
                             <option value="gagne"
-                                {% if c.dossier_status == 'gagne' %}selected{% endif %}>
+                                {% if c.status == 'gagne' %}selected{% endif %}>
                                 Gagné
                             </option>
 
                             <option value="perdu"
-                                {% if c.dossier_status == 'perdu' %}selected{% endif %}>
+                                {% if c.status == 'perdu' %}selected{% endif %}>
                                 Perdu
                             </option>
 
                             <option value="demande_maj"
-                                {% if c.dossier_status == 'demande_maj' %}selected{% endif %}>
+                                {% if c.status == 'demande_maj' %}selected{% endif %}>
                                 Demande de MAJ
                             </option>
                         </select>
@@ -127,7 +127,7 @@
                 <td style="text-align:right;">
                     <a
                         href="{{ url_for('client_detail', client_id=c.id) }}"
-                        class="btn btn-secondary btn-sm"
+                        class="btn btn-ouvrir btn-sm"
                     >
                         Ouvrir
                     </a>
