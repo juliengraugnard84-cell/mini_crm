@@ -21,6 +21,47 @@
     {% endif %}
 </div>
 
+<!-- ================= FICHE ENTREPRISE (NOUVEAU) ================= -->
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Fiche entreprise</strong>
+    </div>
+
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 mb-2">
+                <strong>Entreprise :</strong><br>
+                {{ client.name }}
+            </div>
+
+            <div class="col-md-6 mb-2">
+                <strong>Gérant :</strong><br>
+                {{ client.gerant_nom or "—" }}
+            </div>
+
+            <div class="col-md-6 mb-2">
+                <strong>Email :</strong><br>
+                {{ client.email or "—" }}
+            </div>
+
+            <div class="col-md-6 mb-2">
+                <strong>Téléphone :</strong><br>
+                {{ client.phone or "—" }}
+            </div>
+
+            <div class="col-md-6 mb-2">
+                <strong>SIRET :</strong><br>
+                {{ client.siret or "—" }}
+            </div>
+
+            <div class="col-md-6 mb-2">
+                <strong>Adresse :</strong><br>
+                {{ client.address or "—" }}
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ================= INFORMATIONS DOSSIER ================= -->
 <div class="card mb-4">
     <div class="card-header">
@@ -207,7 +248,7 @@
 </div>
 
 <!-- ======================================================
-     ONGLET DOCUMENTS (OUVRIR + TÉLÉCHARGER)
+     ONGLET DOCUMENTS (INCHANGÉ)
 ====================================================== -->
 <div class="tab-pane fade" id="documents">
 
@@ -241,18 +282,13 @@
             <tr>
                 <td>{{ doc.nom }}</td>
                 <td class="d-flex gap-2">
-                    <!-- OUVRIR : aperçu navigateur (PDF) -->
                     <a href="{{ doc.url }}"
                        target="_blank"
-                       class="btn btn-success btn-sm"
-                       title="Ouvrir le document">
+                       class="btn btn-success btn-sm">
                         Ouvrir
                     </a>
-
-                    <!-- TÉLÉCHARGER : téléchargement forcé -->
                     <a href="{{ doc.url }}&response-content-disposition=attachment"
                        class="btn btn-primary btn-sm"
-                       title="Télécharger le document"
                        download>
                         Télécharger
                     </a>

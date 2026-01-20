@@ -1173,7 +1173,6 @@ def clients():
 
 # =========================
 # MISE À JOUR STATUT CLIENT
-# (ADMIN + COMMERCIAL AUTORISÉS)
 # =========================
 @app.route("/clients/<int:client_id>/status", methods=["POST"])
 @login_required
@@ -1190,11 +1189,7 @@ def update_client_status(client_id):
     conn = get_db()
     with conn.cursor() as cur:
         cur.execute(
-            """
-            UPDATE crm_clients
-            SET status = %s
-            WHERE id = %s
-            """,
+            "UPDATE crm_clients SET status=%s WHERE id=%s",
             (new_status, client_id),
         )
 
@@ -1204,7 +1199,7 @@ def update_client_status(client_id):
 
 
 # =========================
-# CRÉATION CLIENT
+# CRÉATION CLIENT (CORRIGÉE)
 # =========================
 @app.route("/clients/new", methods=["GET", "POST"])
 @login_required
@@ -1219,23 +1214,30 @@ def new_client():
         conn = get_db()
 
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 INSERT INTO crm_clients (
                     name,
+                    gerant_nom,
+                    email,
+                    phone,
+                    siret,
+                    address,
                     owner_id,
                     status,
                     created_at
                 )
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP)
                 RETURNING id
-                """,
-                (
-                    name,
-                    session["user"]["id"],
-                    "nouveau",
-                ),
-            )
+            """, (
+                name,
+                request.form.get("gerant_nom"),
+                request.form.get("email"),
+                request.form.get("phone"),
+                request.form.get("siret"),
+                request.form.get("address"),
+                session["user"]["id"],
+                "nouveau",
+            ))
             client_id = cur.fetchone()[0]
 
         conn.commit()
@@ -1243,7 +1245,6 @@ def new_client():
         return redirect(url_for("client_detail", client_id=client_id))
 
     return render_template("new_client.html")
-
 
 
 # =========================
@@ -1269,14 +1270,13 @@ def client_detail(client_id):
         """, (client_id,))
         cotations = cur.fetchall()
 
-        # CA par mois — GROUP BY SAFE
         cur.execute("""
             SELECT
-                TO_CHAR(date::date, 'YYYY-MM') AS mois,
+                TO_CHAR(date::date,'YYYY-MM') AS mois,
                 SUM(montant) AS total
             FROM revenus
-            WHERE client_id = %s
-            GROUP BY TO_CHAR(date::date, 'YYYY-MM')
+            WHERE client_id=%s
+            GROUP BY mois
             ORDER BY mois DESC
         """, (client_id,))
         ca_par_mois = cur.fetchall()
@@ -1298,6 +1298,7 @@ def client_detail(client_id):
         ca_par_mois=[row_to_obj(r) for r in ca_par_mois],
         ca_total=ca_total,
     )
+
 
 # =========================
 # CRÉATION COTATION
@@ -1365,9 +1366,8 @@ def create_cotation(client_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-
 # =========================
-# SUPPRESSION COTATION (COMMERCIAL PROPRIÉTAIRE OU ADMIN)
+# SUPPRESSION COTATION
 # =========================
 @app.route("/cotations/<int:cotation_id>/delete", methods=["POST"])
 @login_required
