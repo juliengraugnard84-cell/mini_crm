@@ -1,6 +1,6 @@
 /* =========================================================
    SYNERGYGROUP CRM — STYLE CSS GLOBAL & STABLE
-   Compatible CRM COMPLET + Chat
+   Compatible Windows / macOS / Chrome / Safari
    ========================================================= */
 
 /* =========================================================
@@ -13,7 +13,7 @@
 
     --bg:#f4f6f9;
     --surface:#ffffff;
-    --border:#e5e7eb;
+    --border:#d1d5db;
 
     --text:#0f172a;
     --muted:#6b7280;
@@ -25,14 +25,21 @@
     --radius:12px;
     --radius-sm:10px;
 
-    --shadow-soft:0 2px 10px rgba(5,10,58,.06);
+    --shadow-soft:0 2px 12px rgba(5,10,58,.08);
 
     --sidebar-w:240px;
 }
 
-* { box-sizing:border-box; }
+* {
+    box-sizing:border-box;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+}
 
-html, body { height:100%; }
+html, body {
+    height:100%;
+    color-scheme:light;
+}
 
 body {
     margin:0;
@@ -75,7 +82,7 @@ body {
     align-items:center;
     gap:12px;
     padding:18px;
-    border-bottom:1px solid rgba(255,255,255,.08);
+    border-bottom:1px solid rgba(255,255,255,.12);
 }
 
 .logo {
@@ -90,7 +97,7 @@ body {
 }
 
 .company strong { font-weight:800; letter-spacing:.3px; }
-.company small { font-size:.8rem; opacity:.75; }
+.company small { font-size:.8rem; opacity:.8; }
 
 .sidebar-nav {
     display:flex;
@@ -107,27 +114,16 @@ body {
     color:#e5e7eb;
     font-weight:500;
     transition:background .15s ease,color .15s ease;
-    position:relative;
 }
 
-.sidebar-nav a:hover { background:rgba(242,178,51,.15); }
+.sidebar-nav a:hover {
+    background:rgba(242,178,51,.2);
+}
 
 .sidebar-nav a.active {
     background:var(--accent);
     color:var(--primary);
-    font-weight:700;
-}
-
-.sidebar-footer {
-    margin-top:auto;
-    padding:14px;
-    border-top:1px solid rgba(255,255,255,.08);
-}
-
-.sidebar-footer a {
-    color:#fecaca;
-    font-size:.85rem;
-    text-decoration:none;
+    font-weight:800;
 }
 
 /* =========================================================
@@ -138,12 +134,6 @@ body {
     background:var(--surface);
     border-bottom:1px solid var(--border);
     padding:14px 22px;
-}
-
-.topbar .role {
-    color:var(--muted);
-    font-size:.85rem;
-    margin-left:6px;
 }
 
 .content {
@@ -162,46 +152,8 @@ body {
 }
 
 /* =========================================================
-   5. FLASH MESSAGES
+   5. UI — CARDS / KPI
    ========================================================= */
-
-.flash-container { padding:16px 22px 0; }
-
-.flash {
-    display:flex;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    box-shadow:var(--shadow-soft);
-    overflow:hidden;
-    margin-bottom:10px;
-}
-
-.flash::before {
-    content:"";
-    width:6px;
-    background:var(--accent);
-}
-
-.flash-success::before { background:var(--success); }
-.flash-danger::before  { background:var(--danger); }
-.flash-warning::before { background:var(--warning); }
-
-.flash > * { padding:10px 12px; }
-
-/* =========================================================
-   6. UI CRM — TITRES / CARDS / KPI
-   ========================================================= */
-
-h1 { font-size:1.5rem; margin:0 0 18px; }
-
-h5 {
-    font-size:.75rem;
-    text-transform:uppercase;
-    letter-spacing:.12em;
-    color:var(--muted);
-    margin-bottom:10px;
-}
 
 .card {
     background:var(--surface);
@@ -213,200 +165,87 @@ h5 {
 }
 
 .kpi-tile {
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    padding:16px;
     border-left:4px solid var(--accent);
-    box-shadow:var(--shadow-soft);
-}
-
-.kpi-label {
-    font-size:.75rem;
-    color:var(--muted);
-    text-transform:uppercase;
-}
-
-.kpi-value {
-    font-size:1.7rem;
-    font-weight:800;
-    margin-top:4px;
 }
 
 /* =========================================================
-   7. TABLES
+   6. TABLES
    ========================================================= */
 
-.table { width:100%; border-collapse:collapse; }
-
 .table th {
-    text-align:left;
-    font-size:.75rem;
-    text-transform:uppercase;
-    color:var(--muted);
-    padding:12px 10px;
-    border-bottom:1px solid var(--border);
-}
-
-.table td {
-    padding:14px 10px;
-    border-bottom:1px solid #f0f0f0;
-    vertical-align:middle;
+    color:#475569;
 }
 
 /* =========================================================
-   8. FORMULAIRES & BOUTONS
+   7. FORMULAIRES & BOUTONS
    ========================================================= */
 
 .form-control,
 .form-select,
 input,
 textarea {
-    width:100%;
-    padding:9px 11px;
-    font-size:.9rem;
     border:1px solid var(--border);
-    border-radius:var(--radius-sm);
-}
-
-.form-control:focus,
-.form-select:focus,
-textarea:focus {
-    outline:none;
-    border-color:var(--primary);
-    box-shadow:0 0 0 3px rgba(242,178,51,.2);
 }
 
 .btn {
     padding:9px 14px;
-    font-size:.85rem;
     border-radius:var(--radius-sm);
-    border:none;
-    cursor:pointer;
     font-weight:700;
 }
 
-.btn-primary { background:var(--accent); color:var(--primary); }
-.btn-secondary { background:#eef0f4; }
-.btn-success { background:var(--success); color:#fff; }
-.btn-danger { background:var(--danger); color:#fff; }
+/* 🔵 Bouton OUVRIR — UNIQUE & STABLE */
+.btn-ouvrir {
+    background-color:#2563eb;
+    color:#ffffff;
+    border:none;
+    padding:8px 18px;
+    font-weight:700;
+    border-radius:8px;
+    transition:background-color .2s ease, transform .1s ease;
+}
+
+.btn-ouvrir:hover {
+    background-color:#1e40af;
+    transform:translateY(-1px);
+}
+
+.btn-ouvrir:active {
+    transform:translateY(0);
+}
+
+/* 🟡 Bouton RECHERCHER */
+.btn-rechercher {
+    background-color:#f59e0b;
+    color:#111827;
+    border:none;
+    padding:8px 18px;
+    font-weight:700;
+    border-radius:8px;
+    transition:background-color .2s ease;
+}
+
+.btn-rechercher:hover {
+    background-color:#d97706;
+    color:#ffffff;
+}
 
 /* =========================================================
-   9. CHAT — COMPOSANT
+   8. PROGRESS BAR (CA)
    ========================================================= */
 
-.chat-toggle {
-    position:fixed;
-    bottom:24px;
-    right:24px;
-    width:56px;
-    height:56px;
-    border-radius:50%;
-    background:var(--accent);
-    color:var(--primary);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:22px;
-    cursor:pointer;
-    box-shadow:0 10px 25px rgba(0,0,0,.25);
-    z-index:10000;
-}
-
-/* ✅ VERSION UNIQUE & CORRIGÉE */
-.chat-badge {
-    position:absolute;
-    top:-6px;
-    right:-6px;
-    min-width:18px;
-    height:18px;
-    padding:0 6px;
-    background:var(--danger);
-    color:#fff;
-    font-size:11px;
-    font-weight:700;
+.progress {
+    background-color:#e5e7eb;
     border-radius:999px;
-    display:none;
-    align-items:center;
-    justify-content:center;
-}
-
-.chat-badge.mention {
-    background:var(--warning);
-    color:#1f2937;
-    animation:pulse 1.2s infinite;
-}
-
-@keyframes pulse {
-    0% { transform:scale(1); }
-    50% { transform:scale(1.25); }
-    100% { transform:scale(1); }
-}
-
-.chat-widget {
-    position:fixed;
-    bottom:90px;
-    right:24px;
-    width:380px;
-    height:520px;
-    background:#fff;
-    border-radius:16px;
-    box-shadow:0 20px 40px rgba(0,0,0,.25);
-    display:flex;
-    flex-direction:column;
     overflow:hidden;
-    opacity:0;
-    transform:translateY(20px);
-    pointer-events:none;
-    transition:.25s;
-    z-index:9999;
 }
 
-.chat-widget.open {
-    opacity:1;
-    transform:translateY(0);
-    pointer-events:auto;
-}
-
-.chat-header {
-    background:linear-gradient(180deg,#050A3A,#040833);
-    color:#fff;
-    padding:12px 14px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
+.progress-bar {
+    background:linear-gradient(90deg,#f59e0b,#d97706);
     font-weight:700;
-}
-
-.chat-messages {
-    flex:1;
-    padding:12px;
-    overflow-y:auto;
-    font-size:13px;
-}
-
-.chat-msg {
-    background:#f5f7fa;
-    padding:8px 10px;
-    border-radius:6px;
-    margin-bottom:6px;
-}
-
-.chat-msg strong {
-    font-size:12px;
-    color:#0d6efd;
-}
-
-.chat-inputbar {
-    padding:10px;
-    border-top:1px solid var(--border);
-    display:flex;
-    flex-direction:column;
-    gap:8px;
 }
 
 /* =========================================================
-   10. RESPONSIVE
+   9. RESPONSIVE
    ========================================================= */
 
 @media (max-width:900px) {
@@ -416,53 +255,4 @@ textarea:focus {
 @media (max-width:720px) {
     .app-layout { flex-direction:column; }
     .sidebar { width:100%; }
-}
-/* ===== Bouton Ouvrir – Dashboard Commercial ===== */
-.btn-ouvrir {
-    background-color: #2563eb;
-    color: #ffffff;
-    border: none;
-    padding: 8px 18px;
-    font-weight: 600;
-    border-radius: 8px;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-}
-
-.btn-ouvrir:hover {
-    background-color: #1e40af;
-    transform: translateY(-1px);
-}
-
-.btn-ouvrir:active {
-    transform: translateY(0);
-}
-/* Bouton Ouvrir – action principale */
-.btn-ouvrir {
-    background-color: #2563eb; /* bleu vif */
-    color: #ffffff;
-    border: none;
-    font-weight: 600;
-    border-radius: 8px;
-    padding: 8px 18px;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-}
-
-.btn-ouvrir:hover {
-    background-color: #1e40af;
-    transform: translateY(-1px);
-}
-/* Bouton Rechercher */
-.btn-rechercher {
-    background-color: #f59e0b; /* orange CRM */
-    color: #111827;
-    border: none;
-    font-weight: 600;
-    border-radius: 8px;
-    padding: 8px 18px;
-    transition: background-color 0.2s ease;
-}
-
-.btn-rechercher:hover {
-    background-color: #d97706;
-    color: #ffffff;
 }
