@@ -823,7 +823,7 @@ def dashboard():
     user = session.get("user")
 
     # =========================
-    # DONNÉES ADMIN (INCHANGÉES)
+    # DONNÉES ADMIN
     # =========================
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM crm_clients")
@@ -873,12 +873,10 @@ def dashboard():
                 WHERE COALESCE(cotations.is_read,0)=0
                 ORDER BY cotations.date_creation DESC
             """)
-            rows = cur.fetchall()
-
-        cotations_admin = [row_to_obj(r) for r in rows]
+            cotations_admin = cur.fetchall()
 
     # =========================
-    # DONNÉES COMMERCIAL (NOUVEAU)
+    # DONNÉES COMMERCIAL
     # =========================
     commercial_stats = None
     commercial_clients = []
@@ -886,15 +884,12 @@ def dashboard():
 
     if user["role"] == "commercial":
         with conn.cursor() as cur:
-
-            # Mes dossiers
             cur.execute(
                 "SELECT COUNT(*) FROM crm_clients WHERE owner_id=%s",
                 (user["id"],)
             )
             nb_clients = cur.fetchone()[0]
 
-            # Mon CA total
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
@@ -902,7 +897,6 @@ def dashboard():
             """, (user["username"],))
             ca_total_com = cur.fetchone()[0]
 
-            # Mon CA du mois
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
@@ -912,7 +906,6 @@ def dashboard():
             """, (user["username"],))
             ca_mois_com = cur.fetchone()[0]
 
-            # Cotations en attente
             cur.execute("""
                 SELECT COUNT(*)
                 FROM cotations
@@ -928,7 +921,6 @@ def dashboard():
                 "cotations_attente": cotations_attente,
             }
 
-            # Mes dossiers récents
             cur.execute("""
                 SELECT id, name, status, created_at
                 FROM crm_clients
@@ -938,7 +930,6 @@ def dashboard():
             """, (user["id"],))
             commercial_clients = cur.fetchall()
 
-            # Mes cotations récentes
             cur.execute("""
                 SELECT *
                 FROM cotations
@@ -950,15 +941,13 @@ def dashboard():
 
     return render_template(
         "dashboard.html",
-        # ===== ADMIN =====
         total_clients=total_clients,
         last_clients=last_clients,
         total_ca=total_ca,
         last_rev=row_to_obj(last_rev) if last_rev else None,
         total_docs=total_docs,
         unread_cotations=unread_cotations,
-        cotations_admin=cotations_admin,
-        # ===== COMMERCIAL =====
+        cotations_admin=[row_to_obj(r) for r in cotations_admin],
         commercial_stats=commercial_stats,
         commercial_clients=[row_to_obj(c) for c in commercial_clients],
         commercial_cotations=[row_to_obj(c) for c in commercial_cotations],
@@ -980,16 +969,12 @@ def chiffre_affaire():
     ca_annuel_perso = 0
     ca_mensuel_perso = 0
     ca_perso_par_mois = []
-    ca_perso_par_annee = []
-
     clients = []
-    annuel_par_com = []
     global_par_mois = []
     historique_ca = []
 
     with conn.cursor() as cur:
 
-        # ===== CA ANNUEL & MENSUEL =====
         if role == "admin":
             cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
             ca_annuel_perso = cur.fetchone()[0]
@@ -1001,6 +986,28 @@ def chiffre_affaire():
                     = date_trunc('month', CURRENT_DATE)
             """)
             ca_mensuel_perso = cur.fetchone()[0]
+
+            cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
+            clients = cur.fetchall()
+
+            cur.execute("""
+                SELECT TO_CHAR(date::date,'YYYY-MM') AS mois,
+                       SUM(montant) AS total
+                FROM revenus
+                GROUP BY mois
+                ORDER BY mois ASC
+            """)
+            global_par_mois = cur.fetchall()
+
+            cur.execute("""
+                SELECT revenus.id, revenus.date, revenus.montant,
+                       revenus.commercial,
+                       crm_clients.name AS client_name
+                FROM revenus
+                JOIN crm_clients ON crm_clients.id = revenus.client_id
+                ORDER BY date::date DESC, revenus.id DESC
+            """)
+            historique_ca = cur.fetchall()
 
         else:
             cur.execute("""
@@ -1014,15 +1021,14 @@ def chiffre_affaire():
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                  AND date_trunc('month', date::date)
-                      = date_trunc('month', CURRENT_DATE)
+                AND date_trunc('month', date::date)
+                    = date_trunc('month', CURRENT_DATE)
             """, (commercial_name,))
             ca_mensuel_perso = cur.fetchone()[0]
 
             cur.execute("""
-                SELECT
-                    TO_CHAR(date::date,'YYYY-MM') AS mois,
-                    SUM(montant) AS total
+                SELECT TO_CHAR(date::date,'YYYY-MM') AS mois,
+                       SUM(montant) AS total
                 FROM revenus
                 WHERE commercial=%s
                 GROUP BY mois
@@ -1030,79 +1036,51 @@ def chiffre_affaire():
             """, (commercial_name,))
             ca_perso_par_mois = cur.fetchall()
 
-            cur.execute("""
-                SELECT
-                    EXTRACT(YEAR FROM date::date)::int AS annee,
-                    SUM(montant) AS total
-                FROM revenus
-                WHERE commercial=%s
-                GROUP BY annee
-                ORDER BY annee ASC
-            """, (commercial_name,))
-            ca_perso_par_annee = cur.fetchall()
-
-        # ===== DONNÉES ADMIN =====
-        if role == "admin":
-            cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
-            clients = cur.fetchall()
-
-            cur.execute("""
-                SELECT commercial, SUM(montant) AS total
-                FROM revenus
-                GROUP BY commercial
-                ORDER BY total DESC
-            """)
-            annuel_par_com = cur.fetchall()
-
-            cur.execute("""
-                SELECT
-                    TO_CHAR(date::date,'YYYY-MM') AS mois,
-                    SUM(montant) AS total
-                FROM revenus
-                GROUP BY mois
-                ORDER BY mois ASC
-            """)
-            global_par_mois = cur.fetchall()
-
-            cur.execute("""
-                SELECT
-                    revenus.id,
-                    revenus.date,
-                    revenus.montant,
-                    revenus.commercial,
-                    crm_clients.name AS client_name
-                FROM revenus
-                JOIN crm_clients ON crm_clients.id = revenus.client_id
-                ORDER BY date::date DESC, revenus.id DESC
-            """)
-            historique_ca = cur.fetchall()
-
     return render_template(
         "chiffre_affaire.html",
         ca_annuel_perso=ca_annuel_perso,
         ca_mensuel_perso=ca_mensuel_perso,
         ca_perso_par_mois=[row_to_obj(r) for r in ca_perso_par_mois],
-        ca_perso_par_annee=[row_to_obj(r) for r in ca_perso_par_annee],
         clients=[row_to_obj(c) for c in clients],
-        annuel_par_com=[row_to_obj(r) for r in annuel_par_com],
         global_par_mois=[row_to_obj(r) for r in global_par_mois],
         historique_ca=[row_to_obj(r) for r in historique_ca],
     )
 
-# ============================
-# FIN PARTIE 1/4
-# La PARTIE 2/4 continue avec:
-# - Clients (liste/creation/detail)
-# - Cotations create/delete
-# - Upload/Delete documents client
-# ============================
-# ============================
-# app.py — VERSION COMPLÈTE CORRIGÉE (PARTIE 2/4)
-# Contenu:
-# - CLIENTS (liste / création / détail)
-# - COTATIONS (create / delete)
-# - DOCUMENTS CLIENT (upload / delete)
-# - ADMIN USERS + RESET PASSWORD (début)
+
+############################################################
+# AJOUT CHIFFRE D’AFFAIRES — ADMIN UNIQUEMENT (CORRECTION)
+############################################################
+
+@app.route("/chiffre-affaire/add", methods=["POST"])
+@admin_required
+def add_chiffre_affaire():
+    conn = get_db()
+
+    date_ca = request.form.get("date")
+    client_id = request.form.get("client_id")
+    commercial = request.form.get("commercial")
+    montant = request.form.get("montant")
+
+    if not date_ca or not client_id or not commercial or not montant:
+        flash("Tous les champs sont obligatoires.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    try:
+        montant = float(montant)
+    except ValueError:
+        flash("Montant invalide.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO revenus (date, client_id, commercial, montant)
+            VALUES (%s, %s, %s, %s)
+        """, (date_ca, client_id, commercial, montant))
+
+    conn.commit()
+    flash("Chiffre d’affaires ajouté.", "success")
+    return redirect(url_for("chiffre_affaire"))
+
 # ============================
 
 ############################################################
