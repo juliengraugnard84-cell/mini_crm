@@ -861,9 +861,7 @@ def dashboard():
 
     if user["role"] == "admin":
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0"
-            )
+            cur.execute("SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0")
             unread_cotations = cur.fetchone()[0]
 
             cur.execute("""
@@ -969,6 +967,7 @@ def chiffre_affaire():
     ca_annuel_perso = 0
     ca_mensuel_perso = 0
     ca_perso_par_mois = []
+
     clients = []
     global_par_mois = []
     historique_ca = []
@@ -1066,16 +1065,33 @@ def add_chiffre_affaire():
         return redirect(url_for("chiffre_affaire"))
 
     try:
-        montant = float(montant)
-    except ValueError:
+        client_id_int = int(client_id)
+    except (TypeError, ValueError):
+        flash("Dossier client invalide.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    try:
+        montant_float = float(montant)
+    except (TypeError, ValueError):
         flash("Montant invalide.", "danger")
         return redirect(url_for("chiffre_affaire"))
 
+    commercial = (commercial or "").strip()
+    if not commercial:
+        flash("Commercial invalide.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
     with conn.cursor() as cur:
+        # Sécurise l’insertion : le client doit exister (évite client_id fantôme)
+        cur.execute("SELECT 1 FROM crm_clients WHERE id=%s", (client_id_int,))
+        if not cur.fetchone():
+            flash("Dossier client introuvable.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
         cur.execute("""
             INSERT INTO revenus (date, client_id, commercial, montant)
             VALUES (%s, %s, %s, %s)
-        """, (date_ca, client_id, commercial, montant))
+        """, (date_ca, client_id_int, commercial, montant_float))
 
     conn.commit()
     flash("Chiffre d’affaires ajouté.", "success")
@@ -1089,15 +1105,20 @@ def edit_chiffre_affaire(ca_id):
     montant = request.form.get("montant")
 
     try:
-        montant = float(montant)
+        montant_float = float(montant)
     except (TypeError, ValueError):
         flash("Montant invalide.", "danger")
         return redirect(url_for("chiffre_affaire"))
 
     with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM revenus WHERE id=%s", (ca_id,))
+        if not cur.fetchone():
+            flash("Entrée CA introuvable.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
         cur.execute(
             "UPDATE revenus SET montant=%s WHERE id=%s",
-            (montant, ca_id)
+            (montant_float, ca_id)
         )
 
     conn.commit()
@@ -1111,11 +1132,17 @@ def delete_chiffre_affaire(ca_id):
     conn = get_db()
 
     with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM revenus WHERE id=%s", (ca_id,))
+        if not cur.fetchone():
+            flash("Entrée CA introuvable.", "danger")
+            return redirect(url_for("chiffre_affaire"))
+
         cur.execute("DELETE FROM revenus WHERE id=%s", (ca_id,))
 
     conn.commit()
     flash("Chiffre d’affaires supprimé.", "success")
     return redirect(url_for("chiffre_affaire"))
+
 
 
 ############################################################

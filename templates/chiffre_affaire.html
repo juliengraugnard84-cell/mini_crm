@@ -90,7 +90,6 @@
                 <th>Dossier</th>
                 <th>Commercial</th>
                 <th>Montant</th>
-                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -99,30 +98,18 @@
                 <td>{{ r.date }}</td>
                 <td>{{ r.client_name }}</td>
                 <td>{{ r.commercial }}</td>
-                <td>
-                    <form method="POST"
-                          action="{{ url_for('edit_chiffre_affaire', ca_id=r.id) }}"
-                          class="d-flex gap-1">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <input type="number" step="0.01" name="montant"
-                               value="{{ r.montant }}"
-                               class="form-control form-control-sm"
-                               style="width:120px">
-                        <button class="btn btn-sm btn-outline-primary">💾</button>
-                    </form>
-                </td>
-                <td>
-                    <form method="POST"
-                          action="{{ url_for('delete_chiffre_affaire', ca_id=r.id) }}"
-                          onsubmit="return confirm('Supprimer ce CA ?');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button class="btn btn-sm btn-outline-danger">🗑</button>
-                    </form>
-                </td>
+                <td><strong>{{ r.montant }} €</strong></td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
+
+    <!--
+        ⚠️ ÉDITION / SUPPRESSION DÉSACTIVÉES VOLONTAIREMENT
+        Les routes edit_chiffre_affaire et delete_chiffre_affaire
+        ne sont PAS définies dans app.py.
+        Cela évite toute erreur 500 et toute régression.
+    -->
 </div>
 {% endif %}
 
