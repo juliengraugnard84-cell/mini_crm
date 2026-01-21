@@ -232,3 +232,53 @@ textarea {
         right:2.5vw;
     }
 }
+/* =========================================================
+   🔒 FIX DÉFINITIF CHAT — ISOLATION TOTALE
+   ========================================================= */
+
+/* Le chat NE DOIT JAMAIS influencer le layout */
+.chat-toggle,
+.chat-widget {
+    position: fixed !important;
+    z-index: 100000 !important;
+}
+
+/* Bouton flottant */
+.chat-toggle {
+    bottom: 24px;
+    right: 24px;
+}
+
+/* Fenêtre chat */
+.chat-widget {
+    bottom: 96px;
+    right: 24px;
+    width: 380px;
+    max-width: calc(100vw - 48px);
+    height: 520px;
+
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.35);
+
+    display: flex;
+    flex-direction: column;
+
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+
+    transition: opacity .25s ease, transform .25s ease;
+}
+
+/* État ouvert */
+.chat-widget.open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+/* IMPORTANT : empêche TOUT conflit layout */
+.chat-widget * {
+    box-sizing: border-box;
+}
