@@ -134,30 +134,37 @@
 </div>
 
 <script>
-const labelsMois = [{% for r in ca_perso_par_mois %}"{{ r.mois }}",{% endfor %}];
-const dataCA = [{% for r in ca_perso_par_mois %}{{ r.total }},{% endfor %}];
-const objectif = labelsMois.map(() => 5000);
-
-new Chart(document.getElementById('chartMensuelPerso'), {
-    type: 'line',
-    data: {
-        labels: labelsMois,
-        datasets: [
-            {
-                label: 'Votre CA',
-                data: dataCA,
-                borderColor: '#0d6efd',
-                tension: 0.3
-            },
-            {
-                label: 'Objectif 5 000 €',
-                data: objectif,
-                borderDash: [6,6],
-                borderColor: '#dc3545'
-            }
-        ]
+(function () {
+    if (typeof Chart === "undefined") {
+        console.warn("Chart.js non chargé : graphique mensuel non affiché.");
+        return;
     }
-});
+
+    const labelsMois = [{% for r in ca_perso_par_mois %}"{{ r.mois }}",{% endfor %}];
+    const dataCA = [{% for r in ca_perso_par_mois %}{{ r.total }},{% endfor %}];
+    const objectif = labelsMois.map(() => 5000);
+
+    new Chart(document.getElementById('chartMensuelPerso'), {
+        type: 'line',
+        data: {
+            labels: labelsMois,
+            datasets: [
+                {
+                    label: 'Votre CA',
+                    data: dataCA,
+                    borderColor: '#2563eb',
+                    tension: 0.3
+                },
+                {
+                    label: 'Objectif 5 000 €',
+                    data: objectif,
+                    borderDash: [6,6],
+                    borderColor: '#dc2626'
+                }
+            ]
+        }
+    });
+})();
 </script>
 {% endif %}
 
@@ -169,18 +176,25 @@ new Chart(document.getElementById('chartMensuelPerso'), {
 </div>
 
 <script>
-new Chart(document.getElementById('chartGlobal'), {
-    type: 'line',
-    data: {
-        labels: [{% for r in global_par_mois %}"{{ r.mois }}",{% endfor %}],
-        datasets: [{
-            label: 'CA global',
-            data: [{% for r in global_par_mois %}{{ r.total }},{% endfor %}],
-            borderColor: '#198754',
-            tension: 0.3
-        }]
+(function () {
+    if (typeof Chart === "undefined") {
+        console.warn("Chart.js non chargé : graphique global non affiché.");
+        return;
     }
-});
+
+    new Chart(document.getElementById('chartGlobal'), {
+        type: 'line',
+        data: {
+            labels: [{% for r in global_par_mois %}"{{ r.mois }}",{% endfor %}],
+            datasets: [{
+                label: 'CA global',
+                data: [{% for r in global_par_mois %}{{ r.total }},{% endfor %}],
+                borderColor: '#16a34a',
+                tension: 0.3
+            }]
+        }
+    });
+})();
 </script>
 {% endif %}
 

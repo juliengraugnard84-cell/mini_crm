@@ -10,7 +10,9 @@ if not DATABASE_URL:
 conn = psycopg2.connect(DATABASE_URL, sslmode="require")
 cur = conn.cursor()
 
-# Création de la table users
+# =====================================================
+# TABLE USERS (EXISTANT — INCHANGÉ)
+# =====================================================
 cur.execute("""
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -21,9 +23,25 @@ CREATE TABLE IF NOT EXISTS users (
 );
 """)
 
-# Création de l'utilisateur admin
+# =====================================================
+# TABLE CHIFFRE D'AFFAIRES (NOUVELLE — SAFE)
+# =====================================================
+cur.execute("""
+CREATE TABLE IF NOT EXISTS chiffre_affaires (
+    id SERIAL PRIMARY KEY,
+    client_id INTEGER NOT NULL,
+    commercial_id INTEGER NOT NULL,
+    date DATE NOT NULL,
+    montant NUMERIC(10,2) NOT NULL CHECK (montant >= 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+""")
+
+# =====================================================
+# UTILISATEUR ADMIN PAR DÉFAUT (EXISTANT — INCHANGÉ)
+# =====================================================
 username = "admin"
-password = "admin123"  # change-le après la première connexion
+password = "admin123"  # ⚠️ À CHANGER après première connexion
 password_hash = generate_password_hash(password)
 
 cur.execute("""
@@ -36,4 +54,4 @@ conn.commit()
 cur.close()
 conn.close()
 
-print("✅ Base initialisée avec succès")
+print("✅ Base initialisée avec succès (users + chiffre_affaires)")
