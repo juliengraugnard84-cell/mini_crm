@@ -1048,7 +1048,7 @@ def chiffre_affaire():
 
 
 ############################################################
-# AJOUT CHIFFRE D’AFFAIRES — ADMIN UNIQUEMENT
+# AJOUT / ÉDITION / SUPPRESSION CA — ADMIN UNIQUEMENT
 ############################################################
 
 @app.route("/chiffre-affaire/add", methods=["POST"])
@@ -1082,36 +1082,39 @@ def add_chiffre_affaire():
     return redirect(url_for("chiffre_affaire"))
 
 
-############################################################
-# MODIFICATION CHIFFRE D’AFFAIRES — ADMIN UNIQUEMENT
-############################################################
-
 @app.route("/chiffre-affaire/<int:ca_id>/edit", methods=["POST"])
 @admin_required
 def edit_chiffre_affaire(ca_id):
     conn = get_db()
-
     montant = request.form.get("montant")
-
-    if not montant:
-        flash("Montant obligatoire.", "danger")
-        return redirect(url_for("chiffre_affaire"))
 
     try:
         montant = float(montant)
-    except ValueError:
+    except (TypeError, ValueError):
         flash("Montant invalide.", "danger")
         return redirect(url_for("chiffre_affaire"))
 
     with conn.cursor() as cur:
-        cur.execute("""
-            UPDATE revenus
-            SET montant = %s
-            WHERE id = %s
-        """, (montant, ca_id))
+        cur.execute(
+            "UPDATE revenus SET montant=%s WHERE id=%s",
+            (montant, ca_id)
+        )
 
     conn.commit()
-    flash("Chiffre d’affaires modifié.", "success")
+    flash("Chiffre d’affaires mis à jour.", "success")
+    return redirect(url_for("chiffre_affaire"))
+
+
+@app.route("/chiffre-affaire/<int:ca_id>/delete", methods=["POST"])
+@admin_required
+def delete_chiffre_affaire(ca_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM revenus WHERE id=%s", (ca_id,))
+
+    conn.commit()
+    flash("Chiffre d’affaires supprimé.", "success")
     return redirect(url_for("chiffre_affaire"))
 
 
