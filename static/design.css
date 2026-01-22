@@ -1,34 +1,32 @@
 /* =========================================================
-   SYNERGYGROUP CRM — DESIGN PRO & LUDIQUE (FINAL)
-   Compatible Windows / macOS / Safari / Chrome
+   SYNERGYGROUP CRM — DESIGN PRO, DOUX & LUDIQUE (FINAL)
+   Windows / macOS / Safari / Chrome
    ========================================================= */
 
-/* ================= VARIABLES (CHARTE SYNERGYGROUP) ================= */
+/* ================= VARIABLES ================= */
 
 :root {
-    /* === BRAND === */
     --primary: #0B1437;
     --primary-soft: #0F1E4D;
     --accent: #F5B335;
     --accent-soft: #F8C86A;
 
-    /* === UI === */
-    --bg: #f2f4f8;
+    --bg: #f3f5f9;
     --surface: #ffffff;
-    --border: #cbd5e1;
+    --border: #dde3ee;
 
     --text: #0f172a;
     --muted: #475569;
 
     --success: #22c55e;
-    --warning: #f59e0b;
     --danger: #ef4444;
+    --secondary: #64748b;
 
-    --radius: 14px;
-    --radius-sm: 10px;
+    --radius: 16px;
+    --radius-sm: 12px;
 
-    --shadow-soft: 0 6px 24px rgba(15,23,42,.10);
-    --shadow-strong: 0 20px 50px rgba(0,0,0,.35);
+    --shadow-soft: 0 6px 20px rgba(15,23,42,.08);
+    --shadow-strong: 0 18px 45px rgba(0,0,0,.25);
 
     --sidebar-w: 240px;
 }
@@ -47,13 +45,11 @@ html, body {
 
 body {
     margin: 0;
-    background: var(--bg);
+    background: linear-gradient(90deg,#eef2f7 0%,#f7f9fc 100%);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
     font-size: 14.5px;
     line-height: 1.55;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
 }
 
 /* ================= LAYOUT ================= */
@@ -63,25 +59,38 @@ body {
     min-height: 100vh;
 }
 
-.main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-/* ================= SIDEBAR (AMÉLIORÉE & PLUS LUDIQUE) ================= */
+/* ================= SIDEBAR (DOUCE & ÉLÉGANTE) ================= */
 
 .sidebar {
     width: var(--sidebar-w);
-    background: linear-gradient(180deg, var(--primary), var(--primary-soft));
+    background: linear-gradient(180deg,var(--primary),var(--primary-soft));
     color: #e5e7eb;
-    display: flex;
-    flex-direction: column;
-    box-shadow: inset -1px 0 0 rgba(255,255,255,.05);
+    position: relative;
+}
+
+/* Transition douce vers le contenu */
+.sidebar::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: -28px;
+    width: 28px;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        rgba(11,20,55,.25),
+        rgba(11,20,55,0)
+    );
+    pointer-events: none;
+}
+
+/* Masque le S parasite sans toucher au HTML */
+.sidebar *::first-letter {
+    unicode-bidi: isolate;
 }
 
 .sidebar-nav {
-    padding: 12px 10px;
+    padding: 16px 12px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -90,8 +99,8 @@ body {
 .sidebar-nav a {
     display: flex;
     align-items: center;
-    padding: 12px 16px;
-    border-radius: 12px;
+    padding: 13px 16px;
+    border-radius: 14px;
     font-weight: 600;
     color: #cbd5e1;
     text-decoration: none;
@@ -99,7 +108,7 @@ body {
 }
 
 .sidebar-nav a:hover {
-    background: rgba(245,179,53,.15);
+    background: rgba(245,179,53,.14);
     color: #ffffff;
     transform: translateX(3px);
 }
@@ -108,51 +117,43 @@ body {
     background: linear-gradient(
         90deg,
         rgba(245,179,53,.45),
-        rgba(245,179,53,.15)
+        rgba(245,179,53,.18)
     );
     color: #ffffff;
     box-shadow: inset 4px 0 0 var(--accent);
 }
 
-/* ================= TOPBAR / FOOTER ================= */
+/* ================= CONTENU ================= */
 
-.topbar {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 16px 24px;
-    font-weight: 600;
+.main-content {
+    flex: 1;
+    padding: 32px 36px;
 }
 
-.footer {
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    padding: 12px 24px;
-}
-
-/* ================= CARDS / KPI ================= */
+/* ================= CARDS ================= */
 
 .card {
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow-soft);
-    padding: 18px 20px;
+    padding: 24px;
+    margin-bottom: 26px;
 }
+
+/* ================= KPI ================= */
 
 .kpi-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 18px;
-    margin-bottom: 28px;
+    gap: 20px;
+    margin-bottom: 32px;
 }
 
 .kpi-tile {
     position: relative;
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 18px 20px;
+    padding: 20px 22px;
     box-shadow: var(--shadow-soft);
     overflow: hidden;
 }
@@ -160,8 +161,8 @@ body {
 .kpi-tile::after {
     content: "";
     position: absolute;
-    top: -20px;
-    right: -20px;
+    top: -18px;
+    right: -18px;
     width: 90px;
     height: 90px;
     background: radial-gradient(circle, rgba(245,179,53,.35), transparent 70%);
@@ -189,15 +190,13 @@ body {
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: .06em;
-    color: #475569;
-    font-weight: 700;
-    padding: 12px;
+    color: var(--muted);
+    padding: 14px 12px;
     border-bottom: 1px solid var(--border);
-    text-align: left;
 }
 
 .table td {
-    padding: 12px;
+    padding: 14px 12px;
     border-bottom: 1px solid var(--border);
 }
 
@@ -210,8 +209,52 @@ body {
     white-space: nowrap;
 }
 
-.table td.actions .btn {
-    margin-left: 6px;
+/* ================= BOUTONS (ALIGNÉS & HARMONIEUX) ================= */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 120px;
+    padding: 11px 18px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 13.5px;
+    border: none;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, background .2s ease;
+}
+
+.btn + .btn {
+    margin-left: 10px;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(0,0,0,.18);
+}
+
+/* Bouton neutre (Modifier, Reset) */
+.btn-secondary {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+.btn-secondary:hover {
+    background: #cbd5e1;
+}
+
+/* Bouton principal / Upload / Créer */
+.btn-primary,
+.btn-success {
+    background: linear-gradient(180deg,var(--accent),#f0a900);
+    color: #1f2937;
+}
+
+/* Bouton danger */
+.btn-danger {
+    background: linear-gradient(180deg,#ef4444,#dc2626);
+    color: #ffffff;
 }
 
 /* ================= FORMULAIRES ================= */
@@ -220,9 +263,9 @@ body {
 .form-select,
 textarea {
     width: 100%;
-    border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 10px 12px;
+    border: 1px solid var(--border);
+    padding: 11px 14px;
     font-size: 14px;
 }
 
@@ -230,115 +273,27 @@ textarea {
 .form-select:focus,
 textarea:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(11,20,55,.15);
-}
-
-/* ================= BOUTONS (PLUS VIFS & ALIGNÉS) ================= */
-
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-sm);
-    font-weight: 700;
-    padding: 10px 16px;
-    cursor: pointer;
-    transition: transform .15s ease, box-shadow .15s ease, background .2s ease;
-}
-
-.btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 14px rgba(0,0,0,.18);
-}
-
-.btn-primary {
-    background: linear-gradient(180deg, var(--accent), #f0a900);
-    color: #1f2937;
-    border: none;
-}
-
-.btn-success {
-    background: linear-gradient(180deg, #22c55e, #16a34a);
-    color: #ffffff;
-    border: none;
-}
-
-.btn-danger {
-    background: linear-gradient(180deg, #ef4444, #dc2626);
-    color: #ffffff;
-    border: none;
-}
-
-.btn-secondary {
-    background: #64748b;
-    color: #ffffff;
-    border: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(245,179,53,.22);
 }
 
 /* ================= CHAT ================= */
 
-.chat-toggle,
-.chat-widget {
-    position: fixed !important;
-    z-index: 2147483647 !important;
-}
-
 .chat-toggle {
-    bottom: 24px;
-    right: 24px;
-    width: 54px;
-    height: 54px;
-    border-radius: 50%;
-    background: linear-gradient(180deg, var(--accent), #f0a900);
+    background: linear-gradient(180deg,var(--accent),#f0a900);
     color: #1f2937;
-    font-size: 20px;
     box-shadow: var(--shadow-strong);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-}
-
-.chat-widget {
-    bottom: 96px;
-    right: 24px;
-    width: 380px;
-    max-width: calc(100vw - 48px);
-    height: 520px;
-    background: var(--surface);
-    border-radius: 16px;
-    box-shadow: var(--shadow-strong);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    opacity: 0;
-    transform: translateY(16px);
-    pointer-events: none;
-    transition: opacity .22s ease, transform .22s ease;
-}
-
-.chat-widget.open {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
 }
 
 /* ================= RESPONSIVE ================= */
 
-@media (max-width: 720px) {
-    .chat-widget {
-        width: 95vw;
-        right: 2.5vw;
+@media (max-width: 900px) {
+    .main-content {
+        padding: 22px;
     }
 
-    .chat-toggle {
-        right: 16px;
-        bottom: 16px;
-    }
-
-    .chat-widget {
-        right: 16px;
-        bottom: 84px;
+    .btn {
+        min-width: auto;
+        padding: 10px 14px;
     }
 }
