@@ -1,15 +1,15 @@
 /* =========================================================
-   SYNERGYGROUP CRM — DESIGN PRO STABLE (FINAL)
-   Windows / macOS / Safari / Chrome
+   SYNERGYGROUP CRM — DESIGN PRO & LUDIQUE (FINAL)
+   Compatible Windows / macOS / Safari / Chrome
    ========================================================= */
 
 /* ================= VARIABLES (CHARTE SYNERGYGROUP) ================= */
 
 :root {
     /* === BRAND === */
-    --primary: #0B1437;        /* Bleu principal logo */
-    --primary-soft: #0F1E4D;   /* Dégradés / headers */
-    --accent: #F5B335;         /* Or Synergy */
+    --primary: #0B1437;
+    --primary-soft: #0F1E4D;
+    --accent: #F5B335;
     --accent-soft: #F8C86A;
 
     /* === UI === */
@@ -20,9 +20,9 @@
     --text: #0f172a;
     --muted: #475569;
 
-    --success: #15803d;
-    --warning: #d97706;
-    --danger: #b91c1c;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
 
     --radius: 14px;
     --radius-sm: 10px;
@@ -33,7 +33,7 @@
     --sidebar-w: 240px;
 }
 
-/* ================= RESET GLOBAL ================= */
+/* ================= RESET ================= */
 
 *,
 *::before,
@@ -69,35 +69,49 @@ body {
     flex-direction: column;
 }
 
-/* ================= SIDEBAR ================= */
+/* ================= SIDEBAR (AMÉLIORÉE & PLUS LUDIQUE) ================= */
 
 .sidebar {
     width: var(--sidebar-w);
     background: linear-gradient(180deg, var(--primary), var(--primary-soft));
     color: #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    box-shadow: inset -1px 0 0 rgba(255,255,255,.05);
 }
 
 .sidebar-nav {
-    padding: 14px;
+    padding: 12px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
 .sidebar-nav a {
-    display: block;
+    display: flex;
+    align-items: center;
     padding: 12px 16px;
-    margin-bottom: 6px;
-    border-radius: 10px;
+    border-radius: 12px;
     font-weight: 600;
     color: #cbd5e1;
     text-decoration: none;
+    transition: background .2s ease, transform .15s ease, color .2s ease;
 }
 
 .sidebar-nav a:hover {
-    background: rgba(255,255,255,.06);
+    background: rgba(245,179,53,.15);
+    color: #ffffff;
+    transform: translateX(3px);
 }
 
 .sidebar-nav a.active {
-    background: rgba(245,179,53,.18);
+    background: linear-gradient(
+        90deg,
+        rgba(245,179,53,.45),
+        rgba(245,179,53,.15)
+    );
     color: #ffffff;
+    box-shadow: inset 4px 0 0 var(--accent);
 }
 
 /* ================= TOPBAR / FOOTER ================= */
@@ -134,12 +148,23 @@ body {
 }
 
 .kpi-tile {
+    position: relative;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-left: 4px solid var(--accent);
     border-radius: var(--radius);
     padding: 18px 20px;
     box-shadow: var(--shadow-soft);
+    overflow: hidden;
+}
+
+.kpi-tile::after {
+    content: "";
+    position: absolute;
+    top: -20px;
+    right: -20px;
+    width: 90px;
+    height: 90px;
+    background: radial-gradient(circle, rgba(245,179,53,.35), transparent 70%);
 }
 
 .kpi-tile h4 {
@@ -150,8 +175,7 @@ body {
 
 .kpi-tile .value {
     font-size: 22px;
-    font-weight: 700;
-    color: var(--text);
+    font-weight: 800;
 }
 
 /* ================= TABLES ================= */
@@ -162,9 +186,9 @@ body {
 }
 
 .table th {
-    font-size: 12.5px;
+    font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: .05em;
+    letter-spacing: .06em;
     color: #475569;
     font-weight: 700;
     padding: 12px;
@@ -173,13 +197,21 @@ body {
 }
 
 .table td {
-    color: #1e293b;
     padding: 12px;
     border-bottom: 1px solid var(--border);
 }
 
 .table tr:hover {
     background: #f8fafc;
+}
+
+.table td.actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.table td.actions .btn {
+    margin-left: 6px;
 }
 
 /* ================= FORMULAIRES ================= */
@@ -192,7 +224,6 @@ textarea {
     border-radius: var(--radius-sm);
     padding: 10px 12px;
     font-size: 14px;
-    font-family: inherit;
 }
 
 .form-control:focus,
@@ -203,28 +234,49 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(11,20,55,.15);
 }
 
-/* ================= BOUTONS ================= */
+/* ================= BOUTONS (PLUS VIFS & ALIGNÉS) ================= */
 
 .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--radius-sm);
     font-weight: 700;
-    padding: 10px 14px;
+    padding: 10px 16px;
     cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, background .2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(0,0,0,.18);
+}
+
+.btn-primary {
+    background: linear-gradient(180deg, var(--accent), #f0a900);
+    color: #1f2937;
+    border: none;
 }
 
 .btn-success {
-    background: var(--success);
+    background: linear-gradient(180deg, #22c55e, #16a34a);
+    color: #ffffff;
     border: none;
-    color: #fff;
 }
 
-.btn-success:hover {
-    background: #166534;
+.btn-danger {
+    background: linear-gradient(180deg, #ef4444, #dc2626);
+    color: #ffffff;
+    border: none;
 }
 
-/* =========================================================
-   CHAT — ISOLATION TOTALE & DESIGN SYNERGYGROUP
-   ========================================================= */
+.btn-secondary {
+    background: #64748b;
+    color: #ffffff;
+    border: none;
+}
+
+/* ================= CHAT ================= */
 
 .chat-toggle,
 .chat-widget {
@@ -235,11 +287,11 @@ textarea:focus {
 .chat-toggle {
     bottom: 24px;
     right: 24px;
-    width: 52px;
-    height: 52px;
+    width: 54px;
+    height: 54px;
     border-radius: 50%;
-    background: var(--primary);
-    color: #ffffff;
+    background: linear-gradient(180deg, var(--accent), #f0a900);
+    color: #1f2937;
     font-size: 20px;
     box-shadow: var(--shadow-strong);
     display: flex;
@@ -260,8 +312,6 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    isolation: isolate;
-    contain: layout paint style;
     opacity: 0;
     transform: translateY(16px);
     pointer-events: none;
@@ -272,54 +322,6 @@ textarea:focus {
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
-}
-
-.chat-header {
-    background: linear-gradient(180deg, var(--primary), var(--primary-soft));
-    color: #ffffff;
-    padding: 14px 16px;
-    font-size: 15px;
-    font-weight: 700;
-}
-
-.chat-messages {
-    flex: 1;
-    background: #eef2f7;
-    padding: 14px;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-.chat-bubble.me {
-    background: var(--accent);
-    color: #1f2937;
-    font-weight: 600;
-}
-
-.chat-bubble.them {
-    background: #ffffff;
-    border: 1px solid var(--border);
-}
-
-.chat-text {
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-.chat-input {
-    font-size: 14.5px;
-    padding: 10px 12px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-}
-
-.chat-send {
-    background: var(--primary);
-    color: #ffffff;
-    font-weight: 700;
-    border-radius: var(--radius-sm);
-    border: none;
-    padding: 10px 12px;
 }
 
 /* ================= RESPONSIVE ================= */
