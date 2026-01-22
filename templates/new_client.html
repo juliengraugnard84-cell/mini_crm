@@ -30,7 +30,7 @@
                        placeholder="Nom du client ou de l’entreprise">
             </div>
 
-            <!-- EMAIL (non encore persisté côté backend) -->
+            <!-- EMAIL -->
             <div class="col-md-6">
                 <label class="form-label">Email</label>
                 <input type="email"
@@ -39,7 +39,26 @@
                        placeholder="email@exemple.com">
             </div>
 
-            <!-- TÉLÉPHONE (non encore persisté côté backend) -->
+            <!-- NOM DU GÉRANT (ALIGNÉ BACKEND) -->
+            <div class="col-md-6">
+                <label class="form-label">Nom du gérant</label>
+                <input type="text"
+                       name="gerant_nom"
+                       class="form-control"
+                       placeholder="Nom et prénom du gérant / dirigeant">
+            </div>
+
+            <!-- SIRET -->
+            <div class="col-md-6">
+                <label class="form-label">SIRET</label>
+                <input type="text"
+                       name="siret"
+                       class="form-control"
+                       maxlength="14"
+                       placeholder="Numéro SIRET (14 chiffres)">
+            </div>
+
+            <!-- TÉLÉPHONE -->
             <div class="col-md-6">
                 <label class="form-label">Téléphone</label>
                 <input type="text"
@@ -48,7 +67,7 @@
                        placeholder="06 00 00 00 00">
             </div>
 
-            <!-- ADRESSE (non encore persistée côté backend) -->
+            <!-- ADRESSE -->
             <div class="col-md-6">
                 <label class="form-label">Adresse</label>
                 <input type="text"
@@ -57,7 +76,7 @@
                        placeholder="Adresse complète">
             </div>
 
-            <!-- STATUT (non encore persisté côté backend) -->
+            <!-- STATUT (non persisté, conservé volontairement) -->
             <div class="col-md-4">
                 <label class="form-label">Statut</label>
                 <select name="status" class="form-select">
@@ -68,7 +87,7 @@
                 </select>
             </div>
 
-            <!-- COMMERCIAL (ADMIN SEULEMENT – non persisté côté backend) -->
+            <!-- COMMERCIAL (ADMIN SEULEMENT – non persisté, conservé) -->
             {% if current_user and current_user.role == 'admin' %}
             <div class="col-md-4">
                 <label class="form-label">Commercial</label>
@@ -79,7 +98,7 @@
             </div>
             {% endif %}
 
-            <!-- NOTES (non encore persistées côté backend) -->
+            <!-- NOTES (non persistées – conservées) -->
             <div class="col-md-12">
                 <label class="form-label">Notes</label>
                 <textarea name="notes"
