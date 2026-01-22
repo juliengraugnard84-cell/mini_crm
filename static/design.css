@@ -1,14 +1,18 @@
 /* =========================================================
-   SYNERGYGROUP CRM — DESIGN PRO STABLE
-   Compatible Windows / macOS / Safari / Chrome
+   SYNERGYGROUP CRM — DESIGN PRO STABLE (FINAL)
+   Windows / macOS / Safari / Chrome
    ========================================================= */
 
-/* ================= VARIABLES ================= */
+/* ================= VARIABLES (CHARTE SYNERGYGROUP) ================= */
 
 :root {
-    --primary: #0a0f3d;
-    --accent: #f4b740;
+    /* === BRAND === */
+    --primary: #0B1437;        /* Bleu principal logo */
+    --primary-soft: #0F1E4D;   /* Dégradés / headers */
+    --accent: #F5B335;         /* Or Synergy */
+    --accent-soft: #F8C86A;
 
+    /* === UI === */
     --bg: #f2f4f8;
     --surface: #ffffff;
     --border: #cbd5e1;
@@ -69,12 +73,12 @@ body {
 
 .sidebar {
     width: var(--sidebar-w);
-    background: linear-gradient(180deg, #0b122f, #0a1028);
+    background: linear-gradient(180deg, var(--primary), var(--primary-soft));
     color: #e5e7eb;
 }
 
 .sidebar-nav {
-    padding: 12px;
+    padding: 14px;
 }
 
 .sidebar-nav a {
@@ -92,8 +96,8 @@ body {
 }
 
 .sidebar-nav a.active {
-    background: rgba(244,183,64,.18);
-    color: #f8fafc;
+    background: rgba(245,179,53,.18);
+    color: #ffffff;
 }
 
 /* ================= TOPBAR / FOOTER ================= */
@@ -132,6 +136,7 @@ body {
 .kpi-tile {
     background: var(--surface);
     border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
     border-radius: var(--radius);
     padding: 18px 20px;
     box-shadow: var(--shadow-soft);
@@ -157,9 +162,9 @@ body {
 }
 
 .table th {
-    font-size: 13px;
+    font-size: 12.5px;
     text-transform: uppercase;
-    letter-spacing: .04em;
+    letter-spacing: .05em;
     color: #475569;
     font-weight: 700;
     padding: 12px;
@@ -195,7 +200,7 @@ textarea {
 textarea:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(10,15,61,.15);
+    box-shadow: 0 0 0 3px rgba(11,20,55,.15);
 }
 
 /* ================= BOUTONS ================= */
@@ -218,7 +223,7 @@ textarea:focus {
 }
 
 /* =========================================================
-   CHAT — ISOLATION TOTALE & DESIGN PRO
+   CHAT — ISOLATION TOTALE & DESIGN SYNERGYGROUP
    ========================================================= */
 
 .chat-toggle,
@@ -234,7 +239,7 @@ textarea:focus {
     height: 52px;
     border-radius: 50%;
     background: var(--primary);
-    color: #fff;
+    color: #ffffff;
     font-size: 20px;
     box-shadow: var(--shadow-strong);
     display: flex;
@@ -270,8 +275,8 @@ textarea:focus {
 }
 
 .chat-header {
-    background: linear-gradient(180deg, #0a0f3d, #070b2e);
-    color: #fff;
+    background: linear-gradient(180deg, var(--primary), var(--primary-soft));
+    color: #ffffff;
     padding: 14px 16px;
     font-size: 15px;
     font-weight: 700;
@@ -310,7 +315,7 @@ textarea:focus {
 
 .chat-send {
     background: var(--primary);
-    color: #fff;
+    color: #ffffff;
     font-weight: 700;
     border-radius: var(--radius-sm);
     border: none;
