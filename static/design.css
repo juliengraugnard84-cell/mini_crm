@@ -26,7 +26,7 @@
     --radius-sm: 12px;
 
     --shadow-soft: 0 6px 20px rgba(15,23,42,.08);
-    --shadow-strong: 0 18px 45px rgba(0,0,0,.25);
+    --shadow-strong: 0 18px 45px rgba(0,0,0,.30);
 
     --sidebar-w: 240px;
 }
@@ -59,7 +59,7 @@ body {
     min-height: 100vh;
 }
 
-/* ================= SIDEBAR (DOUCE & ÉLÉGANTE) ================= */
+/* ================= SIDEBAR ================= */
 
 .sidebar {
     width: var(--sidebar-w);
@@ -68,25 +68,20 @@ body {
     position: relative;
 }
 
-/* Transition douce vers le contenu */
+/* Séparation douce sidebar → contenu */
 .sidebar::after {
     content: "";
     position: absolute;
     top: 0;
-    right: -28px;
-    width: 28px;
+    right: -26px;
+    width: 26px;
     height: 100%;
     background: linear-gradient(
         90deg,
-        rgba(11,20,55,.25),
+        rgba(11,20,55,.22),
         rgba(11,20,55,0)
     );
     pointer-events: none;
-}
-
-/* Masque le S parasite sans toucher au HTML */
-.sidebar *::first-letter {
-    unicode-bidi: isolate;
 }
 
 .sidebar-nav {
@@ -165,7 +160,7 @@ body {
     right: -18px;
     width: 90px;
     height: 90px;
-    background: radial-gradient(circle, rgba(245,179,53,.35), transparent 70%);
+    background: radial-gradient(circle, rgba(245,179,53,.30), transparent 70%);
 }
 
 .kpi-tile h4 {
@@ -209,7 +204,7 @@ body {
     white-space: nowrap;
 }
 
-/* ================= BOUTONS (ALIGNÉS & HARMONIEUX) ================= */
+/* ================= BOUTONS ================= */
 
 .btn {
     display: inline-flex;
@@ -234,7 +229,6 @@ body {
     box-shadow: 0 6px 14px rgba(0,0,0,.18);
 }
 
-/* Bouton neutre (Modifier, Reset) */
 .btn-secondary {
     background: #e2e8f0;
     color: #1e293b;
@@ -244,14 +238,12 @@ body {
     background: #cbd5e1;
 }
 
-/* Bouton principal / Upload / Créer */
 .btn-primary,
 .btn-success {
     background: linear-gradient(180deg,var(--accent),#f0a900);
     color: #1f2937;
 }
 
-/* Bouton danger */
 .btn-danger {
     background: linear-gradient(180deg,#ef4444,#dc2626);
     color: #ffffff;
@@ -277,12 +269,124 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(245,179,53,.22);
 }
 
-/* ================= CHAT ================= */
+/* =========================================================
+   CHAT — BULLE FLOTTANTE (RESTORÉE)
+   ========================================================= */
 
+.chat-toggle,
+.chat-widget {
+    position: fixed !important;
+    z-index: 2147483647 !important;
+}
+
+/* Bouton bulle */
 .chat-toggle {
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
     background: linear-gradient(180deg,var(--accent),#f0a900);
     color: #1f2937;
+    font-size: 22px;
     box-shadow: var(--shadow-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.chat-toggle:hover {
+    transform: translateY(-2px);
+}
+
+/* Fenêtre chat */
+.chat-widget {
+    bottom: 96px;
+    right: 24px;
+    width: 380px;
+    max-width: calc(100vw - 48px);
+    height: 520px;
+    background: var(--surface);
+    border-radius: 18px;
+    box-shadow: var(--shadow-strong);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    opacity: 0;
+    transform: translateY(16px);
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+}
+
+.chat-widget.open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.chat-header {
+    background: linear-gradient(180deg,var(--primary),var(--primary-soft));
+    color: #ffffff;
+    padding: 14px 16px;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.chat-messages {
+    flex: 1;
+    background: #eef2f7;
+    padding: 14px;
+    overflow-y: auto;
+}
+
+.chat-bubble.me {
+    background: var(--accent);
+    color: #1f2937;
+    font-weight: 600;
+    border-radius: 14px 14px 4px 14px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    max-width: 75%;
+    align-self: flex-end;
+}
+
+.chat-bubble.them {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 14px 14px 14px 4px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    max-width: 75%;
+    align-self: flex-start;
+}
+
+.chat-input {
+    border-top: 1px solid var(--border);
+    padding: 10px;
+    display: flex;
+    gap: 8px;
+}
+
+.chat-input input,
+.chat-input textarea {
+    flex: 1;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    font-size: 14px;
+}
+
+.chat-send {
+    background: linear-gradient(180deg,var(--accent),#f0a900);
+    color: #1f2937;
+    border-radius: 999px;
+    border: none;
+    padding: 10px 16px;
+    font-weight: 700;
+    cursor: pointer;
 }
 
 /* ================= RESPONSIVE ================= */
@@ -295,5 +399,18 @@ textarea:focus {
     .btn {
         min-width: auto;
         padding: 10px 14px;
+    }
+}
+
+@media (max-width: 720px) {
+    .chat-widget {
+        width: 95vw;
+        right: 2.5vw;
+        bottom: 88px;
+    }
+
+    .chat-toggle {
+        right: 16px;
+        bottom: 16px;
     }
 }
