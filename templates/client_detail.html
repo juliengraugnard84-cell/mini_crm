@@ -86,113 +86,111 @@
 <div class="tab-pane fade show active" id="cotations">
 
 {% if current_user and current_user.role in ['commercial','admin'] %}
-<div class="card mb-4">
+<div class="card mb-4 p-3">
     <h5>Nouvelle demande de cotation</h5>
 
     <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="row g-3">
-
             <div class="col-md-4">
-                <input type="date"
-                       name="date_negociation"
-                       class="form-control"
-                       required>
+                <input type="date" name="date_negociation" class="form-control" required>
             </div>
-
             <div class="col-md-4">
-                <input type="time"
-                       name="heure_negociation"
-                       class="form-control"
-                       required>
+                <input type="time" name="heure_negociation" class="form-control" required>
             </div>
-
             <div class="col-md-4">
-                <select name="energie_type"
-                        class="form-select"
-                        required>
+                <select name="energie_type" class="form-select" required>
                     <option value="">— Énergie —</option>
                     <option value="gaz">Gaz</option>
                     <option value="electricite">Électricité</option>
                 </select>
             </div>
 
-            <!-- SIGNATAIRE / GÉRANT (pré-rempli et sécurisé) -->
             <div class="col-md-6">
-                <label class="form-label">Nom du signataire / gérant</label>
-                <input type="text"
-                       name="signataire_nom"
-                       class="form-control"
-                       value="{{ client.gerant_nom or '' }}"
-                       placeholder="Nom du signataire du contrat">
-            </div>
-
-            <!-- SIRET (pré-rempli et sécurisé) -->
-            <div class="col-md-6">
-                <label class="form-label">SIRET</label>
-                <input type="text"
-                       name="siret"
-                       class="form-control"
-                       value="{{ client.siret or '' }}"
-                       placeholder="SIRET">
-            </div>
-
-            <div class="col-md-4">
-                <input type="text"
-                       name="type_compteur"
-                       class="form-control"
-                       placeholder="Type compteur"
-                       required>
-            </div>
-
-            <div class="col-md-4">
-                <input type="text"
-                       name="pdl_pce"
-                       class="form-control"
-                       placeholder="PDL / PCE">
-            </div>
-
-            <div class="col-md-4">
-                <input type="date"
-                       name="date_echeance"
-                       class="form-control">
+                <input type="text" name="type_compteur" class="form-control" placeholder="Type compteur" required>
             </div>
 
             <div class="col-md-6">
-                <input type="text"
-                       name="fournisseur_actuel"
-                       class="form-control"
-                       placeholder="Fournisseur actuel">
-            </div>
-
-            <div class="col-md-6">
-                <input type="text"
-                       name="entreprise_nom"
-                       class="form-control"
-                       value="{{ client.name }}"
-                       placeholder="Entreprise">
+                <input type="text" name="pdl_pce" class="form-control" placeholder="PDL / PCE">
             </div>
 
             <div class="col-md-12">
-                <textarea name="commentaire"
-                          class="form-control"
-                          rows="3"
-                          placeholder="Commentaire"></textarea>
+                <textarea name="commentaire" class="form-control" rows="3" placeholder="Commentaire"></textarea>
             </div>
-
         </div>
 
         <div class="mt-3 text-end">
-            <button class="btn btn-primary">
-                Créer la demande
-            </button>
+            <button class="btn btn-primary">Créer la demande</button>
         </div>
-
     </form>
 </div>
 {% endif %}
+</div>
 
+<!-- ================= ONGLET DOCUMENTS ================= -->
+<div class="tab-pane fade" id="documents">
+
+<div class="card mb-4 p-3">
+    <h5>Documents du client</h5>
+
+    <form method="post"
+          enctype="multipart/form-data"
+          action="{{ url_for('upload_client_document', client_id=client.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="file" name="file" class="form-control mb-2" required>
+        <button class="btn btn-secondary">Ajouter un document</button>
+    </form>
+
+    <hr>
+
+    {% if documents %}
+        <ul class="list-group">
+            {% for doc in documents %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ doc.nom }}
+                {% if doc.url %}
+                    <a href="{{ doc.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        Télécharger
+                    </a>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted mt-3">Aucun document pour ce client.</p>
+    {% endif %}
+</div>
+</div>
+
+<!-- ================= ONGLET MISE À JOUR ================= -->
+<div class="tab-pane fade" id="updates">
+
+<div class="card mb-4 p-3">
+    <h5>Demande de mise à jour</h5>
+
+    {% if can_request_update %}
+    <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="mb-3">
+            <label class="form-label">Date de mise à jour</label>
+            <input type="date" name="update_date" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Commentaire</label>
+            <textarea name="update_commentaire" class="form-control" rows="4"></textarea>
+        </div>
+
+        <button class="btn btn-warning">
+            Envoyer la demande
+        </button>
+    </form>
+    {% else %}
+        <p class="text-muted">Aucune action disponible.</p>
+    {% endif %}
+</div>
 </div>
 
 </div>
