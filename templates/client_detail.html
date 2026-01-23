@@ -1,201 +1,256 @@
-/* =========================================================
-   SYNERGYGROUP CRM — DESIGN PRO, DOUX & LUDIQUE (FINAL)
-   ========================================================= */
+{% extends "base.html" %}
 
-/* ================= VARIABLES ================= */
+{% block title %}Dossier client{% endblock %}
 
-:root {
-    --primary: #0B1437;
-    --primary-soft: #0F1E4D;
-    --accent: #F5B335;
-    --accent-soft: #F8C86A;
+{% block content %}
 
-    --bg: #f3f5f9;
-    --surface: #ffffff;
-    --border: #dde3ee;
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4 d-flex justify-content-between align-items-center">
+    <div>
+        <h1>Dossier client</h1>
+        <p class="text-muted mb-0">{{ client.name }}</p>
+    </div>
 
-    --text: #0f172a;
-    --muted: #475569;
+    {% if current_user and current_user.role == 'admin' %}
+    <form method="post"
+          action="{{ url_for('delete_client', client_id=client.id) }}"
+          onsubmit="return confirm('SUPPRIMER DÉFINITIVEMENT ce dossier client ?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-danger">
+            Supprimer le dossier client
+        </button>
+    </form>
+    {% endif %}
+</div>
 
-    --success: #22c55e;
-    --danger: #ef4444;
-    --secondary: #64748b;
+<!-- ================= FICHE ENTREPRISE ================= -->
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Fiche entreprise</strong>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 mb-2">
+                <strong>Entreprise :</strong><br>
+                {{ client.name }}
+            </div>
 
-    --radius: 16px;
-    --radius-sm: 12px;
+            <div class="col-md-6 mb-2">
+                <strong>Gérant :</strong><br>
+                {{ client.gerant_nom or "—" }}
+            </div>
 
-    --shadow-soft: 0 6px 20px rgba(15,23,42,.08);
-    --shadow-strong: 0 18px 45px rgba(0,0,0,.30);
+            <div class="col-md-6 mb-2">
+                <strong>Email :</strong><br>
+                {{ client.email or "—" }}
+            </div>
 
-    --sidebar-w: 240px;
-}
+            <div class="col-md-6 mb-2">
+                <strong>Téléphone :</strong><br>
+                {{ client.phone or "—" }}
+            </div>
 
-/* ================= RESET ================= */
+            <div class="col-md-6 mb-2">
+                <strong>SIRET :</strong><br>
+                {{ client.siret or "—" }}
+            </div>
 
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-}
+            <div class="col-md-6 mb-2">
+                <strong>Adresse :</strong><br>
+                {{ client.address or "—" }}
+            </div>
+        </div>
+    </div>
+</div>
 
-html, body {
-    min-height: 100%;
-}
+<!-- ================= TABS ================= -->
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active"
+                data-bs-toggle="tab"
+                data-bs-target="#cotations"
+                type="button">
+            Cotations
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link"
+                data-bs-toggle="tab"
+                data-bs-target="#documents"
+                type="button">
+            Documents
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link"
+                data-bs-toggle="tab"
+                data-bs-target="#updates"
+                type="button">
+            Mise à jour
+        </button>
+    </li>
+</ul>
 
-body {
-    margin: 0;
-    background: linear-gradient(90deg,#eef2f7 0%,#f7f9fc 100%);
-    color: var(--text);
-    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-    font-size: 14.5px;
-    line-height: 1.55;
-}
+<div class="tab-content">
 
-/* ================= LAYOUT ================= */
+<!-- ================= ONGLET COTATIONS ================= -->
+<div class="tab-pane fade show active" id="cotations">
 
-.app-layout {
-    display: flex;
-    min-height: 100vh;
-}
+{% if current_user and current_user.role in ['commercial','admin'] %}
+<div class="card mb-4">
+    <h5>Nouvelle demande de cotation</h5>
 
-/* ================= SIDEBAR ================= */
+    <form method="post"
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-.sidebar {
-    width: var(--sidebar-w);
-    background: linear-gradient(180deg,var(--primary),var(--primary-soft));
-    color: #e5e7eb;
-    position: relative;
-}
+        <div class="row g-3">
+            <div class="col-md-4">
+                <input type="date"
+                       name="date_negociation"
+                       class="form-control"
+                       required>
+            </div>
 
-.sidebar::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: -26px;
-    width: 26px;
-    height: 100%;
-    background: linear-gradient(
-        90deg,
-        rgba(11,20,55,.22),
-        rgba(11,20,55,0)
-    );
-    pointer-events: none;
-}
+            <div class="col-md-4">
+                <input type="time"
+                       name="heure_negociation"
+                       class="form-control"
+                       required>
+            </div>
 
-.sidebar-nav {
-    padding: 16px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
+            <div class="col-md-4">
+                <select name="energie_type"
+                        class="form-select"
+                        required>
+                    <option value="">— Énergie —</option>
+                    <option value="gaz">Gaz</option>
+                    <option value="electricite">Électricité</option>
+                </select>
+            </div>
 
-.sidebar-nav a {
-    display: flex;
-    align-items: center;
-    padding: 13px 16px;
-    border-radius: 14px;
-    font-weight: 600;
-    color: #cbd5e1;
-    text-decoration: none;
-    transition: background .2s ease, transform .15s ease, color .2s ease;
-}
+            <div class="col-md-6">
+                <input type="text"
+                       name="type_compteur"
+                       class="form-control"
+                       placeholder="Type compteur"
+                       required>
+            </div>
 
-.sidebar-nav a:hover {
-    background: rgba(245,179,53,.14);
-    color: #ffffff;
-    transform: translateX(3px);
-}
+            <div class="col-md-6">
+                <input type="text"
+                       name="pdl_pce"
+                       class="form-control"
+                       placeholder="PDL / PCE">
+            </div>
 
-.sidebar-nav a.active {
-    background: linear-gradient(
-        90deg,
-        rgba(245,179,53,.45),
-        rgba(245,179,53,.18)
-    );
-    color: #ffffff;
-    box-shadow: inset 4px 0 0 var(--accent);
-}
+            <div class="col-md-12">
+                <textarea name="commentaire"
+                          class="form-control"
+                          rows="3"
+                          placeholder="Commentaire"></textarea>
+            </div>
+        </div>
 
-/* ================= CONTENU ================= */
+        <div class="mt-3 text-end">
+            <button class="btn btn-primary">
+                Créer la demande
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
 
-.main-content {
-    flex: 1;
-    padding: 32px 36px;
-    display: flex;
-    flex-direction: column;
-}
+</div>
 
-/* ⚠️ AUCUN height:100vh / AUCUN overflow:hidden ICI */
+<!-- ================= ONGLET DOCUMENTS ================= -->
+<div class="tab-pane fade" id="documents">
 
-main.content {
-    flex: 1;
-}
+<div class="card mb-4">
+    <h5>Documents du client</h5>
 
-/* ================= CARDS ================= */
+    <form method="post"
+          enctype="multipart/form-data"
+          action="{{ url_for('upload_client_document', client_id=client.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="file"
+               name="file"
+               class="form-control mb-2"
+               required>
+        <button class="btn btn-secondary">
+            Ajouter un document
+        </button>
+    </form>
 
-.card {
-    background: var(--surface);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-soft);
-    padding: 24px;
-    margin-bottom: 26px;
-}
+    <hr>
 
-/* ================= BOUTONS ================= */
+    {% if documents %}
+        <ul class="list-group">
+            {% for doc in documents %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ doc.nom }}
+                {% if doc.url %}
+                    <a href="{{ doc.url }}"
+                       target="_blank"
+                       class="btn btn-sm btn-primary">
+                        Télécharger
+                    </a>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted mt-3">
+            Aucun document pour ce client.
+        </p>
+    {% endif %}
+</div>
 
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 120px;
-    padding: 11px 18px;
-    border-radius: 999px;
-    font-weight: 700;
-    font-size: 13.5px;
-    border: none;
-    cursor: pointer;
-    transition: transform .15s ease, box-shadow .15s ease;
-}
+</div>
 
-.btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 14px rgba(0,0,0,.18);
-}
+<!-- ================= ONGLET MISE À JOUR ================= -->
+<div class="tab-pane fade" id="updates">
 
-.btn-primary {
-    background: linear-gradient(180deg,var(--accent),#f0a900);
-    color: #1f2937;
-}
+<div class="card mb-4">
+    <h5>Demande de mise à jour</h5>
 
-.btn-danger {
-    background: linear-gradient(180deg,#ef4444,#dc2626);
-    color: #fff;
-}
+    {% if can_request_update %}
+    <form method="post"
+          action="{{ url_for('update_client', client_id=client.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-/* ================= FORMULAIRES ================= */
+        <div class="mb-3">
+            <label class="form-label">
+                Date de mise à jour
+            </label>
+            <input type="date"
+                   name="update_date"
+                   class="form-control"
+                   required>
+        </div>
 
-.form-control,
-.form-select,
-textarea {
-    width: 100%;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    padding: 11px 14px;
-    font-size: 14px;
-}
+        <div class="mb-3">
+            <label class="form-label">
+                Commentaire
+            </label>
+            <textarea name="update_commentaire"
+                      class="form-control"
+                      rows="4"></textarea>
+        </div>
 
-/* ================= CHAT ================= */
+        <button class="btn btn-primary">
+            Envoyer la demande
+        </button>
+    </form>
+    {% else %}
+        <p class="text-muted">
+            Aucune action disponible.
+        </p>
+    {% endif %}
+</div>
 
-.chat-toggle,
-.chat-widget {
-    position: fixed !important;
-    z-index: 2147483647 !important;
-}
+</div>
 
-/* ================= RESPONSIVE ================= */
+</div>
 
-@media (max-width: 900px) {
-    .main-content {
-        padding: 22px;
-    }
-}
+{% endblock %}
