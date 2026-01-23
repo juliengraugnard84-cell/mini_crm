@@ -457,7 +457,10 @@ def s3_presigned_url(key: str, expires_in: int = 3600) -> str:
             ExpiresIn=expires_in,
         )
     except ClientError as e:
-        logger.error("Erreur presigned URL S3 (ClientError): %s", getattr(e, "response", None))
+        logger.error(
+            "Erreur presigned URL S3 (ClientError): %s",
+            getattr(e, "response", None)
+        )
         return ""
     except Exception as e:
         logger.exception("Erreur presigned URL S3 : %r", e)
@@ -494,11 +497,11 @@ def s3_list_all_objects(bucket: str, prefix: str | None = None):
 
 def _s3_object_exists(bucket: str, key: str) -> bool:
     """
-    Test existence objet S3, sans casser le comportement:
-    - utilisé uniquement pour éviter overwrite silencieux.
+    Test existence objet S3, sans casser le comportement.
     """
     if not s3:
         return False
+
     try:
         s3.head_object(Bucket=bucket, Key=key)
         return True
@@ -513,7 +516,7 @@ def _s3_object_exists(bucket: str, key: str) -> bool:
 
 def _s3_make_non_overwriting_key(bucket: str, key: str) -> str:
     """
-    Conserve le nom original, mais si collision -> ajoute suffixe aléatoire.
+    Conserve le nom original, mais si collision → suffixe aléatoire.
     """
     if not _s3_object_exists(bucket, key):
         return key
@@ -524,15 +527,16 @@ def _s3_make_non_overwriting_key(bucket: str, key: str) -> str:
         if not _s3_object_exists(bucket, candidate):
             return candidate
 
-    # ultime fallback (rare)
     return f"{base}_{secrets.token_hex(8)}{ext}"
 
 
 def list_client_documents(client_id: int):
     """
-    Liste documents d’un client (URL signée incluse).
+    Liste documents d’un client.
+    - PROD : URL signée
+    - LOCAL : liste visible sans URL
     """
-    if LOCAL_MODE or not s3:
+    if not s3:
         return []
 
     prefix = client_s3_prefix(client_id)
@@ -551,7 +555,11 @@ def list_client_documents(client_id: int):
                     "nom": key.replace(prefix, "", 1),
                     "key": key,
                     "taille": item.get("Size", 0),
-                    "url": s3_presigned_url(key),
+                    "url": (
+                        s3_presigned_url(key)
+                        if not LOCAL_MODE
+                        else None
+                    ),
                 }
             )
 
@@ -1239,7 +1247,7 @@ def update_client_status(client_id):
 
 
 # =========================
-# CRÉATION CLIENT (CORRIGÉE)
+# CRÉATION CLIENT
 # =========================
 @app.route("/clients/new", methods=["GET", "POST"])
 @login_required
@@ -1288,7 +1296,7 @@ def new_client():
 
 
 # =========================
-# DÉTAIL CLIENT
+# DÉTAIL CLIENT (CORRIGÉ)
 # =========================
 @app.route("/clients/<int:client_id>")
 @login_required
@@ -1297,6 +1305,7 @@ def client_detail(client_id):
         abort(403)
 
     conn = get_db()
+    user = session.get("user") or {}
 
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM crm_clients WHERE id=%s", (client_id,))
@@ -1337,6 +1346,12 @@ def client_detail(client_id):
         documents=documents,
         ca_par_mois=[row_to_obj(r) for r in ca_par_mois],
         ca_total=ca_total,
+
+        # ✅ CORRECTION DÉFINITIVE
+        can_request_update=(
+            user.get("role") == "commercial"
+            and can_access_client(client_id)
+        ),
     )
 
 
