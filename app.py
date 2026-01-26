@@ -1324,6 +1324,32 @@ def admin_cotation_detail(cotation_id):
         cotation=row_to_obj(row)
     )
 
+
+############################################################
+# 10 TER. ADMIN — UTILISATEURS
+############################################################
+
+@app.route("/admin/users")
+@admin_required
+def admin_users():
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                id,
+                username,
+                role
+            FROM users
+            ORDER BY id ASC
+        """)
+        rows = cur.fetchall()
+
+    return render_template(
+        "admin_users.html",
+        users=[row_to_obj(r) for r in rows],
+    )
+
 # =========================
 # ADMIN → ÉDITION COTATION
 # =========================
