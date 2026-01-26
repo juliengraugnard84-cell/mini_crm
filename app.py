@@ -1329,26 +1329,96 @@ def admin_cotation_detail(cotation_id):
 # 10 TER. ADMIN — UTILISATEURS
 ############################################################
 
-@app.route("/admin/users")
+@app.route("/admin/users", methods=["GET", "POST"])
 @admin_required
 def admin_users():
     conn = get_db()
 
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = (request.form.get("password") or "").strip()
+        role = (request.form.get("role") or "").strip()
+
+        if not username or not password or not role:
+            flash("Tous les champs sont obligatoires.", "danger")
+            return redirect(url_for("admin_users"))
+
+        if len(password) < 10:
+            flash("Mot de passe trop court (min 10 caractères).", "danger")
+            return redirect(url_for("admin_users"))
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM users WHERE username=%s",
+                (username,),
+            )
+            if cur.fetchone()[0] > 0:
+                flash("Nom d'utilisateur déjà utilisé.", "danger")
+                return redirect(url_for("admin_users"))
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO users (username, password_hash, role)
+                VALUES (%s, %s, %s)
+                """,
+                (username, generate_password_hash(password), role),
+            )
+
+        conn.commit()
+        flash("Utilisateur créé.", "success")
+        return redirect(url_for("admin_users"))
+
     with conn.cursor() as cur:
-        cur.execute("""
-            SELECT
-                id,
-                username,
-                role
-            FROM users
-            ORDER BY id ASC
-        """)
-        rows = cur.fetchall()
+        cur.execute("SELECT id, username, role FROM users ORDER BY id ASC")
+        users = cur.fetchall()
 
     return render_template(
         "admin_users.html",
-        users=[row_to_obj(r) for r in rows],
+        users=[row_to_obj(u) for u in users],
     )
+
+
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_user(user_id):
+    if user_id == 1:
+        flash("Impossible de supprimer l’administrateur principal.", "danger")
+        return redirect(url_for("admin_users"))
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
+
+    conn.commit()
+    flash("Utilisateur supprimé.", "success")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:user_id>/reset_password", methods=["POST"])
+@admin_required
+def admin_reset_password(user_id):
+    new_password = (request.form.get("new_password") or "").strip()
+
+    if not new_password:
+        flash("Mot de passe requis.", "danger")
+        return redirect(url_for("admin_users"))
+
+    if len(new_password) < 10:
+        flash("Mot de passe trop court (min 10 caractères).", "danger")
+        return redirect(url_for("admin_users"))
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE users SET password_hash=%s WHERE id=%s",
+            (generate_password_hash(new_password), user_id),
+        )
+
+    conn.commit()
+    flash("Mot de passe réinitialisé.", "success")
+    return redirect(url_for("admin_users"))
+
 
 # =========================
 # ADMIN → ÉDITION COTATION
@@ -1583,15 +1653,21 @@ def update_client(client_id):
     conn = get_db()
     user = session.get("user") or {}
 
-    update_date = request.form.get("update_date")
+    update_date = (request.form.get("update_date") or "").strip()
     commentaire = (request.form.get("update_commentaire") or "").strip()
 
     if not update_date:
         flash("La date de mise à jour est obligatoire.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
+        try:
+            return redirect(url_for("client_detail", client_id=client_id))
+        except Exception:
+            return redirect(url_for("clients"))
 
     with conn.cursor() as cur:
-        cur.execute("SELECT name FROM crm_clients WHERE id=%s", (client_id,))
+        cur.execute(
+            "SELECT name FROM crm_clients WHERE id = %s",
+            (client_id,)
+        )
         client = cur.fetchone()
 
     if not client:
@@ -1610,13 +1686,13 @@ def update_client(client_id):
                 commentaire,
                 is_read
             )
-            VALUES (%s,%s,%s,%s,%s,%s,0)
+            VALUES (%s, %s, %s, %s, %s, %s, 0)
             """,
             (
                 client_id,
                 client["name"],
-                user["id"],
-                user["username"],
+                user.get("id"),
+                user.get("username"),
                 update_date,
                 commentaire,
             ),
@@ -1624,7 +1700,11 @@ def update_client(client_id):
 
     conn.commit()
     flash("Demande de mise à jour envoyée à l’administrateur.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
+
+    try:
+        return redirect(url_for("client_detail", client_id=client_id))
+    except Exception:
+        return redirect(url_for("clients"))
 
 
 # =========================
@@ -1640,7 +1720,7 @@ def admin_updates():
             """
             SELECT *
             FROM client_updates
-            ORDER BY is_read ASC, created_at DESC
+            ORDER BY COALESCE(is_read, 0) ASC, created_at DESC
             """
         )
         rows = cur.fetchall()
@@ -1660,7 +1740,10 @@ def open_update(update_id):
     conn = get_db()
 
     with conn.cursor() as cur:
-        cur.execute("SELECT * FROM client_updates WHERE id=%s", (update_id,))
+        cur.execute(
+            "SELECT * FROM client_updates WHERE id = %s",
+            (update_id,)
+        )
         upd = cur.fetchone()
 
     if not upd:
@@ -1668,10 +1751,18 @@ def open_update(update_id):
         return redirect(url_for("admin_updates"))
 
     with conn.cursor() as cur:
-        cur.execute("UPDATE client_updates SET is_read=1 WHERE id=%s", (update_id,))
+        cur.execute(
+            "UPDATE client_updates SET is_read = 1 WHERE id = %s",
+            (update_id,)
+        )
 
     conn.commit()
-    return redirect(url_for("client_detail", client_id=upd["client_id"]))
+    flash("Mise à jour marquée comme lue.", "success")
+
+    try:
+        return redirect(url_for("client_detail", client_id=upd["client_id"]))
+    except Exception:
+        return redirect(url_for("clients"))
 
 
 # =========================
@@ -1684,14 +1775,17 @@ def delete_update(update_id):
     admin = session.get("user") or {}
 
     with conn.cursor() as cur:
-        cur.execute("SELECT * FROM client_updates WHERE id=%s", (update_id,))
+        cur.execute(
+            "SELECT * FROM client_updates WHERE id = %s",
+            (update_id,)
+        )
         upd = cur.fetchone()
 
     if not upd:
         flash("Mise à jour introuvable.", "danger")
         return redirect(url_for("admin_updates"))
 
-    # Log suppression (table désormais créée)
+    # Log suppression (non bloquant)
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -1702,7 +1796,7 @@ def delete_update(update_id):
                     admin_id,
                     admin_username
                 )
-                VALUES (%s,%s,%s,%s)
+                VALUES (%s, %s, %s, %s)
                 """,
                 (
                     upd["id"],
@@ -1712,31 +1806,18 @@ def delete_update(update_id):
                 ),
             )
     except Exception:
-        # Log facultatif : ne bloque pas la suppression
         pass
 
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM client_updates WHERE id=%s", (update_id,))
+        cur.execute(
+            "DELETE FROM client_updates WHERE id = %s",
+            (update_id,)
+        )
 
     conn.commit()
     flash("Demande de mise à jour supprimée.", "success")
     return redirect(url_for("admin_updates"))
 
-
-# ============================
-# FIN PARTIE 3/4
-# La PARTIE 4/4 continue avec:
-# - CHAT (backend complet)
-# - ROOT
-# - RUN (local/prod)
-# ============================
-# ============================
-# app.py — VERSION COMPLÈTE CORRIGÉE (PARTIE 4/4)
-# Contenu:
-# - CHAT (backend)
-# - ROOT
-# - RUN
-# ============================
 
 ############################################################
 # 14. CHAT (BACKEND)
