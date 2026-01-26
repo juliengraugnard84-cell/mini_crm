@@ -11,7 +11,7 @@
     <p class="text-muted">Suivi de mon activité commerciale</p>
 </div>
 
-<!-- KPI COMMERCIAL -->
+<!-- ================= KPI COMMERCIAL ================= -->
 <div class="kpi-grid"
      style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:32px;">
     <div class="kpi-tile">
@@ -35,7 +35,80 @@
     </div>
 </div>
 
-<!-- MES DOSSIERS -->
+<!-- ================= PIPELINE COMMERCIAL ================= -->
+<h3 class="mb-3">Mon pipeline</h3>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:32px;">
+
+    <!-- EN COURS -->
+    <div class="card">
+        <div class="card-header fw-bold">
+            🟡 En cours ({{ pipeline_en_cours|length }})
+        </div>
+        <div class="card-body d-flex flex-column gap-2">
+            {% for c in pipeline_en_cours %}
+            <div class="border rounded p-2">
+                <strong>{{ c.name }}</strong>
+                <div class="mt-2">
+                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                       class="btn btn-ouvrir btn-sm w-100">
+                        Ouvrir
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucun dossier.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- GAGNÉS -->
+    <div class="card border-success">
+        <div class="card-header fw-bold text-success">
+            🟢 Gagnés ({{ pipeline_gagnes|length }})
+        </div>
+        <div class="card-body d-flex flex-column gap-2">
+            {% for c in pipeline_gagnes %}
+            <div class="border border-success rounded p-2">
+                <strong>{{ c.name }}</strong>
+                <div class="mt-2">
+                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                       class="btn btn-ouvrir btn-sm w-100">
+                        Ouvrir
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucun dossier gagné.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- PERDUS -->
+    <div class="card border-danger">
+        <div class="card-header fw-bold text-danger">
+            🔴 Perdus ({{ pipeline_perdus|length }})
+        </div>
+        <div class="card-body d-flex flex-column gap-2">
+            {% for c in pipeline_perdus %}
+            <div class="border border-danger rounded p-2">
+                <strong>{{ c.name }}</strong>
+                <div class="mt-2">
+                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                       class="btn btn-ouvrir btn-sm w-100">
+                        Ouvrir
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucun dossier perdu.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= DOSSIERS RÉCENTS ================= -->
 <div class="card">
     <h5>Mes dossiers récents</h5>
 
@@ -70,7 +143,7 @@
     {% endif %}
 </div>
 
-<!-- MES COTATIONS -->
+<!-- ================= MES COTATIONS ================= -->
 <div class="card">
     <h5>Mes dernières cotations</h5>
 
@@ -100,13 +173,14 @@
 
 {% else %}
 
-<!-- ================= DASHBOARD ADMIN (INCHANGÉ) ================= -->
+<!-- ================= DASHBOARD ADMIN ================= -->
 
 <div class="page-header" style="margin-bottom:24px;">
     <h1>Tableau de bord</h1>
     <p class="text-muted">Vue d’ensemble de l’activité</p>
 </div>
 
+<!-- ================= KPI ADMIN ================= -->
 <div class="kpi-grid"
      style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:32px;">
     <div class="kpi-tile">
@@ -130,9 +204,76 @@
     </div>
 </div>
 
+<!-- ================= PIPELINE ADMIN ================= -->
+<h3 class="mb-3">Pipeline global des dossiers</h3>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:32px;">
+
+    <div class="card">
+        <div class="card-header fw-bold">
+            🟡 En cours ({{ pipeline_en_cours|length }})
+        </div>
+        <div class="card-body d-flex flex-column gap-2">
+            {% for c in pipeline_en_cours %}
+            <div class="border rounded p-2">
+                <strong>{{ c.name }}</strong><br>
+                <small class="text-muted">{{ c.commercial or "—" }}</small>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucun dossier.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card border-success">
+        <div class="card-header fw-bold text-success">
+            🟢 Gagnés ({{ pipeline_gagnes|length }})
+        </div>
+        <div class="card-body d-flex flex-column gap-2">
+            {% for c in pipeline_gagnes %}
+            <div class="border border-success rounded p-2">
+                <strong>{{ c.name }}</strong><br>
+                <small class="text-muted">{{ c.commercial or "—" }}</small>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucun dossier gagné.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card border-danger">
+        <div class="card-header fw-bold text-danger">
+            🔴 Perdus ({{ pipeline_perdus|length }})
+        </div>
+        <div class="card-body d-flex flex-column gap-2">
+            {% for c in pipeline_perdus %}
+            <div class="border border-danger rounded p-2">
+                <strong>{{ c.name }}</strong><br>
+                <small class="text-muted">{{ c.commercial or "—" }}</small>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucun dossier perdu.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= BLOCS ADMIN EXISTANTS ================= -->
 <div class="card">
     <h5>Derniers dossiers créés</h5>
-
     {% if last_clients %}
     <table class="table">
         <thead>
@@ -154,63 +295,6 @@
     </table>
     {% else %}
         <p class="text-muted">Aucun dossier récent.</p>
-    {% endif %}
-</div>
-
-<div class="card">
-    <h5>Dernier chiffre d’affaires enregistré</h5>
-
-    {% if last_rev %}
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;">
-        <div>
-            <div class="kpi-label">Date</div>
-            <strong>{{ format_date(last_rev.date) }}</strong>
-        </div>
-        <div>
-            <div class="kpi-label">Montant</div>
-            <strong>{{ "%.2f"|format(last_rev.montant) }} €</strong>
-        </div>
-        <div>
-            <div class="kpi-label">Commercial</div>
-            <strong>{{ last_rev.commercial or "—" }}</strong>
-        </div>
-    </div>
-    {% else %}
-        <p class="text-muted">Aucun chiffre d’affaires.</p>
-    {% endif %}
-</div>
-
-<div class="card">
-    <h5>Dernières demandes de cotation</h5>
-
-    {% if cotations_admin %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Dossier</th>
-                <th>Énergie</th>
-                <th style="text-align:right;">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in cotations_admin %}
-            <tr>
-                <td>{{ format_date(c.date_creation) }}</td>
-                <td><strong>{{ c.client_name }}</strong></td>
-                <td>{{ c.energie_type or "—" }}</td>
-                <td style="text-align:right;">
-                    <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
-                       class="btn btn-secondary btn-sm">
-                        Ouvrir
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-        <p class="text-muted">Aucune nouvelle demande.</p>
     {% endif %}
 </div>
 

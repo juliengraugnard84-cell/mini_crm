@@ -4,144 +4,133 @@
 {% block content %}
 
 <!-- ================= PAGE HEADER ================= -->
-<div
-    class="page-header"
-    style="
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        gap:16px;
-        margin-bottom:24px;
-        flex-wrap:wrap;
-    "
->
+<div class="page-header"
+     style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
     <div>
         <h1>Clients</h1>
         <p class="text-muted">Gestion des dossiers clients</p>
     </div>
 
-    <a
-        href="{{ url_for('new_client') }}"
-        class="btn btn-primary"
-    >
+    <a href="{{ url_for('new_client') }}" class="btn btn-primary">
         ➕ Nouveau dossier
     </a>
 </div>
 
 <!-- ================= SEARCH ================= -->
 <div class="card mb-4">
-    <form
-        method="get"
-        action="{{ url_for('clients') }}"
-        style="
-            display:flex;
-            gap:12px;
-            align-items:center;
-            flex-wrap:wrap;
-        "
-    >
-        <input
-            type="text"
-            name="q"
-            placeholder="Rechercher un dossier…"
-            value="{{ q or '' }}"
-            class="form-control"
-            style="max-width:320px;"
-        >
-
-        <button
-            type="submit"
-            class="btn btn-rechercher"
-        >
+    <form method="get" action="{{ url_for('clients') }}"
+          style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <input type="text"
+               name="q"
+               placeholder="Rechercher un dossier…"
+               value="{{ q or '' }}"
+               class="form-control"
+               style="max-width:320px;">
+        <button type="submit" class="btn btn-rechercher">
             Rechercher
         </button>
     </form>
 </div>
 
-<!-- ================= LISTE CLIENTS ================= -->
-<div class="card">
+<h2 class="mb-4">
+    {% if current_user.role == 'admin' %}
+        Pipeline des dossiers
+    {% else %}
+        Mes dossiers
+    {% endif %}
+</h2>
 
-{% if clients %}
-    <table class="table align-middle">
-        <thead>
-            <tr>
-                <th>Dossier</th>
-                <th>Commercial</th>
-                <th>Statut</th>
-                <th>Date de création</th>
-                <th style="text-align:right;">Action</th>
-            </tr>
-        </thead>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
 
-        <tbody>
-            {% for c in clients %}
-            <tr>
-                <td>
-                    <strong>{{ c.name }}</strong>
-                </td>
+    <!-- ================= EN COURS ================= -->
+    <div class="card">
+        <div class="card-header fw-bold">
+            🟡 En cours ({{ clients_en_cours|length }})
+        </div>
 
-                <td>
-                    {{ c.commercial or "—" }}
-                </td>
+        <div class="card-body d-flex flex-column gap-2">
+            {% for c in clients_en_cours %}
+            <div class="border rounded p-2">
+                <strong>{{ c.name }}</strong><br>
+                <small class="text-muted">
+                    Commercial : {{ c.commercial or "—" }}
+                </small>
 
-                <!-- ✅ STATUT MODIFIABLE (commercial + admin) -->
-                <td style="max-width:180px;">
-                    <form
-                        method="post"
-                        action="{{ url_for('update_client_status', client_id=c.id) }}"
-                    >
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-                        <select
-                            name="status"
+                {% if current_user.role == 'admin' %}
+                <form method="post"
+                      action="{{ url_for('update_client_status', client_id=c.id) }}"
+                      class="mt-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <select name="status"
                             class="form-select form-select-sm"
-                            onchange="this.form.submit()"
-                        >
-                            <option value="en_cours"
-                                {% if c.status == 'en_cours' %}selected{% endif %}>
-                                En cours
-                            </option>
+                            onchange="this.form.submit()">
+                        <option value="en_cours" selected>En cours</option>
+                        <option value="gagne">Gagné</option>
+                        <option value="perdu">Perdu</option>
+                    </select>
+                </form>
+                {% endif %}
 
-                            <option value="gagne"
-                                {% if c.status == 'gagne' %}selected{% endif %}>
-                                Gagné
-                            </option>
-
-                            <option value="perdu"
-                                {% if c.status == 'perdu' %}selected{% endif %}>
-                                Perdu
-                            </option>
-
-                            <option value="demande_maj"
-                                {% if c.status == 'demande_maj' %}selected{% endif %}>
-                                Demande de MAJ
-                            </option>
-                        </select>
-                    </form>
-                </td>
-
-                <td>
-                    {{ format_date(c.created_at) }}
-                </td>
-
-                <td style="text-align:right;">
-                    <a
-                        href="{{ url_for('client_detail', client_id=c.id) }}"
-                        class="btn btn-ouvrir btn-sm"
-                    >
-                        Ouvrir
-                    </a>
-                </td>
-            </tr>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucun dossier.</p>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+    </div>
 
-{% else %}
-    <p class="text-muted mb-0">
-        Aucun dossier trouvé.
-    </p>
-{% endif %}
+    <!-- ================= GAGNÉS ================= -->
+    <div class="card border-success">
+        <div class="card-header fw-bold text-success">
+            🟢 Gagnés ({{ clients_gagnes|length }})
+        </div>
+
+        <div class="card-body d-flex flex-column gap-2">
+            {% for c in clients_gagnes %}
+            <div class="border border-success rounded p-2">
+                <strong>{{ c.name }}</strong><br>
+                <small class="text-muted">
+                    Commercial : {{ c.commercial or "—" }}
+                </small>
+                <div class="text-success fw-bold mt-1">✔ Gagné</div>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucun dossier gagné.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ================= PERDUS ================= -->
+    <div class="card border-danger">
+        <div class="card-header fw-bold text-danger">
+            🔴 Perdus ({{ clients_perdus|length }})
+        </div>
+
+        <div class="card-body d-flex flex-column gap-2">
+            {% for c in clients_perdus %}
+            <div class="border border-danger rounded p-2">
+                <strong>{{ c.name }}</strong><br>
+                <small class="text-muted">
+                    Commercial : {{ c.commercial or "—" }}
+                </small>
+                <div class="text-danger fw-bold mt-1">✖ Perdu</div>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucun dossier perdu.</p>
+            {% endfor %}
+        </div>
+    </div>
 
 </div>
 
