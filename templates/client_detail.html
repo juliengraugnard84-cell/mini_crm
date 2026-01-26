@@ -11,12 +11,6 @@
         <p class="text-muted mb-0">{{ client.name }}</p>
     </div>
 
-    {# ⚠️ BOUTON SUPPRESSION DÉSACTIVÉ
-       La route delete_client N’EXISTE PAS côté backend.
-       La laisser ici ferait planter toute la page.
-       À réactiver uniquement quand la route sera créée.
-    #}
-    {#
     {% if current_user and current_user.role == 'admin' %}
     <form method="post"
           action="{{ url_for('delete_client', client_id=client.id) }}"
@@ -27,7 +21,6 @@
         </button>
     </form>
     {% endif %}
-    #}
 </div>
 
 <!-- ================= FICHE ENTREPRISE ================= -->
@@ -66,13 +59,21 @@
 <div class="tab-pane fade show active" id="cotations">
 {% if current_user and current_user.role in ['commercial', 'admin'] %}
 <div class="card mb-4">
-    <h5>Nouvelle demande de cotation</h5>
-    <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="mt-3 text-end">
-            <button class="btn btn-primary">Créer la demande</button>
-        </div>
-    </form>
+    <div class="card-body">
+        <h5 class="mb-3">Nouvelle demande de cotation</h5>
+
+        <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <!-- ⚠️ FORMULAIRE SIMPLIFIÉ INTENTIONNEL
+                 Le détail complet est géré dans la page cotation -->
+            <div class="text-end">
+                <button class="btn btn-primary">
+                    Créer la demande
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 {% endif %}
 </div>
@@ -80,33 +81,35 @@
 <!-- ================= ONGLET DOCUMENTS ================= -->
 <div class="tab-pane fade" id="documents">
 <div class="card mb-4">
-    <h5>Documents du client</h5>
+    <div class="card-body">
+        <h5 class="mb-3">Documents du client</h5>
 
-    <!-- Upload classique -->
-    <form method="post"
-          enctype="multipart/form-data"
-          action="{{ url_for('upload_client_document', client_id=client.id) }}"
-          class="mb-3">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="file" name="file" class="form-control mb-2">
-        <button class="btn btn-secondary">Ajouter un document</button>
-    </form>
+        <!-- Upload classique -->
+        <form method="post"
+              enctype="multipart/form-data"
+              action="{{ url_for('upload_client_document', client_id=client.id) }}"
+              class="mb-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="file" name="file" class="form-control mb-2">
+            <button class="btn btn-secondary">Ajouter un document</button>
+        </form>
 
-    <form
-        action="{{ url_for('upload_client_document', client_id=client.id) }}"
-        method="post"
-        enctype="multipart/form-data"
-        class="dropzone border rounded p-3"
-        id="clientDocumentsDropzone">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="dz-message text-center text-muted">
-            <strong>Glissez-déposez vos documents ici</strong>
-        </div>
-    </form>
+        <!-- Dropzone -->
+        <form
+            action="{{ url_for('upload_client_document', client_id=client.id) }}"
+            method="post"
+            enctype="multipart/form-data"
+            class="dropzone border rounded p-3"
+            id="clientDocumentsDropzone">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="dz-message text-center text-muted">
+                <strong>Glissez-déposez vos documents ici</strong>
+            </div>
+        </form>
 
-    <hr>
+        <hr>
 
-    {% if documents %}
+        {% if documents %}
         <ul class="list-group">
             {% for doc in documents %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -114,43 +117,57 @@
 
                 <div class="d-flex gap-2">
                     {% if doc.url %}
-                        <a href="{{ doc.url }}" target="_blank" class="btn btn-sm btn-primary">
-                            Télécharger
-                        </a>
+                    <a href="{{ doc.url }}" target="_blank" class="btn btn-sm btn-primary">
+                        Télécharger
+                    </a>
                     {% endif %}
 
                     {% if current_user and current_user.role == 'admin' %}
-                        <button
-                            type="button"
-                            class="btn btn-sm btn-outline-danger js-delete-doc"
-                            data-delete-url="{{ url_for('delete_document', key=doc.key) }}"
-                            data-doc-name="{{ doc.nom|e }}">
-                            Supprimer
-                        </button>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-danger js-delete-doc"
+                        data-delete-url="{{ url_for('delete_document', key=doc.key) }}"
+                        data-doc-name="{{ doc.nom|e }}">
+                        Supprimer
+                    </button>
                     {% endif %}
                 </div>
             </li>
             {% endfor %}
         </ul>
-    {% else %}
+        {% else %}
         <p class="text-muted">Aucun document.</p>
-    {% endif %}
+        {% endif %}
+    </div>
 </div>
 </div>
 
 <!-- ================= ONGLET MISE À JOUR ================= -->
 <div class="tab-pane fade" id="updates">
 <div class="card mb-4">
-    <h5>Demande de mise à jour</h5>
+    <div class="card-body">
+        <h5 class="mb-3">Demande de mise à jour</h5>
 
-    {% if can_request_update %}
-    <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="date" name="update_date" class="form-control mb-2" required>
-        <textarea name="update_commentaire" class="form-control mb-2"></textarea>
-        <button class="btn btn-primary">Envoyer</button>
-    </form>
-    {% endif %}
+        {% if can_request_update %}
+        <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <input type="date"
+                   name="update_date"
+                   class="form-control mb-2"
+                   required>
+
+            <textarea
+                name="update_commentaire"
+                class="form-control mb-3"
+                placeholder="Commentaire (optionnel)"></textarea>
+
+            <button class="btn btn-primary">Envoyer</button>
+        </form>
+        {% else %}
+        <p class="text-muted">Aucune action disponible.</p>
+        {% endif %}
+    </div>
 </div>
 </div>
 
