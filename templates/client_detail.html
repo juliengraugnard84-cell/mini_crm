@@ -11,6 +11,12 @@
         <p class="text-muted mb-0">{{ client.name }}</p>
     </div>
 
+    {# ⚠️ BOUTON SUPPRESSION DÉSACTIVÉ
+       La route delete_client N’EXISTE PAS côté backend.
+       La laisser ici ferait planter toute la page.
+       À réactiver uniquement quand la route sera créée.
+    #}
+    {#
     {% if current_user and current_user.role == 'admin' %}
     <form method="post"
           action="{{ url_for('delete_client', client_id=client.id) }}"
@@ -21,6 +27,7 @@
         </button>
     </form>
     {% endif %}
+    #}
 </div>
 
 <!-- ================= FICHE ENTREPRISE ================= -->
@@ -75,41 +82,15 @@
 <div class="card mb-4">
     <h5>Documents du client</h5>
 
-    <!-- ===== UPLOAD CLASSIQUE (FALLBACK SANS JS) ===== -->
+    <!-- Upload classique -->
     <form method="post"
           enctype="multipart/form-data"
           action="{{ url_for('upload_client_document', client_id=client.id) }}"
           class="mb-3">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="file" name="file" class="form-control mb-2">
-        <button class="btn btn-secondary">
-            Ajouter un document (classique)
-        </button>
-        <div class="form-text text-muted mt-1">
-            Si le glisser-déposer ne fonctionne pas, utilisez ce formulaire.
-        </div>
+        <button class="btn btn-secondary">Ajouter un document</button>
     </form>
-
-    <!-- ===== DROPZONE (UPLOAD MULTI SANS BACKEND) ===== -->
-    <div class="mb-2 d-flex justify-content-between align-items-center">
-        <div class="text-muted">
-            Glissez-déposez un ou plusieurs fichiers (envoi 1 par 1).
-        </div>
-
-        <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="dzClearQueue" style="display:none;">
-                Vider la file
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-primary" id="dzProcessQueue" style="display:none;">
-                Envoyer la file
-            </button>
-        </div>
-    </div>
-
-    <!-- Barre de progression globale -->
-    <div class="progress mb-3" style="height: 10px; display:none;" id="dzTotalProgressWrap">
-        <div class="progress-bar" role="progressbar" style="width: 0%;" id="dzTotalProgress"></div>
-    </div>
 
     <form
         action="{{ url_for('upload_client_document', client_id=client.id) }}"
@@ -119,25 +100,17 @@
         id="clientDocumentsDropzone">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="dz-message text-center text-muted">
-            <strong>Glissez-déposez vos documents ici</strong><br>
-            <small>ou cliquez pour sélectionner</small>
+            <strong>Glissez-déposez vos documents ici</strong>
         </div>
     </form>
 
     <hr>
 
     {% if documents %}
-        <ul class="list-group" id="clientDocumentsList">
+        <ul class="list-group">
             {% for doc in documents %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                <div class="d-flex flex-column">
-                    <span>{{ doc.nom }}</span>
-                    <small class="text-muted">
-                        {% if doc.taille is defined and doc.taille %}
-                            {{ (doc.taille / 1024) | round(1) }} Ko
-                        {% endif %}
-                    </small>
-                </div>
+                <span>{{ doc.nom }}</span>
 
                 <div class="d-flex gap-2">
                     {% if doc.url %}
@@ -147,7 +120,6 @@
                     {% endif %}
 
                     {% if current_user and current_user.role == 'admin' %}
-                        <!-- Suppression via fetch pour éviter la redirection vers /documents -->
                         <button
                             type="button"
                             class="btn btn-sm btn-outline-danger js-delete-doc"
@@ -161,7 +133,7 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p class="text-muted mt-3">Aucun document pour ce client.</p>
+        <p class="text-muted">Aucun document.</p>
     {% endif %}
 </div>
 </div>
@@ -174,142 +146,14 @@
     {% if can_request_update %}
     <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="mb-3">
-            <label class="form-label">Date de mise à jour</label>
-            <input type="date" name="update_date" class="form-control" required>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Commentaire</label>
-            <textarea name="update_commentaire" class="form-control" rows="4"></textarea>
-        </div>
-        <button class="btn btn-primary">Envoyer la demande</button>
+        <input type="date" name="update_date" class="form-control mb-2" required>
+        <textarea name="update_commentaire" class="form-control mb-2"></textarea>
+        <button class="btn btn-primary">Envoyer</button>
     </form>
-    {% else %}
-        <p class="text-muted">Aucune action disponible.</p>
     {% endif %}
 </div>
 </div>
 
 </div>
-
-<!-- ================= DROPZONE CSS/JS (chargé uniquement ici) ================= -->
-<link rel="stylesheet" href="https://unpkg.com/dropzone@5/dist/min/dropzone.min.css">
-<script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-    // ===============================
-    // 1) DROPZONE (upload multiple)
-    // ===============================
-    if (typeof Dropzone !== "undefined") {
-        Dropzone.autoDiscover = false;
-
-        const totalWrap = document.getElementById("dzTotalProgressWrap");
-        const totalBar  = document.getElementById("dzTotalProgress");
-        const btnClear  = document.getElementById("dzClearQueue");
-        const btnSend   = document.getElementById("dzProcessQueue");
-
-        const dz = new Dropzone("#clientDocumentsDropzone", {
-            url: "{{ url_for('upload_client_document', client_id=client.id) }}",
-            paramName: "file",
-            maxFilesize: 10,           // MB
-            timeout: 180000,
-            parallelUploads: 2,
-            uploadMultiple: false,     // IMPORTANT: backend attend 1 fichier => 1 requête
-            autoProcessQueue: true,    // mettez false si vous voulez utiliser le bouton "Envoyer la file"
-            addRemoveLinks: true,
-            dictRemoveFile: "Retirer",
-            headers: {
-                "X-CSRF-Token": "{{ csrf_token }}"
-            }
-        });
-
-        // Affiche/masque la barre globale
-        dz.on("addedfile", function () {
-            if (totalWrap) totalWrap.style.display = "block";
-            if (btnClear) btnClear.style.display = "inline-block";
-            if (btnSend)  btnSend.style.display  = dz.options.autoProcessQueue ? "none" : "inline-block";
-        });
-
-        dz.on("queuecomplete", function () {
-            // Petite pause visuelle + reload pour afficher la liste à jour
-            setTimeout(function () {
-                window.location.reload();
-            }, 450);
-        });
-
-        dz.on("totaluploadprogress", function (progress) {
-            if (!totalBar) return;
-            const p = Math.max(0, Math.min(100, progress));
-            totalBar.style.width = p.toFixed(0) + "%";
-        });
-
-        dz.on("sending", function () {
-            if (totalWrap) totalWrap.style.display = "block";
-        });
-
-        dz.on("error", function (file, response) {
-            const msg =
-                (typeof response === "string")
-                    ? response
-                    : (response && response.message)
-                        ? response.message
-                        : "Erreur lors de l’upload";
-
-            alert(msg);
-        });
-
-        btnClear?.addEventListener("click", function () {
-            dz.removeAllFiles(true);
-            if (totalWrap) totalWrap.style.display = "none";
-            if (btnClear) btnClear.style.display = "none";
-            if (btnSend)  btnSend.style.display  = "none";
-        });
-
-        btnSend?.addEventListener("click", function () {
-            dz.processQueue();
-        });
-    }
-
-    // ===============================
-    // 2) SUPPRESSION DOCUMENTS (admin)
-    //    -> fetch POST pour éviter la redirection /documents
-    // ===============================
-    const deleteButtons = document.querySelectorAll(".js-delete-doc");
-    deleteButtons.forEach(btn => {
-        btn.addEventListener("click", async function () {
-            const url = btn.getAttribute("data-delete-url");
-            const docName = btn.getAttribute("data-doc-name") || "ce document";
-
-            if (!url) return;
-
-            const ok = confirm("Supprimer définitivement " + docName + " ?");
-            if (!ok) return;
-
-            try {
-                const res = await fetch(url, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-                    },
-                    body: "csrf_token=" + encodeURIComponent("{{ csrf_token }}")
-                });
-
-                // Même si ça renvoie une page de redirect HTML, on reste côté client et on reload.
-                if (!res.ok) {
-                    alert("Erreur lors de la suppression (HTTP " + res.status + ").");
-                    return;
-                }
-
-                window.location.reload();
-            } catch (e) {
-                alert("Erreur réseau lors de la suppression.");
-            }
-        });
-    });
-
-});
-</script>
 
 {% endblock %}

@@ -1182,13 +1182,7 @@ def new_client():
             cur.execute(
                 """
                 INSERT INTO crm_clients (
-                    name,
-                    email,
-                    phone,
-                    address,
-                    siret,
-                    owner_id,
-                    status
+                    name, email, phone, address, siret, owner_id, status
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
                 RETURNING id
@@ -1201,7 +1195,6 @@ def new_client():
         flash("Dossier client créé.", "success")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    # GET → formulaire création
     return render_template("client_new.html")
 
 
@@ -1220,7 +1213,7 @@ def update_client_status(client_id):
     conn = get_db()
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE crm_clients SET status = %s WHERE id = %s",
+            "UPDATE crm_clients SET status=%s WHERE id=%s",
             (status, client_id),
         )
 
@@ -1246,9 +1239,7 @@ def clients():
             if q:
                 cur.execute(
                     """
-                    SELECT
-                        crm_clients.*,
-                        users.username AS commercial
+                    SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.name ILIKE %s
@@ -1259,9 +1250,7 @@ def clients():
             else:
                 cur.execute(
                     """
-                    SELECT
-                        crm_clients.*,
-                        users.username AS commercial
+                    SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     ORDER BY crm_clients.created_at DESC
@@ -1271,12 +1260,10 @@ def clients():
             if q:
                 cur.execute(
                     """
-                    SELECT
-                        crm_clients.*,
-                        users.username AS commercial
+                    SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id = %s
+                    WHERE crm_clients.owner_id=%s
                       AND crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
                     """,
@@ -1285,12 +1272,10 @@ def clients():
             else:
                 cur.execute(
                     """
-                    SELECT
-                        crm_clients.*,
-                        users.username AS commercial
+                    SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id = %s
+                    WHERE crm_clients.owner_id=%s
                     ORDER BY crm_clients.created_at DESC
                     """,
                     (user_id,),
@@ -1298,9 +1283,7 @@ def clients():
 
         rows = cur.fetchall()
 
-    clients_en_cours = []
-    clients_gagnes = []
-    clients_perdus = []
+    clients_en_cours, clients_gagnes, clients_perdus = [], [], []
 
     for r in rows:
         status = (r["status"] or "en_cours").lower()
@@ -1334,12 +1317,10 @@ def client_detail(client_id):
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT
-                crm_clients.*,
-                users.username AS commercial
+            SELECT crm_clients.*, users.username AS commercial
             FROM crm_clients
             LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.id = %s
+            WHERE crm_clients.id=%s
             """,
             (client_id,),
         )
@@ -1354,7 +1335,7 @@ def client_detail(client_id):
             """
             SELECT *
             FROM client_updates
-            WHERE client_id = %s
+            WHERE client_id=%s
             ORDER BY created_at DESC
             """,
             (client_id,),
@@ -1373,6 +1354,82 @@ def client_detail(client_id):
         documents=documents,
         can_request_update=can_request_update,
     )
+
+
+# =========================
+# CLIENT — UPLOAD DOCUMENT (COMPATIBLE DROPZONE)
+# =========================
+@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
+@login_required
+def upload_client_document(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    file = request.files.get("file")
+    if not file or not allowed_file(file.filename):
+        flash("Fichier invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    filename = clean_filename(secure_filename(file.filename))
+    prefix = client_s3_prefix(client_id)
+    key_raw = f"{prefix}{filename}"
+    key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
+
+    try:
+        s3_upload_fileobj(file, AWS_BUCKET, key)
+    except Exception:
+        flash("Erreur lors de l’upload.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    flash("Document ajouté.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# CLIENT — CRÉATION COTATION
+# =========================
+@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
+@login_required
+def create_cotation(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    user = session.get("user") or {}
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO cotations (client_id, created_by, status)
+            VALUES (%s, %s, 'nouvelle')
+            """,
+            (client_id, user.get("id")),
+        )
+
+    conn.commit()
+    flash("Demande de cotation créée.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# CLIENT — SUPPRESSION (ADMIN)
+# =========================
+@app.route("/clients/<int:client_id>/delete", methods=["POST"])
+@admin_required
+def delete_client(client_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM crm_clients WHERE id=%s", (client_id,))
+        if not cur.fetchone():
+            flash("Dossier client introuvable.", "danger")
+            return redirect(url_for("clients"))
+
+        cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
+
+    conn.commit()
+    flash("Dossier client supprimé.", "success")
+    return redirect(url_for("clients"))
 
 
 ###########################################################
