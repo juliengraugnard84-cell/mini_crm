@@ -1158,19 +1158,51 @@ def delete_chiffre_affaire(ca_id):
 ############################################################
 
 # =========================
-# CLIENT — CRÉATION (POINT D’ENTRÉE)
+# CLIENT — CRÉATION (PAGE + TRAITEMENT)
 # =========================
-@app.route("/clients/new")
+@app.route("/clients/new", methods=["GET", "POST"])
 @login_required
 def new_client():
-    """
-    Point d’entrée utilisé par le bouton
-    ➕ Nouveau dossier (clients.html)
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip()
+        phone = (request.form.get("phone") or "").strip()
+        address = (request.form.get("address") or "").strip()
+        siret = (request.form.get("siret") or "").strip()
 
-    ⚠️ Route volontairement minimale
-    pour éviter tout crash url_for('new_client')
-    """
-    return redirect(url_for("clients"))
+        if not name:
+            flash("Le nom du client est obligatoire.", "danger")
+            return render_template("client_new.html")
+
+        user = session.get("user") or {}
+        owner_id = user.get("id")
+
+        conn = get_db()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO crm_clients (
+                    name,
+                    email,
+                    phone,
+                    address,
+                    siret,
+                    owner_id,
+                    status
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
+                RETURNING id
+                """,
+                (name, email, phone, address, siret, owner_id),
+            )
+            client_id = cur.fetchone()[0]
+
+        conn.commit()
+        flash("Dossier client créé.", "success")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    # GET → formulaire création
+    return render_template("client_new.html")
 
 
 # =========================
@@ -1341,120 +1373,6 @@ def client_detail(client_id):
         documents=documents,
         can_request_update=can_request_update,
     )
-
-
-############################################################
-# 12 BIS. ROUTES CLIENT UTILISÉES PAR LES TEMPLATES
-############################################################
-
-# =========================
-# CLIENT — SUPPRESSION (ADMIN)
-# =========================
-@app.route("/clients/<int:client_id>/delete", methods=["POST"])
-@admin_required
-def delete_client(client_id):
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT 1 FROM crm_clients WHERE id=%s", (client_id,))
-        if not cur.fetchone():
-            flash("Dossier client introuvable.", "danger")
-            return redirect(url_for("clients"))
-
-        cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
-
-    conn.commit()
-    flash("Dossier client supprimé.", "success")
-    return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — CRÉATION COTATION
-# =========================
-@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
-@login_required
-def create_cotation(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-    user = session.get("user") or {}
-
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO cotations (client_id, created_by, status)
-            VALUES (%s, %s, 'nouvelle')
-            """,
-            (client_id, user.get("id")),
-        )
-
-    conn.commit()
-    flash("Demande de cotation créée.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# CLIENT — UPLOAD DOCUMENT
-# =========================
-@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
-@login_required
-def upload_client_document(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
-    if LOCAL_MODE or not s3:
-        flash("Upload désactivé en mode local.", "warning")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    fichier = request.files.get("file")
-    if not fichier or not allowed_file(fichier.filename):
-        flash("Fichier non valide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    nom = clean_filename(secure_filename(fichier.filename))
-    prefix = client_s3_prefix(client_id)
-    key_raw = f"{prefix}{nom}"
-    key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
-
-    try:
-        s3_upload_fileobj(fichier, AWS_BUCKET, key)
-        flash("Document ajouté.", "success")
-    except Exception as e:
-        logger.exception("Erreur upload document client : %r", e)
-        flash("Erreur lors de l’upload.", "danger")
-
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# CLIENT — SUPPRESSION DOCUMENT (ADMIN)
-# =========================
-@app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
-@admin_required
-def delete_client_document(client_id):
-    if LOCAL_MODE or not s3:
-        flash("Suppression désactivée en mode local.", "warning")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    key = (request.form.get("key") or "").strip()
-    if not key:
-        flash("Document invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    prefix = client_s3_prefix(client_id)
-    if not key.startswith(prefix):
-        flash("Suppression non autorisée.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    try:
-        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
-        flash("Document supprimé.", "success")
-    except Exception as e:
-        logger.exception("Erreur suppression document client : %r", e)
-        flash("Erreur lors de la suppression.", "danger")
-
-    return redirect(url_for("client_detail", client_id=client_id))
 
 
 ###########################################################
