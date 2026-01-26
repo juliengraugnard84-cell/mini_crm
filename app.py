@@ -1157,6 +1157,27 @@ def delete_chiffre_affaire(ca_id):
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + COTATIONS + DOCUMENTS CLIENT
 ############################################################
 
+# =========================
+# CLIENT — CRÉATION (POINT D’ENTRÉE)
+# =========================
+@app.route("/clients/new")
+@login_required
+def new_client():
+    """
+    Point d’entrée utilisé par le bouton
+    ➕ Nouveau dossier (clients.html)
+
+    ⚠️ IMPORTANT :
+    - Cette route EXISTE pour éviter le crash url_for('new_client')
+    - Elle ne casse rien
+    - Elle peut être enrichie plus tard (formulaire dédié)
+    """
+    return redirect(url_for("clients"))
+
+
+# =========================
+# CLIENT — LISTE
+# =========================
 @app.route("/clients")
 @login_required
 def clients():
