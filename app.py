@@ -1294,13 +1294,11 @@ def clients():
 @app.route("/clients/<int:client_id>")
 @login_required
 def client_detail(client_id):
-    # Sécurité d’accès (admin = OK, commercial = owner_id)
     if not can_access_client(client_id):
         abort(403)
 
     conn = get_db()
 
-    # -------- Client --------
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1319,7 +1317,6 @@ def client_detail(client_id):
         flash("Dossier client introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    # -------- Mises à jour --------
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1332,10 +1329,8 @@ def client_detail(client_id):
         )
         updates = cur.fetchall()
 
-    # -------- Documents --------
     documents = list_client_documents(client_id)
 
-    # ✅ Variable attendue par ton template client_detail.html
     user = session.get("user") or {}
     can_request_update = user.get("role") in ("admin", "commercial")
 
@@ -1346,8 +1341,10 @@ def client_detail(client_id):
         documents=documents,
         can_request_update=can_request_update,
     )
+
+
 ############################################################
-# 12 BIS. ROUTES MANQUANTES APPELÉES PAR LES TEMPLATES CLIENT
+# 12 BIS. ROUTES CLIENT UTILISÉES PAR LES TEMPLATES
 ############################################################
 
 # =========================
@@ -1426,6 +1423,36 @@ def upload_client_document(client_id):
     except Exception as e:
         logger.exception("Erreur upload document client : %r", e)
         flash("Erreur lors de l’upload.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# CLIENT — SUPPRESSION DOCUMENT (ADMIN)
+# =========================
+@app.route("/clients/<int:client_id>/documents/delete", methods=["POST"])
+@admin_required
+def delete_client_document(client_id):
+    if LOCAL_MODE or not s3:
+        flash("Suppression désactivée en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    key = (request.form.get("key") or "").strip()
+    if not key:
+        flash("Document invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    prefix = client_s3_prefix(client_id)
+    if not key.startswith(prefix):
+        flash("Suppression non autorisée.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    try:
+        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+        flash("Document supprimé.", "success")
+    except Exception as e:
+        logger.exception("Erreur suppression document client : %r", e)
+        flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
 
