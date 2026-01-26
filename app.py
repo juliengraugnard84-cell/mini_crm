@@ -1154,7 +1154,7 @@ def delete_chiffre_affaire(ca_id):
 
 
 ############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + COTATIONS + DOCUMENTS CLIENT
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + STATUT
 ############################################################
 
 # =========================
@@ -1167,11 +1167,33 @@ def new_client():
     Point d’entrée utilisé par le bouton
     ➕ Nouveau dossier (clients.html)
 
-    ⚠️ IMPORTANT :
-    - Cette route EXISTE pour éviter le crash url_for('new_client')
-    - Elle ne casse rien
-    - Elle peut être enrichie plus tard (formulaire dédié)
+    ⚠️ Route volontairement minimale
+    pour éviter tout crash url_for('new_client')
     """
+    return redirect(url_for("clients"))
+
+
+# =========================
+# CLIENT — MISE À JOUR STATUT (ADMIN)
+# =========================
+@app.route("/clients/<int:client_id>/status", methods=["POST"])
+@admin_required
+def update_client_status(client_id):
+    status = (request.form.get("status") or "").strip().lower()
+
+    if status not in ("en_cours", "gagne", "perdu"):
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("clients"))
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE crm_clients SET status = %s WHERE id = %s",
+            (status, client_id)
+        )
+
+    conn.commit()
+    flash("Statut du dossier mis à jour.", "success")
     return redirect(url_for("clients"))
 
 
