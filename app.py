@@ -1189,7 +1189,7 @@ def update_client_status(client_id):
     with conn.cursor() as cur:
         cur.execute(
             "UPDATE crm_clients SET status = %s WHERE id = %s",
-            (status, client_id)
+            (status, client_id),
         )
 
     conn.commit()
@@ -1206,14 +1206,14 @@ def clients():
     conn = get_db()
     q = (request.args.get("q") or "").strip()
     user = session.get("user") or {}
+    is_admin = user.get("role") == "admin"
+    user_id = user.get("id")
 
-    # ======================================================
-    # ADMIN — TOUS LES DOSSIERS, VISU PAR STATUT
-    # ======================================================
-    if user.get("role") == "admin":
-        with conn.cursor() as cur:
+    with conn.cursor() as cur:
+        if is_admin:
             if q:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT
                         crm_clients.*,
                         users.username AS commercial
@@ -1221,64 +1221,49 @@ def clients():
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
-                """, (f"%{q}%",))
+                    """,
+                    (f"%{q}%",),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT
                         crm_clients.*,
                         users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     ORDER BY crm_clients.created_at DESC
-                """)
-            rows = cur.fetchall()
-
-        clients_en_cours = []
-        clients_gagnes = []
-        clients_perdus = []
-
-        for r in rows:
-            status = (r["status"] or "en_cours").lower()
-            if status == "gagne":
-                clients_gagnes.append(r)
-            elif status == "perdu":
-                clients_perdus.append(r)
-            else:
-                clients_en_cours.append(r)
-
-        return render_template(
-            "clients.html",
-            clients_en_cours=[row_to_obj(r) for r in clients_en_cours],
-            clients_gagnes=[row_to_obj(r) for r in clients_gagnes],
-            clients_perdus=[row_to_obj(r) for r in clients_perdus],
-            q=q,
-        )
-
-    # ======================================================
-    # COMMERCIAL — SES DOSSIERS UNIQUEMENT, VISU PAR STATUT
-    # ======================================================
-    with conn.cursor() as cur:
-        if q:
-            cur.execute("""
-                SELECT
-                    crm_clients.*,
-                    users.username AS commercial
-                FROM crm_clients
-                LEFT JOIN users ON users.id = crm_clients.owner_id
-                WHERE crm_clients.owner_id = %s
-                  AND crm_clients.name ILIKE %s
-                ORDER BY crm_clients.created_at DESC
-            """, (user.get("id"), f"%{q}%"))
+                    """
+                )
         else:
-            cur.execute("""
-                SELECT
-                    crm_clients.*,
-                    users.username AS commercial
-                FROM crm_clients
-                LEFT JOIN users ON users.id = crm_clients.owner_id
-                WHERE crm_clients.owner_id = %s
-                ORDER BY crm_clients.created_at DESC
-            """, (user.get("id"),))
+            if q:
+                cur.execute(
+                    """
+                    SELECT
+                        crm_clients.*,
+                        users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.owner_id = %s
+                      AND crm_clients.name ILIKE %s
+                    ORDER BY crm_clients.created_at DESC
+                    """,
+                    (user_id, f"%{q}%"),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT
+                        crm_clients.*,
+                        users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.owner_id = %s
+                    ORDER BY crm_clients.created_at DESC
+                    """,
+                    (user_id,),
+                )
+
         rows = cur.fetchall()
 
     clients_en_cours = []
@@ -1301,6 +1286,148 @@ def clients():
         clients_perdus=[row_to_obj(r) for r in clients_perdus],
         q=q,
     )
+
+
+# =========================
+# CLIENT — DÉTAIL
+# =========================
+@app.route("/clients/<int:client_id>")
+@login_required
+def client_detail(client_id):
+    # Sécurité d’accès (admin = OK, commercial = owner_id)
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    # -------- Client --------
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                crm_clients.*,
+                users.username AS commercial
+            FROM crm_clients
+            LEFT JOIN users ON users.id = crm_clients.owner_id
+            WHERE crm_clients.id = %s
+            """,
+            (client_id,),
+        )
+        client = cur.fetchone()
+
+    if not client:
+        flash("Dossier client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    # -------- Mises à jour --------
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM client_updates
+            WHERE client_id = %s
+            ORDER BY created_at DESC
+            """,
+            (client_id,),
+        )
+        updates = cur.fetchall()
+
+    # -------- Documents --------
+    documents = list_client_documents(client_id)
+
+    # ✅ Variable attendue par ton template client_detail.html
+    user = session.get("user") or {}
+    can_request_update = user.get("role") in ("admin", "commercial")
+
+    return render_template(
+        "client_detail.html",
+        client=row_to_obj(client),
+        updates=[row_to_obj(u) for u in updates],
+        documents=documents,
+        can_request_update=can_request_update,
+    )
+############################################################
+# 12 BIS. ROUTES MANQUANTES APPELÉES PAR LES TEMPLATES CLIENT
+############################################################
+
+# =========================
+# CLIENT — SUPPRESSION (ADMIN)
+# =========================
+@app.route("/clients/<int:client_id>/delete", methods=["POST"])
+@admin_required
+def delete_client(client_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM crm_clients WHERE id=%s", (client_id,))
+        if not cur.fetchone():
+            flash("Dossier client introuvable.", "danger")
+            return redirect(url_for("clients"))
+
+        cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
+
+    conn.commit()
+    flash("Dossier client supprimé.", "success")
+    return redirect(url_for("clients"))
+
+
+# =========================
+# CLIENT — CRÉATION COTATION
+# =========================
+@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
+@login_required
+def create_cotation(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO cotations (client_id, created_by, status)
+            VALUES (%s, %s, 'nouvelle')
+            """,
+            (client_id, user.get("id")),
+        )
+
+    conn.commit()
+    flash("Demande de cotation créée.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# CLIENT — UPLOAD DOCUMENT
+# =========================
+@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
+@login_required
+def upload_client_document(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    if LOCAL_MODE or not s3:
+        flash("Upload désactivé en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    fichier = request.files.get("file")
+    if not fichier or not allowed_file(fichier.filename):
+        flash("Fichier non valide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    nom = clean_filename(secure_filename(fichier.filename))
+    prefix = client_s3_prefix(client_id)
+    key_raw = f"{prefix}{nom}"
+    key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
+
+    try:
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
+        flash("Document ajouté.", "success")
+    except Exception as e:
+        logger.exception("Erreur upload document client : %r", e)
+        flash("Erreur lors de l’upload.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 ###########################################################
