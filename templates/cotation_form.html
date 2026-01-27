@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Nouvelle demande de cotation{% endblock %}
+
+{% block content %}
+
+<div class="page-header mb-4">
+    <h1>Nouvelle demande de cotation</h1>
+    <p class="text-muted">
+        Client : <strong>{{ client.name }}</strong>
+    </p>
+</div>
+
+<div class="card">
+    <form method="post"
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="row g-3">
+
+            <!-- TYPE D'ÉNERGIE -->
+            <div class="col-md-6">
+                <label class="form-label">Type d’énergie *</label>
+                <select name="energie_type" class="form-control" required>
+                    <option value="">— Sélectionner —</option>
+                    <option value="electricite">Électricité</option>
+                    <option value="gaz">Gaz</option>
+                </select>
+            </div>
+
+            <!-- PDL / PCE -->
+            <div class="col-md-6">
+                <label class="form-label">PDL / PCE *</label>
+                <input type="text"
+                       name="pdl_pce"
+                       class="form-control"
+                       required>
+            </div>
+
+            <!-- FOURNISSEUR ACTUEL -->
+            <div class="col-md-6">
+                <label class="form-label">Fournisseur actuel</label>
+                <input type="text"
+                       name="fournisseur_actuel"
+                       class="form-control">
+            </div>
+
+            <!-- COMMENTAIRE -->
+            <div class="col-12">
+                <label class="form-label">Commentaire</label>
+                <textarea name="commentaire"
+                          class="form-control"
+                          rows="4"
+                          placeholder="Informations complémentaires…"></textarea>
+            </div>
+
+        </div>
+
+        <div class="mt-4 d-flex justify-content-between">
+            <a href="{{ url_for('client_detail', client_id=client.id) }}"
+               class="btn btn-secondary">
+                Annuler
+            </a>
+
+            <button type="submit" class="btn btn-primary">
+                Envoyer la demande
+            </button>
+        </div>
+
+    </form>
+</div>
+
+{% endblock %}

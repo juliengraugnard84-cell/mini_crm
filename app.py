@@ -1313,7 +1313,6 @@ def client_detail(client_id):
         abort(403)
 
     conn = get_db()
-
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1330,18 +1329,6 @@ def client_detail(client_id):
         flash("Dossier client introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT *
-            FROM client_updates
-            WHERE client_id=%s
-            ORDER BY created_at DESC
-            """,
-            (client_id,),
-        )
-        updates = cur.fetchall()
-
     documents = list_client_documents(client_id)
 
     user = session.get("user") or {}
@@ -1350,39 +1337,9 @@ def client_detail(client_id):
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
-        updates=[row_to_obj(u) for u in updates],
         documents=documents,
         can_request_update=can_request_update,
     )
-
-
-# =========================
-# CLIENT — UPLOAD DOCUMENT (COMPATIBLE DROPZONE)
-# =========================
-@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
-@login_required
-def upload_client_document(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
-    file = request.files.get("file")
-    if not file or not allowed_file(file.filename):
-        flash("Fichier invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    filename = clean_filename(secure_filename(file.filename))
-    prefix = client_s3_prefix(client_id)
-    key_raw = f"{prefix}{filename}"
-    key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
-
-    try:
-        s3_upload_fileobj(file, AWS_BUCKET, key)
-    except Exception:
-        flash("Erreur lors de l’upload.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    flash("Document ajouté.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
 
 
 # =========================
@@ -1396,50 +1353,63 @@ def new_cotation(client_id):
 
     conn = get_db()
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT id, name FROM crm_clients WHERE id = %s",
-            (client_id,)
-        )
+        cur.execute("SELECT id, name FROM crm_clients WHERE id=%s", (client_id,))
         client = cur.fetchone()
 
     if not client:
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
+    # ✅ TEMPLATE AVEC LE FORMULAIRE COMPLET
     return render_template(
-        "admin_cotations_new.html",
+        "cotation_form.html",
         client=row_to_obj(client),
     )
 
 
 # =========================
-# CLIENT — CRÉATION COTATION (GET + POST SAFE)
+# CLIENT — CRÉATION COTATION (POST UNIQUEMENT)
 # =========================
-@app.route("/clients/<int:client_id>/cotations/create", methods=["GET", "POST"])
+@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
 def create_cotation(client_id):
-
-    # 🔁 Sécurité absolue : si appelé en GET, on redirige vers le formulaire
-    if request.method == "GET":
-        return redirect(url_for("new_cotation", client_id=client_id))
-
     if not can_access_client(client_id):
         abort(403)
 
     user = session.get("user") or {}
 
+    energie_type = request.form.get("energie_type")
+    pdl_pce = request.form.get("pdl_pce")
+    fournisseur = request.form.get("fournisseur_actuel")
+    commentaire = request.form.get("commentaire")
+
     conn = get_db()
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO cotations (client_id, created_by, status)
-            VALUES (%s, %s, 'nouvelle')
+            INSERT INTO cotations (
+                client_id,
+                created_by,
+                energie_type,
+                pdl_pce,
+                fournisseur_actuel,
+                commentaire,
+                status
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, 'nouvelle')
             """,
-            (client_id, user.get("id")),
+            (
+                client_id,
+                user.get("id"),
+                energie_type,
+                pdl_pce,
+                fournisseur,
+                commentaire,
+            ),
         )
 
     conn.commit()
-    flash("Demande de cotation créée.", "success")
+    flash("Demande de cotation envoyée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
 
