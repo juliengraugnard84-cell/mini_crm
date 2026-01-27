@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Nouvelle demande de cotation</h2>
+
+  <div class="card mt-3">
+    <div class="card-body">
+
+      <p><strong>Client :</strong> {{ client.name }}</p>
+
+      <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="row g-3">
+
+          <div class="col-md-4">
+            <label class="form-label">Date négociation</label>
+            <input type="date" name="date_negociation" class="form-control">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Heure négociation</label>
+            <input type="time" name="heure_negociation" class="form-control">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Type énergie</label>
+            <select name="energie_type" class="form-select">
+              <option value="">—</option>
+              <option value="electricite">Électricité</option>
+              <option value="gaz">Gaz</option>
+              <option value="elec_gaz">Élec + Gaz</option>
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Type compteur</label>
+            <input type="text" name="type_compteur" class="form-control" placeholder="ex: C4, C5, etc.">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">PDL / PCE</label>
+            <input type="text" name="pdl_pce" class="form-control">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Date échéance</label>
+            <input type="date" name="date_echeance" class="form-control">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Fournisseur actuel</label>
+            <input type="text" name="fournisseur_actuel" class="form-control">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Nom entreprise</label>
+            <input type="text" name="entreprise_nom" class="form-control">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">SIRET</label>
+            <input type="text" name="siret" class="form-control">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Nom signataire</label>
+            <input type="text" name="signataire_nom" class="form-control">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Téléphone signataire</label>
+            <input type="text" name="signataire_tel" class="form-control">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Email signataire</label>
+            <input type="email" name="signataire_email" class="form-control">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Commentaire</label>
+            <textarea name="commentaire" class="form-control" rows="4"></textarea>
+          </div>
+
+        </div>
+
+        <div class="mt-4">
+          <button type="submit" class="btn btn-warning">Envoyer la demande</button>
+          <a href="{{ url_for('client_detail', client_id=client.id) }}" class="btn btn-secondary ms-2">Annuler</a>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

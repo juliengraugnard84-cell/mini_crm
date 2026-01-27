@@ -15,6 +15,7 @@
     <form method="post"
           action="{{ url_for('create_cotation', client_id=client.id) }}">
 
+        <!-- CSRF OBLIGATOIRE -->
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="row g-3">
@@ -22,7 +23,9 @@
             <!-- TYPE D'ÉNERGIE -->
             <div class="col-md-6">
                 <label class="form-label">Type d’énergie *</label>
-                <select name="energie_type" class="form-control" required>
+                <select name="energie_type"
+                        class="form-control"
+                        required>
                     <option value="">— Sélectionner —</option>
                     <option value="electricite">Électricité</option>
                     <option value="gaz">Gaz</option>
