@@ -1154,7 +1154,7 @@ def delete_chiffre_affaire(ca_id):
 
 
 ############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + STATUT
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + STATUT + COTATIONS
 ############################################################
 
 # =========================
@@ -1304,10 +1304,7 @@ def clients():
 
 
 # =========================
-# CLIENT — DÉTAIL
-# (⚠️ on CONSERVE documents + updates si ton app les affiche,
-#     mais ici on ne peut pas les réinventer si ton extrait les a retirés.
-#     => Si tu as déjà la version avec updates, remets-la telle quelle.)
+# CLIENT — DÉTAIL (ONGLETS)
 # =========================
 @app.route("/clients/<int:client_id>")
 @login_required
@@ -1316,7 +1313,6 @@ def client_detail(client_id):
         abort(403)
 
     conn = get_db()
-
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1333,10 +1329,8 @@ def client_detail(client_id):
         flash("Dossier client introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    # ✅ Documents (si S3/local)
     documents = list_client_documents(client_id)
 
-    # ✅ Updates (si ta DB/table existe) : on fait safe
     updates = []
     try:
         with conn.cursor() as cur:
@@ -1366,54 +1360,7 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — UPLOAD DOCUMENT (COMPATIBLE DROPZONE)
-# =========================
-@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
-@login_required
-def upload_client_document(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
-    file = request.files.get("file")
-    if not file or not allowed_file(file.filename):
-        flash("Fichier invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    filename = clean_filename(secure_filename(file.filename))
-    prefix = client_s3_prefix(client_id)
-    key_raw = f"{prefix}{filename}"
-    key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
-
-    try:
-        s3_upload_fileobj(file, AWS_BUCKET, key)
-    except Exception:
-        flash("Erreur lors de l’upload.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    flash("Document ajouté.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# COTATIONS — MIGRATION SAFE (colonnes optionnelles)
-# =========================
-def _ensure_cotations_columns(conn):
-    """
-    Ajoute les colonnes manquantes si ta DB n'est pas à jour.
-    - NE SUPPRIME rien
-    - N'échoue pas si déjà présent
-    """
-    try:
-        _try_add_column(conn, "cotations", "heure_negociation TEXT")
-        _try_add_column(conn, "cotations", "type_compteur TEXT")
-    except Exception:
-        # sécurité: ne casse pas le flux si la DB refuse ALTER
-        pass
-
-
-# =========================
-# CLIENT — FORMULAIRE NOUVELLE COTATION (GET)
-# -> affiche le formulaire complet
+# CLIENT — FORMULAIRE DE COTATION (ONGLET COTATIONS)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["GET"])
 @login_required
@@ -1423,14 +1370,13 @@ def new_cotation(client_id):
 
     conn = get_db()
     with conn.cursor() as cur:
-        cur.execute("SELECT id, name FROM crm_clients WHERE id=%s", (client_id,))
+        cur.execute("SELECT * FROM crm_clients WHERE id=%s", (client_id,))
         client = cur.fetchone()
 
     if not client:
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    # ✅ IMPORTANT : c'est ici que le formulaire complet doit être rendu
     return render_template(
         "cotation_form.html",
         client=row_to_obj(client),
@@ -1438,8 +1384,7 @@ def new_cotation(client_id):
 
 
 # =========================
-# CLIENT — CRÉATION COTATION (POST)
-# -> enregistre TOUS les champs du formulaire
+# CLIENT — ENVOI DE LA DEMANDE DE COTATION (POST)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
@@ -1450,69 +1395,49 @@ def create_cotation(client_id):
     user = session.get("user") or {}
     conn = get_db()
 
-    # ✅ évite les 500 si ta DB n'a pas ces colonnes
-    _ensure_cotations_columns(conn)
-
-    # Récupération complète du formulaire
-    date_negociation = request.form.get("date_negociation")
-    heure_negociation = request.form.get("heure_negociation")
-    energie_type = request.form.get("energie_type")
-    type_compteur = request.form.get("type_compteur")
-    pdl_pce = request.form.get("pdl_pce")
-    date_echeance = request.form.get("date_echeance")
-    fournisseur_actuel = request.form.get("fournisseur_actuel")
-    entreprise_nom = request.form.get("entreprise_nom")
-    siret = request.form.get("siret")
-    signataire_nom = request.form.get("signataire_nom")
-    signataire_tel = request.form.get("signataire_tel")
-    signataire_email = request.form.get("signataire_email")
-    commentaire = request.form.get("commentaire")
-
     with conn.cursor() as cur:
         cur.execute(
             """
             INSERT INTO cotations (
                 client_id,
-                date_negociation,
-                heure_negociation,
+                created_by,
                 energie_type,
                 type_compteur,
+                heure_negociation,
                 pdl_pce,
                 date_echeance,
                 fournisseur_actuel,
                 entreprise_nom,
                 siret,
                 signataire_nom,
-                signataire_tel,
                 signataire_email,
+                signataire_tel,
                 commentaire,
-                created_by,
-                is_read,
-                status
+                status,
+                is_read
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'nouvelle',0)
             """,
             (
                 client_id,
-                date_negociation,
-                heure_negociation,
-                energie_type,
-                type_compteur,
-                pdl_pce,
-                date_echeance,
-                fournisseur_actuel,
-                entreprise_nom,
-                siret,
-                signataire_nom,
-                signataire_tel,
-                signataire_email,
-                commentaire,
                 user.get("id"),
+                request.form.get("energie_type"),
+                request.form.get("type_compteur"),
+                request.form.get("heure_negociation"),
+                request.form.get("pdl_pce"),
+                request.form.get("date_echeance"),
+                request.form.get("fournisseur_actuel"),
+                request.form.get("entreprise_nom"),
+                request.form.get("siret"),
+                request.form.get("signataire_nom"),
+                request.form.get("signataire_email"),
+                request.form.get("signataire_tel"),
+                request.form.get("commentaire"),
             ),
         )
 
     conn.commit()
-    flash("Demande de cotation envoyée.", "success")
+    flash("Demande de cotation envoyée à l’administrateur.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
 
@@ -1535,7 +1460,6 @@ def delete_client(client_id):
     conn.commit()
     flash("Dossier client supprimé.", "success")
     return redirect(url_for("clients"))
-
 
 
 ###########################################################
