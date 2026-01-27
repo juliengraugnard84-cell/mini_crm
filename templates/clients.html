@@ -59,7 +59,7 @@
 
                 {% if current_user.role == 'admin' %}
                 <form method="post"
-                      action="{{ url_for('update_client', client_id=c.id) }}"
+                      action="{{ url_for('update_client_status', client_id=c.id) }}"
                       class="mt-2">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <select name="status"

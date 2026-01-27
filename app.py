@@ -2133,3 +2133,9 @@ if __name__ == "__main__":
 # ============================
 # FIN PARTIE 4/4
 # ============================
+# =========================
+# DEBUG — LISTE DES ROUTES CHARGÉES
+# =========================
+@app.route("/__routes__")
+def debug_routes():
+    return "<br>".join(sorted(app.view_functions.keys()))

@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}Dossier client{% endblock %}
 
 {% block content %}
@@ -30,11 +29,21 @@
     </div>
     <div class="card-body">
         <div class="row">
-            <div class="col-md-6 mb-2"><strong>Entreprise :</strong><br>{{ client.name }}</div>
-            <div class="col-md-6 mb-2"><strong>Email :</strong><br>{{ client.email or "—" }}</div>
-            <div class="col-md-6 mb-2"><strong>Téléphone :</strong><br>{{ client.phone or "—" }}</div>
-            <div class="col-md-6 mb-2"><strong>SIRET :</strong><br>{{ client.siret or "—" }}</div>
-            <div class="col-md-6 mb-2"><strong>Adresse :</strong><br>{{ client.address or "—" }}</div>
+            <div class="col-md-6 mb-2">
+                <strong>Entreprise :</strong><br>{{ client.name }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>Email :</strong><br>{{ client.email or "—" }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>Téléphone :</strong><br>{{ client.phone or "—" }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>SIRET :</strong><br>{{ client.siret or "—" }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>Adresse :</strong><br>{{ client.address or "—" }}
+            </div>
         </div>
     </div>
 </div>
@@ -129,12 +138,63 @@
 
 <!-- ================= ONGLET DOCUMENTS ================= -->
 <div class="tab-pane fade" id="documents">
-    <!-- TON CODE DOCUMENTS INCHANGÉ -->
+    {% if documents %}
+        <ul class="list-group">
+            {% for d in documents %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ d.nom }}
+                    {% if d.url %}
+                        <a href="{{ d.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            Ouvrir
+                        </a>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted">Aucun document.</p>
+    {% endif %}
 </div>
 
 <!-- ================= ONGLET MISE À JOUR ================= -->
 <div class="tab-pane fade" id="updates">
-    <!-- TON CODE UPDATES INCHANGÉ -->
+
+{% if can_request_update %}
+<form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Date de mise à jour *</label>
+            <input type="date" name="update_date" class="form-control" required>
+        </div>
+
+        <div class="col-md-8">
+            <label class="form-label">Commentaire</label>
+            <textarea name="update_commentaire" class="form-control" rows="3"></textarea>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-warning">
+        Demander une mise à jour
+    </button>
+</form>
+{% endif %}
+
+<hr>
+
+{% if updates %}
+    {% for u in updates %}
+        <div class="border rounded p-2 mb-2">
+            <strong>{{ u.commercial_name }}</strong>
+            <small class="text-muted"> — {{ format_date(u.update_date) }}</small>
+            <div>{{ u.commentaire or "—" }}</div>
+        </div>
+    {% endfor %}
+{% else %}
+    <p class="text-muted">Aucune mise à jour.</p>
+{% endif %}
+
 </div>
 
 </div>
