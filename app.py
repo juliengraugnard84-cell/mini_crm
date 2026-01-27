@@ -1386,7 +1386,34 @@ def upload_client_document(client_id):
 
 
 # =========================
-# CLIENT — CRÉATION COTATION
+# CLIENT — FORMULAIRE NOUVELLE COTATION (GET) ✅ AJOUT
+# =========================
+@app.route("/clients/<int:client_id>/cotations/new", methods=["GET"])
+@login_required
+def new_cotation(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, name FROM crm_clients WHERE id = %s",
+            (client_id,)
+        )
+        client = cur.fetchone()
+
+    if not client:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    return render_template(
+        "admin_cotations_new.html",
+        client=row_to_obj(client),
+    )
+
+
+# =========================
+# CLIENT — CRÉATION COTATION (POST)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
