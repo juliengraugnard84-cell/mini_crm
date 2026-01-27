@@ -1567,6 +1567,34 @@ def admin_reset_password(user_id):
     return redirect(url_for("admin_users"))
 
 
+############################################################
+# ADMIN — LISTE DES DEMANDES DE COTATION  ✅ (ROUTE MANQUANTE)
+############################################################
+
+@app.route("/admin/cotations")
+@admin_required
+def admin_cotations():
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                cotations.*,
+                crm_clients.name AS client_name,
+                users.username AS commercial_name
+            FROM cotations
+            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN users ON users.id = cotations.created_by
+            ORDER BY cotations.date_creation DESC
+        """)
+        rows = cur.fetchall()
+
+    return render_template(
+        "admin_cotations.html",
+        cotations=[row_to_obj(r) for r in rows],
+    )
+
+
 # =========================
 # ADMIN → ÉDITION COTATION
 # =========================
@@ -1638,7 +1666,6 @@ def admin_edit_cotation(cotation_id):
     )
 
 
-
 # =========================
 # ADMIN → SUPPRESSION COTATION (FORCÉE)
 # =========================
@@ -1648,19 +1675,15 @@ def delete_cotation_admin(cotation_id):
     conn = get_db()
 
     with conn.cursor() as cur:
-        cur.execute("SELECT client_id FROM cotations WHERE id=%s", (cotation_id,))
-        cot = cur.fetchone()
+        cur.execute("SELECT 1 FROM cotations WHERE id=%s", (cotation_id,))
+        if not cur.fetchone():
+            flash("Cotation introuvable.", "danger")
+            return redirect(url_for("admin_cotations"))
 
-    if not cot:
-        flash("Cotation introuvable.", "danger")
-        return redirect(url_for("admin_cotations"))
-
-    with conn.cursor() as cur:
         cur.execute("DELETE FROM cotations WHERE id=%s", (cotation_id,))
 
     conn.commit()
     flash("Cotation supprimée par l’administrateur.", "success")
-
     return redirect(url_for("admin_cotations"))
 
 
@@ -1677,7 +1700,6 @@ def delete_cotation(cotation_id):
     NE PAS SUPPRIMER.
     """
     return delete_cotation_admin(cotation_id)
-
 
 
 ############################################################
