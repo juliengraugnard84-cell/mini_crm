@@ -2241,10 +2241,7 @@ if __name__ == "__main__":
         port=int(os.environ.get("PORT", 5000)),
         debug=DEBUG,
     )
-@app.route("/clients/<int:client_id>/cotations/new")
-@login_required
-def new_cotation(client_id):
-    return f"DEBUG NEW COTATION CLIENT {client_id}"
+
 
 # ============================
 # FIN PARTIE 4/4
