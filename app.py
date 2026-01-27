@@ -85,7 +85,9 @@ ADMIN_DEFAULT_PASSWORD = (
 # CSRF: endpoints JSON éventuellement exemptés (si vous ne voulez pas gérer le header côté front)
 CSRF_EXEMPT_ENDPOINTS = {
     "chat_send",
+    "chat_mark_read",
 }
+
 
 ############################################################
 # 2. INITIALISATION FLASK
@@ -117,7 +119,7 @@ if is_production:
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
 
-############################################################
+###########################################################
 # 3. BASE DE DONNÉES (POSTGRESQL – PROD SAFE)
 ############################################################
 
@@ -170,7 +172,8 @@ def row_to_obj(row):
 
 def _try_add_column(conn, table, column_sql):
     """
-    Ajout de colonne SAFE (sans casser une base existante).
+    Ajout de colonne SAFE (idempotent).
+    Ne casse jamais une base existante.
     """
     try:
         with conn.cursor() as cur:
@@ -308,6 +311,17 @@ def init_db():
                         "admin",
                     ),
                 )
+
+            # ================= MIGRATIONS SAFE =================
+            # Alignement strict avec les routes existantes
+
+            # crm_clients
+            _try_add_column(conn, "crm_clients", "siret TEXT")
+
+            # cotations
+            _try_add_column(conn, "cotations", "type_compteur TEXT")
+            _try_add_column(conn, "cotations", "heure_negociation TIME")
+            _try_add_column(conn, "cotations", "signataire_mobile TEXT")
 
         conn.commit()
 
@@ -1263,7 +1277,7 @@ def clients():
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
+                    WHERE crm_clients.owner_id = %s
                       AND crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
                     """,
@@ -1275,7 +1289,7 @@ def clients():
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
+                    WHERE crm_clients.owner_id = %s
                     ORDER BY crm_clients.created_at DESC
                     """,
                     (user_id,),
@@ -1319,7 +1333,7 @@ def client_detail(client_id):
             SELECT crm_clients.*, users.username AS commercial
             FROM crm_clients
             LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.id=%s
+            WHERE crm_clients.id = %s
             """,
             (client_id,),
         )
@@ -1331,21 +1345,17 @@ def client_detail(client_id):
 
     documents = list_client_documents(client_id)
 
-    updates = []
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT *
-                FROM client_updates
-                WHERE client_id=%s
-                ORDER BY created_at DESC
-                """,
-                (client_id,),
-            )
-            updates = cur.fetchall()
-    except Exception:
-        updates = []
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM client_updates
+            WHERE client_id = %s
+            ORDER BY created_at DESC
+            """,
+            (client_id,),
+        )
+        updates = cur.fetchall()
 
     user = session.get("user") or {}
     can_request_update = user.get("role") in ("admin", "commercial")
@@ -1360,7 +1370,7 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — FORMULAIRE DE COTATION (ONGLET COTATIONS)
+# CLIENT — FORMULAIRE DE COTATION
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["GET"])
 @login_required
@@ -1377,14 +1387,11 @@ def new_cotation(client_id):
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    return render_template(
-        "cotation_form.html",
-        client=row_to_obj(client),
-    )
+    return render_template("cotation_form.html", client=row_to_obj(client))
 
 
 # =========================
-# CLIENT — ENVOI DE LA DEMANDE DE COTATION (POST)
+# CLIENT — ENVOI DEMANDE DE COTATION
 # =========================
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
@@ -1412,11 +1419,12 @@ def create_cotation(client_id):
                 signataire_nom,
                 signataire_email,
                 signataire_tel,
+                signataire_mobile,
                 commentaire,
                 status,
                 is_read
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'nouvelle',0)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'nouvelle',0)
             """,
             (
                 client_id,
@@ -1432,6 +1440,7 @@ def create_cotation(client_id):
                 request.form.get("signataire_nom"),
                 request.form.get("signataire_email"),
                 request.form.get("signataire_tel"),
+                request.form.get("signataire_mobile"),
                 request.form.get("commentaire"),
             ),
         )
@@ -1461,70 +1470,6 @@ def delete_client(client_id):
     flash("Dossier client supprimé.", "success")
     return redirect(url_for("clients"))
 
-
-###########################################################
-# 10 BIS. ADMIN — DEMANDES DE COTATION
-############################################################
-
-@app.route("/admin/cotations")
-@admin_required
-def admin_cotations():
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT
-                cotations.*,
-                crm_clients.name AS client_name,
-                users.username AS commercial_name
-            FROM cotations
-            JOIN crm_clients ON crm_clients.id = cotations.client_id
-            LEFT JOIN users ON users.id = cotations.created_by
-            ORDER BY cotations.date_creation DESC
-        """)
-        rows = cur.fetchall()
-
-    return render_template(
-        "admin_cotations.html",
-        cotations=[row_to_obj(r) for r in rows],
-    )
-
-
-@app.route("/admin/cotations/<int:cotation_id>")
-@admin_required
-def admin_cotation_detail(cotation_id):
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT
-                cotations.*,
-                crm_clients.name AS client_name,
-                users.username AS commercial_name
-            FROM cotations
-            JOIN crm_clients ON crm_clients.id = cotations.client_id
-            LEFT JOIN users ON users.id = cotations.created_by
-            WHERE cotations.id = %s
-        """, (cotation_id,))
-        row = cur.fetchone()
-
-    if not row:
-        flash("Demande de cotation introuvable.", "danger")
-        return redirect(url_for("admin_cotations"))
-
-    # Marquer comme lue
-    with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE cotations SET is_read = 1 WHERE id = %s",
-            (cotation_id,)
-        )
-
-    conn.commit()
-
-    return render_template(
-        "admin_cotation_detail.html",
-        cotation=row_to_obj(row)
-    )
 
 
 ############################################################
