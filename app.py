@@ -1386,7 +1386,7 @@ def upload_client_document(client_id):
 
 
 # =========================
-# CLIENT — FORMULAIRE NOUVELLE COTATION (GET) ✅ AJOUT
+# CLIENT — FORMULAIRE NOUVELLE COTATION (GET)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["GET"])
 @login_required
@@ -1413,11 +1413,16 @@ def new_cotation(client_id):
 
 
 # =========================
-# CLIENT — CRÉATION COTATION (POST)
+# CLIENT — CRÉATION COTATION (GET + POST SAFE)
 # =========================
-@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
+@app.route("/clients/<int:client_id>/cotations/create", methods=["GET", "POST"])
 @login_required
 def create_cotation(client_id):
+
+    # 🔁 Sécurité absolue : si appelé en GET, on redirige vers le formulaire
+    if request.method == "GET":
+        return redirect(url_for("new_cotation", client_id=client_id))
+
     if not can_access_client(client_id):
         abort(403)
 
