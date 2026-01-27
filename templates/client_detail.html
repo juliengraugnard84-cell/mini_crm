@@ -16,7 +16,7 @@
           action="{{ url_for('delete_client', client_id=client.id) }}"
           onsubmit="return confirm('SUPPRIMER DÉFINITIVEMENT ce dossier client ?');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button class="btn btn-danger">
+        <button type="submit" class="btn btn-danger">
             Supprimer le dossier client
         </button>
     </form>
@@ -43,17 +43,26 @@
 <!-- ================= TABS ================= -->
 <ul class="nav nav-tabs mb-4" role="tablist">
     <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cotations">
+        <button type="button"
+                class="nav-link active"
+                data-bs-toggle="tab"
+                data-bs-target="#cotations">
             Cotations
         </button>
     </li>
     <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#documents">
+        <button type="button"
+                class="nav-link"
+                data-bs-toggle="tab"
+                data-bs-target="#documents">
             Documents
         </button>
     </li>
     <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#updates">
+        <button type="button"
+                class="nav-link"
+                data-bs-toggle="tab"
+                data-bs-target="#updates">
             Mise à jour
         </button>
     </li>
@@ -69,7 +78,6 @@
     <div class="card-body">
         <h5 class="mb-3">Nouvelle demande de cotation</h5>
 
-        <!-- ✅ CORRECTION : lien GET vers le formulaire -->
         <div class="text-end">
             <a href="{{ url_for('new_cotation', client_id=client.id) }}"
                class="btn btn-primary">
@@ -88,23 +96,22 @@
     <div class="card-body">
         <h5 class="mb-3">Documents du client</h5>
 
-        <!-- Upload classique -->
         <form method="post"
               enctype="multipart/form-data"
               action="{{ url_for('upload_client_document', client_id=client.id) }}"
               class="mb-3">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="file" name="file" class="form-control mb-2">
-            <button class="btn btn-secondary">Ajouter un document</button>
+            <button type="submit" class="btn btn-secondary">
+                Ajouter un document
+            </button>
         </form>
 
-        <!-- Dropzone -->
-        <form
-            action="{{ url_for('upload_client_document', client_id=client.id) }}"
-            method="post"
-            enctype="multipart/form-data"
-            class="dropzone border rounded p-3"
-            id="clientDocumentsDropzone">
+        <form action="{{ url_for('upload_client_document', client_id=client.id) }}"
+              method="post"
+              enctype="multipart/form-data"
+              class="dropzone border rounded p-3"
+              id="clientDocumentsDropzone">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="dz-message text-center text-muted">
                 <strong>Glissez-déposez vos documents ici</strong>
@@ -127,11 +134,10 @@
                     {% endif %}
 
                     {% if current_user and current_user.role == 'admin' %}
-                    <button
-                        type="button"
-                        class="btn btn-sm btn-outline-danger js-delete-doc"
-                        data-delete-url="{{ url_for('delete_document', key=doc.key) }}"
-                        data-doc-name="{{ doc.nom|e }}">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger js-delete-doc"
+                            data-delete-url="{{ url_for('delete_document', key=doc.key) }}"
+                            data-doc-name="{{ doc.nom|e }}">
                         Supprimer
                     </button>
                     {% endif %}
@@ -161,12 +167,13 @@
                    class="form-control mb-2"
                    required>
 
-            <textarea
-                name="update_commentaire"
-                class="form-control mb-3"
-                placeholder="Commentaire (optionnel)"></textarea>
+            <textarea name="update_commentaire"
+                      class="form-control mb-3"
+                      placeholder="Commentaire (optionnel)"></textarea>
 
-            <button class="btn btn-primary">Envoyer</button>
+            <button type="submit" class="btn btn-primary">
+                Envoyer
+            </button>
         </form>
         {% else %}
         <p class="text-muted">Aucune action disponible.</p>
