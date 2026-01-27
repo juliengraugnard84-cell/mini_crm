@@ -43,13 +43,19 @@
 <!-- ================= TABS ================= -->
 <ul class="nav nav-tabs mb-4" role="tablist">
     <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cotations">Cotations</button>
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cotations">
+            Cotations
+        </button>
     </li>
     <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#documents">Documents</button>
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#documents">
+            Documents
+        </button>
     </li>
     <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#updates">Mise à jour</button>
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#updates">
+            Mise à jour
+        </button>
     </li>
 </ul>
 
@@ -57,25 +63,23 @@
 
 <!-- ================= ONGLET COTATIONS ================= -->
 <div class="tab-pane fade show active" id="cotations">
+
 {% if current_user and current_user.role in ['commercial', 'admin'] %}
 <div class="card mb-4">
     <div class="card-body">
         <h5 class="mb-3">Nouvelle demande de cotation</h5>
 
-        <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-            <!-- ⚠️ FORMULAIRE SIMPLIFIÉ INTENTIONNEL
-                 Le détail complet est géré dans la page cotation -->
-            <div class="text-end">
-                <button class="btn btn-primary">
-                    Créer la demande
-                </button>
-            </div>
-        </form>
+        <!-- ✅ CORRECTION : lien GET vers le formulaire -->
+        <div class="text-end">
+            <a href="{{ url_for('new_cotation', client_id=client.id) }}"
+               class="btn btn-primary">
+                Créer la demande
+            </a>
+        </div>
     </div>
 </div>
 {% endif %}
+
 </div>
 
 <!-- ================= ONGLET DOCUMENTS ================= -->
