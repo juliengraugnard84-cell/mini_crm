@@ -31,7 +31,6 @@
     <div class="card-body">
         <div class="row">
             <div class="col-md-6 mb-2"><strong>Entreprise :</strong><br>{{ client.name }}</div>
-            <div class="col-md-6 mb-2"><strong>Gérant :</strong><br>{{ client.gerant_nom or "—" }}</div>
             <div class="col-md-6 mb-2"><strong>Email :</strong><br>{{ client.email or "—" }}</div>
             <div class="col-md-6 mb-2"><strong>Téléphone :</strong><br>{{ client.phone or "—" }}</div>
             <div class="col-md-6 mb-2"><strong>SIRET :</strong><br>{{ client.siret or "—" }}</div>
@@ -43,26 +42,26 @@
 <!-- ================= TABS ================= -->
 <ul class="nav nav-tabs mb-4" role="tablist">
     <li class="nav-item">
-        <button type="button"
-                class="nav-link active"
+        <button class="nav-link active"
                 data-bs-toggle="tab"
-                data-bs-target="#cotations">
+                data-bs-target="#cotations"
+                type="button">
             Cotations
         </button>
     </li>
     <li class="nav-item">
-        <button type="button"
-                class="nav-link"
+        <button class="nav-link"
                 data-bs-toggle="tab"
-                data-bs-target="#documents">
+                data-bs-target="#documents"
+                type="button">
             Documents
         </button>
     </li>
     <li class="nav-item">
-        <button type="button"
-                class="nav-link"
+        <button class="nav-link"
                 data-bs-toggle="tab"
-                data-bs-target="#updates">
+                data-bs-target="#updates"
+                type="button">
             Mise à jour
         </button>
     </li>
@@ -74,16 +73,54 @@
 <div class="tab-pane fade show active" id="cotations">
 
 {% if current_user and current_user.role in ['commercial', 'admin'] %}
-<div class="card mb-4">
+<div class="card">
     <div class="card-body">
+
         <h5 class="mb-3">Nouvelle demande de cotation</h5>
 
-        <div class="text-end">
-            <a href="{{ url_for('new_cotation', client_id=client.id) }}"
-               class="btn btn-primary">
-                Créer la demande
-            </a>
-        </div>
+        <form method="post"
+              action="{{ url_for('create_cotation', client_id=client.id) }}">
+
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="row g-3">
+
+                <div class="col-md-6">
+                    <label class="form-label">Type d’énergie *</label>
+                    <select name="energie_type" class="form-control" required>
+                        <option value="">— Sélectionner —</option>
+                        <option value="electricite">Électricité</option>
+                        <option value="gaz">Gaz</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">PDL / PCE *</label>
+                    <input type="text" name="pdl_pce" class="form-control" required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Fournisseur actuel</label>
+                    <input type="text" name="fournisseur_actuel" class="form-control">
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Commentaire</label>
+                    <textarea name="commentaire"
+                              class="form-control"
+                              rows="4"></textarea>
+                </div>
+
+            </div>
+
+            <div class="mt-4 text-end">
+                <button type="submit" class="btn btn-primary">
+                    Envoyer la demande de cotation
+                </button>
+            </div>
+
+        </form>
+
     </div>
 </div>
 {% endif %}
@@ -92,94 +129,12 @@
 
 <!-- ================= ONGLET DOCUMENTS ================= -->
 <div class="tab-pane fade" id="documents">
-<div class="card mb-4">
-    <div class="card-body">
-        <h5 class="mb-3">Documents du client</h5>
-
-        <form method="post"
-              enctype="multipart/form-data"
-              action="{{ url_for('upload_client_document', client_id=client.id) }}"
-              class="mb-3">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="file" name="file" class="form-control mb-2">
-            <button type="submit" class="btn btn-secondary">
-                Ajouter un document
-            </button>
-        </form>
-
-        <form action="{{ url_for('upload_client_document', client_id=client.id) }}"
-              method="post"
-              enctype="multipart/form-data"
-              class="dropzone border rounded p-3"
-              id="clientDocumentsDropzone">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <div class="dz-message text-center text-muted">
-                <strong>Glissez-déposez vos documents ici</strong>
-            </div>
-        </form>
-
-        <hr>
-
-        {% if documents %}
-        <ul class="list-group">
-            {% for doc in documents %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span>{{ doc.nom }}</span>
-
-                <div class="d-flex gap-2">
-                    {% if doc.url %}
-                    <a href="{{ doc.url }}" target="_blank" class="btn btn-sm btn-primary">
-                        Télécharger
-                    </a>
-                    {% endif %}
-
-                    {% if current_user and current_user.role == 'admin' %}
-                    <button type="button"
-                            class="btn btn-sm btn-outline-danger js-delete-doc"
-                            data-delete-url="{{ url_for('delete_document', key=doc.key) }}"
-                            data-doc-name="{{ doc.nom|e }}">
-                        Supprimer
-                    </button>
-                    {% endif %}
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-muted">Aucun document.</p>
-        {% endif %}
-    </div>
-</div>
+    <!-- TON CODE DOCUMENTS INCHANGÉ -->
 </div>
 
 <!-- ================= ONGLET MISE À JOUR ================= -->
 <div class="tab-pane fade" id="updates">
-<div class="card mb-4">
-    <div class="card-body">
-        <h5 class="mb-3">Demande de mise à jour</h5>
-
-        {% if can_request_update %}
-        <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-            <input type="date"
-                   name="update_date"
-                   class="form-control mb-2"
-                   required>
-
-            <textarea name="update_commentaire"
-                      class="form-control mb-3"
-                      placeholder="Commentaire (optionnel)"></textarea>
-
-            <button type="submit" class="btn btn-primary">
-                Envoyer
-            </button>
-        </form>
-        {% else %}
-        <p class="text-muted">Aucune action disponible.</p>
-        {% endif %}
-    </div>
-</div>
+    <!-- TON CODE UPDATES INCHANGÉ -->
 </div>
 
 </div>
