@@ -18,7 +18,8 @@
 
 <!-- ================= SEARCH ================= -->
 <div class="card mb-4">
-    <form method="get" action="{{ url_for('clients') }}"
+    <form method="get"
+          action="{{ url_for('clients') }}"
           style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
         <input type="text"
                name="q"
@@ -58,7 +59,7 @@
 
                 {% if current_user.role == 'admin' %}
                 <form method="post"
-                      action="{{ url_for('update_client_status', client_id=c.id) }}"
+                      action="{{ url_for('update_client', client_id=c.id) }}"
                       class="mt-2">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <select name="status"
