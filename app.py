@@ -1150,16 +1150,13 @@ def new_client():
 
         conn = get_db()
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 INSERT INTO crm_clients (
                     name, email, phone, address, siret, owner_id, status
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
                 RETURNING id
-                """,
-                (name, email, phone, address, siret, owner_id),
-            )
+            """, (name, email, phone, address, siret, owner_id))
             client_id = cur.fetchone()[0]
 
         conn.commit()
@@ -1178,11 +1175,11 @@ def clients():
     conn = get_db()
     q = (request.args.get("q") or "").strip()
     user = session.get("user") or {}
-    is_admin = user.get("role") == "admin"
+    role = user.get("role")
     user_id = user.get("id")
 
     with conn.cursor() as cur:
-        if is_admin:
+        if role == "admin":
             if q:
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
@@ -1255,20 +1252,16 @@ def update_client_status(client_id):
 
     conn = get_db()
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT owner_id FROM crm_clients WHERE id=%s",
-            (client_id,)
-        )
+        cur.execute("SELECT owner_id FROM crm_clients WHERE id=%s", (client_id,))
         row = cur.fetchone()
 
     if not row:
         flash("Dossier introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    # 🔒 Autorisation
+    # 🔒 Sécurité
     if role != "admin" and row["owner_id"] != user_id:
-        flash("Vous n’êtes pas autorisé à modifier ce dossier.", "danger")
-        return redirect(url_for("clients"))
+        abort(403)
 
     with conn.cursor() as cur:
         cur.execute(
@@ -1278,7 +1271,7 @@ def update_client_status(client_id):
 
     conn.commit()
     flash("Statut du dossier mis à jour.", "success")
-    return redirect(url_for("clients"))
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 # =========================
@@ -1330,12 +1323,10 @@ def client_detail(client_id):
 @admin_required
 def delete_client(client_id):
     conn = get_db()
-
     with conn.cursor() as cur:
         cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
         cur.execute("DELETE FROM client_updates WHERE client_id=%s", (client_id,))
         cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
-
     conn.commit()
     flash("Dossier client supprimé.", "success")
     return redirect(url_for("clients"))
@@ -1400,6 +1391,7 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation envoyée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
+
 
 ############################################################
 # 10 TER. ADMIN — UTILISATEURS
