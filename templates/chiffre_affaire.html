@@ -14,30 +14,32 @@
 
     <div class="kpi-tile">
         <div class="kpi-label">
-            {% if current_user.role == 'admin' %}
+            {% if current_user and current_user.role == 'admin' %}
                 Chiffre d’affaires annuel (global)
             {% else %}
                 Votre chiffre d’affaires annuel
             {% endif %}
         </div>
-        <div class="kpi-value">{{ ca_annuel_perso }} €</div>
+        <div class="kpi-value">{{ ca_annuel_perso or 0 }} €</div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">
-            {% if current_user.role == 'admin' %}
+            {% if current_user and current_user.role == 'admin' %}
                 Chiffre d’affaires mensuel (global)
             {% else %}
                 Votre chiffre d’affaires mensuel
             {% endif %}
         </div>
-        <div class="kpi-value">{{ ca_mensuel_perso }} €</div>
+        <div class="kpi-value">{{ ca_mensuel_perso or 0 }} €</div>
     </div>
 
 </div>
 
 <!-- ================= AJOUT CA (ADMIN) ================= -->
-{% if current_user.role == 'admin' %}
+{% if current_user
+      and current_user.role == 'admin'
+      and 'add_chiffre_affaire' in current_app.view_functions %}
 <div class="card mb-4">
     <h5>Ajouter un chiffre d’affaires</h5>
 
@@ -54,7 +56,7 @@
                 <label>Dossier client</label>
                 <select name="client_id" class="form-select" required>
                     <option value="">— Sélectionner —</option>
-                    {% for c in clients %}
+                    {% for c in clients or [] %}
                         <option value="{{ c.id }}">{{ c.name }}</option>
                     {% endfor %}
                 </select>
@@ -79,7 +81,9 @@
 {% endif %}
 
 <!-- ================= HISTORIQUE CA (ADMIN) ================= -->
-{% if current_user.role == 'admin' and historique_ca %}
+{% if current_user
+      and current_user.role == 'admin'
+      and historique_ca %}
 <div class="card mb-4">
     <h5>Historique des chiffres d’affaires</h5>
 
@@ -106,15 +110,15 @@
 
     <!--
         ⚠️ ÉDITION / SUPPRESSION DÉSACTIVÉES VOLONTAIREMENT
-        Les routes edit_chiffre_affaire et delete_chiffre_affaire
-        ne sont PAS définies dans app.py.
-        Cela évite toute erreur 500 et toute régression.
+        Routes non définies dans app.py → aucun risque de 500
     -->
 </div>
 {% endif %}
 
 <!-- ================= GRAPHIQUE COMMERCIAL ================= -->
-{% if current_user.role != 'admin' and ca_perso_par_mois %}
+{% if current_user
+      and current_user.role != 'admin'
+      and ca_perso_par_mois %}
 <div class="card mb-4">
     <h5>Votre chiffre d’affaires mensuel (objectif 5 000 €)</h5>
     <canvas id="chartMensuelPerso"></canvas>
@@ -156,7 +160,9 @@
 {% endif %}
 
 <!-- ================= GRAPHIQUE ADMIN GLOBAL ================= -->
-{% if current_user.role == 'admin' and global_par_mois %}
+{% if current_user
+      and current_user.role == 'admin'
+      and global_par_mois %}
 <div class="card mb-4">
     <h5>Chiffre d’affaires global par mois</h5>
     <canvas id="chartGlobal"></canvas>

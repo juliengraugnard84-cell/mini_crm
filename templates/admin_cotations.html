@@ -16,7 +16,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Historique des cotations</h5>
         <div class="text-muted small">
-            Total : {{ cotations|length }}
+            Total : {{ cotations|length if cotations else 0 }}
         </div>
     </div>
 
@@ -46,13 +46,17 @@
                     </td>
 
                     <td>
-                        {{ format_date(c.date_creation) }}
+                        {{ format_date(c.date_creation) if c.date_creation else "—" }}
                     </td>
 
                     <td>
-                        <a href="{{ url_for('client_detail', client_id=c.client_id) }}">
+                        {% if 'client_detail' in current_app.view_functions %}
+                            <a href="{{ url_for('client_detail', client_id=c.client_id) }}">
+                                {{ c.client_name or ("Client #" ~ c.client_id) }}
+                            </a>
+                        {% else %}
                             {{ c.client_name or ("Client #" ~ c.client_id) }}
-                        </a>
+                        {% endif %}
                     </td>
 
                     <td>
@@ -64,7 +68,7 @@
                     </td>
 
                     <td>
-                        {{ format_date(c.date_negociation) }}
+                        {{ format_date(c.date_negociation) if c.date_negociation else "—" }}
                     </td>
 
                     <td>
@@ -82,13 +86,26 @@
                     <td class="text-end">
                         <div class="d-inline-flex gap-2">
 
-                            <!-- OUVRIR -->
+                            <!-- ================= OUVRIR ================= -->
+                            {% if 'admin_cotation_detail' in current_app.view_functions %}
                             <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
                                class="btn btn-outline-primary btn-sm">
                                 Ouvrir
                             </a>
+                            {% endif %}
 
-                            <!-- SUPPRIMER (ADMIN) -->
+                            <!-- ================= SUPPRIMER ================= -->
+                            {% if 'delete_cotation_admin' in current_app.view_functions %}
+                            <form method="post"
+                                  action="{{ url_for('delete_cotation_admin', cotation_id=c.id) }}"
+                                  onsubmit="return confirm('Supprimer définitivement cette cotation ?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button class="btn btn-danger btn-sm">
+                                    Supprimer
+                                </button>
+                            </form>
+
+                            {% elif 'delete_cotation' in current_app.view_functions %}
                             <form method="post"
                                   action="{{ url_for('delete_cotation', cotation_id=c.id) }}"
                                   onsubmit="return confirm('Supprimer définitivement cette cotation ?');">
@@ -97,6 +114,7 @@
                                     Supprimer
                                 </button>
                             </form>
+                            {% endif %}
 
                         </div>
                     </td>

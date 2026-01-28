@@ -6,7 +6,7 @@
 {% if current_user and current_user.role == 'commercial' %}
 
 <!-- ================= DASHBOARD COMMERCIAL ================= -->
-<div class="page-header" style="margin-bottom:24px;">
+<div class="page-header mb-4">
     <h1>Mon tableau de bord</h1>
     <p class="text-muted">Suivi de mon activité commerciale</p>
 </div>
@@ -14,25 +14,35 @@
 <!-- ================= KPI COMMERCIAL ================= -->
 <div class="kpi-grid"
      style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:32px;">
+
     <div class="kpi-tile">
         <div class="kpi-label">Mes dossiers</div>
-        <div class="kpi-value">{{ commercial_stats.nb_clients }}</div>
+        <div class="kpi-value">
+            {{ commercial_stats.nb_clients if commercial_stats is defined else 0 }}
+        </div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">Mon CA total</div>
-        <div class="kpi-value">{{ "%.2f"|format(commercial_stats.ca_total) }} €</div>
+        <div class="kpi-value">
+            {{ "%.2f"|format(commercial_stats.ca_total) if commercial_stats is defined else "0.00" }} €
+        </div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">Mon CA du mois</div>
-        <div class="kpi-value">{{ "%.2f"|format(commercial_stats.ca_mois) }} €</div>
+        <div class="kpi-value">
+            {{ "%.2f"|format(commercial_stats.ca_mois) if commercial_stats is defined else "0.00" }} €
+        </div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">Cotations en attente</div>
-        <div class="kpi-value">{{ commercial_stats.cotations_attente }}</div>
+        <div class="kpi-value">
+            {{ commercial_stats.cotations_attente if commercial_stats is defined else 0 }}
+        </div>
     </div>
+
 </div>
 
 <!-- ================= PIPELINE COMMERCIAL ================= -->
@@ -40,70 +50,42 @@
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:32px;">
 
-    <div class="card">
-        <div class="card-header fw-bold">
-            🟡 En cours ({{ pipeline_en_cours|length }})
-        </div>
-        <div class="card-body d-flex flex-column gap-2">
-            {% for c in pipeline_en_cours %}
+{% for title, items, color in [
+    ('🟡 En cours', pipeline_en_cours if pipeline_en_cours is defined else [], ''),
+    ('🟢 Gagnés', pipeline_gagnes if pipeline_gagnes is defined else [], 'success'),
+    ('🔴 Perdus', pipeline_perdus if pipeline_perdus is defined else [], 'danger')
+] %}
+
+<div class="card {% if color %}border-{{ color }}{% endif %}">
+    <div class="card-header fw-bold {% if color %}text-{{ color }}{% endif %}">
+        {{ title }} ({{ items|length }})
+    </div>
+    <div class="card-body d-flex flex-column gap-2">
+        {% if items %}
+            {% for c in items %}
             <div class="border rounded p-2">
                 <strong>{{ c.name }}</strong>
+                {% if 'client_detail' in current_app.view_functions %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
                    class="btn btn-ouvrir btn-sm mt-2 w-100">
                     Ouvrir
                 </a>
+                {% endif %}
             </div>
-            {% else %}
+            {% endfor %}
+        {% else %}
             <p class="text-muted mb-0">Aucun dossier.</p>
-            {% endfor %}
-        </div>
+        {% endif %}
     </div>
+</div>
 
-    <div class="card border-success">
-        <div class="card-header fw-bold text-success">
-            🟢 Gagnés ({{ pipeline_gagnes|length }})
-        </div>
-        <div class="card-body d-flex flex-column gap-2">
-            {% for c in pipeline_gagnes %}
-            <div class="border border-success rounded p-2">
-                <strong>{{ c.name }}</strong>
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="btn btn-ouvrir btn-sm mt-2 w-100">
-                    Ouvrir
-                </a>
-            </div>
-            {% else %}
-            <p class="text-muted mb-0">Aucun dossier gagné.</p>
-            {% endfor %}
-        </div>
-    </div>
-
-    <div class="card border-danger">
-        <div class="card-header fw-bold text-danger">
-            🔴 Perdus ({{ pipeline_perdus|length }})
-        </div>
-        <div class="card-body d-flex flex-column gap-2">
-            {% for c in pipeline_perdus %}
-            <div class="border border-danger rounded p-2">
-                <strong>{{ c.name }}</strong>
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="btn btn-ouvrir btn-sm mt-2 w-100">
-                    Ouvrir
-                </a>
-            </div>
-            {% else %}
-            <p class="text-muted mb-0">Aucun dossier perdu.</p>
-            {% endfor %}
-        </div>
-    </div>
-
+{% endfor %}
 </div>
 
 {% else %}
 
 <!-- ================= DASHBOARD ADMIN ================= -->
-
-<div class="page-header" style="margin-bottom:24px;">
+<div class="page-header mb-4">
     <h1>Tableau de bord</h1>
     <p class="text-muted">Vue d’ensemble de l’activité</p>
 </div>
@@ -111,25 +93,29 @@
 <!-- ================= KPI ADMIN ================= -->
 <div class="kpi-grid"
      style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:32px;">
+
     <div class="kpi-tile">
         <div class="kpi-label">Dossiers clients</div>
-        <div class="kpi-value">{{ total_clients }}</div>
+        <div class="kpi-value">{{ total_clients if total_clients is defined else 0 }}</div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">Chiffre d’affaires total</div>
-        <div class="kpi-value">{{ "%.2f"|format(total_ca) }} €</div>
+        <div class="kpi-value">
+            {{ "%.2f"|format(total_ca) if total_ca is defined else "0.00" }} €
+        </div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">Documents stockés</div>
-        <div class="kpi-value">{{ total_docs }}</div>
+        <div class="kpi-value">{{ total_docs if total_docs is defined else 0 }}</div>
     </div>
 
     <div class="kpi-tile" style="border-left-color:var(--danger);">
         <div class="kpi-label">Nouvelles cotations</div>
-        <div class="kpi-value">{{ unread_cotations }}</div>
+        <div class="kpi-value">{{ unread_cotations if unread_cotations is defined else 0 }}</div>
     </div>
+
 </div>
 
 <!-- ================= PIPELINE ADMIN ================= -->
@@ -138,53 +124,50 @@
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:32px;">
 
 {% for label, color, items in [
-    ('🟡 En cours', 'secondary', pipeline_en_cours),
-    ('🟢 Gagnés', 'success', pipeline_gagnes),
-    ('🔴 Perdus', 'danger', pipeline_perdus)
+    ('🟡 En cours', 'secondary', pipeline_en_cours if pipeline_en_cours is defined else []),
+    ('🟢 Gagnés', 'success', pipeline_gagnes if pipeline_gagnes is defined else []),
+    ('🔴 Perdus', 'danger', pipeline_perdus if pipeline_perdus is defined else [])
 ] %}
 
 <div class="card {% if color != 'secondary' %}border-{{ color }}{% endif %}">
     <div class="card-header fw-bold {% if color != 'secondary' %}text-{{ color }}{% endif %}">
         {{ label }} ({{ items|length }})
     </div>
+
     <div class="card-body d-flex flex-column gap-2">
-        {% for c in items %}
-        <div class="border rounded p-2">
-            <strong>{{ c.name }}</strong><br>
-            <small class="text-muted">{{ c.commercial or "—" }}</small>
+        {% if items %}
+            {% for c in items %}
+            <div class="border rounded p-2">
+                <strong>{{ c.name }}</strong><br>
+                <small class="text-muted">{{ c.commercial or "—" }}</small>
 
-            <a href="{{ url_for('client_detail', client_id=c.id) }}"
-               class="btn btn-ouvrir btn-sm mt-2 w-100">
-                Ouvrir
-            </a>
+                {% if 'client_detail' in current_app.view_functions %}
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
+                {% endif %}
 
-            <!-- FORMULAIRE STATUT ADMIN (RÉTABLI) -->
-            <form method="post"
-                  action="{{ url_for('update_client_status', client_id=c.id) }}"
-                  class="mt-2">
-
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-                <select name="status" class="form-select form-select-sm mb-1">
-                    <option value="en_cours" {% if c.status == "en_cours" %}selected{% endif %}>
-                        En cours
-                    </option>
-                    <option value="gagne" {% if c.status == "gagne" %}selected{% endif %}>
-                        Gagné
-                    </option>
-                    <option value="perdu" {% if c.status == "perdu" %}selected{% endif %}>
-                        Perdu
-                    </option>
-                </select>
-
-                <button type="submit" class="btn btn-outline-primary btn-sm w-100">
-                    Mettre à jour le statut
-                </button>
-            </form>
-        </div>
+                {% if 'update_client_status' in current_app.view_functions %}
+                <form method="post"
+                      action="{{ url_for('update_client_status', client_id=c.id) }}"
+                      class="mt-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <select name="status" class="form-select form-select-sm mb-1">
+                        <option value="en_cours" {% if c.status == "en_cours" %}selected{% endif %}>En cours</option>
+                        <option value="gagne" {% if c.status == "gagne" %}selected{% endif %}>Gagné</option>
+                        <option value="perdu" {% if c.status == "perdu" %}selected{% endif %}>Perdu</option>
+                    </select>
+                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">
+                        Mettre à jour le statut
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
         {% else %}
-        <p class="text-muted mb-0">Aucun dossier.</p>
-        {% endfor %}
+            <p class="text-muted mb-0">Aucun dossier.</p>
+        {% endif %}
     </div>
 </div>
 
@@ -194,7 +177,8 @@
 <!-- ================= DERNIERS DOSSIERS ================= -->
 <div class="card">
     <h5>Derniers dossiers créés</h5>
-    {% if last_clients %}
+
+    {% if last_clients is defined and last_clients %}
     <table class="table">
         <thead>
             <tr>
