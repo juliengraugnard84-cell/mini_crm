@@ -1239,17 +1239,37 @@ def clients():
 
 
 # =========================
-# CLIENT — MISE À JOUR STATUT (ADMIN)
+# CLIENT — MISE À JOUR STATUT (ADMIN + COMMERCIAL PROPRIÉTAIRE)
 # =========================
 @app.route("/clients/<int:client_id>/status", methods=["POST"])
-@admin_required
+@login_required
 def update_client_status(client_id):
     status = (request.form.get("status") or "").strip().lower()
     if status not in ("en_cours", "gagne", "perdu"):
         flash("Statut invalide.", "danger")
         return redirect(url_for("clients"))
 
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
+
     conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT owner_id FROM crm_clients WHERE id=%s",
+            (client_id,)
+        )
+        row = cur.fetchone()
+
+    if not row:
+        flash("Dossier introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    # 🔒 Autorisation
+    if role != "admin" and row["owner_id"] != user_id:
+        flash("Vous n’êtes pas autorisé à modifier ce dossier.", "danger")
+        return redirect(url_for("clients"))
+
     with conn.cursor() as cur:
         cur.execute(
             "UPDATE crm_clients SET status=%s WHERE id=%s",
@@ -1379,7 +1399,7 @@ def create_cotation(client_id):
 
     conn.commit()
     flash("Demande de cotation envoyée.", "success")
-    return redirect(url_for("client_detail", client_id=client_id)) 
+    return redirect(url_for("client_detail", client_id=client_id))
 
 ############################################################
 # 10 TER. ADMIN — UTILISATEURS
