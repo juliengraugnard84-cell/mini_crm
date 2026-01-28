@@ -1282,6 +1282,29 @@ def clients():
 
 
 # =========================
+# CLIENT — MISE À JOUR STATUT (ADMIN)
+# =========================
+@app.route("/clients/<int:client_id>/status", methods=["POST"])
+@admin_required
+def update_client_status(client_id):
+    status = (request.form.get("status") or "").strip().lower()
+    if status not in ("en_cours", "gagne", "perdu"):
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("clients"))
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE crm_clients SET status=%s WHERE id=%s",
+            (status, client_id)
+        )
+
+    conn.commit()
+    flash("Statut du dossier mis à jour.", "success")
+    return redirect(url_for("clients"))
+
+
+# =========================
 # CLIENT — DÉTAIL
 # =========================
 @app.route("/clients/<int:client_id>")
@@ -1324,27 +1347,48 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — FORMULAIRE DE COTATION (FORCÉ)
+# CLIENT — SUPPRESSION (ADMIN)
 # =========================
-@app.route("/clients/<int:client_id>/cotations/new", methods=["GET"])
+@app.route("/clients/<int:client_id>/delete", methods=["POST"])
+@admin_required
+def delete_client(client_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
+        cur.execute("DELETE FROM client_updates WHERE client_id=%s", (client_id,))
+        cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
+
+    conn.commit()
+    flash("Dossier client supprimé.", "success")
+    return redirect(url_for("clients"))
+
+
+# =========================
+# CLIENT — UPLOAD DOCUMENT
+# =========================
+@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
-def new_cotation(client_id):
+def upload_client_document(client_id):
     if not can_access_client(client_id):
         abort(403)
 
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM crm_clients WHERE id=%s", (client_id,))
-        client = cur.fetchone()
+    fichier = request.files.get("file")
+    if not fichier or not allowed_file(fichier.filename):
+        flash("Fichier invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
 
-    if not client:
-        abort(404)
+    if LOCAL_MODE or not s3:
+        flash("Upload indisponible en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
 
-    # 🔥 FORÇAGE DU TEMPLATE (OBLIGATOIRE POUR DÉBLOQUER)
-    return render_template(
-        "FORCE_cotation_form.html",
-        client=row_to_obj(client),
-    )
+    prefix = client_s3_prefix(client_id)
+    name = clean_filename(secure_filename(fichier.filename))
+    key = _s3_make_non_overwriting_key(AWS_BUCKET, f"{prefix}{name}")
+
+    s3_upload_fileobj(fichier, AWS_BUCKET, key)
+    flash("Document ajouté.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 # =========================
@@ -1362,37 +1406,23 @@ def create_cotation(client_id):
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO cotations (
-                client_id, created_by, energie_type, type_compteur,
-                heure_negociation, pdl_pce, date_echeance,
-                fournisseur_actuel, entreprise_nom, siret,
-                signataire_nom, signataire_email,
-                signataire_tel, signataire_mobile,
+                client_id, created_by, energie_type,
+                pdl_pce, fournisseur_actuel,
                 commentaire, status, is_read
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'nouvelle',0)
+            VALUES (%s,%s,%s,%s,%s,%s,'nouvelle',0)
         """, (
             client_id,
             user.get("id"),
             request.form.get("energie_type"),
-            request.form.get("type_compteur"),
-            request.form.get("heure_negociation"),
             request.form.get("pdl_pce"),
-            request.form.get("date_echeance"),
             request.form.get("fournisseur_actuel"),
-            request.form.get("entreprise_nom"),
-            request.form.get("siret"),
-            request.form.get("signataire_nom"),
-            request.form.get("signataire_email"),
-            request.form.get("signataire_tel"),
-            request.form.get("signataire_mobile"),
             request.form.get("commentaire"),
         ))
 
     conn.commit()
     flash("Demande de cotation envoyée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
-
-
 
 ############################################################
 # 10 TER. ADMIN — UTILISATEURS
