@@ -1193,16 +1193,13 @@ def new_client():
 
         conn = get_db()
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 INSERT INTO crm_clients (
                     name, email, phone, address, siret, owner_id, status
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
                 RETURNING id
-                """,
-                (name, email, phone, address, siret, owner_id),
-            )
+            """, (name, email, phone, address, siret, owner_id))
             client_id = cur.fetchone()[0]
 
         conn.commit()
@@ -1226,48 +1223,39 @@ def clients():
 
     with conn.cursor() as cur:
         if is_admin:
+            sql = """
+                SELECT crm_clients.*, users.username AS commercial
+                FROM crm_clients
+                LEFT JOIN users ON users.id = crm_clients.owner_id
+            """
+            params = ()
             if q:
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                """, (f"%{q}%",))
-            else:
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    ORDER BY crm_clients.created_at DESC
-                """)
+                sql += " WHERE crm_clients.name ILIKE %s"
+                params = (f"%{q}%",)
+            sql += " ORDER BY crm_clients.created_at DESC"
+            cur.execute(sql, params)
         else:
+            sql = """
+                SELECT crm_clients.*, users.username AS commercial
+                FROM crm_clients
+                LEFT JOIN users ON users.id = crm_clients.owner_id
+                WHERE crm_clients.owner_id=%s
+            """
+            params = [user_id]
             if q:
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
-                      AND crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                """, (user_id, f"%{q}%"))
-            else:
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
-                    ORDER BY crm_clients.created_at DESC
-                """, (user_id,))
+                sql += " AND crm_clients.name ILIKE %s"
+                params.append(f"%{q}%")
+            sql += " ORDER BY crm_clients.created_at DESC"
+            cur.execute(sql, tuple(params))
 
         rows = cur.fetchall()
 
     en_cours, gagnes, perdus = [], [], []
     for r in rows:
-        s = (r["status"] or "en_cours").lower()
-        if s == "gagne":
+        status = (r["status"] or "en_cours").lower()
+        if status == "gagne":
             gagnes.append(r)
-        elif s == "perdu":
+        elif status == "perdu":
             perdus.append(r)
         else:
             en_cours.append(r)
@@ -1332,7 +1320,8 @@ def upload_client_document(client_id):
     if not can_access_client(client_id):
         abort(403)
 
-    fichiers = request.files.getlist("files")
+    fichiers = request.files.getlist("file")
+
     if not fichiers:
         flash("Aucun fichier sélectionné.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
@@ -1343,11 +1332,9 @@ def upload_client_document(client_id):
 
     prefix = client_s3_prefix(client_id)
     uploaded = 0
-    skipped = 0
 
     for fichier in fichiers:
         if not fichier or not allowed_file(fichier.filename):
-            skipped += 1
             continue
 
         name = clean_filename(secure_filename(fichier.filename))
@@ -1357,18 +1344,18 @@ def upload_client_document(client_id):
             s3_upload_fileobj(fichier, AWS_BUCKET, key)
             uploaded += 1
         except Exception:
-            skipped += 1
+            logger.exception("Erreur upload document client")
 
-    if uploaded:
+    if uploaded == 0:
+        flash("Aucun fichier valide n’a été envoyé.", "danger")
+    else:
         flash(f"{uploaded} document(s) ajouté(s).", "success")
-    if skipped:
-        flash(f"{skipped} fichier(s) ignoré(s).", "warning")
 
     return redirect(url_for("client_detail", client_id=client_id))
 
 
 # =========================
-# CLIENT — ENVOI DEMANDE DE COTATION
+# CLIENT — ENVOI DEMANDE DE COTATION (COMPLÈTE)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
@@ -1382,17 +1369,44 @@ def create_cotation(client_id):
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO cotations (
-                client_id, created_by, energie_type,
-                pdl_pce, fournisseur_actuel,
-                commentaire, status, is_read
+                client_id,
+                created_by,
+                date_negociation,
+                heure_negociation,
+                energie_type,
+                type_compteur,
+                pdl_pce,
+                date_echeance,
+                fournisseur_actuel,
+                entreprise_nom,
+                siret,
+                signataire_nom,
+                signataire_email,
+                signataire_tel,
+                signataire_mobile,
+                commentaire,
+                status,
+                is_read
             )
-            VALUES (%s,%s,%s,%s,%s,%s,'nouvelle',0)
+            VALUES (
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'nouvelle',0
+            )
         """, (
             client_id,
             user.get("id"),
+            request.form.get("date_negociation"),
+            request.form.get("heure_negociation"),
             request.form.get("energie_type"),
+            request.form.get("type_compteur"),
             request.form.get("pdl_pce"),
+            request.form.get("date_echeance"),
             request.form.get("fournisseur_actuel"),
+            request.form.get("entreprise_nom"),
+            request.form.get("siret"),
+            request.form.get("signataire_nom"),
+            request.form.get("signataire_email"),
+            request.form.get("signataire_tel"),
+            request.form.get("signataire_mobile"),
             request.form.get("commentaire"),
         ))
 
