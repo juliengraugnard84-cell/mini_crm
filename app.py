@@ -1282,29 +1282,6 @@ def clients():
 
 
 # =========================
-# CLIENT — MISE À JOUR STATUT (ADMIN)
-# =========================
-@app.route("/clients/<int:client_id>/status", methods=["POST"])
-@admin_required
-def update_client_status(client_id):
-    status = (request.form.get("status") or "").strip().lower()
-    if status not in ("en_cours", "gagne", "perdu"):
-        flash("Statut invalide.", "danger")
-        return redirect(url_for("clients"))
-
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE crm_clients SET status=%s WHERE id=%s",
-            (status, client_id)
-        )
-
-    conn.commit()
-    flash("Statut du dossier mis à jour.", "success")
-    return redirect(url_for("clients"))
-
-
-# =========================
 # CLIENT — DÉTAIL
 # =========================
 @app.route("/clients/<int:client_id>")
@@ -1347,25 +1324,7 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — SUPPRESSION (ADMIN)
-# =========================
-@app.route("/clients/<int:client_id>/delete", methods=["POST"])
-@admin_required
-def delete_client(client_id):
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
-        cur.execute("DELETE FROM client_updates WHERE client_id=%s", (client_id,))
-        cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
-
-    conn.commit()
-    flash("Dossier client supprimé.", "success")
-    return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — UPLOAD DOCUMENT
+# CLIENT — UPLOAD DOCUMENTS (MULTI)
 # =========================
 @app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
 @login_required
@@ -1373,9 +1332,9 @@ def upload_client_document(client_id):
     if not can_access_client(client_id):
         abort(403)
 
-    fichier = request.files.get("file")
-    if not fichier or not allowed_file(fichier.filename):
-        flash("Fichier invalide.", "danger")
+    fichiers = request.files.getlist("files")
+    if not fichiers:
+        flash("Aucun fichier sélectionné.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
     if LOCAL_MODE or not s3:
@@ -1383,11 +1342,28 @@ def upload_client_document(client_id):
         return redirect(url_for("client_detail", client_id=client_id))
 
     prefix = client_s3_prefix(client_id)
-    name = clean_filename(secure_filename(fichier.filename))
-    key = _s3_make_non_overwriting_key(AWS_BUCKET, f"{prefix}{name}")
+    uploaded = 0
+    skipped = 0
 
-    s3_upload_fileobj(fichier, AWS_BUCKET, key)
-    flash("Document ajouté.", "success")
+    for fichier in fichiers:
+        if not fichier or not allowed_file(fichier.filename):
+            skipped += 1
+            continue
+
+        name = clean_filename(secure_filename(fichier.filename))
+        key = _s3_make_non_overwriting_key(AWS_BUCKET, f"{prefix}{name}")
+
+        try:
+            s3_upload_fileobj(fichier, AWS_BUCKET, key)
+            uploaded += 1
+        except Exception:
+            skipped += 1
+
+    if uploaded:
+        flash(f"{uploaded} document(s) ajouté(s).", "success")
+    if skipped:
+        flash(f"{skipped} fichier(s) ignoré(s).", "warning")
+
     return redirect(url_for("client_detail", client_id=client_id))
 
 
@@ -1423,6 +1399,7 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation envoyée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
+
 
 ############################################################
 # 10 TER. ADMIN — UTILISATEURS

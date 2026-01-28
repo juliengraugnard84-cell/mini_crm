@@ -61,139 +61,149 @@
 
 <!-- ================= ONGLET COTATIONS ================= -->
 <div class="tab-pane fade show active" id="cotations">
-
 {% if current_user and current_user.role in ['commercial', 'admin'] %}
 <div class="card">
-    <div class="card-body">
+<div class="card-body">
+<h5 class="mb-3">Nouvelle demande de cotation</h5>
 
-        <h5 class="mb-3">Nouvelle demande de cotation</h5>
+<form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<div class="row g-3">
 
-            <div class="row g-3">
+<div class="col-md-6">
+<label class="form-label">Nom du dossier</label>
+<input class="form-control" value="{{ client.name }}" disabled>
+</div>
 
-                <!-- Infos dossier -->
-                <div class="col-md-6">
-                    <label class="form-label">Nom du dossier</label>
-                    <input class="form-control" value="{{ client.name }}" disabled>
-                </div>
+<div class="col-md-6">
+<label class="form-label">Commercial</label>
+<input class="form-control" value="{{ current_user.username }}" disabled>
+</div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Commercial</label>
-                    <input class="form-control" value="{{ current_user.username }}" disabled>
-                </div>
+<div class="col-md-4">
+<label class="form-label">Type d’énergie *</label>
+<select name="energie_type" class="form-control" required>
+<option value="">— Sélectionner —</option>
+<option value="electricite">Électricité</option>
+<option value="gaz">Gaz</option>
+</select>
+</div>
 
-                <div class="col-md-4">
-                    <label class="form-label">Type d’énergie *</label>
-                    <select name="energie_type" class="form-control" required>
-                        <option value="">— Sélectionner —</option>
-                        <option value="electricite">Électricité</option>
-                        <option value="gaz">Gaz</option>
-                    </select>
-                </div>
+<div class="col-md-4">
+<label class="form-label">Date création dossier</label>
+<input class="form-control" value="{{ format_date(client.created_at) }}" disabled>
+</div>
 
-                <div class="col-md-4">
-                    <label class="form-label">Date création dossier</label>
-                    <input class="form-control" value="{{ format_date(client.created_at) }}" disabled>
-                </div>
+<div class="col-md-4">
+<label class="form-label">Date de négociation</label>
+<input type="date" name="date_negociation" class="form-control">
+</div>
 
-                <div class="col-md-4">
-                    <label class="form-label">Date de négociation</label>
-                    <input type="date" name="date_negociation" class="form-control">
-                </div>
+<div class="col-md-4">
+<label class="form-label">Heure de négociation</label>
+<input type="time" name="heure_negociation" class="form-control">
+</div>
 
-                <div class="col-md-4">
-                    <label class="form-label">Heure de négociation</label>
-                    <input type="time" name="heure_negociation" class="form-control">
-                </div>
+<div class="col-md-4">
+<label class="form-label">PDL / PCE *</label>
+<input type="text" name="pdl_pce" class="form-control" required>
+</div>
 
-                <div class="col-md-4">
-                    <label class="form-label">PDL / PCE *</label>
-                    <input type="text" name="pdl_pce" class="form-control" required>
-                </div>
+<div class="col-md-4">
+<label class="form-label">Type de compteur</label>
+<select name="type_compteur" class="form-control">
+<option value="">— Sélectionner —</option>
+<option value="C5">C5</option>
+<option value="C4">C4</option>
+<option value="C2">C2</option>
+<option value="T1">T1</option>
+<option value="T2">T2</option>
+<option value="T3">T3</option>
+<option value="T4">T4</option>
+</select>
+</div>
 
-                <div class="col-md-4">
-                    <label class="form-label">Type de compteur</label>
-                    <select name="type_compteur" class="form-control">
-                        <option value="">— Sélectionner —</option>
-                        <option value="C5">C5</option>
-                        <option value="C4">C4</option>
-                        <option value="C2">C2</option>
-                        <option value="T1">T1</option>
-                        <option value="T2">T2</option>
-                        <option value="T3">T3</option>
-                        <option value="T4">T4</option>
-                    </select>
-                </div>
+<div class="col-md-6">
+<label class="form-label">Fournisseur actuel</label>
+<input type="text" name="fournisseur_actuel" class="form-control">
+</div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Fournisseur actuel</label>
-                    <input type="text" name="fournisseur_actuel" class="form-control">
-                </div>
+<div class="col-md-6">
+<label class="form-label">Date d’échéance</label>
+<input type="date" name="date_echeance" class="form-control">
+</div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Date d’échéance</label>
-                    <input type="date" name="date_echeance" class="form-control">
-                </div>
+<div class="col-md-6">
+<label class="form-label">Entreprise</label>
+<input type="text" name="entreprise_nom" class="form-control" value="{{ client.name }}">
+</div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Entreprise</label>
-                    <input type="text" name="entreprise_nom" class="form-control" value="{{ client.name }}">
-                </div>
+<div class="col-md-6">
+<label class="form-label">SIRET</label>
+<input type="text" name="siret" class="form-control" value="{{ client.siret }}">
+</div>
 
-                <div class="col-md-6">
-                    <label class="form-label">SIRET</label>
-                    <input type="text" name="siret" class="form-control" value="{{ client.siret }}">
-                </div>
+<div class="col-md-6">
+<label class="form-label">Nom du signataire</label>
+<input type="text" name="signataire_nom" class="form-control">
+</div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Nom du signataire</label>
-                    <input type="text" name="signataire_nom" class="form-control">
-                </div>
+<div class="col-md-6">
+<label class="form-label">Email du signataire</label>
+<input type="email" name="signataire_email" class="form-control">
+</div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Email du signataire</label>
-                    <input type="email" name="signataire_email" class="form-control">
-                </div>
+<div class="col-md-6">
+<label class="form-label">Téléphone fixe</label>
+<input type="text" name="signataire_tel" class="form-control">
+</div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Téléphone fixe</label>
-                    <input type="text" name="signataire_tel" class="form-control">
-                </div>
+<div class="col-md-6">
+<label class="form-label">Téléphone portable</label>
+<input type="text" name="signataire_mobile" class="form-control">
+</div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Téléphone portable</label>
-                    <input type="text" name="signataire_mobile" class="form-control">
-                </div>
+<div class="col-12">
+<label class="form-label">Commentaire</label>
+<textarea name="commentaire" class="form-control" rows="4"></textarea>
+</div>
 
-                <div class="col-12">
-                    <label class="form-label">Commentaire</label>
-                    <textarea name="commentaire" class="form-control" rows="4"></textarea>
-                </div>
+</div>
 
-            </div>
+<div class="mt-4 text-end">
+<button class="btn btn-warning">Envoyer la demande de cotation</button>
+</div>
 
-            <div class="mt-4 text-end">
-                <button class="btn btn-warning">Envoyer la demande de cotation</button>
-            </div>
-        </form>
-
-    </div>
+</form>
+</div>
 </div>
 {% endif %}
 </div>
 
 <!-- ================= ONGLET DOCUMENTS ================= -->
 <div class="tab-pane fade" id="documents">
-<form method="post" enctype="multipart/form-data"
-      action="{{ url_for('upload_client_document', client_id=client.id) }}"
+
+<form method="post"
+      enctype="multipart/form-data"
+      action="{{ url_for('upload_client_documents', client_id=client.id) }}"
       class="mb-3">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <div class="d-flex gap-2 flex-wrap">
-        <input type="file" name="file" class="form-control" required style="max-width:360px;">
-        <button class="btn btn-primary btn-sm">Ajouter un document</button>
-    </div>
+
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+<div class="d-flex gap-2 flex-wrap">
+<input type="file"
+       name="files"
+       class="form-control"
+       multiple
+       required
+       style="max-width:360px;">
+<button class="btn btn-primary btn-sm">Ajouter des documents</button>
+</div>
+
+<small class="text-muted">
+Sélection multiple possible (Ctrl / Cmd).
+</small>
 </form>
 
 {% if documents %}
