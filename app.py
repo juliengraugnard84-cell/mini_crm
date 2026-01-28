@@ -1218,10 +1218,10 @@ def clients():
 
     en_cours, gagnes, perdus = [], [], []
     for r in rows:
-        s = (r["status"] or "en_cours").lower()
-        if s == "gagne":
+        status = (r["status"] or "en_cours").lower()
+        if status == "gagne":
             gagnes.append(r)
-        elif s == "perdu":
+        elif status == "perdu":
             perdus.append(r)
         else:
             en_cours.append(r)
@@ -1236,7 +1236,7 @@ def clients():
 
 
 # =========================
-# CLIENT — MISE À JOUR STATUT (ADMIN + COMMERCIAL PROPRIÉTAIRE)
+# CLIENT — MISE À JOUR STATUT
 # =========================
 @app.route("/clients/<int:client_id>/status", methods=["POST"])
 @login_required
@@ -1283,6 +1283,7 @@ def client_detail(client_id):
         abort(403)
 
     conn = get_db()
+
     with conn.cursor() as cur:
         cur.execute("""
             SELECT crm_clients.*, users.username AS commercial
@@ -1369,7 +1370,7 @@ def upload_client_document(client_id):
 
 
 # =========================
-# CLIENT — ENVOI DEMANDE DE COTATION
+# CLIENT — ENVOI DEMANDE DE COTATION (COMPLET)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
 @login_required
@@ -1383,17 +1384,42 @@ def create_cotation(client_id):
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO cotations (
-                client_id, created_by, energie_type,
-                pdl_pce, fournisseur_actuel,
-                commentaire, status, is_read
+                client_id,
+                created_by,
+                date_negociation,
+                heure_negociation,
+                energie_type,
+                type_compteur,
+                pdl_pce,
+                date_echeance,
+                fournisseur_actuel,
+                entreprise_nom,
+                siret,
+                signataire_nom,
+                signataire_tel,
+                signataire_email,
+                commentaire,
+                status,
+                is_read
             )
-            VALUES (%s,%s,%s,%s,%s,%s,'nouvelle',0)
+            VALUES (
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'nouvelle',0
+            )
         """, (
             client_id,
             user.get("id"),
+            request.form.get("date_negociation"),
+            request.form.get("heure_negociation"),
             request.form.get("energie_type"),
+            request.form.get("type_compteur"),
             request.form.get("pdl_pce"),
+            request.form.get("date_echeance"),
             request.form.get("fournisseur_actuel"),
+            request.form.get("entreprise_nom"),
+            request.form.get("siret"),
+            request.form.get("signataire_nom"),
+            request.form.get("signataire_tel"),
+            request.form.get("signataire_email"),
             request.form.get("commentaire"),
         ))
 
@@ -1401,266 +1427,6 @@ def create_cotation(client_id):
     flash("Demande de cotation envoyée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 
-
-############################################################
-# 10 TER. ADMIN — UTILISATEURS
-############################################################
-
-@app.route("/admin/users", methods=["GET", "POST"])
-@admin_required
-def admin_users():
-    conn = get_db()
-
-    if request.method == "POST":
-        username = (request.form.get("username") or "").strip()
-        password = (request.form.get("password") or "").strip()
-        role = (request.form.get("role") or "").strip()
-
-        if not username or not password or not role:
-            flash("Tous les champs sont obligatoires.", "danger")
-            return redirect(url_for("admin_users"))
-
-        if len(password) < 10:
-            flash("Mot de passe trop court (min 10 caractères).", "danger")
-            return redirect(url_for("admin_users"))
-
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT COUNT(*) FROM users WHERE username=%s",
-                (username,),
-            )
-            if cur.fetchone()[0] > 0:
-                flash("Nom d'utilisateur déjà utilisé.", "danger")
-                return redirect(url_for("admin_users"))
-
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO users (username, password_hash, role)
-                VALUES (%s, %s, %s)
-                """,
-                (username, generate_password_hash(password), role),
-            )
-
-        conn.commit()
-        flash("Utilisateur créé.", "success")
-        return redirect(url_for("admin_users"))
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT id, username, role FROM users ORDER BY id ASC")
-        users = cur.fetchall()
-
-    return render_template(
-        "admin_users.html",
-        users=[row_to_obj(u) for u in users],
-    )
-
-
-@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
-@admin_required
-def admin_delete_user(user_id):
-    if user_id == 1:
-        flash("Impossible de supprimer l’administrateur principal.", "danger")
-        return redirect(url_for("admin_users"))
-
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
-
-    conn.commit()
-    flash("Utilisateur supprimé.", "success")
-    return redirect(url_for("admin_users"))
-
-
-@app.route("/admin/users/<int:user_id>/reset_password", methods=["POST"])
-@admin_required
-def admin_reset_password(user_id):
-    new_password = (request.form.get("new_password") or "").strip()
-
-    if not new_password:
-        flash("Mot de passe requis.", "danger")
-        return redirect(url_for("admin_users"))
-
-    if len(new_password) < 10:
-        flash("Mot de passe trop court (min 10 caractères).", "danger")
-        return redirect(url_for("admin_users"))
-
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE users SET password_hash=%s WHERE id=%s",
-            (generate_password_hash(new_password), user_id),
-        )
-
-    conn.commit()
-    flash("Mot de passe réinitialisé.", "success")
-    return redirect(url_for("admin_users"))
-
-
-############################################################
-# 10 QUATER. ADMIN — DEMANDES DE COTATION
-############################################################
-
-@app.route("/admin/cotations")
-@admin_required
-def admin_cotations():
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT
-                cotations.*,
-                crm_clients.name AS client_name,
-                users.username AS commercial_name
-            FROM cotations
-            JOIN crm_clients ON crm_clients.id = cotations.client_id
-            LEFT JOIN users ON users.id = cotations.created_by
-            ORDER BY cotations.date_creation DESC
-        """)
-        rows = cur.fetchall()
-
-    return render_template(
-        "admin_cotations.html",
-        cotations=[row_to_obj(r) for r in rows],
-    )
-
-
-# =========================
-# ADMIN → DÉTAIL COTATION (ROUTE RESTAURÉE)
-# =========================
-@app.route("/admin/cotations/<int:cotation_id>")
-@admin_required
-def admin_cotation_detail(cotation_id):
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT
-                cotations.*,
-                crm_clients.name AS client_name,
-                users.username AS commercial_name
-            FROM cotations
-            JOIN crm_clients ON crm_clients.id = cotations.client_id
-            LEFT JOIN users ON users.id = cotations.created_by
-            WHERE cotations.id = %s
-        """, (cotation_id,))
-        cotation = cur.fetchone()
-
-    if not cotation:
-        flash("Cotation introuvable.", "danger")
-        return redirect(url_for("admin_cotations"))
-
-    return render_template(
-        "admin_cotation_detail.html",
-        cotation=row_to_obj(cotation),
-    )
-
-
-# =========================
-# ADMIN → ÉDITION COTATION
-# =========================
-@app.route("/admin/cotations/<int:cotation_id>/edit", methods=["GET", "POST"])
-@admin_required
-def admin_edit_cotation(cotation_id):
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT
-                cotations.*,
-                crm_clients.name AS client_name
-            FROM cotations
-            JOIN crm_clients ON crm_clients.id = cotations.client_id
-            WHERE cotations.id = %s
-        """, (cotation_id,))
-        cotation = cur.fetchone()
-
-    if not cotation:
-        flash("Cotation introuvable.", "danger")
-        return redirect(url_for("admin_cotations"))
-
-    if request.method == "POST":
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE cotations
-                SET
-                    date_negociation = %s,
-                    heure_negociation = %s,
-                    energie_type = %s,
-                    type_compteur = %s,
-                    pdl_pce = %s,
-                    date_echeance = %s,
-                    fournisseur_actuel = %s,
-                    entreprise_nom = %s,
-                    siret = %s,
-                    signataire_nom = %s,
-                    signataire_tel = %s,
-                    signataire_email = %s,
-                    commentaire = %s,
-                    status = %s
-                WHERE id = %s
-            """, (
-                request.form.get("date_negociation"),
-                request.form.get("heure_negociation"),
-                request.form.get("energie_type"),
-                request.form.get("type_compteur"),
-                request.form.get("pdl_pce"),
-                request.form.get("date_echeance"),
-                request.form.get("fournisseur_actuel"),
-                request.form.get("entreprise_nom"),
-                request.form.get("siret"),
-                request.form.get("signataire_nom"),
-                request.form.get("signataire_tel"),
-                request.form.get("signataire_email"),
-                request.form.get("commentaire"),
-                request.form.get("status"),
-                cotation_id,
-            ))
-
-        conn.commit()
-        flash("Cotation mise à jour.", "success")
-        return redirect(url_for("admin_cotation_detail", cotation_id=cotation_id))
-
-    return render_template(
-        "admin_edit_cotation.html",
-        cotation=row_to_obj(cotation),
-    )
-
-
-# =========================
-# ADMIN → SUPPRESSION COTATION (FORCÉE)
-# =========================
-@app.route("/admin/cotations/<int:cotation_id>/delete", methods=["POST"])
-@admin_required
-def delete_cotation_admin(cotation_id):
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT 1 FROM cotations WHERE id=%s", (cotation_id,))
-        if not cur.fetchone():
-            flash("Cotation introuvable.", "danger")
-            return redirect(url_for("admin_cotations"))
-
-        cur.execute("DELETE FROM cotations WHERE id=%s", (cotation_id,))
-
-    conn.commit()
-    flash("Cotation supprimée par l’administrateur.", "success")
-    return redirect(url_for("admin_cotations"))
-
-
-############################################################
-# ALIAS TEMPLATE — delete_cotation (ADMIN)
-# (utilisé par admin_cotations.html)
-############################################################
-
-@app.route("/admin/cotations/<int:cotation_id>/delete-alias", methods=["POST"])
-@admin_required
-def delete_cotation(cotation_id):
-    """
-    Alias historique appelé par les templates admin.
-    NE PAS SUPPRIMER.
-    """
-    return delete_cotation_admin(cotation_id)
 
 
 ############################################################
