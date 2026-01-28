@@ -5,7 +5,7 @@
     <title>{% block title %}Mini CRM{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap -->
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- STYLE GLOBAL CRM -->
@@ -45,10 +45,9 @@
 
             {% if current_user and current_user.role == "admin" %}
 
-                <!-- ✅ ROUTE EXISTANTE -->
                 <a href="{{ url_for('admin_updates') }}"
                    class="{% if request.path.startswith('/admin/updates') %}active{% endif %}">
-                    Demandes de cotation
+                    Demandes de mise à jour
                     {% if unread_updates is defined and unread_updates > 0 %}
                         <span class="nav-alert-badge danger">{{ unread_updates }}</span>
                     {% endif %}
@@ -100,6 +99,8 @@
     </div>
 </div>
 
+<!-- Bootstrap JS (OBLIGATOIRE pour les onglets, modals, dropdowns) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>
-
