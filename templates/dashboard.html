@@ -40,7 +40,6 @@
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:32px;">
 
-    <!-- EN COURS -->
     <div class="card">
         <div class="card-header fw-bold">
             🟡 En cours ({{ pipeline_en_cours|length }})
@@ -49,12 +48,10 @@
             {% for c in pipeline_en_cours %}
             <div class="border rounded p-2">
                 <strong>{{ c.name }}</strong>
-                <div class="mt-2">
-                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                       class="btn btn-ouvrir btn-sm w-100">
-                        Ouvrir
-                    </a>
-                </div>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
             </div>
             {% else %}
             <p class="text-muted mb-0">Aucun dossier.</p>
@@ -62,7 +59,6 @@
         </div>
     </div>
 
-    <!-- GAGNÉS -->
     <div class="card border-success">
         <div class="card-header fw-bold text-success">
             🟢 Gagnés ({{ pipeline_gagnes|length }})
@@ -71,12 +67,10 @@
             {% for c in pipeline_gagnes %}
             <div class="border border-success rounded p-2">
                 <strong>{{ c.name }}</strong>
-                <div class="mt-2">
-                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                       class="btn btn-ouvrir btn-sm w-100">
-                        Ouvrir
-                    </a>
-                </div>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
             </div>
             {% else %}
             <p class="text-muted mb-0">Aucun dossier gagné.</p>
@@ -84,7 +78,6 @@
         </div>
     </div>
 
-    <!-- PERDUS -->
     <div class="card border-danger">
         <div class="card-header fw-bold text-danger">
             🔴 Perdus ({{ pipeline_perdus|length }})
@@ -93,12 +86,10 @@
             {% for c in pipeline_perdus %}
             <div class="border border-danger rounded p-2">
                 <strong>{{ c.name }}</strong>
-                <div class="mt-2">
-                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                       class="btn btn-ouvrir btn-sm w-100">
-                        Ouvrir
-                    </a>
-                </div>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="btn btn-ouvrir btn-sm mt-2 w-100">
+                    Ouvrir
+                </a>
             </div>
             {% else %}
             <p class="text-muted mb-0">Aucun dossier perdu.</p>
@@ -106,69 +97,6 @@
         </div>
     </div>
 
-</div>
-
-<!-- ================= DOSSIERS RÉCENTS ================= -->
-<div class="card">
-    <h5>Mes dossiers récents</h5>
-
-    {% if commercial_clients %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Dossier</th>
-                <th>Statut</th>
-                <th>Date</th>
-                <th style="text-align:right;">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in commercial_clients %}
-            <tr>
-                <td><strong>{{ c.name }}</strong></td>
-                <td>{{ c.status or "—" }}</td>
-                <td>{{ format_date(c.created_at) }}</td>
-                <td style="text-align:right;">
-                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                       class="btn btn-ouvrir btn-sm">
-                        Ouvrir
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-        <p class="text-muted">Aucun dossier.</p>
-    {% endif %}
-</div>
-
-<!-- ================= MES COTATIONS ================= -->
-<div class="card">
-    <h5>Mes dernières cotations</h5>
-
-    {% if commercial_cotations %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Énergie</th>
-                <th>Statut</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in commercial_cotations %}
-            <tr>
-                <td>{{ format_date(c.date_creation) }}</td>
-                <td>{{ c.energie_type or "—" }}</td>
-                <td>{{ c.status or "—" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-        <p class="text-muted">Aucune cotation récente.</p>
-    {% endif %}
 </div>
 
 {% else %}
@@ -209,69 +137,61 @@
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:32px;">
 
-    <div class="card">
-        <div class="card-header fw-bold">
-            🟡 En cours ({{ pipeline_en_cours|length }})
-        </div>
-        <div class="card-body d-flex flex-column gap-2">
-            {% for c in pipeline_en_cours %}
-            <div class="border rounded p-2">
-                <strong>{{ c.name }}</strong><br>
-                <small class="text-muted">{{ c.commercial or "—" }}</small>
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="btn btn-ouvrir btn-sm mt-2 w-100">
-                    Ouvrir
-                </a>
-            </div>
-            {% else %}
-            <p class="text-muted mb-0">Aucun dossier.</p>
-            {% endfor %}
-        </div>
-    </div>
+{% for label, color, items in [
+    ('🟡 En cours', 'secondary', pipeline_en_cours),
+    ('🟢 Gagnés', 'success', pipeline_gagnes),
+    ('🔴 Perdus', 'danger', pipeline_perdus)
+] %}
 
-    <div class="card border-success">
-        <div class="card-header fw-bold text-success">
-            🟢 Gagnés ({{ pipeline_gagnes|length }})
-        </div>
-        <div class="card-body d-flex flex-column gap-2">
-            {% for c in pipeline_gagnes %}
-            <div class="border border-success rounded p-2">
-                <strong>{{ c.name }}</strong><br>
-                <small class="text-muted">{{ c.commercial or "—" }}</small>
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="btn btn-ouvrir btn-sm mt-2 w-100">
-                    Ouvrir
-                </a>
-            </div>
-            {% else %}
-            <p class="text-muted mb-0">Aucun dossier gagné.</p>
-            {% endfor %}
-        </div>
+<div class="card {% if color != 'secondary' %}border-{{ color }}{% endif %}">
+    <div class="card-header fw-bold {% if color != 'secondary' %}text-{{ color }}{% endif %}">
+        {{ label }} ({{ items|length }})
     </div>
+    <div class="card-body d-flex flex-column gap-2">
+        {% for c in items %}
+        <div class="border rounded p-2">
+            <strong>{{ c.name }}</strong><br>
+            <small class="text-muted">{{ c.commercial or "—" }}</small>
 
-    <div class="card border-danger">
-        <div class="card-header fw-bold text-danger">
-            🔴 Perdus ({{ pipeline_perdus|length }})
+            <a href="{{ url_for('client_detail', client_id=c.id) }}"
+               class="btn btn-ouvrir btn-sm mt-2 w-100">
+                Ouvrir
+            </a>
+
+            <!-- FORMULAIRE STATUT ADMIN (RÉTABLI) -->
+            <form method="post"
+                  action="{{ url_for('update_client_status', client_id=c.id) }}"
+                  class="mt-2">
+
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                <select name="status" class="form-select form-select-sm mb-1">
+                    <option value="en_cours" {% if c.status == "en_cours" %}selected{% endif %}>
+                        En cours
+                    </option>
+                    <option value="gagne" {% if c.status == "gagne" %}selected{% endif %}>
+                        Gagné
+                    </option>
+                    <option value="perdu" {% if c.status == "perdu" %}selected{% endif %}>
+                        Perdu
+                    </option>
+                </select>
+
+                <button type="submit" class="btn btn-outline-primary btn-sm w-100">
+                    Mettre à jour le statut
+                </button>
+            </form>
         </div>
-        <div class="card-body d-flex flex-column gap-2">
-            {% for c in pipeline_perdus %}
-            <div class="border border-danger rounded p-2">
-                <strong>{{ c.name }}</strong><br>
-                <small class="text-muted">{{ c.commercial or "—" }}</small>
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="btn btn-ouvrir btn-sm mt-2 w-100">
-                    Ouvrir
-                </a>
-            </div>
-            {% else %}
-            <p class="text-muted mb-0">Aucun dossier perdu.</p>
-            {% endfor %}
-        </div>
+        {% else %}
+        <p class="text-muted mb-0">Aucun dossier.</p>
+        {% endfor %}
     </div>
-
 </div>
 
-<!-- ================= BLOCS ADMIN EXISTANTS ================= -->
+{% endfor %}
+</div>
+
+<!-- ================= DERNIERS DOSSIERS ================= -->
 <div class="card">
     <h5>Derniers dossiers créés</h5>
     {% if last_clients %}
