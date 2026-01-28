@@ -14,13 +14,47 @@
     <form method="post"
           action="{{ url_for('delete_client', client_id=client.id) }}"
           onsubmit="return confirm('SUPPRIMER DÉFINITIVEMENT ce dossier client ?');">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit" class="btn btn-danger">
             Supprimer le dossier client
         </button>
     </form>
     {% endif %}
 </div>
+
+<!-- ================= STATUT DOSSIER ================= -->
+{% if current_user.role == "admin" or current_user.id == client.owner_id %}
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Statut du dossier</strong>
+    </div>
+    <div class="card-body" style="max-width:300px;">
+        <form method="POST"
+              action="{{ url_for('update_client_status', client_id=client.id) }}">
+
+            <select name="status"
+                    class="form-select"
+                    onchange="this.form.submit()">
+
+                <option value="en_cours"
+                        {% if client.status == "en_cours" %}selected{% endif %}>
+                    🟡 En cours
+                </option>
+
+                <option value="gagne"
+                        {% if client.status == "gagne" %}selected{% endif %}>
+                    🟢 Gagné
+                </option>
+
+                <option value="perdu"
+                        {% if client.status == "perdu" %}selected{% endif %}>
+                    🔴 Perdu
+                </option>
+
+            </select>
+        </form>
+    </div>
+</div>
+{% endif %}
 
 <!-- ================= FICHE ENTREPRISE ================= -->
 <div class="card mb-4">
@@ -69,11 +103,9 @@
         <h5 class="mb-3">Nouvelle demande de cotation</h5>
 
         <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
             <div class="row g-3">
 
-                <!-- Infos dossier (lecture seule) -->
                 <div class="col-md-6">
                     <label class="form-label">Nom du dossier</label>
                     <input class="form-control" value="{{ client.name }}" disabled>
@@ -94,77 +126,13 @@
                 </div>
 
                 <div class="col-md-4">
-                    <label class="form-label">Date création dossier</label>
-                    <input class="form-control" value="{{ format_date(client.created_at) }}" disabled>
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">Date de négociation</label>
-                    <input type="date" name="date_negociation" class="form-control">
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">Heure de négociation</label>
-                    <input type="time" name="heure_negociation" class="form-control">
-                </div>
-
-                <div class="col-md-4">
                     <label class="form-label">PDL / PCE *</label>
                     <input type="text" name="pdl_pce" class="form-control" required>
                 </div>
 
                 <div class="col-md-4">
-                    <label class="form-label">Type de compteur</label>
-                    <select name="type_compteur" class="form-control">
-                        <option value="">— Sélectionner —</option>
-                        <option value="C5">C5</option>
-                        <option value="C4">C4</option>
-                        <option value="C2">C2</option>
-                        <option value="T1">T1</option>
-                        <option value="T2">T2</option>
-                        <option value="T3">T3</option>
-                        <option value="T4">T4</option>
-                    </select>
-                </div>
-
-                <div class="col-md-6">
                     <label class="form-label">Fournisseur actuel</label>
                     <input type="text" name="fournisseur_actuel" class="form-control">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Date d’échéance</label>
-                    <input type="date" name="date_echeance" class="form-control">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Entreprise</label>
-                    <input type="text" name="entreprise_nom" class="form-control" value="{{ client.name }}">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">SIRET</label>
-                    <input type="text" name="siret" class="form-control" value="{{ client.siret }}">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Nom du signataire</label>
-                    <input type="text" name="signataire_nom" class="form-control">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Email du signataire</label>
-                    <input type="email" name="signataire_email" class="form-control">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Téléphone fixe</label>
-                    <input type="text" name="signataire_tel" class="form-control">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Téléphone portable</label>
-                    <input type="text" name="signataire_mobile" class="form-control">
                 </div>
 
                 <div class="col-12">
@@ -192,7 +160,6 @@
       enctype="multipart/form-data"
       action="{{ url_for('upload_client_document', client_id=client.id) }}"
       class="mb-3">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="d-flex gap-2 flex-wrap">
         <input type="file" name="file" class="form-control" required style="max-width:360px;">
         <button class="btn btn-primary btn-sm">Ajouter un document</button>
@@ -219,7 +186,6 @@
 <div class="tab-pane fade" id="updates">
 {% if can_request_update %}
 <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 <div class="row g-3 mb-3">
 <div class="col-md-4">
 <label class="form-label">Date de mise à jour *</label>
