@@ -28,21 +28,21 @@
 
         <nav class="sidebar-nav">
 
-            {% if 'dashboard' in current_app.view_functions %}
+            {% if 'dashboard' in available_endpoints %}
             <a href="{{ url_for('dashboard') }}"
                class="{% if request.path.startswith('/dashboard') %}active{% endif %}">
                 Tableau de bord
             </a>
             {% endif %}
 
-            {% if 'clients' in current_app.view_functions %}
+            {% if 'clients' in available_endpoints %}
             <a href="{{ url_for('clients') }}"
                class="{% if request.path.startswith('/clients') %}active{% endif %}">
                 Clients
             </a>
             {% endif %}
 
-            {% if 'chiffre_affaire' in current_app.view_functions %}
+            {% if 'chiffre_affaire' in available_endpoints %}
             <a href="{{ url_for('chiffre_affaire') }}"
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
                 Chiffre d'affaires
@@ -51,7 +51,7 @@
 
             {% if current_user and current_user.role == "admin" %}
 
-                {% if 'admin_updates' in current_app.view_functions %}
+                {% if 'admin_updates' in available_endpoints %}
                 <a href="{{ url_for('admin_updates') }}"
                    class="{% if request.path.startswith('/admin/updates') %}active{% endif %}">
                     Demandes de mise à jour
@@ -61,7 +61,7 @@
                 </a>
                 {% endif %}
 
-                {% if 'admin_cotations' in current_app.view_functions %}
+                {% if 'admin_cotations' in available_endpoints %}
                 <a href="{{ url_for('admin_cotations') }}"
                    class="{% if request.path.startswith('/admin/cotations') %}active{% endif %}">
                     Demandes de cotation
@@ -71,14 +71,14 @@
                 </a>
                 {% endif %}
 
-                {% if 'documents' in current_app.view_functions %}
+                {% if 'documents' in available_endpoints %}
                 <a href="{{ url_for('documents') }}"
                    class="{% if request.path.startswith('/documents') %}active{% endif %}">
                     Documents
                 </a>
                 {% endif %}
 
-                {% if 'admin_users' in current_app.view_functions %}
+                {% if 'admin_users' in available_endpoints %}
                 <a href="{{ url_for('admin_users') }}"
                    class="{% if request.path.startswith('/admin/users') %}active{% endif %}">
                     Utilisateurs
@@ -89,7 +89,7 @@
         </nav>
 
         <div class="sidebar-footer">
-            {% if 'logout' in current_app.view_functions %}
+            {% if 'logout' in available_endpoints %}
             <a href="{{ url_for('logout') }}">Déconnexion</a>
             {% endif %}
         </div>

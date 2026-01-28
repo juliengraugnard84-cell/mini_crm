@@ -50,7 +50,7 @@
                     </td>
 
                     <td>
-                        {% if 'client_detail' in current_app.view_functions %}
+                        {% if 'client_detail' in available_endpoints %}
                             <a href="{{ url_for('client_detail', client_id=c.client_id) }}">
                                 {{ c.client_name or ("Client #" ~ c.client_id) }}
                             </a>
@@ -87,7 +87,7 @@
                         <div class="d-inline-flex gap-2">
 
                             <!-- ================= OUVRIR ================= -->
-                            {% if 'admin_cotation_detail' in current_app.view_functions %}
+                            {% if 'admin_cotation_detail' in available_endpoints %}
                             <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
                                class="btn btn-outline-primary btn-sm">
                                 Ouvrir
@@ -95,7 +95,7 @@
                             {% endif %}
 
                             <!-- ================= SUPPRIMER ================= -->
-                            {% if 'delete_cotation_admin' in current_app.view_functions %}
+                            {% if 'delete_cotation_admin' in available_endpoints %}
                             <form method="post"
                                   action="{{ url_for('delete_cotation_admin', cotation_id=c.id) }}"
                                   onsubmit="return confirm('Supprimer définitivement cette cotation ?');">
@@ -105,7 +105,7 @@
                                 </button>
                             </form>
 
-                            {% elif 'delete_cotation' in current_app.view_functions %}
+                            {% elif 'delete_cotation' in available_endpoints %}
                             <form method="post"
                                   action="{{ url_for('delete_cotation', cotation_id=c.id) }}"
                                   onsubmit="return confirm('Supprimer définitivement cette cotation ?');">

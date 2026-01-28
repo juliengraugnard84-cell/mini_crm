@@ -11,7 +11,7 @@
         <p class="text-muted">Gestion des dossiers clients</p>
     </div>
 
-    {% if 'new_client' in current_app.view_functions %}
+    {% if 'new_client' in available_endpoints %}
     <a href="{{ url_for('new_client') }}" class="btn btn-primary">
         ➕ Nouveau dossier
     </a>
@@ -62,7 +62,7 @@
 
                     {% if current_user
                           and current_user.role == 'admin'
-                          and 'update_client_status' in current_app.view_functions %}
+                          and 'update_client_status' in available_endpoints %}
                     <form method="post"
                           action="{{ url_for('update_client_status', client_id=c.id) }}"
                           class="mt-2">
@@ -83,7 +83,7 @@
                     </form>
                     {% endif %}
 
-                    {% if 'client_detail' in current_app.view_functions %}
+                    {% if 'client_detail' in available_endpoints %}
                     <a href="{{ url_for('client_detail', client_id=c.id) }}"
                        class="btn btn-ouvrir btn-sm mt-2 w-100">
                         Ouvrir
@@ -113,7 +113,7 @@
                     </small>
                     <div class="text-success fw-bold mt-1">✔ Gagné</div>
 
-                    {% if 'client_detail' in current_app.view_functions %}
+                    {% if 'client_detail' in available_endpoints %}
                     <a href="{{ url_for('client_detail', client_id=c.id) }}"
                        class="btn btn-ouvrir btn-sm mt-2 w-100">
                         Ouvrir
@@ -143,7 +143,7 @@
                     </small>
                     <div class="text-danger fw-bold mt-1">✖ Perdu</div>
 
-                    {% if 'client_detail' in current_app.view_functions %}
+                    {% if 'client_detail' in available_endpoints %}
                     <a href="{{ url_for('client_detail', client_id=c.id) }}"
                        class="btn btn-ouvrir btn-sm mt-2 w-100">
                         Ouvrir

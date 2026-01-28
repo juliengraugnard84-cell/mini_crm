@@ -65,7 +65,7 @@
             {% for c in items %}
             <div class="border rounded p-2">
                 <strong>{{ c.name }}</strong>
-                {% if 'client_detail' in current_app.view_functions %}
+                {% if 'client_detail' in available_endpoints %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
                    class="btn btn-ouvrir btn-sm mt-2 w-100">
                     Ouvrir
@@ -141,14 +141,14 @@
                 <strong>{{ c.name }}</strong><br>
                 <small class="text-muted">{{ c.commercial or "—" }}</small>
 
-                {% if 'client_detail' in current_app.view_functions %}
+                {% if 'client_detail' in available_endpoints %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
                    class="btn btn-ouvrir btn-sm mt-2 w-100">
                     Ouvrir
                 </a>
                 {% endif %}
 
-                {% if 'update_client_status' in current_app.view_functions %}
+                {% if 'update_client_status' in available_endpoints %}
                 <form method="post"
                       action="{{ url_for('update_client_status', client_id=c.id) }}"
                       class="mt-2">

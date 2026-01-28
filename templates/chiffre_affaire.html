@@ -39,7 +39,7 @@
 <!-- ================= AJOUT CA (ADMIN) ================= -->
 {% if current_user
       and current_user.role == 'admin'
-      and 'add_chiffre_affaire' in current_app.view_functions %}
+      and 'add_chiffre_affaire' in available_endpoints %}
 <div class="card mb-4">
     <h5>Ajouter un chiffre d’affaires</h5>
 
