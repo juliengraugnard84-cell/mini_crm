@@ -1125,345 +1125,178 @@ def chiffre_affaire():
 
 
 ############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + STATUT + COTATIONS
+# 9. ADMIN — UTILISATEURS
 ############################################################
 
-# =========================
-# CLIENT — CRÉATION
-# =========================
-@app.route("/clients/new", methods=["GET", "POST"])
-@login_required
-def new_client():
+@app.route("/admin/users", methods=["GET", "POST"])
+@admin_required
+def admin_users():
+    conn = get_db()
+
     if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        email = (request.form.get("email") or "").strip()
-        phone = (request.form.get("phone") or "").strip()
-        address = (request.form.get("address") or "").strip()
-        siret = (request.form.get("siret") or "").strip()
+        username = (request.form.get("username") or "").strip()
+        password = (request.form.get("password") or "").strip()
+        role = (request.form.get("role") or "").strip()
 
-        if not name:
-            flash("Le nom du client est obligatoire.", "danger")
-            return render_template("new_client.html")
+        if not username or not password or not role:
+            flash("Tous les champs sont obligatoires.", "danger")
+            return redirect(url_for("admin_users"))
 
-        user = session.get("user") or {}
-        owner_id = user.get("id")
+        if len(password) < 10:
+            flash("Mot de passe trop court (min 10 caractères).", "danger")
+            return redirect(url_for("admin_users"))
 
-        conn = get_db()
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO crm_clients (
-                    name, email, phone, address, siret, owner_id, status
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
-                RETURNING id
-            """, (name, email, phone, address, siret, owner_id))
-            client_id = cur.fetchone()[0]
+            cur.execute("SELECT 1 FROM users WHERE username=%s", (username,))
+            if cur.fetchone():
+                flash("Nom d'utilisateur déjà utilisé.", "danger")
+                return redirect(url_for("admin_users"))
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO users (username, password_hash, role)
+                VALUES (%s, %s, %s)
+                """,
+                (username, generate_password_hash(password), role),
+            )
 
         conn.commit()
-        flash("Dossier client créé.", "success")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    return render_template("new_client.html")
-
-
-# =========================
-# CLIENT — LISTE
-# =========================
-@app.route("/clients")
-@login_required
-def clients():
-    conn = get_db()
-    q = (request.args.get("q") or "").strip()
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
+        flash("Utilisateur créé.", "success")
+        return redirect(url_for("admin_users"))
 
     with conn.cursor() as cur:
-        if role == "admin":
-            if q:
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                """, (f"%{q}%",))
-            else:
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    ORDER BY crm_clients.created_at DESC
-                """)
-        else:
-            if q:
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
-                      AND crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                """, (user_id, f"%{q}%"))
-            else:
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
-                    ORDER BY crm_clients.created_at DESC
-                """, (user_id,))
-
-        rows = cur.fetchall()
-
-    en_cours, gagnes, perdus = [], [], []
-    for r in rows:
-        status = (r["status"] or "en_cours").lower()
-        if status == "gagne":
-            gagnes.append(r)
-        elif status == "perdu":
-            perdus.append(r)
-        else:
-            en_cours.append(r)
+        cur.execute("SELECT id, username, role FROM users ORDER BY id ASC")
+        users = cur.fetchall()
 
     return render_template(
-        "clients.html",
-        clients_en_cours=[row_to_obj(r) for r in en_cours],
-        clients_gagnes=[row_to_obj(r) for r in gagnes],
-        clients_perdus=[row_to_obj(r) for r in perdus],
-        q=q,
+        "admin_users.html",
+        users=[row_to_obj(u) for u in users],
     )
 
 
-# =========================
-# CLIENT — MISE À JOUR STATUT
-# =========================
-@app.route("/clients/<int:client_id>/status", methods=["POST"])
-@login_required
-def update_client_status(client_id):
-    status = (request.form.get("status") or "").strip().lower()
-    if status not in ("en_cours", "gagne", "perdu"):
-        flash("Statut invalide.", "danger")
-        return redirect(url_for("clients"))
-
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_user(user_id):
+    if user_id == 1:
+        flash("Impossible de supprimer l’administrateur principal.", "danger")
+        return redirect(url_for("admin_users"))
 
     conn = get_db()
     with conn.cursor() as cur:
-        cur.execute("SELECT owner_id FROM crm_clients WHERE id=%s", (client_id,))
-        row = cur.fetchone()
+        cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
 
-    if not row:
-        flash("Dossier introuvable.", "danger")
-        return redirect(url_for("clients"))
+    conn.commit()
+    flash("Utilisateur supprimé.", "success")
+    return redirect(url_for("admin_users"))
 
-    if role != "admin" and row["owner_id"] != user_id:
-        abort(403)
 
+@app.route("/admin/users/<int:user_id>/reset_password", methods=["POST"])
+@admin_required
+def admin_reset_password(user_id):
+    new_password = (request.form.get("new_password") or "").strip()
+
+    if len(new_password) < 10:
+        flash("Mot de passe trop court (min 10 caractères).", "danger")
+        return redirect(url_for("admin_users"))
+
+    conn = get_db()
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE crm_clients SET status=%s WHERE id=%s",
-            (status, client_id)
+            "UPDATE users SET password_hash=%s WHERE id=%s",
+            (generate_password_hash(new_password), user_id),
         )
 
     conn.commit()
-    flash("Statut du dossier mis à jour.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
+    flash("Mot de passe réinitialisé.", "success")
+    return redirect(url_for("admin_users"))
 
 
-# =========================
-# CLIENT — DÉTAIL
-# =========================
-@app.route("/clients/<int:client_id>")
-@login_required
-def client_detail(client_id):
-    if not can_access_client(client_id):
-        abort(403)
+############################################################
+# 10. ADMIN — DEMANDES DE COTATION
+############################################################
 
+@app.route("/admin/cotations")
+@admin_required
+def admin_cotations():
     conn = get_db()
 
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT crm_clients.*, users.username AS commercial
-            FROM crm_clients
-            LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.id=%s
-        """, (client_id,))
-        client = cur.fetchone()
-
-    if not client:
-        abort(404)
-
-    documents = list_client_documents(client_id)
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT *
-            FROM client_updates
-            WHERE client_id=%s
-            ORDER BY created_at DESC
-        """, (client_id,))
-        updates = cur.fetchall()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT *
+            SELECT
+                cotations.*,
+                crm_clients.name AS client_name,
+                users.username AS commercial_name
             FROM cotations
-            WHERE client_id=%s
-            ORDER BY date_creation DESC
-        """, (client_id,))
-        cotations = cur.fetchall()
+            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN users ON users.id = cotations.created_by
+            ORDER BY cotations.date_creation DESC
+        """)
+        rows = cur.fetchall()
 
     return render_template(
-        "client_detail.html",
-        client=row_to_obj(client),
-        documents=documents,
-        updates=[row_to_obj(u) for u in updates],
-        client_cotations=[row_to_obj(c) for c in cotations],
-        can_request_update=True,
+        "admin_cotations.html",
+        cotations=[row_to_obj(r) for r in rows],
     )
 
 
-# =========================
-# CLIENT — SUPPRESSION (ADMIN)
-# =========================
-@app.route("/clients/<int:client_id>/delete", methods=["POST"])
+@app.route("/admin/cotations/<int:cotation_id>")
 @admin_required
-def delete_client(client_id):
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
-        cur.execute("DELETE FROM client_updates WHERE client_id=%s", (client_id,))
-        cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
-    conn.commit()
-    flash("Dossier client supprimé.", "success")
-    return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — UPLOAD DOCUMENT
-# =========================
-@app.route("/clients/<int:client_id>/documents/upload", methods=["POST"])
-@login_required
-def upload_client_document(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
-    fichier = request.files.get("file")
-    if not fichier or not allowed_file(fichier.filename):
-        flash("Fichier invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    if LOCAL_MODE or not s3:
-        flash("Upload indisponible en mode local.", "warning")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    prefix = client_s3_prefix(client_id)
-    name = clean_filename(secure_filename(fichier.filename))
-    key = _s3_make_non_overwriting_key(AWS_BUCKET, f"{prefix}{name}")
-
-    s3_upload_fileobj(fichier, AWS_BUCKET, key)
-    flash("Document ajouté.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# CLIENT — ENVOI DEMANDE DE COTATION (COMPLET)
-# =========================
-@app.route("/clients/<int:client_id>/cotations/create", methods=["POST"])
-@login_required
-def create_cotation(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
-    user = session.get("user") or {}
+def admin_cotation_detail(cotation_id):
     conn = get_db()
 
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO cotations (
-                client_id,
-                created_by,
-                date_negociation,
-                heure_negociation,
-                energie_type,
-                type_compteur,
-                pdl_pce,
-                date_echeance,
-                fournisseur_actuel,
-                entreprise_nom,
-                siret,
-                signataire_nom,
-                signataire_tel,
-                signataire_email,
-                commentaire,
-                status,
-                is_read
-            )
-            VALUES (
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'nouvelle',0
-            )
-        """, (
-            client_id,
-            user.get("id"),
-            request.form.get("date_negociation"),
-            request.form.get("heure_negociation"),
-            request.form.get("energie_type"),
-            request.form.get("type_compteur"),
-            request.form.get("pdl_pce"),
-            request.form.get("date_echeance"),
-            request.form.get("fournisseur_actuel"),
-            request.form.get("entreprise_nom"),
-            request.form.get("siret"),
-            request.form.get("signataire_nom"),
-            request.form.get("signataire_tel"),
-            request.form.get("signataire_email"),
-            request.form.get("commentaire"),
-        ))
+            SELECT
+                cotations.*,
+                crm_clients.name AS client_name,
+                users.username AS commercial_name
+            FROM cotations
+            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN users ON users.id = cotations.created_by
+            WHERE cotations.id = %s
+        """, (cotation_id,))
+        cotation = cur.fetchone()
 
+    if not cotation:
+        flash("Cotation introuvable.", "danger")
+        return redirect(url_for("admin_cotations"))
+
+    with conn.cursor() as cur:
+        cur.execute("UPDATE cotations SET is_read=1 WHERE id=%s", (cotation_id,))
     conn.commit()
-    flash("Demande de cotation envoyée.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
 
+    return render_template(
+        "admin_cotation_detail.html",
+        cotation=row_to_obj(cotation),
+    )
+
+
+@app.route("/admin/cotations/<int:cotation_id>/delete", methods=["POST"])
+@admin_required
+def delete_cotation_admin(cotation_id):
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM cotations WHERE id=%s", (cotation_id,))
+    conn.commit()
+    flash("Cotation supprimée.", "success")
+    return redirect(url_for("admin_cotations"))
 
 
 ############################################################
-# 11. DOCUMENTS GLOBAUX S3 (ADMIN UNIQUEMENT)
+# 11. DOCUMENTS GLOBAUX (ADMIN)
 ############################################################
-
-def _validate_s3_key_for_admin_delete(key: str) -> str:
-    if not key or not key.strip():
-        raise BadRequest("Clé S3 invalide.")
-
-    key = key.strip()
-
-    # Sécurité basique
-    if ".." in key:
-        raise BadRequest("Clé S3 invalide.")
-
-    return key
-
 
 @app.route("/documents")
 @admin_required
 def documents():
-    # Mode local ou S3 indisponible → page vide mais fonctionnelle
     if LOCAL_MODE or not s3:
         return render_template("documents.html", fichiers=[])
 
     fichiers = []
-
-    try:
-        # On liste UNIQUEMENT les objets sous "clients/"
-        items = s3_list_all_objects(AWS_BUCKET, prefix="clients/")
-
-        for item in items:
-            key = item.get("Key")
-            if not key or key.endswith("/"):
-                continue
-
+    for item in s3_list_all_objects(AWS_BUCKET, prefix="clients/"):
+        key = item.get("Key")
+        if key and not key.endswith("/"):
             fichiers.append(
                 {
                     "nom": key,
@@ -1472,65 +1305,94 @@ def documents():
                 }
             )
 
-    except ClientError as e:
-        logger.error("Erreur listing S3 (admin documents) : %s", getattr(e, "response", None))
-        flash("Erreur lors du listing des documents.", "danger")
-
-    except Exception as e:
-        logger.exception("Erreur listing S3 (admin documents) : %r", e)
-        flash("Erreur lors du listing des documents.", "danger")
-
     return render_template("documents.html", fichiers=fichiers)
 
 
-@app.route("/documents/upload", methods=["POST"])
-@admin_required
-def upload_document():
-    if LOCAL_MODE or not s3:
-        flash("Upload désactivé en mode local.", "warning")
-        return redirect(url_for("documents"))
+############################################################
+# 12. CLIENTS + COTATIONS
+############################################################
 
-    fichier = request.files.get("file")
+@app.route("/clients/new", methods=["GET", "POST"])
+@login_required
+def new_client():
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("Nom obligatoire.", "danger")
+            return render_template("new_client.html")
 
-    if not fichier or not allowed_file(fichier.filename):
-        flash("Fichier non valide.", "danger")
-        return redirect(url_for("documents"))
+        conn = get_db()
+        user = session.get("user")
 
-    nom = clean_filename(secure_filename(fichier.filename))
-    key_raw = f"clients/admin/{nom}"
-    key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO crm_clients (name, owner_id, status)
+                VALUES (%s, %s, 'en_cours')
+                RETURNING id
+            """, (name, user["id"]))
+            client_id = cur.fetchone()[0]
 
-    try:
-        s3_upload_fileobj(fichier, AWS_BUCKET, key)
-        flash("Document envoyé.", "success")
+        conn.commit()
+        return redirect(url_for("client_detail", client_id=client_id))
 
-    except Exception as e:
-        logger.exception("Erreur upload S3 (admin) : %r", e)
-        flash("Erreur lors de l’upload.", "danger")
-
-    return redirect(url_for("documents"))
+    return render_template("new_client.html")
 
 
-@app.route("/documents/delete/<path:key>", methods=["POST"])
-@admin_required
-def delete_document(key):
-    if LOCAL_MODE or not s3:
-        flash("Suppression désactivée en local.", "warning")
-        return redirect(url_for("documents"))
+@app.route("/clients")
+@login_required
+def clients():
+    conn = get_db()
+    user = session.get("user")
 
-    try:
-        key = _validate_s3_key_for_admin_delete(key)
-        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
-        flash("Document supprimé.", "success")
+    with conn.cursor() as cur:
+        if user["role"] == "admin":
+            cur.execute("SELECT * FROM crm_clients ORDER BY created_at DESC")
+        else:
+            cur.execute(
+                "SELECT * FROM crm_clients WHERE owner_id=%s ORDER BY created_at DESC",
+                (user["id"],)
+            )
+        rows = cur.fetchall()
 
-    except BadRequest as e:
-        flash(str(e), "danger")
+    return render_template(
+        "clients.html",
+        clients_en_cours=[row_to_obj(r) for r in rows],
+        clients_gagnes=[],
+        clients_perdus=[],
+        q="",
+    )
 
-    except Exception as e:
-        logger.exception("Erreur suppression S3 (admin) : %r", e)
-        flash("Erreur lors de la suppression.", "danger")
 
-    return redirect(url_for("documents"))
+@app.route("/clients/<int:client_id>")
+@login_required
+def client_detail(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM crm_clients WHERE id=%s", (client_id,))
+        client = cur.fetchone()
+
+    if not client:
+        abort(404)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT * FROM cotations WHERE client_id=%s ORDER BY date_creation DESC",
+            (client_id,)
+        )
+        cotations = cur.fetchall()
+
+    return render_template(
+        "client_detail.html",
+        client=row_to_obj(client),
+        client_cotations=[row_to_obj(c) for c in cotations],
+        documents=list_client_documents(client_id),
+        updates=[],
+        can_request_update=True,
+    )
+
 
 
 ############################################################
