@@ -842,11 +842,15 @@ def logout():
 @login_required
 def dashboard():
     conn = get_db()
-    user = session.get("user")
+    user = session.get("user") or {}
 
-    # =========================
-    # DONNÉES ADMIN (toujours calculées)
-    # =========================
+    role = user.get("role")
+    user_id = user.get("id")
+    username = user.get("username")
+
+    # =====================================================
+    # DONNÉES ADMIN (TOUJOURS CALCULÉES – SAFE)
+    # =====================================================
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM crm_clients")
         total_clients = cur.fetchone()[0]
@@ -870,24 +874,24 @@ def dashboard():
         """)
         last_rev = cur.fetchone()
 
-    # =========================
+    # =====================================================
     # DOCUMENTS (ADMIN)
-    # =========================
+    # =====================================================
     total_docs = 0
     if not LOCAL_MODE and s3:
         try:
             items = s3_list_all_objects(AWS_BUCKET)
             total_docs = len([f for f in items if not f["Key"].endswith("/")])
         except Exception:
-            pass
+            total_docs = 0
 
-    # =========================
-    # COTATIONS ADMIN (inchangé)
-    # =========================
+    # =====================================================
+    # COTATIONS ADMIN
+    # =====================================================
     unread_cotations = 0
     cotations_admin = []
 
-    if user["role"] == "admin":
+    if role == "admin":
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0")
             unread_cotations = cur.fetchone()[0]
@@ -901,18 +905,18 @@ def dashboard():
             """)
             cotations_admin = cur.fetchall()
 
-    # =========================
-    # DONNÉES COMMERCIAL (inchangé)
-    # =========================
+    # =====================================================
+    # DONNÉES COMMERCIAL
+    # =====================================================
     commercial_stats = None
     commercial_clients = []
     commercial_cotations = []
 
-    if user["role"] == "commercial":
+    if role == "commercial":
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT COUNT(*) FROM crm_clients WHERE owner_id=%s",
-                (user["id"],)
+                (user_id,)
             )
             nb_clients = cur.fetchone()[0]
 
@@ -920,24 +924,24 @@ def dashboard():
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-            """, (user["username"],))
+            """, (username,))
             ca_total_com = cur.fetchone()[0]
 
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                AND date_trunc('month', date::date)
-                    = date_trunc('month', CURRENT_DATE)
-            """, (user["username"],))
+                  AND date_trunc('month', date::date)
+                      = date_trunc('month', CURRENT_DATE)
+            """, (username,))
             ca_mois_com = cur.fetchone()[0]
 
             cur.execute("""
                 SELECT COUNT(*)
                 FROM cotations
                 WHERE created_by=%s
-                AND COALESCE(status,'')='nouvelle'
-            """, (user["id"],))
+                  AND COALESCE(status,'')='nouvelle'
+            """, (user_id,))
             cotations_attente = cur.fetchone()[0]
 
             commercial_stats = {
@@ -953,7 +957,7 @@ def dashboard():
                 WHERE owner_id=%s
                 ORDER BY created_at DESC
                 LIMIT 5
-            """, (user["id"],))
+            """, (user_id,))
             commercial_clients = cur.fetchall()
 
             cur.execute("""
@@ -962,28 +966,28 @@ def dashboard():
                 WHERE created_by=%s
                 ORDER BY date_creation DESC
                 LIMIT 5
-            """, (user["id"],))
+            """, (user_id,))
             commercial_cotations = cur.fetchall()
 
-    # =========================
-    # PIPELINE (CORRECTION MAJEURE)
-    # =========================
+    # =====================================================
+    # PIPELINE (ADMIN & COMMERCIAL — FIX FINAL)
+    # =====================================================
     with conn.cursor() as cur:
-        if user["role"] == "admin":
+        if role == "admin":
             cur.execute("""
                 SELECT crm_clients.*, users.username AS commercial
                 FROM crm_clients
                 LEFT JOIN users ON users.id = crm_clients.owner_id
             """)
-            rows = cur.fetchall()
         else:
             cur.execute("""
                 SELECT crm_clients.*, users.username AS commercial
                 FROM crm_clients
                 LEFT JOIN users ON users.id = crm_clients.owner_id
                 WHERE crm_clients.owner_id = %s
-            """, (user["id"],))
-            rows = cur.fetchall()
+            """, (user_id,))
+
+        rows = cur.fetchall()
 
     pipeline_en_cours = []
     pipeline_gagnes = []
@@ -991,16 +995,18 @@ def dashboard():
 
     for r in rows:
         status = (r["status"] or "en_cours").lower()
-        if status == "gagne":
-            pipeline_gagnes.append(row_to_obj(r))
-        elif status == "perdu":
-            pipeline_perdus.append(row_to_obj(r))
-        else:
-            pipeline_en_cours.append(row_to_obj(r))
+        obj = row_to_obj(r)
 
-    # =========================
-    # RENDER FINAL
-    # =========================
+        if status == "gagne":
+            pipeline_gagnes.append(obj)
+        elif status == "perdu":
+            pipeline_perdus.append(obj)
+        else:
+            pipeline_en_cours.append(obj)
+
+    # =====================================================
+    # RENDER FINAL (AUCUNE VARIABLE MANQUANTE)
+    # =====================================================
     return render_template(
         "dashboard.html",
 
@@ -1011,12 +1017,12 @@ def dashboard():
         last_clients=last_clients,
         last_rev=row_to_obj(last_rev) if last_rev else None,
 
-        # PIPELINE (FIX)
+        # PIPELINE
         pipeline_en_cours=pipeline_en_cours,
         pipeline_gagnes=pipeline_gagnes,
         pipeline_perdus=pipeline_perdus,
 
-        # COTATIONS ADMIN
+        # ADMIN
         unread_cotations=unread_cotations,
         cotations_admin=[row_to_obj(r) for r in cotations_admin],
 
