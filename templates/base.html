@@ -28,6 +28,7 @@
 
         <nav class="sidebar-nav">
 
+            <!-- TOUS LES UTILISATEURS CONNECTÉS -->
             <a href="{{ url_for('dashboard') }}"
                class="{% if request.path.startswith('/dashboard') %}active{% endif %}">
                 Tableau de bord
@@ -40,15 +41,16 @@
 
             <a href="{{ url_for('chiffre_affaire') }}"
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
-                Chiffre d'affaires
+                Chiffre d’affaires
             </a>
 
+            <!-- ADMIN UNIQUEMENT -->
             {% if current_user and current_user.role == "admin" %}
 
                 <a href="{{ url_for('admin_updates') }}"
                    class="{% if request.path.startswith('/admin/updates') %}active{% endif %}">
                     Demandes de mise à jour
-                    {% if unread_updates > 0 %}
+                    {% if unread_updates and unread_updates > 0 %}
                         <span class="nav-alert-badge danger">{{ unread_updates }}</span>
                     {% endif %}
                 </a>
@@ -56,7 +58,7 @@
                 <a href="{{ url_for('admin_cotations') }}"
                    class="{% if request.path.startswith('/admin/cotations') %}active{% endif %}">
                     Demandes de cotation
-                    {% if unread_cotations > 0 %}
+                    {% if unread_cotations and unread_cotations > 0 %}
                         <span class="nav-alert-badge danger">{{ unread_cotations }}</span>
                     {% endif %}
                 </a>
@@ -104,7 +106,6 @@
         <div class="footer">
             © {{ current_year if current_year is defined else "" }} SYNERGYGROUP CRM
         </div>
-
     </div>
 </div>
 
