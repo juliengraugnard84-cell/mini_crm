@@ -845,7 +845,7 @@ def dashboard():
     user = session.get("user")
 
     # =========================
-    # DONNÉES ADMIN
+    # DONNÉES ADMIN (toujours calculées)
     # =========================
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM crm_clients")
@@ -870,6 +870,9 @@ def dashboard():
         """)
         last_rev = cur.fetchone()
 
+    # =========================
+    # DOCUMENTS (ADMIN)
+    # =========================
     total_docs = 0
     if not LOCAL_MODE and s3:
         try:
@@ -878,6 +881,9 @@ def dashboard():
         except Exception:
             pass
 
+    # =========================
+    # COTATIONS ADMIN (inchangé)
+    # =========================
     unread_cotations = 0
     cotations_admin = []
 
@@ -896,7 +902,7 @@ def dashboard():
             cotations_admin = cur.fetchall()
 
     # =========================
-    # DONNÉES COMMERCIAL
+    # DONNÉES COMMERCIAL (inchangé)
     # =========================
     commercial_stats = None
     commercial_clients = []
@@ -959,211 +965,66 @@ def dashboard():
             """, (user["id"],))
             commercial_cotations = cur.fetchall()
 
+    # =========================
+    # PIPELINE (CORRECTION MAJEURE)
+    # =========================
+    with conn.cursor() as cur:
+        if user["role"] == "admin":
+            cur.execute("""
+                SELECT crm_clients.*, users.username AS commercial
+                FROM crm_clients
+                LEFT JOIN users ON users.id = crm_clients.owner_id
+            """)
+            rows = cur.fetchall()
+        else:
+            cur.execute("""
+                SELECT crm_clients.*, users.username AS commercial
+                FROM crm_clients
+                LEFT JOIN users ON users.id = crm_clients.owner_id
+                WHERE crm_clients.owner_id = %s
+            """, (user["id"],))
+            rows = cur.fetchall()
+
+    pipeline_en_cours = []
+    pipeline_gagnes = []
+    pipeline_perdus = []
+
+    for r in rows:
+        status = (r["status"] or "en_cours").lower()
+        if status == "gagne":
+            pipeline_gagnes.append(row_to_obj(r))
+        elif status == "perdu":
+            pipeline_perdus.append(row_to_obj(r))
+        else:
+            pipeline_en_cours.append(row_to_obj(r))
+
+    # =========================
+    # RENDER FINAL
+    # =========================
     return render_template(
         "dashboard.html",
+
+        # KPI ADMIN
         total_clients=total_clients,
-        last_clients=last_clients,
         total_ca=total_ca,
-        last_rev=row_to_obj(last_rev) if last_rev else None,
         total_docs=total_docs,
+        last_clients=last_clients,
+        last_rev=row_to_obj(last_rev) if last_rev else None,
+
+        # PIPELINE (FIX)
+        pipeline_en_cours=pipeline_en_cours,
+        pipeline_gagnes=pipeline_gagnes,
+        pipeline_perdus=pipeline_perdus,
+
+        # COTATIONS ADMIN
         unread_cotations=unread_cotations,
         cotations_admin=[row_to_obj(r) for r in cotations_admin],
+
+        # COMMERCIAL
         commercial_stats=commercial_stats,
         commercial_clients=[row_to_obj(c) for c in commercial_clients],
         commercial_cotations=[row_to_obj(c) for c in commercial_cotations],
     )
-
-
-############################################################
-# CHIFFRE D’AFFAIRES — ADMIN & COMMERCIAL
-############################################################
-
-@app.route("/chiffre-affaire")
-@login_required
-def chiffre_affaire():
-    conn = get_db()
-    user = session.get("user")
-    role = user["role"]
-    commercial_name = user["username"]
-
-    ca_annuel_perso = 0
-    ca_mensuel_perso = 0
-    ca_perso_par_mois = []
-
-    clients = []
-    global_par_mois = []
-    historique_ca = []
-
-    with conn.cursor() as cur:
-
-        if role == "admin":
-            cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
-            ca_annuel_perso = cur.fetchone()[0]
-
-            cur.execute("""
-                SELECT COALESCE(SUM(montant),0)
-                FROM revenus
-                WHERE date_trunc('month', date::date)
-                    = date_trunc('month', CURRENT_DATE)
-            """)
-            ca_mensuel_perso = cur.fetchone()[0]
-
-            cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
-            clients = cur.fetchall()
-
-            cur.execute("""
-                SELECT TO_CHAR(date::date,'YYYY-MM') AS mois,
-                       SUM(montant) AS total
-                FROM revenus
-                GROUP BY mois
-                ORDER BY mois ASC
-            """)
-            global_par_mois = cur.fetchall()
-
-            cur.execute("""
-                SELECT revenus.id, revenus.date, revenus.montant,
-                       revenus.commercial,
-                       crm_clients.name AS client_name
-                FROM revenus
-                JOIN crm_clients ON crm_clients.id = revenus.client_id
-                ORDER BY date::date DESC, revenus.id DESC
-            """)
-            historique_ca = cur.fetchall()
-
-        else:
-            cur.execute("""
-                SELECT COALESCE(SUM(montant),0)
-                FROM revenus
-                WHERE commercial=%s
-            """, (commercial_name,))
-            ca_annuel_perso = cur.fetchone()[0]
-
-            cur.execute("""
-                SELECT COALESCE(SUM(montant),0)
-                FROM revenus
-                WHERE commercial=%s
-                AND date_trunc('month', date::date)
-                    = date_trunc('month', CURRENT_DATE)
-            """, (commercial_name,))
-            ca_mensuel_perso = cur.fetchone()[0]
-
-            cur.execute("""
-                SELECT TO_CHAR(date::date,'YYYY-MM') AS mois,
-                       SUM(montant) AS total
-                FROM revenus
-                WHERE commercial=%s
-                GROUP BY mois
-                ORDER BY mois ASC
-            """, (commercial_name,))
-            ca_perso_par_mois = cur.fetchall()
-
-    return render_template(
-        "chiffre_affaire.html",
-        ca_annuel_perso=ca_annuel_perso,
-        ca_mensuel_perso=ca_mensuel_perso,
-        ca_perso_par_mois=[row_to_obj(r) for r in ca_perso_par_mois],
-        clients=[row_to_obj(c) for c in clients],
-        global_par_mois=[row_to_obj(r) for r in global_par_mois],
-        historique_ca=[row_to_obj(r) for r in historique_ca],
-    )
-
-
-############################################################
-# AJOUT / ÉDITION / SUPPRESSION CA — ADMIN UNIQUEMENT
-############################################################
-
-@app.route("/chiffre-affaire/add", methods=["POST"])
-@admin_required
-def add_chiffre_affaire():
-    conn = get_db()
-
-    date_ca = request.form.get("date")
-    client_id = request.form.get("client_id")
-    commercial = request.form.get("commercial")
-    montant = request.form.get("montant")
-
-    if not date_ca or not client_id or not commercial or not montant:
-        flash("Tous les champs sont obligatoires.", "danger")
-        return redirect(url_for("chiffre_affaire"))
-
-    try:
-        client_id_int = int(client_id)
-    except (TypeError, ValueError):
-        flash("Dossier client invalide.", "danger")
-        return redirect(url_for("chiffre_affaire"))
-
-    try:
-        montant_float = float(montant)
-    except (TypeError, ValueError):
-        flash("Montant invalide.", "danger")
-        return redirect(url_for("chiffre_affaire"))
-
-    commercial = (commercial or "").strip()
-    if not commercial:
-        flash("Commercial invalide.", "danger")
-        return redirect(url_for("chiffre_affaire"))
-
-    with conn.cursor() as cur:
-        # Sécurise l’insertion : le client doit exister (évite client_id fantôme)
-        cur.execute("SELECT 1 FROM crm_clients WHERE id=%s", (client_id_int,))
-        if not cur.fetchone():
-            flash("Dossier client introuvable.", "danger")
-            return redirect(url_for("chiffre_affaire"))
-
-        cur.execute("""
-            INSERT INTO revenus (date, client_id, commercial, montant)
-            VALUES (%s, %s, %s, %s)
-        """, (date_ca, client_id_int, commercial, montant_float))
-
-    conn.commit()
-    flash("Chiffre d’affaires ajouté.", "success")
-    return redirect(url_for("chiffre_affaire"))
-
-
-@app.route("/chiffre-affaire/<int:ca_id>/edit", methods=["POST"])
-@admin_required
-def edit_chiffre_affaire(ca_id):
-    conn = get_db()
-    montant = request.form.get("montant")
-
-    try:
-        montant_float = float(montant)
-    except (TypeError, ValueError):
-        flash("Montant invalide.", "danger")
-        return redirect(url_for("chiffre_affaire"))
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT 1 FROM revenus WHERE id=%s", (ca_id,))
-        if not cur.fetchone():
-            flash("Entrée CA introuvable.", "danger")
-            return redirect(url_for("chiffre_affaire"))
-
-        cur.execute(
-            "UPDATE revenus SET montant=%s WHERE id=%s",
-            (montant_float, ca_id)
-        )
-
-    conn.commit()
-    flash("Chiffre d’affaires mis à jour.", "success")
-    return redirect(url_for("chiffre_affaire"))
-
-
-@app.route("/chiffre-affaire/<int:ca_id>/delete", methods=["POST"])
-@admin_required
-def delete_chiffre_affaire(ca_id):
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT 1 FROM revenus WHERE id=%s", (ca_id,))
-        if not cur.fetchone():
-            flash("Entrée CA introuvable.", "danger")
-            return redirect(url_for("chiffre_affaire"))
-
-        cur.execute("DELETE FROM revenus WHERE id=%s", (ca_id,))
-
-    conn.commit()
-    flash("Chiffre d’affaires supprimé.", "success")
-    return redirect(url_for("chiffre_affaire"))
 
 
 
