@@ -833,11 +833,13 @@ def logout():
     return redirect(url_for("login"))
 
 
-
 ###########################################################
 # 8. DASHBOARD + SEARCH + OUVERTURE COTATION + CHIFFRE D’AFFAIRES
 ############################################################
 
+# =========================
+# DASHBOARD
+# =========================
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -970,7 +972,7 @@ def dashboard():
             commercial_cotations = cur.fetchall()
 
     # =====================================================
-    # PIPELINE (ADMIN & COMMERCIAL — FIX FINAL)
+    # PIPELINE (ADMIN & COMMERCIAL)
     # =====================================================
     with conn.cursor() as cur:
         if role == "admin":
@@ -986,7 +988,6 @@ def dashboard():
                 LEFT JOIN users ON users.id = crm_clients.owner_id
                 WHERE crm_clients.owner_id = %s
             """, (user_id,))
-
         rows = cur.fetchall()
 
     pipeline_en_cours = []
@@ -1005,31 +1006,120 @@ def dashboard():
             pipeline_en_cours.append(obj)
 
     # =====================================================
-    # RENDER FINAL (AUCUNE VARIABLE MANQUANTE)
+    # RENDER DASHBOARD
     # =====================================================
     return render_template(
         "dashboard.html",
 
-        # KPI ADMIN
         total_clients=total_clients,
         total_ca=total_ca,
         total_docs=total_docs,
         last_clients=last_clients,
         last_rev=row_to_obj(last_rev) if last_rev else None,
 
-        # PIPELINE
         pipeline_en_cours=pipeline_en_cours,
         pipeline_gagnes=pipeline_gagnes,
         pipeline_perdus=pipeline_perdus,
 
-        # ADMIN
         unread_cotations=unread_cotations,
         cotations_admin=[row_to_obj(r) for r in cotations_admin],
 
-        # COMMERCIAL
         commercial_stats=commercial_stats,
         commercial_clients=[row_to_obj(c) for c in commercial_clients],
         commercial_cotations=[row_to_obj(c) for c in commercial_cotations],
+    )
+
+
+# =========================
+# CHIFFRE D’AFFAIRES (MENU)
+# =========================
+@app.route("/chiffre-affaire", endpoint="chiffre_affaire")
+@login_required
+def chiffre_affaire():
+    conn = get_db()
+    user = session.get("user")
+
+    role = user["role"]
+    username = user["username"]
+
+    ca_annuel_perso = 0
+    ca_mensuel_perso = 0
+    ca_perso_par_mois = []
+
+    clients = []
+    global_par_mois = []
+    historique_ca = []
+
+    with conn.cursor() as cur:
+        if role == "admin":
+            cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
+            ca_annuel_perso = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                WHERE date_trunc('month', date::date)
+                      = date_trunc('month', CURRENT_DATE)
+            """)
+            ca_mensuel_perso = cur.fetchone()[0]
+
+            cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
+            clients = cur.fetchall()
+
+            cur.execute("""
+                SELECT TO_CHAR(date::date,'YYYY-MM') AS mois,
+                       SUM(montant) AS total
+                FROM revenus
+                GROUP BY mois
+                ORDER BY mois ASC
+            """)
+            global_par_mois = cur.fetchall()
+
+            cur.execute("""
+                SELECT revenus.id, revenus.date, revenus.montant,
+                       revenus.commercial,
+                       crm_clients.name AS client_name
+                FROM revenus
+                JOIN crm_clients ON crm_clients.id = revenus.client_id
+                ORDER BY date::date DESC, revenus.id DESC
+            """)
+            historique_ca = cur.fetchall()
+
+        else:
+            cur.execute("""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                WHERE commercial=%s
+            """, (username,))
+            ca_annuel_perso = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                WHERE commercial=%s
+                  AND date_trunc('month', date::date)
+                      = date_trunc('month', CURRENT_DATE)
+            """, (username,))
+            ca_mensuel_perso = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT TO_CHAR(date::date,'YYYY-MM') AS mois,
+                       SUM(montant) AS total
+                FROM revenus
+                WHERE commercial=%s
+                GROUP BY mois
+                ORDER BY mois ASC
+            """, (username,))
+            ca_perso_par_mois = cur.fetchall()
+
+    return render_template(
+        "chiffre_affaire.html",
+        ca_annuel_perso=ca_annuel_perso,
+        ca_mensuel_perso=ca_mensuel_perso,
+        ca_perso_par_mois=[row_to_obj(r) for r in ca_perso_par_mois],
+        clients=[row_to_obj(c) for c in clients],
+        global_par_mois=[row_to_obj(r) for r in global_par_mois],
+        historique_ca=[row_to_obj(r) for r in historique_ca],
     )
 
 
@@ -2036,3 +2126,8 @@ if __name__ == "__main__":
 @app.route("/__routes__")
 def debug_routes():
     return "<br>".join(sorted(app.view_functions.keys()))
+# =========================================================
+# ALIAS ENDPOINT — FIX CRASH MENU / DASHBOARD
+# =========================================================
+
+
