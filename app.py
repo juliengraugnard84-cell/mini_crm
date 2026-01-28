@@ -1143,7 +1143,7 @@ def new_client():
 
         if not name:
             flash("Le nom du client est obligatoire.", "danger")
-            return render_template("client_new.html")
+            return render_template("new_client.html")
 
         user = session.get("user") or {}
         owner_id = user.get("id")
@@ -1163,7 +1163,7 @@ def new_client():
         flash("Dossier client créé.", "success")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    return render_template("client_new.html")
+    return render_template("new_client.html")
 
 
 # =========================
@@ -1259,7 +1259,6 @@ def update_client_status(client_id):
         flash("Dossier introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    # 🔒 Sécurité
     if role != "admin" and row["owner_id"] != user_id:
         abort(403)
 
@@ -1307,11 +1306,21 @@ def client_detail(client_id):
         """, (client_id,))
         updates = cur.fetchall()
 
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT *
+            FROM cotations
+            WHERE client_id=%s
+            ORDER BY date_creation DESC
+        """, (client_id,))
+        cotations = cur.fetchall()
+
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
         documents=documents,
         updates=[row_to_obj(u) for u in updates],
+        client_cotations=[row_to_obj(c) for c in cotations],
         can_request_update=True,
     )
 
