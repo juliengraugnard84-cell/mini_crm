@@ -53,6 +53,15 @@
                     {% endif %}
                 </a>
 
+                <!-- ✅ RESTAURÉ : DEMANDES DE COTATION -->
+                <a href="{{ url_for('admin_cotations') }}"
+                   class="{% if request.path.startswith('/admin/cotations') %}active{% endif %}">
+                    Demandes de cotation
+                    {% if unread_cotations is defined and unread_cotations > 0 %}
+                        <span class="nav-alert-badge danger">{{ unread_cotations }}</span>
+                    {% endif %}
+                </a>
+
                 <a href="{{ url_for('documents') }}"
                    class="{% if request.path.startswith('/documents') %}active{% endif %}">
                     Documents
@@ -99,7 +108,7 @@
     </div>
 </div>
 
-<!-- Bootstrap JS (OBLIGATOIRE pour les onglets, modals, dropdowns) -->
+<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
