@@ -1498,7 +1498,7 @@ def admin_reset_password(user_id):
 
 
 ############################################################
-# ADMIN — LISTE DES DEMANDES DE COTATION  ✅ (ROUTE MANQUANTE)
+# 10 QUATER. ADMIN — DEMANDES DE COTATION
 ############################################################
 
 @app.route("/admin/cotations")
@@ -1522,6 +1522,37 @@ def admin_cotations():
     return render_template(
         "admin_cotations.html",
         cotations=[row_to_obj(r) for r in rows],
+    )
+
+
+# =========================
+# ADMIN → DÉTAIL COTATION (ROUTE RESTAURÉE)
+# =========================
+@app.route("/admin/cotations/<int:cotation_id>")
+@admin_required
+def admin_cotation_detail(cotation_id):
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                cotations.*,
+                crm_clients.name AS client_name,
+                users.username AS commercial_name
+            FROM cotations
+            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN users ON users.id = cotations.created_by
+            WHERE cotations.id = %s
+        """, (cotation_id,))
+        cotation = cur.fetchone()
+
+    if not cotation:
+        flash("Cotation introuvable.", "danger")
+        return redirect(url_for("admin_cotations"))
+
+    return render_template(
+        "admin_cotation_detail.html",
+        cotation=row_to_obj(cotation),
     )
 
 
