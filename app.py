@@ -1881,16 +1881,6 @@ def new_client():
     role = user.get("role")
     user_id = user.get("id")
 
-    # 🔹 Liste admin + commerciaux (select)
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT id, username, role
-            FROM users
-            WHERE role IN ('admin', 'commercial')
-            ORDER BY username
-        """)
-        users = cur.fetchall()
-
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         email = (request.form.get("email") or "").strip()
@@ -1898,28 +1888,14 @@ def new_client():
         address = (request.form.get("address") or "").strip()
         siret = (request.form.get("siret") or "").strip()
 
-        # 🔹 owner_id
-        if role == "admin":
-            try:
-                owner_id = int(request.form.get("owner_id") or 0)
-            except Exception:
-                owner_id = None
-        else:
-            owner_id = user_id
+        # ✅ SÉCURITÉ ABSOLUE
+        # - commercial → dossier auto-attribué
+        # - admin → dossier auto-attribué (plus de select)
+        owner_id = user_id
 
         if not name:
             flash("Le nom du client est obligatoire.", "danger")
-            return render_template(
-                "new_client.html",
-                users=[row_to_obj(u) for u in users],
-            )
-
-        if not owner_id:
-            flash("Veuillez sélectionner un commercial.", "danger")
-            return render_template(
-                "new_client.html",
-                users=[row_to_obj(u) for u in users],
-            )
+            return redirect(url_for("clients"))
 
         with conn.cursor() as cur:
             cur.execute(
@@ -1939,10 +1915,8 @@ def new_client():
         flash("Dossier client créé.", "success")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    return render_template(
-        "new_client.html",
-        users=[row_to_obj(u) for u in users],
-    )
+    # ⚠️ Création inline depuis /clients → jamais affiché
+    return redirect(url_for("clients"))
 
 
 # =========================
@@ -1957,16 +1931,6 @@ def clients():
     user = session.get("user") or {}
     role = user.get("role")
     user_id = user.get("id")
-
-    # 🔹 Liste admin + commerciaux (templates)
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT id, username, role
-            FROM users
-            WHERE role IN ('admin', 'commercial')
-            ORDER BY username
-        """)
-        users = cur.fetchall()
 
     with conn.cursor() as cur:
         if role == "admin":
@@ -2032,7 +1996,6 @@ def clients():
         clients_en_cours=[row_to_obj(r) for r in en_cours],
         clients_gagnes=[row_to_obj(r) for r in gagnes],
         clients_perdus=[row_to_obj(r) for r in perdus],
-        users=[row_to_obj(u) for u in users],
         q=q,
     )
 
@@ -2144,6 +2107,7 @@ app.view_functions.setdefault(
     "update_client_status",
     update_client_status
 )
+
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
