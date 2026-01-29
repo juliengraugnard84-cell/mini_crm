@@ -1866,6 +1866,284 @@ app.view_functions.setdefault(
     "update_client_status",
     update_client_status
 )
+############################################################
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + STATUT + COTATIONS
+############################################################
+
+# =========================
+# CLIENT — CRÉATION
+# =========================
+@app.route("/clients/new", methods=["GET", "POST"])
+@login_required
+def new_client():
+    conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
+
+    # 🔹 Liste admin + commerciaux (select)
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT id, username, role
+            FROM users
+            WHERE role IN ('admin', 'commercial')
+            ORDER BY username
+        """)
+        users = cur.fetchall()
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip()
+        phone = (request.form.get("phone") or "").strip()
+        address = (request.form.get("address") or "").strip()
+        siret = (request.form.get("siret") or "").strip()
+
+        # 🔹 owner_id
+        if role == "admin":
+            try:
+                owner_id = int(request.form.get("owner_id") or 0)
+            except Exception:
+                owner_id = None
+        else:
+            owner_id = user_id
+
+        if not name:
+            flash("Le nom du client est obligatoire.", "danger")
+            return render_template(
+                "new_client.html",
+                users=[row_to_obj(u) for u in users],
+            )
+
+        if not owner_id:
+            flash("Veuillez sélectionner un commercial.", "danger")
+            return render_template(
+                "new_client.html",
+                users=[row_to_obj(u) for u in users],
+            )
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO crm_clients (
+                    name, email, phone, address, siret,
+                    owner_id, status
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
+                RETURNING id
+                """,
+                (name, email, phone, address, siret, owner_id),
+            )
+            client_id = cur.fetchone()[0]
+
+        conn.commit()
+        flash("Dossier client créé.", "success")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    return render_template(
+        "new_client.html",
+        users=[row_to_obj(u) for u in users],
+    )
+
+
+# =========================
+# CLIENT — LISTE + RECHERCHE + PIPELINE
+# =========================
+@app.route("/clients")
+@login_required
+def clients():
+    conn = get_db()
+    q = (request.args.get("q") or "").strip()
+
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
+
+    # 🔹 Liste admin + commerciaux (templates)
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT id, username, role
+            FROM users
+            WHERE role IN ('admin', 'commercial')
+            ORDER BY username
+        """)
+        users = cur.fetchall()
+
+    with conn.cursor() as cur:
+        if role == "admin":
+            if q:
+                cur.execute(
+                    """
+                    SELECT crm_clients.*, users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.name ILIKE %s
+                    ORDER BY crm_clients.created_at DESC
+                    """,
+                    (f"%{q}%",),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT crm_clients.*, users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    ORDER BY crm_clients.created_at DESC
+                    """
+                )
+        else:
+            if q:
+                cur.execute(
+                    """
+                    SELECT crm_clients.*, users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.owner_id = %s
+                      AND crm_clients.name ILIKE %s
+                    ORDER BY crm_clients.created_at DESC
+                    """,
+                    (user_id, f"%{q}%"),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT crm_clients.*, users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.owner_id = %s
+                    ORDER BY crm_clients.created_at DESC
+                    """,
+                    (user_id,),
+                )
+
+        rows = cur.fetchall()
+
+    en_cours, gagnes, perdus = [], [], []
+    for r in rows:
+        status = (r["status"] or "en_cours").lower()
+        if status == "gagne":
+            gagnes.append(r)
+        elif status == "perdu":
+            perdus.append(r)
+        else:
+            en_cours.append(r)
+
+    return render_template(
+        "clients.html",
+        clients_en_cours=[row_to_obj(r) for r in en_cours],
+        clients_gagnes=[row_to_obj(r) for r in gagnes],
+        clients_perdus=[row_to_obj(r) for r in perdus],
+        users=[row_to_obj(u) for u in users],
+        q=q,
+    )
+
+
+# =========================
+# CLIENT — MISE À JOUR STATUT
+# =========================
+@app.route("/clients/<int:client_id>/status", methods=["POST"])
+@login_required
+def update_client_status(client_id):
+    status = (request.form.get("status") or "").strip().lower()
+    if status not in ("en_cours", "gagne", "perdu"):
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("clients"))
+
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("SELECT owner_id FROM crm_clients WHERE id=%s", (client_id,))
+        row = cur.fetchone()
+
+    if not row:
+        flash("Dossier introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    if role != "admin" and row["owner_id"] != user_id:
+        abort(403)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE crm_clients SET status=%s WHERE id=%s",
+            (status, client_id),
+        )
+
+    conn.commit()
+    flash("Statut du dossier mis à jour.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# CLIENT — DÉTAIL (FICHE)
+# =========================
+@app.route("/clients/<int:client_id>", endpoint="client_detail")
+@login_required
+def client_detail(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT crm_clients.*, users.username AS commercial
+            FROM crm_clients
+            LEFT JOIN users ON users.id = crm_clients.owner_id
+            WHERE crm_clients.id = %s
+            """,
+            (client_id,),
+        )
+        client = cur.fetchone()
+
+    if not client:
+        abort(404)
+
+    documents = list_client_documents(client_id)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM client_updates
+            WHERE client_id = %s
+            ORDER BY created_at DESC
+            """,
+            (client_id,),
+        )
+        updates = cur.fetchall()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM cotations
+            WHERE client_id = %s
+            ORDER BY date_creation DESC
+            """,
+            (client_id,),
+        )
+        cotations = cur.fetchall()
+
+    return render_template(
+        "client_detail.html",
+        client=row_to_obj(client),
+        documents=documents,
+        updates=[row_to_obj(u) for u in updates],
+        client_cotations=[row_to_obj(c) for c in cotations],
+        can_request_update=True,
+    )
+
+
+# =========================================================
+# ALIAS ENDPOINT — COMPAT (SAFE)
+# =========================================================
+app.view_functions.setdefault(
+    "update_client_status",
+    update_client_status
+)
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
