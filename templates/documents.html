@@ -12,34 +12,19 @@
 </div>
 
 <!-- ================= UPLOAD DOCUMENT ================= -->
-<div class="card">
+<div class="card mb-4">
     <h5>Ajouter un document</h5>
     <p class="text-muted mb-3">
-        Formats autorisés : PDF, images, Word, Excel, CSV
+        Les documents sont ajoutés depuis la fiche d’un dossier client.
     </p>
 
-    <form action="{{ url_for('upload_document') }}"
-          method="POST"
-          enctype="multipart/form-data">
-
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-            <input type="file"
-                   name="file"
-                   class="form-control"
-                   required
-                   style="max-width:420px;">
-
-            <button type="submit" class="btn btn-primary">
-                Uploader
-            </button>
-        </div>
-
-        <div class="text-muted mt-2" style="font-size:.8rem;">
-            Conseil : utilisez des noms de fichiers courts et explicites.
-        </div>
-    </form>
+    <!-- Upload global volontairement désactivé -->
+    <div class="alert alert-info mb-0">
+        Pour des raisons de traçabilité et de sécurité, l’ajout de documents
+        se fait exclusivement depuis un dossier client.
+        <br>
+        <strong>Clients → Ouvrir un dossier → Documents</strong>
+    </div>
 </div>
 
 <!-- ================= LISTE DOCUMENTS ================= -->
@@ -56,28 +41,19 @@
             Aucun document pour le moment.
         </div>
     {% else %}
-        <table class="table">
+        <table class="table align-middle">
             <thead>
                 <tr>
                     <th>Nom</th>
                     <th style="width:120px;">Taille</th>
-                    <th style="width:180px;text-align:right;">Actions</th>
+                    <th style="width:220px;text-align:right;">Actions</th>
                 </tr>
             </thead>
             <tbody>
             {% for f in fichiers %}
                 <tr>
                     <td>
-                        {% if f.url %}
-                            <a href="{{ f.url }}"
-                               target="_blank"
-                               rel="noopener"
-                               class="doc-link">
-                                <strong>{{ f.nom }}</strong>
-                            </a>
-                        {% else %}
-                            <strong>{{ f.nom }}</strong>
-                        {% endif %}
+                        <strong>{{ f.nom }}</strong>
                     </td>
 
                     <td class="text-muted">
@@ -92,27 +68,25 @@
                     </td>
 
                     <td style="text-align:right;">
-                        {% if f.url %}
-                            <a href="{{ f.url }}"
-                               target="_blank"
-                               rel="noopener"
-                               class="btn btn-secondary btn-sm">
-                                Ouvrir
-                            </a>
-                        {% endif %}
+                        <!-- ================= OUVRIR / TÉLÉCHARGER ================= -->
+                        <a href="{{ url_for('download_document', key=f.key) }}"
+                           class="btn btn-secondary btn-sm">
+                            Ouvrir
+                        </a>
 
-                        <form action="{{ url_for('delete_document', key=f.nom) }}"
-                              method="POST"
+                        <!-- ================= SUPPRIMER (ADMIN SEULEMENT) ================= -->
+                        {% if current_user and current_user.role == 'admin' %}
+                        <form method="post"
+                              action="{{ url_for('delete_document', key=f.key) }}"
                               style="display:inline;"
-                              onsubmit="return confirm('Supprimer ce document ?');">
-
+                              onsubmit="return confirm('Supprimer définitivement ce document ?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
                             <button type="submit"
                                     class="btn btn-danger btn-sm">
                                 Supprimer
                             </button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
             {% endfor %}

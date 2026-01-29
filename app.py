@@ -1294,7 +1294,12 @@ def delete_cotation_admin(cotation_id):
 
 
 ############################################################
-# 11. DOCUMENTS GLOBAUX (ADMIN)
+# 11. DOCUMENTS (GLOBAL + PAR DOSSIER) — LISTE / DOWNLOAD / UPLOAD / DELETE
+# Objectifs :
+# - /documents (ADMIN) : liste globale + upload global + suppression
+# - commerciaux : accès aux documents UNIQUEMENT via leurs dossiers (/clients/<id>)
+# - téléchargement sécurisé via URL signée (S3) + contrôle d'accès
+# - compat templates existants : upload_document, delete_document, download_document
 ############################################################
 
 @app.route("/documents")
@@ -1302,9 +1307,8 @@ def delete_cotation_admin(cotation_id):
 def documents():
     """
     Liste globale de tous les documents clients (ADMIN).
-    - Sécurisé contre erreurs S3
-    - Aucun crash possible
-    - Comportement identique si tout fonctionne
+    - SAFE : aucun 500 si S3 indispo
+    - Retourne des items avec key (indispensable pour delete/download)
     """
 
     fichiers = []
@@ -1323,21 +1327,172 @@ def documents():
 
             fichiers.append(
                 {
-                    "nom": key,
+                    "nom": key,                 # compat template (affichage)
+                    "key": key,                 # ✅ nécessaire pour delete/download
                     "taille": item.get("Size", 0),
-                    "url": s3_presigned_url(key),
+                    "url": None,                # ✅ on passe par route download sécurisée
                 }
             )
 
     except Exception as e:
-        # 🔒 Sécurité absolue : jamais de 500
         logger.exception("❌ Erreur chargement documents S3 : %r", e)
-        flash(
-            "Impossible de charger les documents (erreur stockage S3).",
-            "danger"
-        )
+        flash("Impossible de charger les documents (erreur stockage S3).", "danger")
 
     return render_template("documents.html", fichiers=fichiers)
+
+
+# =========================================================
+# UPLOAD DOCUMENT GLOBAL (ADMIN) — compat template documents.html
+# Endpoint attendu : url_for('upload_document')
+# Stockage : prefix "clients/global/"
+# =========================================================
+@app.route("/documents/upload", methods=["POST"], endpoint="upload_document")
+@admin_required
+def upload_document():
+    """
+    Upload global (ADMIN) pour documents "non rattachés à un dossier précis".
+    Le template documents.html appelle url_for('upload_document').
+    """
+
+    fichier = request.files.get("file")
+    if not fichier or not allowed_file(fichier.filename):
+        flash("Fichier invalide.", "danger")
+        return redirect(url_for("documents"))
+
+    if LOCAL_MODE or not s3:
+        flash("Upload indisponible en mode local.", "warning")
+        return redirect(url_for("documents"))
+
+    try:
+        name = clean_filename(secure_filename(fichier.filename))
+        prefix = "clients/global/"
+        key = _s3_make_non_overwriting_key(AWS_BUCKET, f"{prefix}{name}")
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
+
+        flash("Document uploadé.", "success")
+        return redirect(url_for("documents"))
+
+    except Exception as e:
+        logger.exception("❌ Erreur upload document global : %r", e)
+        flash("Erreur lors de l’upload du document.", "danger")
+        return redirect(url_for("documents"))
+
+
+# =========================================================
+# DOWNLOAD (ADMIN + COMMERCIAL si autorisé)
+# Utilisé par :
+# - documents.html : téléchargement global (admin)
+# - client_detail.html : docs rattachés au dossier (admin + propriétaire)
+# =========================================================
+@app.route("/documents/download")
+@login_required
+def download_document():
+    """
+    Téléchargement sécurisé via URL signée.
+    - Admin : OK pour tout
+    - Commercial : OK uniquement si le document est dans SON dossier client
+    """
+
+    key = (request.args.get("key") or "").strip()
+    if not key:
+        flash("Document introuvable.", "danger")
+        return redirect(url_for("dashboard"))
+
+    if LOCAL_MODE or not s3:
+        flash("Téléchargement indisponible en mode local.", "warning")
+        return redirect(url_for("dashboard"))
+
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    # ✅ Admin : accès total
+    if role == "admin":
+        url = s3_presigned_url(key)
+        if not url:
+            flash("Impossible d’ouvrir le document.", "danger")
+            return redirect(url_for("documents"))
+        return redirect(url)
+
+    # ✅ Commercial : doit être propriétaire du dossier correspondant au prefix
+    # On autorise uniquement les clés sous "clients/<slug>_<id>/..."
+    m = re.match(r"^clients\/[^\/]+_(\d+)\/", key)
+    if not m:
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("dashboard"))
+
+    client_id = int(m.group(1))
+    if not can_access_client(client_id):
+        abort(403)
+
+    url = s3_presigned_url(key)
+    if not url:
+        flash("Impossible d’ouvrir le document.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+    return redirect(url)
+
+
+# =========================================================
+# DELETE (ADMIN + COMMERCIAL si autorisé)
+# Compat template documents.html : url_for('delete_document', key=...)
+# IMPORTANT : template envoie "key=f.nom" (qui est un key S3 complet)
+# =========================================================
+@app.route("/documents/delete", methods=["POST"])
+@login_required
+def delete_document():
+    """
+    Suppression sécurisée.
+    - Admin : peut supprimer tous les documents
+    - Commercial : peut supprimer uniquement les documents de SES dossiers
+    """
+
+    key = (request.args.get("key") or "").strip()
+    if not key:
+        flash("Document introuvable.", "danger")
+        return redirect(url_for("dashboard"))
+
+    if LOCAL_MODE or not s3:
+        flash("Suppression indisponible en mode local.", "warning")
+        return redirect(url_for("dashboard"))
+
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    # ✅ Admin : suppression globale
+    if role == "admin":
+        try:
+            s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+            flash("Document supprimé.", "success")
+        except Exception as e:
+            logger.exception("❌ Erreur suppression S3 (admin) : %r", e)
+            flash("Erreur lors de la suppression du document.", "danger")
+        return redirect(url_for("documents"))
+
+    # ✅ Commercial : uniquement ses dossiers
+    m = re.match(r"^clients\/[^\/]+_(\d+)\/", key)
+    if not m:
+        flash("Accès refusé.", "danger")
+        return redirect(url_for("dashboard"))
+
+    client_id = int(m.group(1))
+    if not can_access_client(client_id):
+        abort(403)
+
+    try:
+        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+        flash("Document supprimé.", "success")
+    except Exception as e:
+        logger.exception("❌ Erreur suppression S3 (commercial) : %r", e)
+        flash("Erreur lors de la suppression du document.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================================================
+# (Optionnel mais utile) ALIAS pour compat si un ancien template
+# utilise endpoint 'documents_admin' ou autre.
+# Ne casse rien.
+# =========================================================
+app.view_functions.setdefault("documents_admin", documents)
 
 
 ############################################################
