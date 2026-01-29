@@ -1603,7 +1603,7 @@ def new_client():
     role = user.get("role")
     user_id = user.get("id")
 
-    # 🔹 Liste des commerciaux + admin (pour le select)
+    # 🔹 Liste admin + commerciaux (select)
     with conn.cursor() as cur:
         cur.execute("""
             SELECT id, username, role
@@ -1620,9 +1620,7 @@ def new_client():
         address = (request.form.get("address") or "").strip()
         siret = (request.form.get("siret") or "").strip()
 
-        # 🔹 owner_id :
-        # - admin → sélection via formulaire
-        # - commercial → auto
+        # 🔹 owner_id
         if role == "admin":
             try:
                 owner_id = int(request.form.get("owner_id") or 0)
@@ -1682,7 +1680,7 @@ def clients():
     role = user.get("role")
     user_id = user.get("id")
 
-    # 🔹 Liste utilisateurs (admin + commerciaux)
+    # 🔹 Liste admin + commerciaux (templates)
     with conn.cursor() as cur:
         cur.execute("""
             SELECT id, username, role
@@ -1785,7 +1783,6 @@ def update_client_status(client_id):
         flash("Dossier introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    # 🔒 Sécurité
     if role != "admin" and row["owner_id"] != user_id:
         abort(403)
 
@@ -1800,18 +1797,75 @@ def update_client_status(client_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-# =========================================================
-# ALIAS ENDPOINTS — SÉCURITÉ TEMPLATES / DASHBOARD
-# =========================================================
+# =========================
+# CLIENT — DÉTAIL (FICHE)
+# =========================
+@app.route("/clients/<int:client_id>", endpoint="client_detail")
+@login_required
+def client_detail(client_id):
+    if not can_access_client(client_id):
+        abort(403)
 
-# Alias nécessaire pour compat templates / dashboard
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT crm_clients.*, users.username AS commercial
+            FROM crm_clients
+            LEFT JOIN users ON users.id = crm_clients.owner_id
+            WHERE crm_clients.id = %s
+            """,
+            (client_id,),
+        )
+        client = cur.fetchone()
+
+    if not client:
+        abort(404)
+
+    documents = list_client_documents(client_id)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM client_updates
+            WHERE client_id = %s
+            ORDER BY created_at DESC
+            """,
+            (client_id,),
+        )
+        updates = cur.fetchall()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM cotations
+            WHERE client_id = %s
+            ORDER BY date_creation DESC
+            """,
+            (client_id,),
+        )
+        cotations = cur.fetchall()
+
+    return render_template(
+        "client_detail.html",
+        client=row_to_obj(client),
+        documents=documents,
+        updates=[row_to_obj(u) for u in updates],
+        client_cotations=[row_to_obj(c) for c in cotations],
+        can_request_update=True,
+    )
+
+
+# =========================================================
+# ALIAS ENDPOINT — COMPAT (SAFE)
+# =========================================================
 app.view_functions.setdefault(
     "update_client_status",
     update_client_status
 )
-
-# ❌ NE PAS AJOUTER d'alias pour client_detail
-# client_detail est déjà exposé par @app.route("/clients/<int:client_id>")
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
