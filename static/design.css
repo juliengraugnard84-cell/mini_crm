@@ -285,3 +285,26 @@ main.content {
         padding: 22px;
     }
 }
+.pipeline-card {
+    display: block;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fff;
+    transition: all .2s ease;
+    color: inherit;
+}
+
+.pipeline-card:hover {
+    border-color: #2563eb;
+    box-shadow: 0 6px 18px rgba(0,0,0,.08);
+    transform: translateY(-2px);
+}
+
+.pipeline-card-body strong {
+    font-size: 14px;
+}
+
+.pipeline-card-body small {
+    font-size: 12px;
+}

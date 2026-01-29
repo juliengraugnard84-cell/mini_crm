@@ -3,9 +3,11 @@
 
 {% block content %}
 
+{# ============================================================
+   DASHBOARD COMMERCIAL
+   ============================================================ #}
 {% if current_user and current_user.role == 'commercial' %}
 
-<!-- ================= DASHBOARD COMMERCIAL ================= -->
 <div class="page-header mb-4">
     <h1>Mon tableau de bord</h1>
     <p class="text-muted">Suivi de mon activité commerciale</p>
@@ -50,28 +52,27 @@
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:32px;">
 
-{% for title, items, color in [
-    ('🟡 En cours', pipeline_en_cours if pipeline_en_cours is defined else [], ''),
-    ('🟢 Gagnés', pipeline_gagnes if pipeline_gagnes is defined else [], 'success'),
-    ('🔴 Perdus', pipeline_perdus if pipeline_perdus is defined else [], 'danger')
+{% for label, color, items in [
+    ('🟡 En cours', '', pipeline_en_cours if pipeline_en_cours is defined else []),
+    ('🟢 Gagnés', 'success', pipeline_gagnes if pipeline_gagnes is defined else []),
+    ('🔴 Perdus', 'danger', pipeline_perdus if pipeline_perdus is defined else [])
 ] %}
 
 <div class="card {% if color %}border-{{ color }}{% endif %}">
     <div class="card-header fw-bold {% if color %}text-{{ color }}{% endif %}">
-        {{ title }} ({{ items|length }})
+        {{ label }} ({{ items|length }})
     </div>
+
     <div class="card-body d-flex flex-column gap-2">
         {% if items %}
             {% for c in items %}
-            <div class="border rounded p-2">
+            <a href="{{ url_for('client_detail', client_id=c.id) }}"
+               class="pipeline-card text-decoration-none">
                 <strong>{{ c.name }}</strong>
-                {% if 'client_detail' in available_endpoints %}
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="btn btn-ouvrir btn-sm mt-2 w-100">
-                    Ouvrir
-                </a>
-                {% endif %}
-            </div>
+                <small class="text-muted d-block">
+                    {{ c.commercial or "—" }}
+                </small>
+            </a>
             {% endfor %}
         {% else %}
             <p class="text-muted mb-0">Aucun dossier.</p>
@@ -82,9 +83,11 @@
 {% endfor %}
 </div>
 
+{# ============================================================
+   DASHBOARD ADMIN
+   ============================================================ #}
 {% else %}
 
-<!-- ================= DASHBOARD ADMIN ================= -->
 <div class="page-header mb-4">
     <h1>Tableau de bord</h1>
     <p class="text-muted">Vue d’ensemble de l’activité</p>
@@ -137,32 +140,32 @@
     <div class="card-body d-flex flex-column gap-2">
         {% if items %}
             {% for c in items %}
-            <div class="border rounded p-2">
-                <strong>{{ c.name }}</strong><br>
-                <small class="text-muted">{{ c.commercial or "—" }}</small>
+            <div class="pipeline-card">
 
-                {% if 'client_detail' in available_endpoints %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="btn btn-ouvrir btn-sm mt-2 w-100">
-                    Ouvrir
+                   class="text-decoration-none">
+                    <strong>{{ c.name }}</strong>
                 </a>
-                {% endif %}
+                <small class="text-muted d-block">
+                    {{ c.commercial or "—" }}
+                </small>
 
-                {% if 'update_client_status' in available_endpoints %}
                 <form method="post"
                       action="{{ url_for('update_client_status', client_id=c.id) }}"
-                      class="mt-2">
+                      class="mt-2"
+                      onclick="event.stopPropagation();">
+
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <select name="status" class="form-select form-select-sm mb-1">
-                        <option value="en_cours" {% if c.status == "en_cours" %}selected{% endif %}>En cours</option>
-                        <option value="gagne" {% if c.status == "gagne" %}selected{% endif %}>Gagné</option>
-                        <option value="perdu" {% if c.status == "perdu" %}selected{% endif %}>Perdu</option>
+
+                    <select name="status"
+                            class="form-select form-select-sm"
+                            onchange="this.form.submit()">
+                        <option value="en_cours" {% if c.status == 'en_cours' %}selected{% endif %}>🟡 En cours</option>
+                        <option value="gagne" {% if c.status == 'gagne' %}selected{% endif %}>🟢 Gagné</option>
+                        <option value="perdu" {% if c.status == 'perdu' %}selected{% endif %}>🔴 Perdu</option>
                     </select>
-                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">
-                        Mettre à jour le statut
-                    </button>
                 </form>
-                {% endif %}
+
             </div>
             {% endfor %}
         {% else %}
@@ -203,5 +206,4 @@
 </div>
 
 {% endif %}
-
 {% endblock %}
