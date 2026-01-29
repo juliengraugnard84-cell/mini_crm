@@ -1300,13 +1300,27 @@ def delete_cotation_admin(cotation_id):
 @app.route("/documents")
 @admin_required
 def documents():
-    if LOCAL_MODE or not s3:
-        return render_template("documents.html", fichiers=[])
+    """
+    Liste globale de tous les documents clients (ADMIN).
+    - Sécurisé contre erreurs S3
+    - Aucun crash possible
+    - Comportement identique si tout fonctionne
+    """
 
     fichiers = []
-    for item in s3_list_all_objects(AWS_BUCKET, prefix="clients/"):
-        key = item.get("Key")
-        if key and not key.endswith("/"):
+
+    # Mode local ou S3 indisponible → page vide mais fonctionnelle
+    if LOCAL_MODE or not s3:
+        return render_template("documents.html", fichiers=fichiers)
+
+    try:
+        items = s3_list_all_objects(AWS_BUCKET, prefix="clients/")
+
+        for item in items:
+            key = item.get("Key")
+            if not key or key.endswith("/"):
+                continue
+
             fichiers.append(
                 {
                     "nom": key,
@@ -1314,6 +1328,14 @@ def documents():
                     "url": s3_presigned_url(key),
                 }
             )
+
+    except Exception as e:
+        # 🔒 Sécurité absolue : jamais de 500
+        logger.exception("❌ Erreur chargement documents S3 : %r", e)
+        flash(
+            "Impossible de charger les documents (erreur stockage S3).",
+            "danger"
+        )
 
     return render_template("documents.html", fichiers=fichiers)
 
