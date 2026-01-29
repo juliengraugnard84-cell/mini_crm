@@ -1624,9 +1624,8 @@ def new_client():
         # - admin → sélection via formulaire
         # - commercial → auto
         if role == "admin":
-            owner_id = request.form.get("owner_id")
             try:
-                owner_id = int(owner_id)
+                owner_id = int(request.form.get("owner_id") or 0)
             except Exception:
                 owner_id = None
         else:
@@ -1683,7 +1682,7 @@ def clients():
     role = user.get("role")
     user_id = user.get("id")
 
-    # 🔹 Liste utilisateurs pour le formulaire inline (admin)
+    # 🔹 Liste utilisateurs (admin + commerciaux)
     with conn.cursor() as cur:
         cur.execute("""
             SELECT id, username, role
@@ -1757,7 +1756,7 @@ def clients():
         clients_en_cours=[row_to_obj(r) for r in en_cours],
         clients_gagnes=[row_to_obj(r) for r in gagnes],
         clients_perdus=[row_to_obj(r) for r in perdus],
-        users=[row_to_obj(u) for u in users],  # ✅ pour le select
+        users=[row_to_obj(u) for u in users],
         q=q,
     )
 
@@ -1786,6 +1785,7 @@ def update_client_status(client_id):
         flash("Dossier introuvable.", "danger")
         return redirect(url_for("clients"))
 
+    # 🔒 Sécurité
     if role != "admin" and row["owner_id"] != user_id:
         abort(403)
 
@@ -1800,9 +1800,11 @@ def update_client_status(client_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
-# Alias compat
-app.view_functions["update_client_status"] = update_client_status
-
+# =========================================================
+# ALIAS ENDPOINTS — SÉCURITÉ TEMPLATES / DASHBOARD
+# =========================================================
+app.view_functions.setdefault("update_client_status", update_client_status)
+app.view_functions.setdefault("client_detail", client_detail)
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
