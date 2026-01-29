@@ -10,12 +10,62 @@
         <h1>Clients</h1>
         <p class="text-muted">Gestion des dossiers clients</p>
     </div>
+</div>
 
-    {% if 'new_client' in available_endpoints %}
-    <a href="{{ url_for('new_client') }}" class="btn btn-primary">
-        ➕ Nouveau dossier
-    </a>
-    {% endif %}
+<!-- ================= CRÉATION NOUVEAU DOSSIER ================= -->
+<div class="card mb-4">
+    <h5 class="mb-3">Créer un nouveau dossier</h5>
+
+    <form method="post"
+          action="{{ url_for('new_client') }}"
+          style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:end;">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div>
+            <label class="form-label">Nom du client</label>
+            <input type="text"
+                   name="name"
+                   class="form-control"
+                   required>
+        </div>
+
+        <div>
+            <label class="form-label">Email</label>
+            <input type="email"
+                   name="email"
+                   class="form-control">
+        </div>
+
+        <div>
+            <label class="form-label">Téléphone</label>
+            <input type="text"
+                   name="phone"
+                   class="form-control">
+        </div>
+
+        {% if current_user and current_user.role == 'admin' %}
+        <div>
+            <label class="form-label">Commercial</label>
+            <select name="owner_id" class="form-select">
+                <option value="">— Choisir —</option>
+                {% for u in commercials %}
+                <option value="{{ u.id }}">{{ u.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <div>
+            <button type="submit" class="btn btn-primary w-100">
+                ➕ Créer le dossier
+            </button>
+        </div>
+    </form>
+
+    <p class="text-muted mt-2 mb-0" style="font-size:.85rem;">
+        Le dossier sera automatiquement ajouté au pipeline « En cours ».
+    </p>
 </div>
 
 <!-- ================= SEARCH ================= -->
@@ -29,7 +79,7 @@
                value="{{ q if q is defined else '' }}"
                class="form-control"
                style="max-width:320px;">
-        <button type="submit" class="btn btn-rechercher">
+        <button type="submit" class="btn btn-secondary">
             Rechercher
         </button>
     </form>
@@ -106,15 +156,9 @@
             {% if clients_gagnes %}
                 {% for c in clients_gagnes %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="border border-success rounded p-2 text-decoration-none text-dark"
-                   style="transition:background .15s;"
-                   onmouseover="this.style.background='#f0fff4'"
-                   onmouseout="this.style.background='transparent'">
-
+                   class="border border-success rounded p-2 text-decoration-none text-dark">
                     <strong>{{ c.name }}</strong><br>
-                    <small class="text-muted">
-                        Commercial : {{ c.commercial or "—" }}
-                    </small>
+                    <small class="text-muted">Commercial : {{ c.commercial or "—" }}</small>
                     <div class="text-success fw-bold mt-1">✔ Gagné</div>
                 </a>
                 {% endfor %}
@@ -134,15 +178,9 @@
             {% if clients_perdus %}
                 {% for c in clients_perdus %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="border border-danger rounded p-2 text-decoration-none text-dark"
-                   style="transition:background .15s;"
-                   onmouseover="this.style.background='#fff5f5'"
-                   onmouseout="this.style.background='transparent'">
-
+                   class="border border-danger rounded p-2 text-decoration-none text-dark">
                     <strong>{{ c.name }}</strong><br>
-                    <small class="text-muted">
-                        Commercial : {{ c.commercial or "—" }}
-                    </small>
+                    <small class="text-muted">Commercial : {{ c.commercial or "—" }}</small>
                     <div class="text-danger fw-bold mt-1">✖ Perdu</div>
                 </a>
                 {% endfor %}
