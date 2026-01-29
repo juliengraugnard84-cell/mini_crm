@@ -1803,8 +1803,15 @@ def update_client_status(client_id):
 # =========================================================
 # ALIAS ENDPOINTS — SÉCURITÉ TEMPLATES / DASHBOARD
 # =========================================================
-app.view_functions.setdefault("update_client_status", update_client_status)
-app.view_functions.setdefault("client_detail", client_detail)
+
+# Alias nécessaire pour compat templates / dashboard
+app.view_functions.setdefault(
+    "update_client_status",
+    update_client_status
+)
+
+# ❌ NE PAS AJOUTER d'alias pour client_detail
+# client_detail est déjà exposé par @app.route("/clients/<int:client_id>")
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
