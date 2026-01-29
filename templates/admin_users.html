@@ -1,168 +1,145 @@
-############################################################
-# 10. ADMIN UTILISATEURS + RESET PASSWORD
-############################################################
+{% extends "base.html" %}
+{% block title %}Utilisateurs{% endblock %}
 
-@app.route("/admin/users", methods=["GET", "POST"])
-@admin_required
-def admin_users():
-    conn = get_db()
+{% block content %}
 
-    if request.method == "POST":
-        username = (request.form.get("username") or "").strip()
-        password = (request.form.get("password") or "").strip()
-        role = (request.form.get("role") or "").strip()
+<!-- ================= PAGE HEADER ================= -->
+<div class="page-header mb-4">
+    <h1>Gestion des utilisateurs</h1>
+    <p class="text-muted">
+        Création et gestion des comptes (administrateur / commercial)
+    </p>
+</div>
 
-        if not username or not password or not role:
-            flash("Champs obligatoires.", "danger")
-            return redirect(url_for("admin_users"))
+<!-- ================= CRÉATION UTILISATEUR ================= -->
+<div class="card mb-4">
+    <h5>Créer un utilisateur</h5>
 
-        if len(password) < 10:
-            flash("Mot de passe trop court (min 10 caractères).", "danger")
-            return redirect(url_for("admin_users"))
+    <form method="POST" action="{{ url_for('admin_users') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT COUNT(*) FROM users WHERE username=%s",
-                (username,),
-            )
-            exists = cur.fetchone()[0]
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Nom d’utilisateur</label>
+                <input type="text"
+                       name="username"
+                       class="form-control"
+                       required>
+            </div>
 
-        if exists > 0:
-            flash("Nom d'utilisateur déjà utilisé.", "danger")
-            return redirect(url_for("admin_users"))
+            <div class="col-md-4">
+                <label class="form-label">Mot de passe</label>
+                <input type="password"
+                       name="password"
+                       class="form-control"
+                       minlength="10"
+                       required>
+                <small class="text-muted">
+                    Minimum 10 caractères
+                </small>
+            </div>
 
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO users (username, password_hash, role)
-                VALUES (%s, %s, %s)
-                """,
-                (username, generate_password_hash(password), role),
-            )
+            <div class="col-md-3">
+                <label class="form-label">Rôle</label>
+                <select name="role" class="form-select" required>
+                    <option value="">— Choisir —</option>
+                    <option value="admin">Administrateur</option>
+                    <option value="commercial">Commercial</option>
+                </select>
+            </div>
 
-        conn.commit()
-        flash("Utilisateur créé.", "success")
-        return redirect(url_for("admin_users"))
+            <div class="col-md-1 d-flex align-items-end">
+                <button class="btn btn-primary w-100">
+                    Créer
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
 
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM users ORDER BY id ASC")
-        users = cur.fetchall()
+<!-- ================= LISTE UTILISATEURS ================= -->
+<div class="card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Utilisateurs existants</h5>
+        <span class="text-muted small">
+            {{ users|length if users else 0 }} compte(s)
+        </span>
+    </div>
 
-    return render_template("admin_users.html", users=[row_to_obj(u) for u in users])
+    {% if not users %}
+        <p class="text-muted mb-0">
+            Aucun utilisateur.
+        </p>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Utilisateur</th>
+                        <th>Rôle</th>
+                        <th style="width:280px;text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for u in users %}
+                    <tr>
+                        <td class="text-muted">
+                            #{{ u.id }}
+                        </td>
 
+                        <td>
+                            <strong>{{ u.username }}</strong>
+                        </td>
 
-@app.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
-@admin_required
-def admin_edit_user(user_id):
-    conn = get_db()
+                        <td>
+                            {% if u.role == "admin" %}
+                                <span class="badge bg-danger">
+                                    Administrateur
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    Commercial
+                                </span>
+                            {% endif %}
+                        </td>
 
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
-        user = cur.fetchone()
+                        <td class="text-end">
+                            <!-- ===== RESET PASSWORD ===== -->
+                            <form method="POST"
+                                  action="{{ url_for('admin_reset_password', user_id=u.id) }}"
+                                  style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="new_password" value="TempPass123!">
+                                <button class="btn btn-outline-warning btn-sm"
+                                        onclick="return confirm('Réinitialiser le mot de passe ?');">
+                                    Reset MDP
+                                </button>
+                            </form>
 
-    if not user:
-        flash("Utilisateur introuvable.", "danger")
-        return redirect(url_for("admin_users"))
+                            <!-- ===== SUPPRIMER ===== -->
+                            {% if u.id != 1 %}
+                            <form method="POST"
+                                  action="{{ url_for('admin_delete_user', user_id=u.id) }}"
+                                  style="display:inline;"
+                                  onsubmit="return confirm('Supprimer cet utilisateur ?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button class="btn btn-danger btn-sm">
+                                    Supprimer
+                                </button>
+                            </form>
+                            {% else %}
+                                <span class="text-muted small">
+                                    Admin principal
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
 
-    if request.method == "POST":
-        username = (request.form.get("username") or "").strip()
-        password = (request.form.get("password") or "").strip()
-        role = (request.form.get("role") or "").strip()
-
-        if not username or not role:
-            flash("Nom d’utilisateur et rôle obligatoires.", "danger")
-            return redirect(url_for("admin_edit_user", user_id=user_id))
-
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT COUNT(*) FROM users WHERE username=%s AND id<>%s",
-                (username, user_id),
-            )
-            exists = cur.fetchone()[0]
-
-        if exists > 0:
-            flash("Nom déjà utilisé.", "danger")
-            return redirect(url_for("admin_edit_user", user_id=user_id))
-
-        if password:
-            if len(password) < 10:
-                flash("Mot de passe trop court (min 10 caractères).", "danger")
-                return redirect(url_for("admin_edit_user", user_id=user_id))
-
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    UPDATE users
-                    SET username=%s, password_hash=%s, role=%s
-                    WHERE id=%s
-                    """,
-                    (username, generate_password_hash(password), role, user_id),
-                )
-        else:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    UPDATE users
-                    SET username=%s, role=%s
-                    WHERE id=%s
-                    """,
-                    (username, role, user_id),
-                )
-
-        conn.commit()
-        flash("Utilisateur mis à jour.", "success")
-        return redirect(url_for("admin_users"))
-
-    return render_template(
-        "admin_edit_user.html",
-        user=row_to_obj(user),
-    )
-
-
-@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
-@admin_required
-def admin_delete_user(user_id):
-    if user_id == 1:
-        flash("Impossible de supprimer l'administrateur principal.", "danger")
-        return redirect(url_for("admin_users"))
-
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
-
-    conn.commit()
-    flash("Utilisateur supprimé.", "success")
-    return redirect(url_for("admin_users"))
-
-
-@app.route("/admin/users/<int:user_id>/reset_password", methods=["POST"])
-@admin_required
-def admin_reset_password(user_id):
-    new_password = (request.form.get("new_password") or "").strip()
-
-    if not new_password:
-        flash("Le nouveau mot de passe est obligatoire.", "danger")
-        return redirect(url_for("admin_users"))
-
-    if len(new_password) < 10:
-        flash("Mot de passe trop court (min 10 caractères).", "danger")
-        return redirect(url_for("admin_users"))
-
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM users WHERE id=%s", (user_id,))
-        user = cur.fetchone()
-
-    if not user:
-        flash("Utilisateur introuvable.", "danger")
-        return redirect(url_for("admin_users"))
-
-    with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE users SET password_hash=%s WHERE id=%s",
-            (generate_password_hash(new_password), user_id),
-        )
-
-    conn.commit()
-    flash("Mot de passe réinitialisé.", "success")
-    return redirect(url_for("admin_users"))
+{% endblock %}

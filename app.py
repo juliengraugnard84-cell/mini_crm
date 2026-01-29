@@ -595,29 +595,44 @@ def can_access_client(client_id: int) -> bool:
     - Admin : accès total
     - Commercial : uniquement ses dossiers (owner_id)
     """
-    if not client_id:
+
+    # ✅ robustesse : accepte "12" en string, et évite les crashs
+    try:
+        client_id_int = int(client_id)
+    except Exception:
         return False
 
-    user = session.get("user")
-    if not user:
+    if client_id_int <= 0:
         return False
 
-    # Admin = accès total
-    if user.get("role") == "admin":
+    user = session.get("user") or {}
+    user_id = user.get("id")
+    role = user.get("role")
+
+    if not user_id or not role:
+        return False
+
+    # ✅ Admin = accès total
+    if role == "admin":
         return True
 
+    # ✅ Commercial : owner_id doit matcher
     conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT owner_id FROM crm_clients WHERE id = %s",
-            (client_id,),
-        )
-        row = cur.fetchone()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT owner_id FROM crm_clients WHERE id = %s",
+                (client_id_int,),
+            )
+            row = cur.fetchone()
+    except Exception:
+        # sécurité absolue : pas de crash
+        return False
 
     if not row:
         return False
 
-    return row["owner_id"] == user.get("id")
+    return row.get("owner_id") == user_id
 
 
 def get_current_user():
@@ -642,13 +657,67 @@ def format_date_safe(value):
 
     # datetime / date
     if hasattr(value, "strftime"):
-        return value.strftime("%Y-%m-%d")
+        try:
+            return value.strftime("%Y-%m-%d")
+        except Exception:
+            return "—"
 
     # string ISO ou autre
     try:
         return str(value)[:10]
     except Exception:
         return "—"
+
+
+# =========================================================
+# (NOUVEAU) Helpers documents — utilisés par bloc 11
+# - extraction client_id depuis une key S3 "clients/<slug>_<id>/..."
+# - validation d'accès sur une key S3 (download/delete)
+# =========================================================
+
+def extract_client_id_from_s3_key(key: str):
+    """
+    Extrait client_id depuis une key S3 de type :
+    clients/<slug>_<client_id>/fichier.pdf
+
+    Retourne int ou None.
+    """
+    if not key:
+        return None
+    m = re.match(r"^clients\/[^\/]+_(\d+)\/", key)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
+
+
+def can_access_document_key(key: str) -> bool:
+    """
+    Vérifie si l'utilisateur courant peut accéder à un document S3 via sa key.
+    - Admin : OK
+    - Commercial : OK uniquement si le document est dans un dossier accessible
+    - "clients/global/..." : réservé admin (pas de client_id)
+    """
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    if not role:
+        return False
+
+    if role == "admin":
+        return True
+
+    # commerciaux : pas d'accès aux docs globaux
+    if key.startswith("clients/global/"):
+        return False
+
+    client_id = extract_client_id_from_s3_key(key)
+    if not client_id:
+        return False
+
+    return can_access_client(client_id)
 
 
 ############################################################
@@ -1135,7 +1204,7 @@ def chiffre_affaire():
 
 
 ############################################################
-# 9. ADMIN — UTILISATEURS (RESTAURATION COMPLÈTE)
+# 9. ADMIN — UTILISATEURS (GESTION COMPLÈTE ET SÉCURISÉE)
 ############################################################
 
 @app.route("/admin/users", methods=["GET", "POST"])
@@ -1143,9 +1212,9 @@ def chiffre_affaire():
 def admin_users():
     conn = get_db()
 
-    # =========================
-    # AJOUT UTILISATEUR
-    # =========================
+    # =====================================================
+    # AJOUT UTILISATEUR (ADMIN / COMMERCIAL)
+    # =====================================================
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
         password = (request.form.get("password") or "").strip()
@@ -1185,9 +1254,9 @@ def admin_users():
         flash("Utilisateur créé avec succès.", "success")
         return redirect(url_for("admin_users"))
 
-    # =========================
-    # LISTE UTILISATEURS
-    # =========================
+    # =====================================================
+    # LISTE DES UTILISATEURS
+    # =====================================================
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1204,33 +1273,51 @@ def admin_users():
     )
 
 
+# =========================================================
+# SUPPRESSION UTILISATEUR
+# =========================================================
 @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
 @admin_required
 def admin_delete_user(user_id):
-    # Protection admin principal
+    # 🔒 Protection admin principal
     if user_id == 1:
         flash("Impossible de supprimer l’administrateur principal.", "danger")
         return redirect(url_for("admin_users"))
 
     conn = get_db()
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        cur.execute("SELECT id FROM users WHERE id=%s", (user_id,))
+        if not cur.fetchone():
+            flash("Utilisateur introuvable.", "danger")
+            return redirect(url_for("admin_users"))
+
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
 
     conn.commit()
     flash("Utilisateur supprimé.", "success")
     return redirect(url_for("admin_users"))
 
 
+# =========================================================
+# RESET MOT DE PASSE
+# =========================================================
 @app.route("/admin/users/<int:user_id>/reset_password", methods=["POST"])
 @admin_required
 def admin_reset_password(user_id):
     new_password = (request.form.get("new_password") or "").strip()
 
-    if len(new_password) < 10:
+    if not new_password or len(new_password) < 10:
         flash("Mot de passe trop court (min 10 caractères).", "danger")
         return redirect(url_for("admin_users"))
 
     conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("SELECT id FROM users WHERE id=%s", (user_id,))
+        if not cur.fetchone():
+            flash("Utilisateur introuvable.", "danger")
+            return redirect(url_for("admin_users"))
+
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1247,7 +1334,6 @@ def admin_reset_password(user_id):
     conn.commit()
     flash("Mot de passe réinitialisé.", "success")
     return redirect(url_for("admin_users"))
-
 
 
 ############################################################
@@ -1322,26 +1408,26 @@ def delete_cotation_admin(cotation_id):
 
 
 ############################################################
-# 11. DOCUMENTS (GLOBAL + PAR DOSSIER) — LISTE / DOWNLOAD / UPLOAD / DELETE
-# Objectifs :
-# - /documents (ADMIN) : liste globale + upload global + suppression
-# - commerciaux : accès aux documents UNIQUEMENT via leurs dossiers (/clients/<id>)
-# - téléchargement sécurisé via URL signée (S3) + contrôle d'accès
-# - compat templates existants : upload_document, delete_document, download_document
+# 11. DOCUMENTS (GLOBAL + PAR DOSSIER)
+# - ADMIN : vue globale + upload + delete
+# - COMMERCIAL : accès UNIQUEMENT à ses dossiers
+# - S3 privé + URL signée
+# - COMPATIBLE templates existants
 ############################################################
 
+# =========================================================
+# LISTE GLOBALE DOCUMENTS (ADMIN)
+# =========================================================
 @app.route("/documents")
 @admin_required
 def documents():
     """
-    Liste globale de tous les documents clients (ADMIN).
-    - SAFE : aucun 500 si S3 indispo
-    - Retourne des items avec key (indispensable pour delete/download)
+    Liste globale des documents S3 (ADMIN).
+    Aucun crash si S3 indisponible.
     """
 
     fichiers = []
 
-    # Mode local ou S3 indisponible → page vide mais fonctionnelle
     if LOCAL_MODE or not s3:
         return render_template("documents.html", fichiers=fichiers)
 
@@ -1353,36 +1439,29 @@ def documents():
             if not key or key.endswith("/"):
                 continue
 
-            fichiers.append(
-                {
-                    "nom": key,                 # compat template (affichage)
-                    "key": key,                 # ✅ nécessaire pour delete/download
-                    "taille": item.get("Size", 0),
-                    "url": None,                # ✅ on passe par route download sécurisée
-                }
-            )
+            fichiers.append({
+                "nom": key,              # affichage (template legacy)
+                "key": key,              # clé réelle S3
+                "taille": item.get("Size", 0),
+                "url": None,             # download via route sécurisée
+            })
 
     except Exception as e:
         logger.exception("❌ Erreur chargement documents S3 : %r", e)
-        flash("Impossible de charger les documents (erreur stockage S3).", "danger")
+        flash("Impossible de charger les documents.", "danger")
 
     return render_template("documents.html", fichiers=fichiers)
 
 
 # =========================================================
-# UPLOAD DOCUMENT GLOBAL (ADMIN) — compat template documents.html
-# Endpoint attendu : url_for('upload_document')
-# Stockage : prefix "clients/global/"
+# UPLOAD DOCUMENT GLOBAL (ADMIN)
+# endpoint attendu : upload_document
 # =========================================================
 @app.route("/documents/upload", methods=["POST"], endpoint="upload_document")
 @admin_required
 def upload_document():
-    """
-    Upload global (ADMIN) pour documents "non rattachés à un dossier précis".
-    Le template documents.html appelle url_for('upload_document').
-    """
-
     fichier = request.files.get("file")
+
     if not fichier or not allowed_file(fichier.filename):
         flash("Fichier invalide.", "danger")
         return redirect(url_for("documents"))
@@ -1392,35 +1471,29 @@ def upload_document():
         return redirect(url_for("documents"))
 
     try:
-        name = clean_filename(secure_filename(fichier.filename))
+        filename = clean_filename(secure_filename(fichier.filename))
         prefix = "clients/global/"
-        key = _s3_make_non_overwriting_key(AWS_BUCKET, f"{prefix}{name}")
-        s3_upload_fileobj(fichier, AWS_BUCKET, key)
+        key = _s3_make_non_overwriting_key(
+            AWS_BUCKET,
+            f"{prefix}{filename}"
+        )
 
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
         flash("Document uploadé.", "success")
-        return redirect(url_for("documents"))
 
     except Exception as e:
-        logger.exception("❌ Erreur upload document global : %r", e)
-        flash("Erreur lors de l’upload du document.", "danger")
-        return redirect(url_for("documents"))
+        logger.exception("❌ Erreur upload document : %r", e)
+        flash("Erreur lors de l’upload.", "danger")
+
+    return redirect(url_for("documents"))
 
 
 # =========================================================
-# DOWNLOAD (ADMIN + COMMERCIAL si autorisé)
-# Utilisé par :
-# - documents.html : téléchargement global (admin)
-# - client_detail.html : docs rattachés au dossier (admin + propriétaire)
+# DOWNLOAD DOCUMENT (ADMIN + COMMERCIAL AUTORISÉ)
 # =========================================================
 @app.route("/documents/download")
 @login_required
 def download_document():
-    """
-    Téléchargement sécurisé via URL signée.
-    - Admin : OK pour tout
-    - Commercial : OK uniquement si le document est dans SON dossier client
-    """
-
     key = (request.args.get("key") or "").strip()
     if not key:
         flash("Document introuvable.", "danger")
@@ -1433,20 +1506,19 @@ def download_document():
     user = session.get("user") or {}
     role = user.get("role")
 
-    # ✅ Admin : accès total
+    # ================= ADMIN =================
     if role == "admin":
         url = s3_presigned_url(key)
         if not url:
-            flash("Impossible d’ouvrir le document.", "danger")
+            flash("Accès impossible au document.", "danger")
             return redirect(url_for("documents"))
         return redirect(url)
 
-    # ✅ Commercial : doit être propriétaire du dossier correspondant au prefix
-    # On autorise uniquement les clés sous "clients/<slug>_<id>/..."
+    # ================= COMMERCIAL =================
+    # clé attendue : clients/<slug>_<client_id>/...
     m = re.match(r"^clients\/[^\/]+_(\d+)\/", key)
     if not m:
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("dashboard"))
+        abort(403)
 
     client_id = int(m.group(1))
     if not can_access_client(client_id):
@@ -1454,26 +1526,21 @@ def download_document():
 
     url = s3_presigned_url(key)
     if not url:
-        flash("Impossible d’ouvrir le document.", "danger")
+        flash("Accès impossible au document.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
+
     return redirect(url)
 
 
 # =========================================================
-# DELETE (ADMIN + COMMERCIAL si autorisé)
-# Compat template documents.html : url_for('delete_document', key=...)
-# IMPORTANT : template envoie "key=f.nom" (qui est un key S3 complet)
+# DELETE DOCUMENT (ADMIN + COMMERCIAL AUTORISÉ)
+# IMPORTANT : clé reçue en POST
 # =========================================================
 @app.route("/documents/delete", methods=["POST"])
 @login_required
 def delete_document():
-    """
-    Suppression sécurisée.
-    - Admin : peut supprimer tous les documents
-    - Commercial : peut supprimer uniquement les documents de SES dossiers
-    """
+    key = (request.form.get("key") or "").strip()
 
-    key = (request.args.get("key") or "").strip()
     if not key:
         flash("Document introuvable.", "danger")
         return redirect(url_for("dashboard"))
@@ -1485,21 +1552,21 @@ def delete_document():
     user = session.get("user") or {}
     role = user.get("role")
 
-    # ✅ Admin : suppression globale
+    # ================= ADMIN =================
     if role == "admin":
         try:
             s3.delete_object(Bucket=AWS_BUCKET, Key=key)
             flash("Document supprimé.", "success")
         except Exception as e:
-            logger.exception("❌ Erreur suppression S3 (admin) : %r", e)
-            flash("Erreur lors de la suppression du document.", "danger")
+            logger.exception("❌ Erreur suppression admin : %r", e)
+            flash("Erreur lors de la suppression.", "danger")
+
         return redirect(url_for("documents"))
 
-    # ✅ Commercial : uniquement ses dossiers
+    # ================= COMMERCIAL =================
     m = re.match(r"^clients\/[^\/]+_(\d+)\/", key)
     if not m:
-        flash("Accès refusé.", "danger")
-        return redirect(url_for("dashboard"))
+        abort(403)
 
     client_id = int(m.group(1))
     if not can_access_client(client_id):
@@ -1509,16 +1576,14 @@ def delete_document():
         s3.delete_object(Bucket=AWS_BUCKET, Key=key)
         flash("Document supprimé.", "success")
     except Exception as e:
-        logger.exception("❌ Erreur suppression S3 (commercial) : %r", e)
-        flash("Erreur lors de la suppression du document.", "danger")
+        logger.exception("❌ Erreur suppression commercial : %r", e)
+        flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
 
 
 # =========================================================
-# (Optionnel mais utile) ALIAS pour compat si un ancien template
-# utilise endpoint 'documents_admin' ou autre.
-# Ne casse rien.
+# ALIAS COMPAT LEGACY
 # =========================================================
 app.view_functions.setdefault("documents_admin", documents)
 
