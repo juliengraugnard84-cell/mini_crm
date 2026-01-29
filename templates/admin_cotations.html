@@ -40,10 +40,8 @@
             <tbody>
                 {% for c in cotations %}
                 <tr
-                    {% if 'admin_cotation_detail' in available_endpoints %}
                     style="cursor:pointer"
                     onclick="window.location='{{ url_for('admin_cotation_detail', cotation_id=c.id) }}'"
-                    {% endif %}
                 >
 
                     <td class="text-muted">
@@ -55,14 +53,10 @@
                     </td>
 
                     <td>
-                        {% if 'client_detail' in available_endpoints %}
-                            <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
-                               onclick="event.stopPropagation();">
-                                {{ c.client_name or ("Client #" ~ c.client_id) }}
-                            </a>
-                        {% else %}
+                        <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
+                           onclick="event.stopPropagation();">
                             {{ c.client_name or ("Client #" ~ c.client_id) }}
-                        {% endif %}
+                        </a>
                     </td>
 
                     <td>
@@ -93,15 +87,12 @@
                         <div class="d-inline-flex gap-2">
 
                             <!-- ================= OUVRIR ================= -->
-                            {% if 'admin_cotation_detail' in available_endpoints %}
                             <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
                                class="btn btn-outline-primary btn-sm">
                                 Ouvrir
                             </a>
-                            {% endif %}
 
                             <!-- ================= SUPPRIMER ================= -->
-                            {% if 'delete_cotation_admin' in available_endpoints %}
                             <form method="post"
                                   action="{{ url_for('delete_cotation_admin', cotation_id=c.id) }}"
                                   onsubmit="return confirm('Supprimer définitivement cette cotation ?');">
@@ -110,17 +101,6 @@
                                     Supprimer
                                 </button>
                             </form>
-
-                            {% elif 'delete_cotation' in available_endpoints %}
-                            <form method="post"
-                                  action="{{ url_for('delete_cotation', cotation_id=c.id) }}"
-                                  onsubmit="return confirm('Supprimer définitivement cette cotation ?');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button class="btn btn-danger btn-sm">
-                                    Supprimer
-                                </button>
-                            </form>
-                            {% endif %}
 
                         </div>
                     </td>
