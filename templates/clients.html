@@ -52,9 +52,14 @@
         </div>
 
         <div class="card-body d-flex flex-column gap-2">
-            {% if clients_en_cours is defined and clients_en_cours %}
+            {% if clients_en_cours %}
                 {% for c in clients_en_cours %}
-                <div class="border rounded p-2">
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="border rounded p-2 text-decoration-none text-dark"
+                   style="transition:background .15s;"
+                   onmouseover="this.style.background='#f8f9fa'"
+                   onmouseout="this.style.background='transparent'">
+
                     <strong>{{ c.name }}</strong><br>
                     <small class="text-muted">
                         Commercial : {{ c.commercial or "—" }}
@@ -65,7 +70,8 @@
                           and 'update_client_status' in available_endpoints %}
                     <form method="post"
                           action="{{ url_for('update_client_status', client_id=c.id) }}"
-                          class="mt-2">
+                          class="mt-2"
+                          onclick="event.stopPropagation();">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <select name="status"
                                 class="form-select form-select-sm"
@@ -82,14 +88,7 @@
                         </select>
                     </form>
                     {% endif %}
-
-                    {% if 'client_detail' in available_endpoints %}
-                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                       class="btn btn-ouvrir btn-sm mt-2 w-100">
-                        Ouvrir
-                    </a>
-                    {% endif %}
-                </div>
+                </a>
                 {% endfor %}
             {% else %}
                 <p class="text-muted mb-0">Aucun dossier.</p>
@@ -104,22 +103,20 @@
         </div>
 
         <div class="card-body d-flex flex-column gap-2">
-            {% if clients_gagnes is defined and clients_gagnes %}
+            {% if clients_gagnes %}
                 {% for c in clients_gagnes %}
-                <div class="border border-success rounded p-2">
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="border border-success rounded p-2 text-decoration-none text-dark"
+                   style="transition:background .15s;"
+                   onmouseover="this.style.background='#f0fff4'"
+                   onmouseout="this.style.background='transparent'">
+
                     <strong>{{ c.name }}</strong><br>
                     <small class="text-muted">
                         Commercial : {{ c.commercial or "—" }}
                     </small>
                     <div class="text-success fw-bold mt-1">✔ Gagné</div>
-
-                    {% if 'client_detail' in available_endpoints %}
-                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                       class="btn btn-ouvrir btn-sm mt-2 w-100">
-                        Ouvrir
-                    </a>
-                    {% endif %}
-                </div>
+                </a>
                 {% endfor %}
             {% else %}
                 <p class="text-muted mb-0">Aucun dossier gagné.</p>
@@ -134,22 +131,20 @@
         </div>
 
         <div class="card-body d-flex flex-column gap-2">
-            {% if clients_perdus is defined and clients_perdus %}
+            {% if clients_perdus %}
                 {% for c in clients_perdus %}
-                <div class="border border-danger rounded p-2">
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="border border-danger rounded p-2 text-decoration-none text-dark"
+                   style="transition:background .15s;"
+                   onmouseover="this.style.background='#fff5f5'"
+                   onmouseout="this.style.background='transparent'">
+
                     <strong>{{ c.name }}</strong><br>
                     <small class="text-muted">
                         Commercial : {{ c.commercial or "—" }}
                     </small>
                     <div class="text-danger fw-bold mt-1">✖ Perdu</div>
-
-                    {% if 'client_detail' in available_endpoints %}
-                    <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                       class="btn btn-ouvrir btn-sm mt-2 w-100">
-                        Ouvrir
-                    </a>
-                    {% endif %}
-                </div>
+                </a>
                 {% endfor %}
             {% else %}
                 <p class="text-muted mb-0">Aucun dossier perdu.</p>
