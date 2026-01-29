@@ -1135,7 +1135,7 @@ def chiffre_affaire():
 
 
 ############################################################
-# 9. ADMIN — UTILISATEURS
+# 9. ADMIN — UTILISATEURS (RESTAURATION COMPLÈTE)
 ############################################################
 
 @app.route("/admin/users", methods=["GET", "POST"])
@@ -1143,13 +1143,16 @@ def chiffre_affaire():
 def admin_users():
     conn = get_db()
 
+    # =========================
+    # AJOUT UTILISATEUR
+    # =========================
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
         password = (request.form.get("password") or "").strip()
         role = (request.form.get("role") or "").strip()
 
-        if not username or not password or not role:
-            flash("Tous les champs sont obligatoires.", "danger")
+        if not username or not password or role not in ("admin", "commercial"):
+            flash("Champs invalides.", "danger")
             return redirect(url_for("admin_users"))
 
         if len(password) < 10:
@@ -1157,7 +1160,10 @@ def admin_users():
             return redirect(url_for("admin_users"))
 
         with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM users WHERE username=%s", (username,))
+            cur.execute(
+                "SELECT 1 FROM users WHERE username = %s",
+                (username,),
+            )
             if cur.fetchone():
                 flash("Nom d'utilisateur déjà utilisé.", "danger")
                 return redirect(url_for("admin_users"))
@@ -1168,15 +1174,28 @@ def admin_users():
                 INSERT INTO users (username, password_hash, role)
                 VALUES (%s, %s, %s)
                 """,
-                (username, generate_password_hash(password), role),
+                (
+                    username,
+                    generate_password_hash(password),
+                    role,
+                ),
             )
 
         conn.commit()
-        flash("Utilisateur créé.", "success")
+        flash("Utilisateur créé avec succès.", "success")
         return redirect(url_for("admin_users"))
 
+    # =========================
+    # LISTE UTILISATEURS
+    # =========================
     with conn.cursor() as cur:
-        cur.execute("SELECT id, username, role FROM users ORDER BY id ASC")
+        cur.execute(
+            """
+            SELECT id, username, role
+            FROM users
+            ORDER BY id ASC
+            """
+        )
         users = cur.fetchall()
 
     return render_template(
@@ -1188,13 +1207,14 @@ def admin_users():
 @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
 @admin_required
 def admin_delete_user(user_id):
+    # Protection admin principal
     if user_id == 1:
         flash("Impossible de supprimer l’administrateur principal.", "danger")
         return redirect(url_for("admin_users"))
 
     conn = get_db()
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
+        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
 
     conn.commit()
     flash("Utilisateur supprimé.", "success")
@@ -1213,13 +1233,21 @@ def admin_reset_password(user_id):
     conn = get_db()
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE users SET password_hash=%s WHERE id=%s",
-            (generate_password_hash(new_password), user_id),
+            """
+            UPDATE users
+            SET password_hash = %s
+            WHERE id = %s
+            """,
+            (
+                generate_password_hash(new_password),
+                user_id,
+            ),
         )
 
     conn.commit()
     flash("Mot de passe réinitialisé.", "success")
     return redirect(url_for("admin_users"))
+
 
 
 ############################################################
