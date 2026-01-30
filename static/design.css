@@ -308,3 +308,23 @@ main.content {
 .pipeline-card-body small {
     font-size: 12px;
 }
+/* =========================================================
+   🔧 FIX AFFICHAGE PAGES ADMIN (SAFE – SANS IMPACT GLOBAL)
+   ========================================================= */
+
+main.content {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+}
+
+.admin-users-page {
+    width: 100%;
+    max-width: 100%;
+    display: block;
+}
+
+.admin-users-page .card {
+    display: block;
+    width: 100%;
+}

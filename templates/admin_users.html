@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Utilisateurs{% endblock %}
+
+{% block content %}
+
+<!-- WRAPPER OBLIGATOIRE POUR ÉVITER MASQUAGE CSS -->
+<div class="container-fluid admin-users-page">
+
+    <!-- ================= PAGE HEADER ================= -->
+    <div class="page-header mb-4">
+        <h1>Utilisateurs</h1>
+        <p class="text-muted">
+            Création et gestion des comptes (administrateur / commercial)
+        </p>
+    </div>
+
+    <!-- ===================== CRÉATION UTILISATEUR ===================== -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="mb-3">Créer un utilisateur</h5>
+
+            <form method="POST" action="{{ url_for('admin_users') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Nom d’utilisateur</label>
+                        <input type="text"
+                               name="username"
+                               class="form-control"
+                               required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Mot de passe</label>
+                        <input type="password"
+                               name="password"
+                               class="form-control"
+                               minlength="10"
+                               required>
+                        <small class="text-muted">Minimum 10 caractères</small>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Rôle</label>
+                        <select name="role"
+                                class="form-select"
+                                required>
+                            <option value="">— Choisir —</option>
+                            <option value="admin">Administrateur</option>
+                            <option value="commercial">Commercial</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-1 d-grid">
+                        <button class="btn btn-warning">
+                            Créer
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================== LISTE UTILISATEURS ===================== -->
+    <div class="card">
+        <div class="card-body">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Utilisateurs existants</h5>
+                <span class="text-muted">{{ users|length }} compte(s)</span>
+            </div>
+
+            {% if not users %}
+                <div class="text-muted">Aucun utilisateur.</div>
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:70px;">ID</th>
+                                <th>Utilisateur</th>
+                                <th style="width:160px;">Rôle</th>
+                                <th style="width:260px;text-align:right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for u in users %}
+                            <tr>
+                                <td class="text-muted">#{{ u.id }}</td>
+
+                                <td>
+                                    <strong>{{ u.username }}</strong>
+                                </td>
+
+                                <td>
+                                    {% if u.role == "admin" %}
+                                        <span class="badge bg-danger">
+                                            Administrateur
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            Commercial
+                                        </span>
+                                    {% endif %}
+                                </td>
+
+                                <td class="text-end">
+                                    <!-- RESET PASSWORD -->
+                                    <form method="POST"
+                                          action="{{ url_for('admin_reset_password', user_id=u.id) }}"
+                                          class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                        <input type="hidden" name="new_password" value="password1234">
+                                        <button class="btn btn-outline-warning btn-sm">
+                                            Reset MDP
+                                        </button>
+                                    </form>
+
+                                    {% if u.id != 1 %}
+                                        <!-- DELETE -->
+                                        <form method="POST"
+                                              action="{{ url_for('admin_delete_user', user_id=u.id) }}"
+                                              class="d-inline"
+                                              onsubmit="return confirm('Supprimer cet utilisateur ?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                            <button class="btn btn-danger btn-sm ms-2">
+                                                Supprimer
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <span class="text-muted ms-2">
+                                            Admin principal
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
