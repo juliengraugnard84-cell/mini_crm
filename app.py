@@ -352,7 +352,11 @@ if not LOCAL_MODE:
             aws_access_key_id=AWS_ACCESS_KEY,
             aws_secret_access_key=AWS_SECRET_KEY,
         )
-        logger.info("S3 connecté | bucket=%s | region=%s", AWS_BUCKET, AWS_REGION)
+        logger.info(
+            "S3 connecté | bucket=%s | region=%s",
+            AWS_BUCKET,
+            AWS_REGION,
+        )
     except Exception as e:
         logger.exception("❌ Erreur connexion S3 : %r", e)
         s3 = None
@@ -360,16 +364,20 @@ else:
     logger.info("ℹ️ Mode local actif : S3 désactivé.")
 
 
+# =========================================================
+# VALIDATION & NORMALISATION FICHIERS
+# =========================================================
+
 def allowed_file(filename: str) -> bool:
     """
-    Vérifie extension + bloque doubles extensions dangereuses.
+    Vérifie extension + bloque extensions dangereuses.
     """
     if not filename or "." not in filename:
         return False
 
     lowered = filename.lower()
 
-    # Blocage extensions exécutables
+    # ❌ blocage exécutables
     if re.search(r"\.(exe|js|bat|cmd|sh|php|pl|py)\b", lowered):
         return False
 
@@ -379,7 +387,7 @@ def allowed_file(filename: str) -> bool:
 
 def clean_filename(filename: str) -> str:
     """
-    Nettoyage nom de fichier (ASCII / safe S3).
+    Nettoyage nom de fichier (ASCII / S3 safe).
     """
     name, ext = os.path.splitext(filename)
     name = (
@@ -403,14 +411,17 @@ def slugify(text: str) -> str:
         .encode("ascii", "ignore")
         .decode()
     )
-    text = re.sub(r"[^a-zA-Z0-9]+", "_", text).strip("_").lower()
-    return text
+    return re.sub(r"[^a-zA-Z0-9]+", "_", text).strip("_").lower()
 
+
+# =========================================================
+# PREFIX S3 CLIENT — SOURCE DE VÉRITÉ UNIQUE
+# =========================================================
 
 def client_s3_prefix(client_id: int) -> str:
     """
-    Préfixe S3 unique par client :
-    clients/<slug_nom>_<id>/
+    Préfixe S3 UNIQUE par client (OBLIGATOIRE partout) :
+    clients/<slug_nom>_<client_id>/
     """
     conn = get_db()
     with conn.cursor() as cur:
@@ -420,14 +431,17 @@ def client_s3_prefix(client_id: int) -> str:
         )
         row = cur.fetchone()
 
-    base = f"client_{client_id}"
-    if row and row["name"]:
+    slug = ""
+    if row and row.get("name"):
         slug = slugify(row["name"])
-        if slug:
-            base = f"{slug}_{client_id}"
 
+    base = f"{slug}_{client_id}" if slug else f"client_{client_id}"
     return f"clients/{base}/"
 
+
+# =========================================================
+# UPLOAD S3
+# =========================================================
 
 def s3_upload_fileobj(fileobj, bucket: str, key: str):
     """
@@ -454,6 +468,10 @@ def s3_upload_fileobj(fileobj, bucket: str, key: str):
     )
 
 
+# =========================================================
+# URL SIGNÉE
+# =========================================================
+
 def s3_presigned_url(key: str, expires_in: int = 3600) -> str:
     """
     Génère une URL signée (lecture privée).
@@ -473,13 +491,17 @@ def s3_presigned_url(key: str, expires_in: int = 3600) -> str:
     except ClientError as e:
         logger.error(
             "Erreur presigned URL S3 (ClientError): %s",
-            getattr(e, "response", None)
+            getattr(e, "response", None),
         )
         return ""
     except Exception as e:
         logger.exception("Erreur presigned URL S3 : %r", e)
         return ""
 
+
+# =========================================================
+# LISTING S3
+# =========================================================
 
 def s3_list_all_objects(bucket: str, prefix: str | None = None):
     """
@@ -511,7 +533,7 @@ def s3_list_all_objects(bucket: str, prefix: str | None = None):
 
 def _s3_object_exists(bucket: str, key: str) -> bool:
     """
-    Test existence objet S3, sans casser le comportement.
+    Test existence objet S3.
     """
     if not s3:
         return False
@@ -521,16 +543,14 @@ def _s3_object_exists(bucket: str, key: str) -> bool:
         return True
     except ClientError as e:
         code = (e.response or {}).get("Error", {}).get("Code", "")
-        if code in ("404", "NoSuchKey", "NotFound"):
-            return False
-        return False
+        return code not in ("404", "NoSuchKey", "NotFound")
     except Exception:
         return False
 
 
 def _s3_make_non_overwriting_key(bucket: str, key: str) -> str:
     """
-    Conserve le nom original, mais si collision → suffixe aléatoire.
+    Empêche l'écrasement d'un fichier existant.
     """
     if not _s3_object_exists(bucket, key):
         return key
@@ -543,6 +563,10 @@ def _s3_make_non_overwriting_key(bucket: str, key: str) -> str:
 
     return f"{base}_{secrets.token_hex(8)}{ext}"
 
+
+# =========================================================
+# LISTE DOCUMENTS CLIENT
+# =========================================================
 
 def list_client_documents(client_id: int):
     """
@@ -583,6 +607,7 @@ def list_client_documents(client_id: int):
     return docs
 
 
+
 ############################################################
 # 5. UTILITAIRES & CONTRÔLES D’ACCÈS
 ############################################################
@@ -596,7 +621,7 @@ def can_access_client(client_id: int) -> bool:
     - Commercial : uniquement ses dossiers (owner_id)
     """
 
-    # ✅ robustesse : accepte "12" en string, et évite les crashs
+    # ✅ robustesse : accepte "12" en string, évite crash
     try:
         client_id_int = int(client_id)
     except Exception:
@@ -626,7 +651,6 @@ def can_access_client(client_id: int) -> bool:
             )
             row = cur.fetchone()
     except Exception:
-        # sécurité absolue : pas de crash
         return False
 
     if not row:
@@ -646,23 +670,17 @@ def get_current_user():
 
 def format_date_safe(value):
     """
-    Sécurise l'affichage des dates dans les templates :
-    - accepte datetime
-    - accepte date
-    - accepte string
-    - empêche les erreurs .strftime sur str
+    Sécurise l'affichage des dates dans les templates.
     """
     if not value:
         return "—"
 
-    # datetime / date
     if hasattr(value, "strftime"):
         try:
             return value.strftime("%Y-%m-%d")
         except Exception:
             return "—"
 
-    # string ISO ou autre
     try:
         return str(value)[:10]
     except Exception:
@@ -670,35 +688,49 @@ def format_date_safe(value):
 
 
 # =========================================================
-# (NOUVEAU) Helpers documents — utilisés par bloc 11
-# - extraction client_id depuis une key S3 "clients/<slug>_<id>/..."
-# - validation d'accès sur une key S3 (download/delete)
+# Helpers documents — utilisés par bloc 11
 # =========================================================
 
 def extract_client_id_from_s3_key(key: str):
     """
-    Extrait client_id depuis une key S3 de type :
-    clients/<slug>_<client_id>/fichier.pdf
+    Extrait client_id depuis une key S3.
+
+    Formats supportés :
+    - clients/<slug>_<id>/fichier.pdf
+    - clients/<id>/fichier.pdf   (legacy / compat)
 
     Retourne int ou None.
     """
     if not key:
         return None
+
+    # Format : clients/slug_nom_123/...
     m = re.match(r"^clients\/[^\/]+_(\d+)\/", key)
-    if not m:
-        return None
-    try:
-        return int(m.group(1))
-    except Exception:
-        return None
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            return None
+
+    # Format legacy : clients/123/...
+    m = re.match(r"^clients\/(\d+)\/", key)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            return None
+
+    return None
 
 
 def can_access_document_key(key: str) -> bool:
     """
     Vérifie si l'utilisateur courant peut accéder à un document S3 via sa key.
-    - Admin : OK
-    - Commercial : OK uniquement si le document est dans un dossier accessible
-    - "clients/global/..." : réservé admin (pas de client_id)
+
+    Règles :
+    - Admin : accès total
+    - Commercial : accès uniquement à ses clients
+    - clients/global/* : réservé admin
     """
     user = session.get("user") or {}
     role = user.get("role")
@@ -706,10 +738,11 @@ def can_access_document_key(key: str) -> bool:
     if not role:
         return False
 
+    # ✅ Admin = accès total
     if role == "admin":
         return True
 
-    # commerciaux : pas d'accès aux docs globaux
+    # ❌ commerciaux : pas d'accès aux documents globaux
     if key.startswith("clients/global/"):
         return False
 
@@ -739,7 +772,6 @@ def login_required(func):
 def admin_required(func):
     """
     Vérifie que l’utilisateur est admin.
-    (Comportement conservé : flash + redirect dashboard)
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -755,7 +787,7 @@ def admin_required(func):
 
 
 ############################################################
-# CSRF — VERSION SAFE (sans casser les endpoints existants)
+# CSRF — VERSION SAFE (sans casser l’existant)
 ############################################################
 
 @app.before_request
@@ -763,19 +795,16 @@ def csrf_protect():
     """
     CSRF SAFE :
     - Génère toujours un token
-    - Bloque toute requête mutante sans token (sauf endpoints exemptés)
+    - Bloque toute requête mutante sans token
     - Supporte token en form OU header
     """
 
-    # Génération du token
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
 
-    # Méthodes non mutantes
     if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
         return
 
-    # Endpoint exempté
     if request.endpoint in CSRF_EXEMPT_ENDPOINTS:
         return
 
@@ -785,9 +814,9 @@ def csrf_protect():
         or request.headers.get("X-Csrf-Token")
     )
 
-    # ✅ SAFE : token obligatoire (sinon fail) — évite contournement par absence de token
     if not sent_token or sent_token != session.get("csrf_token"):
         abort(403)
+
 
 
 ############################################################
@@ -1430,7 +1459,7 @@ def delete_cotation_admin(cotation_id):
 # ============================
 
 
-############################################################
+###########################################################
 # 11. DOCUMENTS (GLOBAL + PAR DOSSIER)
 # - ADMIN : vue globale + upload + delete
 # - COMMERCIAL : accès UNIQUEMENT à ses dossiers
@@ -1532,7 +1561,10 @@ def upload_client_document(client_id):
 
     try:
         filename = clean_filename(secure_filename(fichier.filename))
-        prefix = f"clients/{client_id}/"
+
+        # ✅ CORRECTION CRITIQUE : dossier client cohérent
+        prefix = client_s3_prefix(client_id)
+
         key = _s3_make_non_overwriting_key(
             AWS_BUCKET,
             f"{prefix}{filename}"
