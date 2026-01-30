@@ -1217,6 +1217,13 @@ def chiffre_affaire():
 @app.route("/admin/users", methods=["GET", "POST"])
 @admin_required
 def admin_users():
+    # =====================================================
+    # 🧪 TEST TEMPORAIRE — À SUPPRIMER APRÈS VÉRIFICATION
+    # =====================================================
+    # Si ce message s'affiche sur /admin/users,
+    # la route fonctionne correctement.
+    # return "<h1>ADMIN USERS OK</h1>"
+
     conn = get_db()
 
     # =====================================================
