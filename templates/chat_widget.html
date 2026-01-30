@@ -1,56 +1,104 @@
-<!-- Chat Floating Button -->
-<button id="chat-toggle" class="chat-toggle" type="button" aria-label="Ouvrir le chat">
-  <span class="chat-toggle-icon">💬</span>
-  <span id="chat-badge" class="chat-badge" style="display:none;">0</span>
+<!-- ================= CHAT BULLE FLOTTANTE ================= -->
+
+<!-- Bouton flottant -->
+<button
+    id="chat-toggle"
+    class="chat-toggle"
+    type="button"
+    aria-label="Ouvrir le chat"
+    aria-haspopup="dialog"
+    aria-expanded="false">
+
+    <span class="chat-toggle-icon">💬</span>
+
+    <span
+        id="chat-badge"
+        class="chat-badge"
+        style="display:none;"
+        aria-hidden="true">
+        0
+    </span>
 </button>
 
-<!-- Chat Widget -->
-<div id="chat-widget" class="chat-widget" aria-hidden="true">
-  <div class="chat-header">
-    <div class="chat-header-left">
-      <div class="chat-title">Chat</div>
-      <div class="chat-subtitle">Support interne</div>
+<!-- Widget Chat -->
+<div
+    id="chat-widget"
+    class="chat-widget"
+    aria-hidden="true"
+    role="dialog"
+    aria-label="Chat interne">
+
+    <!-- HEADER -->
+    <div class="chat-header">
+        <div class="chat-header-left">
+            <div class="chat-title">Chat interne</div>
+            <div class="chat-subtitle">Support</div>
+        </div>
+
+        <button
+            id="chat-close"
+            class="chat-close"
+            type="button"
+            aria-label="Fermer le chat">
+            ✕
+        </button>
     </div>
-    <button id="chat-close" class="chat-close" type="button" aria-label="Fermer">✕</button>
-  </div>
 
-  <div id="chat-messages"
-       class="chat-messages"
-       role="log"
-       aria-live="polite"></div>
+    <!-- MESSAGES -->
+    <div
+        id="chat-messages"
+        class="chat-messages"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions">
+    </div>
 
-  <form id="chat-form"
+    <!-- FORMULAIRE -->
+    <form
+        id="chat-form"
         class="chat-inputbar"
-        enctype="multipart/form-data">
+        enctype="multipart/form-data"
+        autocomplete="off">
 
-    <label class="chat-attach" title="Joindre un fichier">
-      📎
-      <input id="chat-file" name="file" type="file">
-    </label>
+        <label class="chat-attach" title="Joindre un fichier">
+            📎
+            <input
+                id="chat-file"
+                name="file"
+                type="file"
+                tabindex="-1">
+        </label>
 
-    <textarea
-      id="chat-input"
-      name="message"
-      class="chat-input"
-      rows="1"
-      placeholder="Écrire un message…"></textarea>
+        <textarea
+            id="chat-input"
+            name="message"
+            class="chat-input"
+            rows="1"
+            placeholder="Écrire un message…"
+            autocomplete="off">
+        </textarea>
 
-    <button class="chat-send"
+        <button
+            class="chat-send"
             type="submit"
-            aria-label="Envoyer">➤</button>
-  </form>
+            aria-label="Envoyer le message">
+            ➤
+        </button>
+    </form>
 </div>
 
-<script>
-  /*
-    IMPORTANT
-    ----------
-    - Utilisation systématique de |tojson
-    - Aucun "null" en string
-    - JavaScript toujours valide
-  */
+<!-- ================= VARIABLES JS CHAT ================= -->
 
-  window.CHAT_CURRENT_USER_ID = {{ (current_user.id if current_user else None) | tojson }};
-  window.CHAT_CURRENT_USERNAME = {{ (current_user.username if current_user else None) | tojson }};
-  window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else None) | tojson }};
+<script>
+    /*
+      IMPORTANT
+      ----------
+      - Utilisation de |tojson
+      - Jamais de "null" en string
+      - Compatible avec chat_widget.js
+    */
+
+    window.CHAT_CURRENT_USER_ID = {{ (current_user.id if current_user else None) | tojson }};
+    window.CHAT_CURRENT_USERNAME = {{ (current_user.username if current_user else None) | tojson }};
+    window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else None) | tojson }};
 </script>

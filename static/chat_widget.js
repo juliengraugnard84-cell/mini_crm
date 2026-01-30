@@ -12,11 +12,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const messagesBox = document.getElementById("chat-messages");
     const badge       = document.getElementById("chat-badge");
 
-    const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID;
-    const CSRF_TOKEN      = window.CHAT_CSRF_TOKEN;
+    const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID ?? null;
+    const CSRF_TOKEN      = window.CHAT_CSRF_TOKEN ?? null;
 
-    if (!toggleBtn || !widget || !form || !input || !messagesBox || !badge) {
-        console.warn("Chat widget incomplet");
+    /* ================= SÉCURITÉ ================= */
+
+    if (!toggleBtn || !widget || !form || !input || !messagesBox) {
+        console.warn("Chat widget incomplet — initialisation annulée");
         return;
     }
 
@@ -49,6 +51,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function setBadge(n) {
+        if (!badge) return;
+
         unreadCount = Math.max(0, n);
         if (unreadCount > 0) {
             badge.textContent = unreadCount;
@@ -76,7 +80,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const bubble = document.createElement("div");
         bubble.className = `chat-bubble ${mine ? "me" : "them"}`;
 
-        /* ===== META (nom + heure) ===== */
         const meta = document.createElement("div");
         meta.className = "chat-meta";
         meta.innerHTML = `
@@ -85,7 +88,6 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
         bubble.appendChild(meta);
 
-        /* ===== TEXTE ===== */
         if (m.message) {
             const text = document.createElement("div");
             text.className = "chat-text";
@@ -93,7 +95,6 @@ document.addEventListener("DOMContentLoaded", () => {
             bubble.appendChild(text);
         }
 
-        /* ===== FICHIER ===== */
         if (m.file_url) {
             const file = document.createElement("a");
             file.className = "chat-file";
@@ -104,17 +105,12 @@ document.addEventListener("DOMContentLoaded", () => {
             bubble.appendChild(file);
         }
 
-        /* ===== STATUT (✓ / ✓✓) ===== */
         if (mine) {
             const status = document.createElement("div");
             status.className = "chat-status";
-
-            if (m.is_read) {
-                status.innerHTML = `<span class="chat-read read">✓✓</span>`;
-            } else {
-                status.innerHTML = `<span class="chat-read sent">✓</span>`;
-            }
-
+            status.innerHTML = m.is_read
+                ? `<span class="chat-read read">✓✓</span>`
+                : `<span class="chat-read sent">✓</span>`;
             bubble.appendChild(status);
         }
 
@@ -124,22 +120,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ================= OPEN / CLOSE ================= */
 
-    async function setOpen(open) {
-        if (open) {
-            widget.classList.add("open");
-            widget.setAttribute("aria-hidden", "false");
-            resetBadge();
-            await loadMessages(true);
-            await markAsRead();
-            setTimeout(() => input.focus(), 120);
-        } else {
-            widget.classList.remove("open");
-            widget.setAttribute("aria-hidden", "true");
-        }
+    function openChat() {
+        widget.classList.add("open");
+        widget.setAttribute("aria-hidden", "false");
+        resetBadge();
+        loadMessages(true);
+        markAsRead();
+        setTimeout(() => input.focus(), 100);
     }
 
-    toggleBtn.addEventListener("click", () => setOpen(!isOpen()));
-    closeBtn.addEventListener("click", () => setOpen(false));
+    function closeChat() {
+        widget.classList.remove("open");
+        widget.setAttribute("aria-hidden", "true");
+    }
+
+    toggleBtn.addEventListener("click", () => {
+        isOpen() ? closeChat() : openChat();
+    });
+
+    if (closeBtn) {
+        closeBtn.addEventListener("click", closeChat);
+    }
 
     /* ================= LOAD ================= */
 
@@ -198,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function sendMessage() {
         const msg  = input.value.trim();
-        const file = fileInput.files[0];
+        const file = fileInput?.files?.[0];
 
         if (!msg && !file) return;
 
@@ -227,12 +228,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             input.value = "";
-            fileInput.value = "";
+            if (fileInput) fileInput.value = "";
             await loadMessages(true);
 
         } catch (e) {
             console.error("Erreur envoi chat", e);
-            alert("Erreur réseau");
         } finally {
             input.disabled = false;
             form.querySelector(".chat-send").disabled = false;
