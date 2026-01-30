@@ -1605,16 +1605,6 @@ def new_client():
     role = user.get("role")
     user_id = user.get("id")
 
-    # 🔹 Liste admin + commerciaux (select / compat templates)
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT id, username, role
-            FROM users
-            WHERE role IN ('admin', 'commercial')
-            ORDER BY username
-        """)
-        users = cur.fetchall()
-
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         email = (request.form.get("email") or "").strip()
@@ -1622,18 +1612,10 @@ def new_client():
         address = (request.form.get("address") or "").strip()
         siret = (request.form.get("siret") or "").strip()
 
-        # ✅ NOUVEAU : attribution via saisie manuelle "commercial_name"
-        # Objectif : ne plus dépendre d'un select owner_id côté template.
-        # - admin : peut saisir un username (admin/commercial) → on map vers users.id
-        # - commercial : owner_id = lui-même (comportement conservé)
-        owner_id = None
-
+        # 🔹 owner_id via saisie manuelle du commercial
         if role == "admin":
             commercial_name = (request.form.get("commercial_name") or "").strip()
-
-            # (Compat éventuelle) si un ancien template envoie encore owner_id,
-            # on accepte sans casser, mais la saisie manuelle est prioritaire.
-            fallback_owner_id = (request.form.get("owner_id") or "").strip()
+            owner_id = None
 
             if commercial_name:
                 with conn.cursor() as cur:
@@ -1642,56 +1624,43 @@ def new_client():
                         SELECT id
                         FROM users
                         WHERE LOWER(username) = LOWER(%s)
-                          AND role IN ('admin', 'commercial')
+                        AND role IN ('admin', 'commercial')
                         """,
                         (commercial_name,),
                     )
                     row = cur.fetchone()
                 if row:
                     owner_id = row["id"]
-            elif fallback_owner_id:
-                try:
-                    owner_id = int(fallback_owner_id)
-                except Exception:
-                    owner_id = None
-
         else:
             owner_id = user_id
 
         if not name:
             flash("Le nom du client est obligatoire.", "danger")
-            return render_template(
-                "new_client.html",
-                users=[row_to_obj(u) for u in users],
-            )
+            return redirect(url_for("clients"))
 
-        # ✅ Message aligné sur la saisie manuelle
         if not owner_id:
             flash("Commercial introuvable. Vérifiez le nom saisi.", "danger")
-            return render_template(
-                "new_client.html",
-                users=[row_to_obj(u) for u in users],
-            )
+            return redirect(url_for("clients"))
 
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO crm_clients (
                     name, email, phone, address, siret,
                     owner_id, status
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
                 RETURNING id
-            """, (name, email, phone, address, siret, owner_id))
+                """,
+                (name, email, phone, address, siret, owner_id),
+            )
             client_id = cur.fetchone()[0]
 
         conn.commit()
         flash("Dossier client créé.", "success")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    return render_template(
-        "new_client.html",
-        users=[row_to_obj(u) for u in users],
-    )
+    return redirect(url_for("clients"))
 
 
 # =========================
@@ -1707,51 +1676,52 @@ def clients():
     role = user.get("role")
     user_id = user.get("id")
 
-    # 🔹 Liste admin + commerciaux (templates)
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT id, username, role
-            FROM users
-            WHERE role IN ('admin', 'commercial')
-            ORDER BY username
-        """)
-        users = cur.fetchall()
-
     with conn.cursor() as cur:
         if role == "admin":
             if q:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
-                """, (f"%{q}%",))
+                    """,
+                    (f"%{q}%",),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     ORDER BY crm_clients.created_at DESC
-                """)
+                    """
+                )
         else:
             if q:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.owner_id = %s
                       AND crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
-                """, (user_id, f"%{q}%"))
+                    """,
+                    (user_id, f"%{q}%"),
+                )
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.owner_id = %s
                     ORDER BY crm_clients.created_at DESC
-                """, (user_id,))
+                    """,
+                    (user_id,),
+                )
 
         rows = cur.fetchall()
 
@@ -1770,7 +1740,6 @@ def clients():
         clients_en_cours=[row_to_obj(r) for r in en_cours],
         clients_gagnes=[row_to_obj(r) for r in gagnes],
         clients_perdus=[row_to_obj(r) for r in perdus],
-        users=[row_to_obj(u) for u in users],
         q=q,
     )
 
@@ -1825,12 +1794,15 @@ def client_detail(client_id):
     conn = get_db()
 
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT crm_clients.*, users.username AS commercial
             FROM crm_clients
             LEFT JOIN users ON users.id = crm_clients.owner_id
             WHERE crm_clients.id = %s
-        """, (client_id,))
+            """,
+            (client_id,),
+        )
         client = cur.fetchone()
 
     if not client:
@@ -1839,21 +1811,27 @@ def client_detail(client_id):
     documents = list_client_documents(client_id)
 
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT *
             FROM client_updates
             WHERE client_id = %s
             ORDER BY created_at DESC
-        """, (client_id,))
+            """,
+            (client_id,),
+        )
         updates = cur.fetchall()
 
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT *
             FROM cotations
             WHERE client_id = %s
             ORDER BY date_creation DESC
-        """, (client_id,))
+            """,
+            (client_id,),
+        )
         cotations = cur.fetchall()
 
     return render_template(
@@ -1866,12 +1844,26 @@ def client_detail(client_id):
     )
 
 
-# =========================================================
-# ALIAS ENDPOINT — COMPAT (SAFE)
-# =========================================================
-app.view_functions.setdefault("update_client_status", update_client_status)
+# =========================
+# CLIENT — SUPPRESSION (ADMIN)
+# =========================
+@app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
+@admin_required
+def delete_client(client_id):
+    conn = get_db()
 
-# ============================
+    with conn.cursor() as cur:
+        cur.execute("SELECT id FROM crm_clients WHERE id=%s", (client_id,))
+        if not cur.fetchone():
+            flash("Dossier client introuvable.", "danger")
+            return redirect(url_for("clients"))
+
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
+
+    conn.commit()
+    flash("Dossier client supprimé définitivement.", "success")
+    return redirect(url_for("clients"))
 
 
 ############################################################
