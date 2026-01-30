@@ -842,6 +842,15 @@ def inject_globals():
     )
 
 
+# ============================
+# FIN PARTIE 1/4
+# ============================
+# ============================
+# app.py — VERSION COMPLÈTE CORRIGÉE (PARTIE 2/4)
+# (AUTH + DASHBOARD + CHIFFRE D’AFFAIRES + ADMIN USERS + ADMIN COTATIONS)
+# ============================
+
+
 ############################################################
 # 7. LOGIN / LOGOUT — VERSION ROBUSTE & ALIGNÉE DB
 ############################################################
@@ -1201,8 +1210,6 @@ def chiffre_affaire():
     )
 
 
-
-
 ############################################################
 # 9. ADMIN — UTILISATEURS (GESTION COMPLÈTE ET SÉCURISÉE)
 ############################################################
@@ -1407,6 +1414,15 @@ def delete_cotation_admin(cotation_id):
     return redirect(url_for("admin_cotations"))
 
 
+# ============================
+# FIN PARTIE 2/4
+# ============================
+# ============================
+# app.py — VERSION COMPLÈTE CORRIGÉE (PARTIE 3/4)
+# (DOCUMENTS S3 + CLIENTS — VERSION UNIQUE, ADMIN + COMMERCIAL)
+# ============================
+
+
 ############################################################
 # 11. DOCUMENTS (GLOBAL + PAR DOSSIER)
 # - ADMIN : vue globale + upload + delete
@@ -1421,11 +1437,6 @@ def delete_cotation_admin(cotation_id):
 @app.route("/documents")
 @admin_required
 def documents():
-    """
-    Liste globale des documents S3 (ADMIN).
-    Aucun crash si S3 indisponible.
-    """
-
     fichiers = []
 
     if LOCAL_MODE or not s3:
@@ -1440,10 +1451,10 @@ def documents():
                 continue
 
             fichiers.append({
-                "nom": key,              # affichage (template legacy)
-                "key": key,              # clé réelle S3
+                "nom": key,
+                "key": key,
                 "taille": item.get("Size", 0),
-                "url": None,             # download via route sécurisée
+                "url": None,
             })
 
     except Exception as e:
@@ -1515,13 +1526,8 @@ def download_document():
         return redirect(url)
 
     # ================= COMMERCIAL =================
-    # clé attendue : clients/<slug>_<client_id>/...
-    m = re.match(r"^clients\/[^\/]+_(\d+)\/", key)
-    if not m:
-        abort(403)
-
-    client_id = int(m.group(1))
-    if not can_access_client(client_id):
+    client_id = extract_client_id_from_s3_key(key)
+    if not client_id or not can_access_client(client_id):
         abort(403)
 
     url = s3_presigned_url(key)
@@ -1534,7 +1540,6 @@ def download_document():
 
 # =========================================================
 # DELETE DOCUMENT (ADMIN + COMMERCIAL AUTORISÉ)
-# IMPORTANT : clé reçue en POST
 # =========================================================
 @app.route("/documents/delete", methods=["POST"])
 @login_required
@@ -1564,12 +1569,8 @@ def delete_document():
         return redirect(url_for("documents"))
 
     # ================= COMMERCIAL =================
-    m = re.match(r"^clients\/[^\/]+_(\d+)\/", key)
-    if not m:
-        abort(403)
-
-    client_id = int(m.group(1))
-    if not can_access_client(client_id):
+    client_id = extract_client_id_from_s3_key(key)
+    if not client_id or not can_access_client(client_id):
         abort(403)
 
     try:
@@ -1590,6 +1591,7 @@ app.view_functions.setdefault("documents_admin", documents)
 
 ############################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + STATUT + COTATIONS
+# ⚠️ VERSION UNIQUE — AUCUN DOUBLON
 ############################################################
 
 # =========================
@@ -1603,7 +1605,7 @@ def new_client():
     role = user.get("role")
     user_id = user.get("id")
 
-    # 🔹 Liste admin + commerciaux (select)
+    # 🔹 Liste admin + commerciaux (select / compat templates)
     with conn.cursor() as cur:
         cur.execute("""
             SELECT id, username, role
@@ -1620,12 +1622,39 @@ def new_client():
         address = (request.form.get("address") or "").strip()
         siret = (request.form.get("siret") or "").strip()
 
-        # 🔹 owner_id
+        # ✅ NOUVEAU : attribution via saisie manuelle "commercial_name"
+        # Objectif : ne plus dépendre d'un select owner_id côté template.
+        # - admin : peut saisir un username (admin/commercial) → on map vers users.id
+        # - commercial : owner_id = lui-même (comportement conservé)
+        owner_id = None
+
         if role == "admin":
-            try:
-                owner_id = int(request.form.get("owner_id") or 0)
-            except Exception:
-                owner_id = None
+            commercial_name = (request.form.get("commercial_name") or "").strip()
+
+            # (Compat éventuelle) si un ancien template envoie encore owner_id,
+            # on accepte sans casser, mais la saisie manuelle est prioritaire.
+            fallback_owner_id = (request.form.get("owner_id") or "").strip()
+
+            if commercial_name:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id
+                        FROM users
+                        WHERE LOWER(username) = LOWER(%s)
+                          AND role IN ('admin', 'commercial')
+                        """,
+                        (commercial_name,),
+                    )
+                    row = cur.fetchone()
+                if row:
+                    owner_id = row["id"]
+            elif fallback_owner_id:
+                try:
+                    owner_id = int(fallback_owner_id)
+                except Exception:
+                    owner_id = None
+
         else:
             owner_id = user_id
 
@@ -1636,25 +1665,23 @@ def new_client():
                 users=[row_to_obj(u) for u in users],
             )
 
+        # ✅ Message aligné sur la saisie manuelle
         if not owner_id:
-            flash("Veuillez sélectionner un commercial.", "danger")
+            flash("Commercial introuvable. Vérifiez le nom saisi.", "danger")
             return render_template(
                 "new_client.html",
                 users=[row_to_obj(u) for u in users],
             )
 
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 INSERT INTO crm_clients (
                     name, email, phone, address, siret,
                     owner_id, status
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
                 RETURNING id
-                """,
-                (name, email, phone, address, siret, owner_id),
-            )
+            """, (name, email, phone, address, siret, owner_id))
             client_id = cur.fetchone()[0]
 
         conn.commit()
@@ -1693,49 +1720,38 @@ def clients():
     with conn.cursor() as cur:
         if role == "admin":
             if q:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
-                    """,
-                    (f"%{q}%",),
-                )
+                """, (f"%{q}%",))
             else:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     ORDER BY crm_clients.created_at DESC
-                    """
-                )
+                """)
         else:
             if q:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.owner_id = %s
                       AND crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
-                    """,
-                    (user_id, f"%{q}%"),
-                )
+                """, (user_id, f"%{q}%"))
             else:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.owner_id = %s
                     ORDER BY crm_clients.created_at DESC
-                    """,
-                    (user_id,),
-                )
+                """, (user_id,))
 
         rows = cur.fetchall()
 
@@ -1809,15 +1825,12 @@ def client_detail(client_id):
     conn = get_db()
 
     with conn.cursor() as cur:
-        cur.execute(
-            """
+        cur.execute("""
             SELECT crm_clients.*, users.username AS commercial
             FROM crm_clients
             LEFT JOIN users ON users.id = crm_clients.owner_id
             WHERE crm_clients.id = %s
-            """,
-            (client_id,),
-        )
+        """, (client_id,))
         client = cur.fetchone()
 
     if not client:
@@ -1826,27 +1839,21 @@ def client_detail(client_id):
     documents = list_client_documents(client_id)
 
     with conn.cursor() as cur:
-        cur.execute(
-            """
+        cur.execute("""
             SELECT *
             FROM client_updates
             WHERE client_id = %s
             ORDER BY created_at DESC
-            """,
-            (client_id,),
-        )
+        """, (client_id,))
         updates = cur.fetchall()
 
     with conn.cursor() as cur:
-        cur.execute(
-            """
+        cur.execute("""
             SELECT *
             FROM cotations
             WHERE client_id = %s
             ORDER BY date_creation DESC
-            """,
-            (client_id,),
-        )
+        """, (client_id,))
         cotations = cur.fetchall()
 
     return render_template(
@@ -1862,251 +1869,9 @@ def client_detail(client_id):
 # =========================================================
 # ALIAS ENDPOINT — COMPAT (SAFE)
 # =========================================================
-app.view_functions.setdefault(
-    "update_client_status",
-    update_client_status
-)
-############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + STATUT + COTATIONS
-############################################################
+app.view_functions.setdefault("update_client_status", update_client_status)
 
-# =========================
-# CLIENT — CRÉATION
-# =========================
-@app.route("/clients/new", methods=["GET", "POST"])
-@login_required
-def new_client():
-    conn = get_db()
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
-
-    if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        email = (request.form.get("email") or "").strip()
-        phone = (request.form.get("phone") or "").strip()
-        address = (request.form.get("address") or "").strip()
-        siret = (request.form.get("siret") or "").strip()
-
-        # ✅ SÉCURITÉ ABSOLUE
-        # - commercial → dossier auto-attribué
-        # - admin → dossier auto-attribué (plus de select)
-        owner_id = user_id
-
-        if not name:
-            flash("Le nom du client est obligatoire.", "danger")
-            return redirect(url_for("clients"))
-
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO crm_clients (
-                    name, email, phone, address, siret,
-                    owner_id, status
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
-                RETURNING id
-                """,
-                (name, email, phone, address, siret, owner_id),
-            )
-            client_id = cur.fetchone()[0]
-
-        conn.commit()
-        flash("Dossier client créé.", "success")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    # ⚠️ Création inline depuis /clients → jamais affiché
-    return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — LISTE + RECHERCHE + PIPELINE
-# =========================
-@app.route("/clients")
-@login_required
-def clients():
-    conn = get_db()
-    q = (request.args.get("q") or "").strip()
-
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
-
-    with conn.cursor() as cur:
-        if role == "admin":
-            if q:
-                cur.execute(
-                    """
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                    """,
-                    (f"%{q}%",),
-                )
-            else:
-                cur.execute(
-                    """
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    ORDER BY crm_clients.created_at DESC
-                    """
-                )
-        else:
-            if q:
-                cur.execute(
-                    """
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id = %s
-                      AND crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                    """,
-                    (user_id, f"%{q}%"),
-                )
-            else:
-                cur.execute(
-                    """
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id = %s
-                    ORDER BY crm_clients.created_at DESC
-                    """,
-                    (user_id,),
-                )
-
-        rows = cur.fetchall()
-
-    en_cours, gagnes, perdus = [], [], []
-    for r in rows:
-        status = (r["status"] or "en_cours").lower()
-        if status == "gagne":
-            gagnes.append(r)
-        elif status == "perdu":
-            perdus.append(r)
-        else:
-            en_cours.append(r)
-
-    return render_template(
-        "clients.html",
-        clients_en_cours=[row_to_obj(r) for r in en_cours],
-        clients_gagnes=[row_to_obj(r) for r in gagnes],
-        clients_perdus=[row_to_obj(r) for r in perdus],
-        q=q,
-    )
-
-
-# =========================
-# CLIENT — MISE À JOUR STATUT
-# =========================
-@app.route("/clients/<int:client_id>/status", methods=["POST"])
-@login_required
-def update_client_status(client_id):
-    status = (request.form.get("status") or "").strip().lower()
-    if status not in ("en_cours", "gagne", "perdu"):
-        flash("Statut invalide.", "danger")
-        return redirect(url_for("clients"))
-
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
-
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute("SELECT owner_id FROM crm_clients WHERE id=%s", (client_id,))
-        row = cur.fetchone()
-
-    if not row:
-        flash("Dossier introuvable.", "danger")
-        return redirect(url_for("clients"))
-
-    if role != "admin" and row["owner_id"] != user_id:
-        abort(403)
-
-    with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE crm_clients SET status=%s WHERE id=%s",
-            (status, client_id),
-        )
-
-    conn.commit()
-    flash("Statut du dossier mis à jour.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# CLIENT — DÉTAIL (FICHE)
-# =========================
-@app.route("/clients/<int:client_id>", endpoint="client_detail")
-@login_required
-def client_detail(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT crm_clients.*, users.username AS commercial
-            FROM crm_clients
-            LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.id = %s
-            """,
-            (client_id,),
-        )
-        client = cur.fetchone()
-
-    if not client:
-        abort(404)
-
-    documents = list_client_documents(client_id)
-
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT *
-            FROM client_updates
-            WHERE client_id = %s
-            ORDER BY created_at DESC
-            """,
-            (client_id,),
-        )
-        updates = cur.fetchall()
-
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT *
-            FROM cotations
-            WHERE client_id = %s
-            ORDER BY date_creation DESC
-            """,
-            (client_id,),
-        )
-        cotations = cur.fetchall()
-
-    return render_template(
-        "client_detail.html",
-        client=row_to_obj(client),
-        documents=documents,
-        updates=[row_to_obj(u) for u in updates],
-        client_cotations=[row_to_obj(c) for c in cotations],
-        can_request_update=True,
-    )
-
-
-# =========================================================
-# ALIAS ENDPOINT — COMPAT (SAFE)
-# =========================================================
-app.view_functions.setdefault(
-    "update_client_status",
-    update_client_status
-)
+# ============================
 
 
 ############################################################
@@ -2511,17 +2276,14 @@ if __name__ == "__main__":
     )
 
 
-# ============================
-# FIN PARTIE 4/4
-# ============================
-# =========================
+############################################################
 # DEBUG — LISTE DES ROUTES CHARGÉES
-# =========================
+############################################################
 @app.route("/__routes__")
 def debug_routes():
     return "<br>".join(sorted(app.view_functions.keys()))
-# =========================================================
-# ALIAS ENDPOINT — FIX CRASH MENU / DASHBOARD
-# =========================================================
 
 
+# ============================
+# FIN PARTIE 4/4
+# ============================
