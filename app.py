@@ -1500,6 +1500,48 @@ def upload_document():
 
 
 # =========================================================
+# UPLOAD DOCUMENT PAR DOSSIER CLIENT
+# endpoint attendu : upload_client_document (templates)
+# =========================================================
+@app.route(
+    "/clients/<int:client_id>/documents/upload",
+    methods=["POST"],
+    endpoint="upload_client_document",
+)
+@login_required
+def upload_client_document(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    fichier = request.files.get("file")
+
+    if not fichier or not allowed_file(fichier.filename):
+        flash("Fichier invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    if LOCAL_MODE or not s3:
+        flash("Upload indisponible en mode local.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    try:
+        filename = clean_filename(secure_filename(fichier.filename))
+        prefix = f"clients/{client_id}/"
+        key = _s3_make_non_overwriting_key(
+            AWS_BUCKET,
+            f"{prefix}{filename}"
+        )
+
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
+        flash("Document ajouté au dossier client.", "success")
+
+    except Exception as e:
+        logger.exception("❌ Erreur upload document client : %r", e)
+        flash("Erreur lors de l’upload du document.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================================================
 # DOWNLOAD DOCUMENT (ADMIN + COMMERCIAL AUTORISÉ)
 # =========================================================
 @app.route("/documents/download")
