@@ -1845,6 +1845,84 @@ def client_detail(client_id):
 
 
 # =========================
+# COTATION — CRÉATION (COMMERCIAL / ADMIN)
+# =========================
+@app.route("/clients/<int:client_id>/cotation", methods=["POST"], endpoint="create_cotation")
+@login_required
+def create_cotation(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    date_negociation = request.form.get("date_negociation")
+    heure_negociation = request.form.get("heure_negociation")
+    energie_type = request.form.get("energie_type")
+    type_compteur = request.form.get("type_compteur")
+    pdl_pce = request.form.get("pdl_pce")
+    date_echeance = request.form.get("date_echeance")
+    fournisseur_actuel = request.form.get("fournisseur_actuel")
+    entreprise_nom = request.form.get("entreprise_nom")
+    siret = request.form.get("siret")
+    signataire_nom = request.form.get("signataire_nom")
+    signataire_tel = request.form.get("signataire_tel")
+    signataire_email = request.form.get("signataire_email")
+    commentaire = request.form.get("commentaire")
+
+    if not date_negociation or not energie_type or not pdl_pce:
+        flash("Champs obligatoires manquants pour la cotation.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO cotations (
+                client_id,
+                date_negociation,
+                heure_negociation,
+                energie_type,
+                type_compteur,
+                pdl_pce,
+                date_echeance,
+                fournisseur_actuel,
+                entreprise_nom,
+                siret,
+                signataire_nom,
+                signataire_tel,
+                signataire_email,
+                commentaire,
+                created_by,
+                is_read,
+                status
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
+            """,
+            (
+                client_id,
+                date_negociation,
+                heure_negociation,
+                energie_type,
+                type_compteur,
+                pdl_pce,
+                date_echeance,
+                fournisseur_actuel,
+                entreprise_nom,
+                siret,
+                signataire_nom,
+                signataire_tel,
+                signataire_email,
+                commentaire,
+                user.get("id"),
+            ),
+        )
+
+    conn.commit()
+    flash("Demande de cotation envoyée.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
 # CLIENT — SUPPRESSION (ADMIN)
 # =========================
 @app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
@@ -1864,7 +1942,6 @@ def delete_client(client_id):
     conn.commit()
     flash("Dossier client supprimé définitivement.", "success")
     return redirect(url_for("clients"))
-
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
