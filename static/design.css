@@ -328,3 +328,68 @@ main.content {
     display: block;
     width: 100%;
 }
+/* ================= FIX CHAT FLOATING ================= */
+
+.chat-toggle {
+    position: fixed !important;
+    bottom: 24px !important;
+    right: 24px !important;
+
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+
+    background: linear-gradient(180deg, #f5b335, #f0a900);
+    border: none;
+
+    font-size: 26px;
+    color: #1f2937;
+    cursor: pointer;
+
+    z-index: 10000 !important;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Badge */
+.chat-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ================= CHAT WIDGET ================= */
+
+.chat-widget {
+    position: fixed !important;
+    bottom: 90px !important;
+    right: 24px !important;
+
+    width: 360px;
+    max-height: 520px;
+
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.35);
+
+    display: none;
+    flex-direction: column;
+
+    z-index: 10000 !important;
+}
+
+.chat-widget.open {
+    display: flex;
+}
