@@ -1025,7 +1025,7 @@ def dashboard():
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                AND date_trunc('month', date::date)=date_trunc('month', CURRENT_DATE)
+                  AND date_trunc('month', date::date)=date_trunc('month', CURRENT_DATE)
             """, (username,))
             ca_mois_com = cur.fetchone()[0]
 
@@ -1148,28 +1148,15 @@ def add_revenu():
 
 
 # =========================
-# CHIFFRE D’AFFAIRES (MENU)
+# CHIFFRE D’AFFAIRES
 # =========================
 @app.route("/chiffre-affaire", endpoint="chiffre_affaire")
 @login_required
 def chiffre_affaire():
     conn = get_db()
-    user = session.get("user")
-    role = user["role"]
-    username = user["username"]
-
-    ca_annuel_perso = 0
-    ca_mensuel_perso = 0
-
-    clients = []
-    historique_ca = []
-    global_par_mois = []
-    ca_par_commercial = []
-    historique_mensuel = []
-    historique_annuel = []
 
     with conn.cursor() as cur:
-        # ===== GLOBAL =====
+        # KPI GLOBAL
         cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
         ca_annuel_perso = cur.fetchone()[0]
 
@@ -1180,11 +1167,11 @@ def chiffre_affaire():
         """)
         ca_mensuel_perso = cur.fetchone()[0]
 
-        # ===== CLIENTS (FORM) =====
+        # CLIENTS
         cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
         clients = cur.fetchall()
 
-        # ===== HISTORIQUE DETAIL =====
+        # HISTORIQUE DETAIL
         cur.execute("""
             SELECT revenus.date, revenus.montant, revenus.commercial,
                    crm_clients.name AS client_name
@@ -1194,7 +1181,7 @@ def chiffre_affaire():
         """)
         historique_ca = cur.fetchall()
 
-        # ===== PAR COMMERCIAL =====
+        # CA PAR COMMERCIAL (GLOBAL)
         cur.execute("""
             SELECT
                 commercial,
@@ -1208,24 +1195,29 @@ def chiffre_affaire():
         """)
         ca_par_commercial = cur.fetchall()
 
-        # ===== HISTORIQUE GLOBAL =====
+        # ✅ CA MENSUEL PAR COMMERCIAL — ANNÉE EN COURS
         cur.execute("""
-            SELECT TO_CHAR(date::date,'YYYY-MM') AS periode,
-                   SUM(montant) AS total
+            SELECT
+                commercial,
+                EXTRACT(MONTH FROM date::date) AS mois,
+                SUM(montant) AS total
             FROM revenus
-            GROUP BY periode
-            ORDER BY periode DESC
+            WHERE EXTRACT(YEAR FROM date::date) = EXTRACT(YEAR FROM CURRENT_DATE)
+            GROUP BY commercial, mois
+            ORDER BY commercial, mois
         """)
-        historique_mensuel = cur.fetchall()
+        rows = cur.fetchall()
 
-        cur.execute("""
-            SELECT TO_CHAR(date::date,'YYYY') AS periode,
-                   SUM(montant) AS total
-            FROM revenus
-            GROUP BY periode
-            ORDER BY periode DESC
-        """)
-        historique_annuel = cur.fetchall()
+    ca_mensuel_par_commercial = {}
+    for r in rows:
+        com = r["commercial"]
+        mois = int(r["mois"])
+        total = float(r["total"] or 0)
+
+        if com not in ca_mensuel_par_commercial:
+            ca_mensuel_par_commercial[com] = {}
+
+        ca_mensuel_par_commercial[com][mois] = total
 
     return render_template(
         "chiffre_affaire.html",
@@ -1234,9 +1226,9 @@ def chiffre_affaire():
         clients=[row_to_obj(c) for c in clients],
         historique_ca=[row_to_obj(h) for h in historique_ca],
         ca_par_commercial=[row_to_obj(r) for r in ca_par_commercial],
-        historique_mensuel=[row_to_obj(h) for h in historique_mensuel],
-        historique_annuel=[row_to_obj(h) for h in historique_annuel],
+        ca_mensuel_par_commercial=ca_mensuel_par_commercial,
     )
+
 
 
 ############################################################
