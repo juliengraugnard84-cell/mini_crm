@@ -9,21 +9,58 @@
     <p class="text-muted">Suivi des performances financières</p>
 </div>
 
+<!-- ================= FILTRES ================= -->
+{% if current_user and current_user.role == 'admin' %}
+<form method="GET" class="card mb-4">
+    <h5>Filtres</h5>
+
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label>Année</label>
+            <select name="year" class="form-select">
+                {% for y in range(2022, (now().year + 1)) %}
+                    <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>
+                        {{ y }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label>Commercial</label>
+            <select name="commercial" class="form-select">
+                <option value="">— Tous —</option>
+                {% for commercial in ca_mensuel_par_commercial.keys() %}
+                    <option value="{{ commercial }}"
+                        {% if commercial == selected_commercial %}selected{% endif %}>
+                        {{ commercial }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <button class="btn btn-primary w-100">Appliquer</button>
+        </div>
+    </div>
+</form>
+{% endif %}
+
 <!-- ================= KPI ================= -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-bottom:32px;">
     <div class="kpi-tile">
-        <div class="kpi-label">Chiffre d’affaires annuel (global)</div>
+        <div class="kpi-label">Chiffre d’affaires annuel</div>
         <div class="kpi-value">{{ ca_annuel_perso|round(2) }} €</div>
     </div>
 
     <div class="kpi-tile">
-        <div class="kpi-label">Chiffre d’affaires mensuel (global)</div>
+        <div class="kpi-label">Chiffre d’affaires mensuel</div>
         <div class="kpi-value">{{ ca_mensuel_perso|round(2) }} €</div>
     </div>
 </div>
 
-<!-- ================= AJOUT CA (ADMIN UNIQUEMENT) ================= -->
-{% if session.user.role == 'admin' %}
+<!-- ================= AJOUT CA ================= -->
+{% if current_user and current_user.role == 'admin' %}
 <div class="card mb-5">
     <h5>Ajouter un chiffre d’affaires</h5>
 
@@ -59,10 +96,10 @@
 </div>
 {% endif %}
 
-<!-- ================= TABLEAU CA MENSUEL PAR COMMERCIAL ================= -->
-{% if session.user.role == 'admin' and ca_mensuel_par_commercial %}
+<!-- ================= TABLEAU CA MENSUEL ================= -->
+{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
 <div class="card mb-5">
-    <h5>CA mensuel par commercial — année en cours</h5>
+    <h5>CA mensuel par commercial — {{ selected_year }}</h5>
 
     <div class="table-responsive">
         <table class="table table-bordered align-middle text-center">
@@ -94,18 +131,10 @@
 </div>
 {% endif %}
 
-<!-- ================= GRAPHIQUE ================= -->
-{% if session.user.role == 'admin' and ca_mensuel_par_commercial %}
-<div class="card mb-5">
-    <h5>Évolution mensuelle du CA par commercial</h5>
-    <canvas id="caChart" height="120"></canvas>
-</div>
-{% endif %}
-
-<!-- ================= HISTORIQUE DETAIL ================= -->
-{% if session.user.role == 'admin' and historique_ca %}
+<!-- ================= HISTORIQUE ================= -->
+{% if current_user and current_user.role == 'admin' and historique_ca %}
 <div class="card mb-4">
-    <h5>Historique détaillé des chiffres d’affaires</h5>
+    <h5>Historique détaillé</h5>
 
     <table class="table table-sm align-middle">
         <thead>
@@ -129,42 +158,5 @@
     </table>
 </div>
 {% endif %}
-
-<!-- ================= CHART.JS ================= -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-{% if session.user.role == 'admin' and ca_mensuel_par_commercial %}
-const ctx = document.getElementById('caChart');
-
-const labels = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Aoû","Sep","Oct","Nov","Déc"];
-
-const dataSets = [
-    {% for commercial, mois in ca_mensuel_par_commercial.items() %}
-    {
-        label: "{{ commercial }}",
-        data: [{% for m in range(1,13) %}{{ mois.get(m, 0) }},{% endfor %}],
-        tension: 0.3,
-        fill: false
-    },
-    {% endfor %}
-];
-
-new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets: dataSets },
-    options: {
-        responsive: true,
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: { callback: v => v + " €" }
-            }
-        }
-    }
-});
-{% endif %}
-</script>
 
 {% endblock %}

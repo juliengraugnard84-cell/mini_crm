@@ -944,6 +944,8 @@ def logout():
 # 8. DASHBOARD + SEARCH + OUVERTURE COTATION + CHIFFRE D’AFFAIRES
 ############################################################
 
+from datetime import datetime
+
 # =========================
 # DASHBOARD
 # =========================
@@ -957,7 +959,6 @@ def dashboard():
     user_id = user.get("id")
     username = user.get("username")
 
-    # ================= ADMIN GLOBAL =================
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM crm_clients")
         total_clients = cur.fetchone()[0]
@@ -981,7 +982,6 @@ def dashboard():
         """)
         last_rev = cur.fetchone()
 
-    # ================= DOCUMENTS =================
     total_docs = 0
     if not LOCAL_MODE and s3:
         try:
@@ -990,7 +990,6 @@ def dashboard():
         except Exception:
             total_docs = 0
 
-    # ================= COTATIONS ADMIN =================
     unread_cotations = 0
     cotations_admin = []
 
@@ -1008,10 +1007,7 @@ def dashboard():
             """)
             cotations_admin = cur.fetchall()
 
-    # ================= COMMERCIAL =================
     commercial_stats = None
-    commercial_clients = []
-    commercial_cotations = []
 
     if role == "commercial":
         with conn.cursor() as cur:
@@ -1029,63 +1025,11 @@ def dashboard():
             """, (username,))
             ca_mois_com = cur.fetchone()[0]
 
-            cur.execute("""
-                SELECT COUNT(*) FROM cotations
-                WHERE created_by=%s AND COALESCE(status,'')='nouvelle'
-            """, (user_id,))
-            cotations_attente = cur.fetchone()[0]
-
             commercial_stats = {
                 "nb_clients": nb_clients,
                 "ca_total": ca_total_com,
                 "ca_mois": ca_mois_com,
-                "cotations_attente": cotations_attente,
             }
-
-            cur.execute("""
-                SELECT id, name, status, created_at
-                FROM crm_clients
-                WHERE owner_id=%s
-                ORDER BY created_at DESC
-                LIMIT 5
-            """, (user_id,))
-            commercial_clients = cur.fetchall()
-
-            cur.execute("""
-                SELECT * FROM cotations
-                WHERE created_by=%s
-                ORDER BY date_creation DESC
-                LIMIT 5
-            """, (user_id,))
-            commercial_cotations = cur.fetchall()
-
-    # ================= PIPELINE =================
-    with conn.cursor() as cur:
-        if role == "admin":
-            cur.execute("""
-                SELECT crm_clients.*, users.username AS commercial
-                FROM crm_clients
-                LEFT JOIN users ON users.id = crm_clients.owner_id
-            """)
-        else:
-            cur.execute("""
-                SELECT crm_clients.*, users.username AS commercial
-                FROM crm_clients
-                LEFT JOIN users ON users.id = crm_clients.owner_id
-                WHERE crm_clients.owner_id=%s
-            """, (user_id,))
-        rows = cur.fetchall()
-
-    pipeline_en_cours, pipeline_gagnes, pipeline_perdus = [], [], []
-    for r in rows:
-        status = (r["status"] or "en_cours").lower()
-        obj = row_to_obj(r)
-        if status == "gagne":
-            pipeline_gagnes.append(obj)
-        elif status == "perdu":
-            pipeline_perdus.append(obj)
-        else:
-            pipeline_en_cours.append(obj)
 
     return render_template(
         "dashboard.html",
@@ -1094,14 +1038,9 @@ def dashboard():
         total_docs=total_docs,
         last_clients=last_clients,
         last_rev=row_to_obj(last_rev) if last_rev else None,
-        pipeline_en_cours=pipeline_en_cours,
-        pipeline_gagnes=pipeline_gagnes,
-        pipeline_perdus=pipeline_perdus,
         unread_cotations=unread_cotations,
         cotations_admin=[row_to_obj(r) for r in cotations_admin],
         commercial_stats=commercial_stats,
-        commercial_clients=[row_to_obj(c) for c in commercial_clients],
-        commercial_cotations=[row_to_obj(c) for c in commercial_cotations],
     )
 
 
@@ -1126,21 +1065,11 @@ def add_revenu():
         cur.execute("SELECT name FROM crm_clients WHERE id=%s", (client_id,))
         client = cur.fetchone()
 
-    if not client:
-        flash("Client introuvable.", "danger")
-        return redirect(url_for("chiffre_affaire"))
-
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO revenus (date, commercial, dossier, client_id, montant)
             VALUES (%s, %s, %s, %s, %s)
-        """, (
-            date_val,
-            user["username"],
-            client["name"],
-            client_id,
-            float(montant),
-        ))
+        """, (date_val, user["username"], client["name"], client_id, float(montant)))
 
     conn.commit()
     flash("Chiffre d’affaires ajouté.", "success")
@@ -1155,69 +1084,63 @@ def add_revenu():
 def chiffre_affaire():
     conn = get_db()
 
-    with conn.cursor() as cur:
-        # KPI GLOBAL
-        cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
-        ca_annuel_perso = cur.fetchone()[0]
+    year = request.args.get("year", type=int) or datetime.now().year
+    commercial_filter = request.args.get("commercial")
 
+    with conn.cursor() as cur:
+        # KPI annuel
         cur.execute("""
             SELECT COALESCE(SUM(montant),0)
             FROM revenus
-            WHERE date_trunc('month', date::date)=date_trunc('month', CURRENT_DATE)
-        """)
+            WHERE EXTRACT(YEAR FROM date::date)=%s
+        """, (year,))
+        ca_annuel_perso = cur.fetchone()[0]
+
+        # KPI mensuel (mois courant DE L’ANNÉE FILTRÉE)
+        cur.execute("""
+            SELECT COALESCE(SUM(montant),0)
+            FROM revenus
+            WHERE EXTRACT(YEAR FROM date::date)=%s
+              AND EXTRACT(MONTH FROM date::date)=EXTRACT(MONTH FROM CURRENT_DATE)
+        """, (year,))
         ca_mensuel_perso = cur.fetchone()[0]
 
-        # CLIENTS
         cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
         clients = cur.fetchall()
 
-        # HISTORIQUE DETAIL
-        cur.execute("""
+        sql_filter = ""
+        params = [year]
+
+        if commercial_filter:
+            sql_filter = "AND revenus.commercial = %s"
+            params.append(commercial_filter)
+
+        cur.execute(f"""
             SELECT revenus.date, revenus.montant, revenus.commercial,
                    crm_clients.name AS client_name
             FROM revenus
             JOIN crm_clients ON crm_clients.id = revenus.client_id
-            ORDER BY date::date DESC, revenus.id DESC
-        """)
+            WHERE EXTRACT(YEAR FROM date::date)=%s {sql_filter}
+            ORDER BY date::date DESC
+        """, params)
         historique_ca = cur.fetchall()
 
-        # CA PAR COMMERCIAL (GLOBAL)
-        cur.execute("""
-            SELECT
-                commercial,
-                SUM(CASE
-                    WHEN date_trunc('month', date::date)=date_trunc('month', CURRENT_DATE)
-                    THEN montant ELSE 0 END) AS ca_mensuel,
-                SUM(montant) AS ca_annuel
+        cur.execute(f"""
+            SELECT commercial,
+                   EXTRACT(MONTH FROM date::date) AS mois,
+                   SUM(montant) AS total
             FROM revenus
-            GROUP BY commercial
-            ORDER BY commercial
-        """)
-        ca_par_commercial = cur.fetchall()
-
-        # ✅ CA MENSUEL PAR COMMERCIAL — ANNÉE EN COURS
-        cur.execute("""
-            SELECT
-                commercial,
-                EXTRACT(MONTH FROM date::date) AS mois,
-                SUM(montant) AS total
-            FROM revenus
-            WHERE EXTRACT(YEAR FROM date::date) = EXTRACT(YEAR FROM CURRENT_DATE)
+            WHERE EXTRACT(YEAR FROM date::date)=%s {sql_filter}
             GROUP BY commercial, mois
             ORDER BY commercial, mois
-        """)
+        """, params)
         rows = cur.fetchall()
 
     ca_mensuel_par_commercial = {}
     for r in rows:
-        com = r["commercial"]
-        mois = int(r["mois"])
-        total = float(r["total"] or 0)
-
-        if com not in ca_mensuel_par_commercial:
-            ca_mensuel_par_commercial[com] = {}
-
-        ca_mensuel_par_commercial[com][mois] = total
+        ca_mensuel_par_commercial.setdefault(
+            r["commercial"], {}
+        )[int(r["mois"])] = float(r["total"])
 
     return render_template(
         "chiffre_affaire.html",
@@ -1225,10 +1148,10 @@ def chiffre_affaire():
         ca_mensuel_perso=ca_mensuel_perso,
         clients=[row_to_obj(c) for c in clients],
         historique_ca=[row_to_obj(h) for h in historique_ca],
-        ca_par_commercial=[row_to_obj(r) for r in ca_par_commercial],
         ca_mensuel_par_commercial=ca_mensuel_par_commercial,
+        selected_year=year,
+        selected_commercial=commercial_filter,
     )
-
 
 
 ############################################################
