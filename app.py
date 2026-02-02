@@ -1460,6 +1460,9 @@ def delete_cotation_admin(cotation_id):
 
 ############################################################
 # 10 BIS. ADMIN — SUIVI DES DOSSIERS PAR COMMERCIAL
+# - Route UNIQUE (pas de doublon)
+# - Totaux fiables
+# - Status robustes (NULL / vide / casse)
 ############################################################
 
 @app.route("/admin/dossiers")
@@ -1483,9 +1486,7 @@ def admin_dossiers():
 
                 COUNT(*) FILTER (
                     WHERE COALESCE(NULLIF(LOWER(c.status), ''), 'en_cours') = 'perdu'
-                ) AS perdus,
-
-                COUNT(c.id) AS total
+                ) AS perdus
 
             FROM users u
             LEFT JOIN crm_clients c ON c.owner_id = u.id
@@ -1495,9 +1496,16 @@ def admin_dossiers():
         """)
         rows = cur.fetchall()
 
+    stats = []
+    for r in rows:
+        obj = row_to_obj(r)
+        # ✅ total recalculé proprement (évite incohérences SQL)
+        obj.total = obj.en_cours + obj.gagnes + obj.perdus
+        stats.append(obj)
+
     return render_template(
         "admin_dossiers.html",
-        stats=[row_to_obj(r) for r in rows],
+        stats=stats,
     )
 
 
@@ -1515,6 +1523,7 @@ def admin_dossiers_detail(commercial):
 
     conn = get_db()
 
+    # 🔒 Vérifie que le commercial existe
     with conn.cursor() as cur:
         cur.execute("""
             SELECT id, username
@@ -1530,13 +1539,14 @@ def admin_dossiers_detail(commercial):
 
     commercial_id = user["id"]
 
+    # 📂 Récupération des dossiers
     with conn.cursor() as cur:
         cur.execute("""
             SELECT id, name, status, created_at
             FROM crm_clients
             WHERE owner_id = %s
             ORDER BY
-                CASE COALESCE(LOWER(status), 'en_cours')
+                CASE COALESCE(NULLIF(LOWER(status), ''), 'en_cours')
                     WHEN 'en_cours' THEN 1
                     WHEN 'gagne' THEN 2
                     WHEN 'perdu' THEN 3
@@ -1564,6 +1574,7 @@ def admin_dossiers_detail(commercial):
         gagnes=gagnes,
         perdus=perdus,
     )
+
 
 
 ############################################################
