@@ -1616,22 +1616,39 @@ def admin_planning():
     )
 
 
-@app.route("/admin/dossiers/<int:commercial_id>")
+############################################################
+# 10 BIS (DETAIL) — DÉTAIL DOSSIERS PAR COMMERCIAL (ADMIN)
+# ✅ Route UNIQUE (pas de doublon d'endpoint)
+# URL: /admin/dossiers/<username>
+############################################################
+
+@app.route("/admin/dossiers/<string:commercial>", endpoint="admin_dossiers_detail")
 @admin_required
-def admin_dossiers_detail(commercial_id):
+def admin_dossiers_detail(commercial):
+    commercial = (commercial or "").strip()
+    if not commercial:
+        return redirect(url_for("admin_dossiers"))
+
     conn = get_db()
 
-    # 🔒 Vérifie que le commercial existe
+    # 🔒 Vérifie que le commercial existe (par username)
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id, username FROM users WHERE id=%s AND role='commercial'",
-            (commercial_id,),
+            """
+            SELECT id, username
+            FROM users
+            WHERE role = 'commercial'
+              AND username = %s
+            """,
+            (commercial,),
         )
-        commercial = cur.fetchone()
+        u = cur.fetchone()
 
-    if not commercial:
+    if not u:
         flash("Commercial introuvable.", "danger")
         return redirect(url_for("admin_dossiers"))
+
+    commercial_id = u["id"]
 
     # 📂 Récupération des dossiers du commercial
     with conn.cursor() as cur:
@@ -1647,18 +1664,20 @@ def admin_dossiers_detail(commercial_id):
     for r in rows:
         status = (r["status"] or "en_cours").lower()
         if status == "gagne":
-            gagnes.append(r)
+            gagnes.append(row_to_obj(r))
         elif status == "perdu":
-            perdus.append(r)
+            perdus.append(row_to_obj(r))
         else:
-            en_cours.append(r)
+            en_cours.append(row_to_obj(r))
 
+    # ✅ IMPORTANT : ton template admin_dossiers_detail.html attend
+    # commercial.username -> on lui passe l'objet "commercial"
     return render_template(
         "admin_dossiers_detail.html",
-        commercial=row_to_obj(commercial),
-        en_cours=[row_to_obj(c) for c in en_cours],
-        gagnes=[row_to_obj(c) for c in gagnes],
-        perdus=[row_to_obj(c) for c in perdus],
+        commercial=row_to_obj(u),
+        en_cours=en_cours,
+        gagnes=gagnes,
+        perdus=perdus,
     )
 
 
