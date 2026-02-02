@@ -619,3 +619,145 @@ main.content {
     70%  { box-shadow: 0 0 0 12px rgba(37,99,235,0); }
     100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
 }
+/* ===============================
+   SYNERGYGROUP — COULEURS (SAFE)
+   =============================== */
+:root {
+    --sg-primary: #2563eb;     /* bleu principal (à ajuster si besoin) */
+    --sg-primary-soft: #e8efff;
+    --sg-bg: #f5f7fb;
+    --sg-border: #e1e6ef;
+    --sg-text: #0f172a;
+    --sg-muted: #64748b;
+}
+
+/* ===============================
+   ZONE MESSAGES
+   =============================== */
+.chat-messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    background: var(--sg-bg);
+}
+
+/* ===============================
+   MESSAGES
+   =============================== */
+.chat-row {
+    display: flex;
+    margin-bottom: 12px;
+}
+
+.chat-row.me {
+    justify-content: flex-end;
+}
+
+.chat-row.them {
+    justify-content: flex-start;
+}
+
+/* Bulles */
+.chat-bubble {
+    max-width: 75%;
+    padding: 10px 12px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Moi */
+.chat-bubble.me {
+    background: var(--sg-primary);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+
+/* Autre */
+.chat-bubble.them {
+    background: #fff;
+    color: var(--sg-text);
+    border: 1px solid var(--sg-border);
+    border-bottom-left-radius: 4px;
+}
+
+/* Meta (nom + heure) */
+.chat-meta {
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: var(--sg-muted);
+    display: flex;
+    justify-content: space-between;
+}
+
+/* ===============================
+   ZONE SAISIE — GROSSE AMÉLIORATION
+   =============================== */
+.chat-inputbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid var(--sg-border);
+    background: #fff;
+}
+
+/* Champ message BIEN visible */
+.chat-input {
+    flex: 1;
+    min-height: 42px;
+    resize: none;
+    border-radius: 12px;
+    border: 1px solid var(--sg-border);
+    padding: 10px 12px;
+    font-size: 14px;
+    background: var(--sg-primary-soft);
+    color: var(--sg-text);
+}
+
+.chat-input::placeholder {
+    color: var(--sg-muted);
+}
+
+.chat-input:focus {
+    outline: none;
+    border-color: var(--sg-primary);
+    background: #fff;
+}
+
+/* Pièce jointe */
+.chat-attach {
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--sg-muted);
+}
+
+.chat-attach:hover {
+    color: var(--sg-primary);
+}
+
+/* Bouton envoyer */
+.chat-send {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--sg-primary);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.chat-send:hover {
+    background: #1d4ed8;
+}
+
+/* ===============================
+   STATUT LECTURE
+   =============================== */
+.chat-status {
+    margin-top: 4px;
+    text-align: right;
+    font-size: 11px;
+    opacity: 0.8;
+}
