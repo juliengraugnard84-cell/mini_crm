@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Récapitulatif des dossiers par commercial</h1>
+
+<table class="table" style="max-width: 800px;">
+    <thead>
+        <tr>
+            <th>Commercial</th>
+            <th>En cours</th>
+            <th>Gagnés</th>
+            <th>Perdus</th>
+            <th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in stats %}
+        <tr>
+            <td>{{ s.commercial }}</td>
+            <td>{{ s.en_cours }}</td>
+            <td style="color: green;">{{ s.gagnes }}</td>
+            <td style="color: red;">{{ s.perdus }}</td>
+            <td><strong>{{ s.total }}</strong></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1459,6 +1459,37 @@ def delete_cotation_admin(cotation_id):
 # ============================
 
 
+############################################################
+# 10 BIS. ADMIN — SUIVI DES DOSSIERS PAR COMMERCIAL (LECTURE SEULE)
+############################################################
+
+@app.route("/admin/dossiers")
+@admin_required
+def admin_dossiers():
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                u.username AS commercial,
+                COUNT(*) FILTER (WHERE c.status = 'en_cours') AS en_cours,
+                COUNT(*) FILTER (WHERE c.status = 'gagne') AS gagnes,
+                COUNT(*) FILTER (WHERE c.status = 'perdu') AS perdus,
+                COUNT(c.id) AS total
+            FROM users u
+            LEFT JOIN crm_clients c ON c.owner_id = u.id
+            WHERE u.role = 'commercial'
+            GROUP BY u.username
+            ORDER BY u.username
+        """)
+        rows = cur.fetchall()
+
+    return render_template(
+        "admin_dossiers.html",
+        stats=[row_to_obj(r) for r in rows],
+    )
+
+
 ###########################################################
 # 11. DOCUMENTS (GLOBAL + PAR DOSSIER)
 # - ADMIN : vue globale + upload + delete
@@ -1562,7 +1593,7 @@ def upload_client_document(client_id):
     try:
         filename = clean_filename(secure_filename(fichier.filename))
 
-        # ✅ CORRECTION CRITIQUE : dossier client cohérent
+        # ✅ dossier client cohérent (SOURCE DE VÉRITÉ UNIQUE)
         prefix = client_s3_prefix(client_id)
 
         key = _s3_make_non_overwriting_key(
