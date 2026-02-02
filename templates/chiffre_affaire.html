@@ -30,7 +30,7 @@
             <label>Commercial</label>
             <select name="commercial" class="form-select">
                 <option value="">— Tous —</option>
-                {% for commercial in ca_mensuel_par_commercial.keys() %}
+                {% for commercial in all_commerciaux %}
                     <option value="{{ commercial }}"
                         {% if commercial == selected_commercial %}selected{% endif %}>
                         {{ commercial }}

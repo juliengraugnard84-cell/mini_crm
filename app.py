@@ -1098,10 +1098,19 @@ def chiffre_affaire():
     conn = get_db()
 
     year = request.args.get("year", type=int) or datetime.now().year
-    current_year = datetime.now().year   # ✅ CORRECTION ICI
+    current_year = datetime.now().year
     commercial_filter = request.args.get("commercial")
 
     with conn.cursor() as cur:
+        # ✅ LISTE STABLE DES COMMERCIAUX (POUR LE FILTRE)
+        cur.execute("""
+            SELECT DISTINCT commercial
+            FROM revenus
+            WHERE commercial IS NOT NULL
+            ORDER BY commercial
+        """)
+        all_commerciaux = [r["commercial"] for r in cur.fetchall()]
+
         # KPI annuel
         cur.execute("""
             SELECT COALESCE(SUM(montant),0)
@@ -1110,7 +1119,7 @@ def chiffre_affaire():
         """, (year,))
         ca_annuel_perso = cur.fetchone()[0]
 
-        # KPI mensuel (mois courant DE L’ANNÉE FILTRÉE)
+        # KPI mensuel (mois courant de l’année filtrée)
         cur.execute("""
             SELECT COALESCE(SUM(montant),0)
             FROM revenus
@@ -1166,10 +1175,12 @@ def chiffre_affaire():
         clients=[row_to_obj(c) for c in clients],
         historique_ca=[row_to_obj(h) for h in historique_ca],
         ca_mensuel_par_commercial=ca_mensuel_par_commercial,
+        all_commerciaux=all_commerciaux,      # ✅ AJOUT
         selected_year=year,
-        current_year=current_year,    # ✅ PASSÉ AU TEMPLATE
+        current_year=current_year,
         selected_commercial=commercial_filter,
     )
+
 
 
 ############################################################
