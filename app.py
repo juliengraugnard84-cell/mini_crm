@@ -1471,6 +1471,7 @@ def admin_dossiers():
     with conn.cursor() as cur:
         cur.execute("""
             SELECT
+                u.id AS commercial_id,
                 u.username AS commercial,
                 COUNT(*) FILTER (WHERE c.status = 'en_cours') AS en_cours,
                 COUNT(*) FILTER (WHERE c.status = 'gagne') AS gagnes,
@@ -1479,7 +1480,7 @@ def admin_dossiers():
             FROM users u
             LEFT JOIN crm_clients c ON c.owner_id = u.id
             WHERE u.role = 'commercial'
-            GROUP BY u.username
+            GROUP BY u.id, u.username
             ORDER BY u.username
         """)
         rows = cur.fetchall()
@@ -1487,6 +1488,52 @@ def admin_dossiers():
     return render_template(
         "admin_dossiers.html",
         stats=[row_to_obj(r) for r in rows],
+    )
+
+
+@app.route("/admin/dossiers/<int:commercial_id>")
+@admin_required
+def admin_dossiers_detail(commercial_id):
+    conn = get_db()
+
+    # 🔒 Vérifie que le commercial existe
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, username FROM users WHERE id=%s AND role='commercial'",
+            (commercial_id,),
+        )
+        commercial = cur.fetchone()
+
+    if not commercial:
+        flash("Commercial introuvable.", "danger")
+        return redirect(url_for("admin_dossiers"))
+
+    # 📂 Récupération des dossiers du commercial
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT id, name, status, created_at
+            FROM crm_clients
+            WHERE owner_id = %s
+            ORDER BY created_at DESC
+        """, (commercial_id,))
+        rows = cur.fetchall()
+
+    en_cours, gagnes, perdus = [], [], []
+    for r in rows:
+        status = (r["status"] or "en_cours").lower()
+        if status == "gagne":
+            gagnes.append(r)
+        elif status == "perdu":
+            perdus.append(r)
+        else:
+            en_cours.append(r)
+
+    return render_template(
+        "admin_dossiers_detail.html",
+        commercial=row_to_obj(commercial),
+        en_cours=[row_to_obj(c) for c in en_cours],
+        gagnes=[row_to_obj(c) for c in gagnes],
+        perdus=[row_to_obj(c) for c in perdus],
     )
 
 

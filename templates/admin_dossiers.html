@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Récapitulatif des dossiers par commercial</h1>
 
-<table class="table" style="max-width: 800px;">
+<h1 class="mb-4">📊 Récapitulatif des dossiers par commercial</h1>
+
+<table class="table table-striped" style="max-width: 800px;">
     <thead>
         <tr>
             <th>Commercial</th>
@@ -16,13 +17,28 @@
     <tbody>
         {% for s in stats %}
         <tr>
-            <td>{{ s.commercial }}</td>
+            <td>
+                <a href="{{ url_for('admin_dossiers_detail', commercial_id=s.commercial_id) }}">
+                    {{ s.commercial }}
+                </a>
+            </td>
             <td>{{ s.en_cours }}</td>
-            <td style="color: green;">{{ s.gagnes }}</td>
-            <td style="color: red;">{{ s.perdus }}</td>
+            <td style="color: #16a34a; font-weight: 600;">
+                {{ s.gagnes }}
+            </td>
+            <td style="color: #dc2626; font-weight: 600;">
+                {{ s.perdus }}
+            </td>
             <td><strong>{{ s.total }}</strong></td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="5" class="text-center text-muted">
+                Aucun commercial trouvé.
+            </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+
 {% endblock %}
