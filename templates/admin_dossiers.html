@@ -3,42 +3,59 @@
 {% block content %}
 
 <h1 class="mb-4">📊 Récapitulatif des dossiers par commercial</h1>
+<p class="text-muted mb-3">
+    Cliquez sur un commercial pour voir le détail de ses dossiers
+    (en cours / gagnés / perdus).
+</p>
 
-<table class="table table-striped" style="max-width: 800px;">
-    <thead>
-        <tr>
-            <th>Commercial</th>
-            <th>En cours</th>
-            <th>Gagnés</th>
-            <th>Perdus</th>
-            <th>Total</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for s in stats %}
-        <tr>
-            <td>
-                <a href="{{ url_for('admin_dossiers_detail', commercial=s.commercial) }}">
-                    {{ s.commercial }}
-                </a>
-            </td>
-            <td>{{ s.en_cours }}</td>
-            <td style="color: #16a34a; font-weight: 600;">
-                {{ s.gagnes }}
-            </td>
-            <td style="color: #dc2626; font-weight: 600;">
-                {{ s.perdus }}
-            </td>
-            <td><strong>{{ s.total }}</strong></td>
-        </tr>
-        {% else %}
-        <tr>
-            <td colspan="5" class="text-center text-muted">
-                Aucun commercial trouvé.
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="table-responsive" style="max-width: 900px;">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Commercial</th>
+                <th class="text-center">En cours</th>
+                <th class="text-center">Gagnés</th>
+                <th class="text-center">Perdus</th>
+                <th class="text-center">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in stats %}
+            <tr>
+                <td>
+                    <a
+                        href="{{ url_for('admin_dossiers_detail', commercial=s.commercial) }}"
+                        class="fw-semibold text-decoration-none"
+                    >
+                        {{ s.commercial }}
+                    </a>
+                </td>
+
+                <td class="text-center">
+                    {{ s.en_cours }}
+                </td>
+
+                <td class="text-center" style="color: #16a34a; font-weight: 600;">
+                    {{ s.gagnes }}
+                </td>
+
+                <td class="text-center" style="color: #dc2626; font-weight: 600;">
+                    {{ s.perdus }}
+                </td>
+
+                <td class="text-center">
+                    <strong>{{ s.total }}</strong>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                    Aucun commercial trouvé.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
 {% endblock %}
