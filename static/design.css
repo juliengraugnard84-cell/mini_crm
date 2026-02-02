@@ -761,3 +761,107 @@ main.content {
     font-size: 11px;
     opacity: 0.8;
 }
+/* ===============================
+   SYNERGYGROUP — COULEURS
+   =============================== */
+:root {
+    --sg-primary: #2563eb;
+    --sg-primary-dark: #1e40af;
+    --sg-primary-soft: #eef2ff;
+    --sg-bg: #f6f8fc;
+    --sg-border: #e2e8f0;
+    --sg-text: #0f172a;
+    --sg-muted: #64748b;
+}
+
+/* ===============================
+   WIDGET GLOBAL
+   =============================== */
+.chat-widget {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===============================
+   ZONE MESSAGES
+   =============================== */
+.chat-messages {
+    flex: 1;
+    padding: 16px;
+    background: var(--sg-bg);
+    overflow-y: auto;
+}
+
+/* ===============================
+   BARRE DE SAISIE (FIX MAJEUR)
+   =============================== */
+.chat-inputbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 12px;
+    background: #fff;
+    border-top: 1px solid var(--sg-border);
+}
+
+/* Cache l'input file natif (CRITIQUE) */
+.chat-attach input[type="file"] {
+    display: none;
+}
+
+/* Icône trombone */
+.chat-attach {
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--sg-muted);
+    padding: 6px;
+}
+
+.chat-attach:hover {
+    color: var(--sg-primary);
+}
+
+/* VRAI champ de message visible */
+.chat-input {
+    flex: 1;
+    min-height: 48px;
+    max-height: 120px;
+    resize: vertical;
+    border-radius: 12px;
+    border: 1px solid var(--sg-border);
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    background: var(--sg-primary-soft);
+    color: var(--sg-text);
+}
+
+.chat-input::placeholder {
+    color: var(--sg-muted);
+}
+
+.chat-input:focus {
+    outline: none;
+    background: #fff;
+    border-color: var(--sg-primary);
+}
+
+/* Bouton envoyer — BIEN VISIBLE */
+.chat-send {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: var(--sg-primary);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.chat-send:hover {
+    background: var(--sg-primary-dark);
+}
