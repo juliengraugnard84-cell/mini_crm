@@ -22,74 +22,46 @@
     </div>
 </div>
 
-<!-- ================= AJOUT CA ================= -->
-{% if current_user and current_user.role == 'admin' %}
-<div class="card mb-4">
-    <h5>Ajouter un chiffre d’affaires</h5>
+<!-- ================= TABLEAU CA MENSUEL PAR COMMERCIAL ================= -->
+{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
+<div class="card mb-5">
+    <h5>CA mensuel par commercial — année en cours</h5>
 
-    <form method="POST" action="{{ url_for('add_revenu') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-        <div class="row g-3">
-            <div class="col-md-3">
-                <label>Date</label>
-                <input type="date" name="date" class="form-control" required>
-            </div>
-
-            <div class="col-md-5">
-                <label>Dossier client</label>
-                <select name="client_id" class="form-select" required>
-                    <option value="">— Sélectionner —</option>
-                    {% for c in clients %}
-                        <option value="{{ c.id }}">{{ c.name }}</option>
+    <div class="table-responsive">
+        <table class="table table-bordered align-middle text-center">
+            <thead class="table-light">
+                <tr>
+                    <th>Commercial</th>
+                    <th>Jan</th><th>Fév</th><th>Mar</th><th>Avr</th>
+                    <th>Mai</th><th>Juin</th><th>Juil</th><th>Aoû</th>
+                    <th>Sep</th><th>Oct</th><th>Nov</th><th>Déc</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for commercial, mois in ca_mensuel_par_commercial.items() %}
+                {% set total = 0 %}
+                <tr>
+                    <td class="text-start fw-bold">{{ commercial }}</td>
+                    {% for m in range(1,13) %}
+                        {% set val = mois.get(m, 0) %}
+                        {% set total = total + val %}
+                        <td>{{ val|round(2) if val else "—" }}</td>
                     {% endfor %}
-                </select>
-            </div>
-
-            <div class="col-md-4">
-                <label>Montant (€)</label>
-                <input type="number" step="0.01" name="montant" class="form-control" required>
-            </div>
-        </div>
-
-        <div class="mt-3 text-end">
-            <button class="btn btn-success">Ajouter</button>
-        </div>
-    </form>
+                    <td class="fw-bold">{{ total|round(2) }} €</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endif %}
 
-<!-- ================= CA PAR COMMERCIAL ================= -->
-{% if current_user and current_user.role == 'admin' and ca_par_commercial %}
-<div class="card mb-4">
-    <h5>Chiffre d’affaires par commercial</h5>
-
-    <table class="table align-middle">
-        <thead>
-            <tr>
-                <th>Commercial</th>
-                <th>CA mensuel</th>
-                <th>CA annuel</th>
-                <th>Objectif mensuel (5 000 €)</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for r in ca_par_commercial %}
-            <tr>
-                <td><strong>{{ r.commercial }}</strong></td>
-                <td>{{ r.ca_mensuel|round(2) }} €</td>
-                <td>{{ r.ca_annuel|round(2) }} €</td>
-                <td>
-                    {% if r.ca_mensuel >= 5000 %}
-                        <span class="badge bg-success">Atteint</span>
-                    {% else %}
-                        <span class="badge bg-danger">Non atteint</span>
-                    {% endif %}
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+<!-- ================= GRAPHIQUE CA PAR COMMERCIAL ================= -->
+{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
+<div class="card mb-5">
+    <h5>Évolution mensuelle du CA par commercial</h5>
+    <canvas id="caChart" height="120"></canvas>
 </div>
 {% endif %}
 
@@ -121,37 +93,50 @@
 </div>
 {% endif %}
 
-<!-- ================= HISTORIQUE GLOBAL ================= -->
-{% if current_user and current_user.role == 'admin' %}
-<div class="row g-4">
-    <div class="col-md-6">
-        <div class="card">
-            <h5>Historique mensuel global</h5>
-            <ul class="list-group list-group-flush">
-                {% for h in historique_mensuel %}
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>{{ h.periode }}</span>
-                        <strong>{{ h.total|round(2) }} €</strong>
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
+<!-- ================= CHART.JS ================= -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <div class="col-md-6">
-        <div class="card">
-            <h5>Historique annuel global</h5>
-            <ul class="list-group list-group-flush">
-                {% for h in historique_annuel %}
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>{{ h.periode }}</span>
-                        <strong>{{ h.total|round(2) }} €</strong>
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-</div>
+<script>
+{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
+const ctx = document.getElementById('caChart');
+
+const labels = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Aoû","Sep","Oct","Nov","Déc"];
+
+const dataSets = [
+    {% for commercial, mois in ca_mensuel_par_commercial.items() %}
+    {
+        label: "{{ commercial }}",
+        data: [
+            {% for m in range(1,13) %}
+                {{ mois.get(m, 0) }},
+            {% endfor %}
+        ],
+        tension: 0.3,
+        fill: false
+    },
+    {% endfor %}
+];
+
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: dataSets
+    },
+    options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: value => value + " €"
+                }
+            }
+        }
+    }
+});
 {% endif %}
+</script>
 
 {% endblock %}
