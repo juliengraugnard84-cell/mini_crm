@@ -1430,7 +1430,10 @@ def admin_cotation_detail(cotation_id):
         return redirect(url_for("admin_cotations"))
 
     with conn.cursor() as cur:
-        cur.execute("UPDATE cotations SET is_read=1 WHERE id=%s", (cotation_id,))
+        cur.execute(
+            "UPDATE cotations SET is_read = 1 WHERE id = %s",
+            (cotation_id,)
+        )
     conn.commit()
 
     return render_template(
@@ -1443,24 +1446,20 @@ def admin_cotation_detail(cotation_id):
 @admin_required
 def delete_cotation_admin(cotation_id):
     conn = get_db()
+
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM cotations WHERE id=%s", (cotation_id,))
+        cur.execute(
+            "DELETE FROM cotations WHERE id = %s",
+            (cotation_id,)
+        )
+
     conn.commit()
     flash("Cotation supprimée.", "success")
     return redirect(url_for("admin_cotations"))
 
 
-# ============================
-# FIN PARTIE 2/4
-# ============================
-# ============================
-# app.py — VERSION COMPLÈTE CORRIGÉE (PARTIE 3/4)
-# (DOCUMENTS S3 + CLIENTS — VERSION UNIQUE, ADMIN + COMMERCIAL)
-# ============================
-
-
 ############################################################
-# 10 BIS. ADMIN — SUIVI DES DOSSIERS PAR COMMERCIAL (LECTURE SEULE)
+# 10 BIS. ADMIN — SUIVI DES DOSSIERS PAR COMMERCIAL
 ############################################################
 
 @app.route("/admin/dossiers")
@@ -1501,6 +1500,7 @@ def admin_dossiers():
         stats=[row_to_obj(r) for r in rows],
     )
 
+
 ############################################################
 # 10 BIS (DETAIL). ADMIN — DÉTAIL DES DOSSIERS PAR COMMERCIAL
 # URL : /admin/dossiers/<username>
@@ -1515,7 +1515,6 @@ def admin_dossiers_detail(commercial):
 
     conn = get_db()
 
-    # Vérifie que le commercial existe
     with conn.cursor() as cur:
         cur.execute("""
             SELECT id, username
@@ -1531,7 +1530,6 @@ def admin_dossiers_detail(commercial):
 
     commercial_id = user["id"]
 
-    # Récupération des dossiers
     with conn.cursor() as cur:
         cur.execute("""
             SELECT id, name, status, created_at
@@ -1549,11 +1547,12 @@ def admin_dossiers_detail(commercial):
         rows = cur.fetchall()
 
     en_cours, gagnes, perdus = [], [], []
+
     for r in rows:
-        status = (r["status"] or "en_cours").lower()
-        if status == "gagne":
+        st = (r["status"] or "en_cours").lower()
+        if st == "gagne":
             gagnes.append(row_to_obj(r))
-        elif status == "perdu":
+        elif st == "perdu":
             perdus.append(row_to_obj(r))
         else:
             en_cours.append(row_to_obj(r))
@@ -1567,10 +1566,8 @@ def admin_dossiers_detail(commercial):
     )
 
 
-
-    )
 ############################################################
-# 10 TER. ADMIN — PLANNING (COTATIONS & MISES À JOUR À VENIR)
+# 10 TER. ADMIN — PLANNING (COTATIONS & MISES À JOUR)
 ############################################################
 
 @app.route("/admin/planning")
@@ -1578,7 +1575,6 @@ def admin_dossiers_detail(commercial):
 def admin_planning():
     conn = get_db()
 
-    # ===== COTATIONS À VENIR =====
     with conn.cursor() as cur:
         cur.execute("""
             SELECT
@@ -1594,14 +1590,12 @@ def admin_planning():
         """)
         cotations = cur.fetchall()
 
-    # ===== MISES À JOUR À VENIR =====
     with conn.cursor() as cur:
         cur.execute("""
             SELECT
                 client_updates.id,
                 client_updates.update_date,
                 client_updates.commentaire,
-                client_updates.client_id,
                 client_updates.client_name,
                 client_updates.commercial_name
             FROM client_updates
