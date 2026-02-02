@@ -1462,7 +1462,10 @@ def delete_cotation_admin(cotation_id):
 # 10 BIS. ADMIN — SUIVI DES DOSSIERS PAR COMMERCIAL
 # - Route UNIQUE (pas de doublon)
 # - Totaux fiables
-# - Status robustes (NULL / vide / casse)
+# - Statuts métiers réels :
+#   en_cours + nouveau + NULL => EN COURS
+#   gagne                     => GAGNÉ
+#   perdu                     => PERDU
 ############################################################
 
 @app.route("/admin/dossiers")
@@ -1477,15 +1480,18 @@ def admin_dossiers():
                 u.username AS commercial,
 
                 COUNT(*) FILTER (
-                    WHERE COALESCE(NULLIF(LOWER(c.status), ''), 'en_cours') = 'en_cours'
+                    WHERE
+                        c.id IS NOT NULL
+                        AND COALESCE(LOWER(c.status), 'en_cours')
+                        IN ('en_cours', 'nouveau')
                 ) AS en_cours,
 
                 COUNT(*) FILTER (
-                    WHERE COALESCE(NULLIF(LOWER(c.status), ''), 'en_cours') = 'gagne'
+                    WHERE LOWER(c.status) = 'gagne'
                 ) AS gagnes,
 
                 COUNT(*) FILTER (
-                    WHERE COALESCE(NULLIF(LOWER(c.status), ''), 'en_cours') = 'perdu'
+                    WHERE LOWER(c.status) = 'perdu'
                 ) AS perdus
 
             FROM users u
@@ -1499,8 +1505,8 @@ def admin_dossiers():
     stats = []
     for r in rows:
         obj = row_to_obj(r)
-        # ✅ total recalculé proprement (évite incohérences SQL)
-        obj.total = obj.en_cours + obj.gagnes + obj.perdus
+        # ✅ Total calculé côté Python (100 % fiable)
+        obj.total = (obj.en_cours or 0) + (obj.gagnes or 0) + (obj.perdus or 0)
         stats.append(obj)
 
     return render_template(
@@ -1539,17 +1545,18 @@ def admin_dossiers_detail(commercial):
 
     commercial_id = user["id"]
 
-    # 📂 Récupération des dossiers
+    # 📂 Récupération des dossiers du commercial
     with conn.cursor() as cur:
         cur.execute("""
             SELECT id, name, status, created_at
             FROM crm_clients
             WHERE owner_id = %s
             ORDER BY
-                CASE COALESCE(NULLIF(LOWER(status), ''), 'en_cours')
+                CASE COALESCE(LOWER(status), 'en_cours')
                     WHEN 'en_cours' THEN 1
-                    WHEN 'gagne' THEN 2
-                    WHEN 'perdu' THEN 3
+                    WHEN 'nouveau'  THEN 1
+                    WHEN 'gagne'    THEN 2
+                    WHEN 'perdu'    THEN 3
                     ELSE 4
                 END,
                 created_at DESC
@@ -1565,6 +1572,7 @@ def admin_dossiers_detail(commercial):
         elif st == "perdu":
             perdus.append(row_to_obj(r))
         else:
+            # en_cours + nouveau + NULL
             en_cours.append(row_to_obj(r))
 
     return render_template(
@@ -1574,7 +1582,6 @@ def admin_dossiers_detail(commercial):
         gagnes=gagnes,
         perdus=perdus,
     )
-
 
 
 ############################################################
