@@ -1490,10 +1490,11 @@ def admin_dossiers():
     )
 
 
-# =========================================================
-# DETAIL PAR COMMERCIAL (ADMIN)
-# URL: /admin/dossiers/<commercial>
-# =========================================================
+############################################################
+# 10 BIS (DETAIL). ADMIN — DÉTAIL DES DOSSIERS PAR COMMERCIAL
+# URL : /admin/dossiers/<username>
+############################################################
+
 @app.route("/admin/dossiers/<string:commercial>")
 @admin_required
 def admin_dossiers_detail(commercial):
@@ -1503,35 +1504,26 @@ def admin_dossiers_detail(commercial):
 
     conn = get_db()
 
-    # 1) Récupérer l'ID du commercial
+    # 🔒 Vérifie que le commercial existe
     with conn.cursor() as cur:
-        cur.execute(
-            """
+        cur.execute("""
             SELECT id, username
             FROM users
             WHERE role = 'commercial'
               AND username = %s
-            """,
-            (commercial,),
-        )
-        u = cur.fetchone()
+        """, (commercial,))
+        user = cur.fetchone()
 
-    if not u:
+    if not user:
         flash("Commercial introuvable.", "danger")
         return redirect(url_for("admin_dossiers"))
 
-    commercial_id = u["id"]
-    commercial_username = u["username"]
+    commercial_id = user["id"]
 
-    # 2) Récupérer les dossiers de ce commercial, triés par statut
+    # 📂 Récupération des dossiers du commercial
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT
-                id,
-                name,
-                status,
-                created_at
+        cur.execute("""
+            SELECT id, name, status, created_at
             FROM crm_clients
             WHERE owner_id = %s
             ORDER BY
@@ -1542,32 +1534,26 @@ def admin_dossiers_detail(commercial):
                     ELSE 4
                 END,
                 created_at DESC
-            """,
-            (commercial_id,),
-        )
-        clients = cur.fetchall()
+        """, (commercial_id,))
+        rows = cur.fetchall()
 
-    en_cours = []
-    gagnes = []
-    perdus = []
-
-    for c in clients:
-        st = (c["status"] or "en_cours").lower()
-        if st == "gagne":
-            gagnes.append(row_to_obj(c))
-        elif st == "perdu":
-            perdus.append(row_to_obj(c))
+    en_cours, gagnes, perdus = [], [], []
+    for r in rows:
+        status = (r["status"] or "en_cours").lower()
+        if status == "gagne":
+            gagnes.append(row_to_obj(r))
+        elif status == "perdu":
+            perdus.append(row_to_obj(r))
         else:
-            en_cours.append(row_to_obj(c))
+            en_cours.append(row_to_obj(r))
 
     return render_template(
         "admin_dossiers_detail.html",
-        commercial=commercial_username,
+        commercial=row_to_obj(user),
         en_cours=en_cours,
         gagnes=gagnes,
         perdus=perdus,
     )
-
 ############################################################
 # 10 TER. ADMIN — PLANNING (COTATIONS & MISES À JOUR À VENIR)
 ############################################################
@@ -1615,70 +1601,6 @@ def admin_planning():
         updates=[row_to_obj(u) for u in updates],
     )
 
-
-############################################################
-# 10 BIS (DETAIL) — DÉTAIL DOSSIERS PAR COMMERCIAL (ADMIN)
-# ✅ Route UNIQUE (pas de doublon d'endpoint)
-# URL: /admin/dossiers/<username>
-############################################################
-
-@app.route("/admin/dossiers/<string:commercial>", endpoint="admin_dossiers_detail")
-@admin_required
-def admin_dossiers_detail(commercial):
-    commercial = (commercial or "").strip()
-    if not commercial:
-        return redirect(url_for("admin_dossiers"))
-
-    conn = get_db()
-
-    # 🔒 Vérifie que le commercial existe (par username)
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT id, username
-            FROM users
-            WHERE role = 'commercial'
-              AND username = %s
-            """,
-            (commercial,),
-        )
-        u = cur.fetchone()
-
-    if not u:
-        flash("Commercial introuvable.", "danger")
-        return redirect(url_for("admin_dossiers"))
-
-    commercial_id = u["id"]
-
-    # 📂 Récupération des dossiers du commercial
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT id, name, status, created_at
-            FROM crm_clients
-            WHERE owner_id = %s
-            ORDER BY created_at DESC
-        """, (commercial_id,))
-        rows = cur.fetchall()
-
-    en_cours, gagnes, perdus = [], [], []
-    for r in rows:
-        status = (r["status"] or "en_cours").lower()
-        if status == "gagne":
-            gagnes.append(row_to_obj(r))
-        elif status == "perdu":
-            perdus.append(row_to_obj(r))
-        else:
-            en_cours.append(row_to_obj(r))
-
-    # ✅ IMPORTANT : ton template admin_dossiers_detail.html attend
-    # commercial.username -> on lui passe l'objet "commercial"
-    return render_template(
-        "admin_dossiers_detail.html",
-        commercial=row_to_obj(u),
-        en_cours=en_cours,
-        gagnes=gagnes,
-        perdus=perdus,
-    )
 
 
 ###########################################################
