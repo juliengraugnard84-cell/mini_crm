@@ -393,3 +393,229 @@ main.content {
 .chat-widget.open {
     display: flex;
 }
+/* ===============================
+   CHAT WIDGET — DESIGN CLEAN
+   =============================== */
+
+/* Bouton flottant */
+.chat-toggle {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    background: #2563eb; /* bleu propre */
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 10px 25px rgba(0,0,0,.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .2s ease, box-shadow .2s ease;
+    z-index: 1000;
+}
+
+.chat-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgba(0,0,0,.22);
+}
+
+/* Badge */
+.chat-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 6px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Widget */
+.chat-widget {
+    position: fixed;
+    bottom: 96px;
+    right: 24px;
+    width: 360px;
+    max-height: 520px;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 25px 60px rgba(0,0,0,.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(20px) scale(.96);
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+    z-index: 1000;
+}
+
+.chat-widget.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+/* Header */
+.chat-header {
+    padding: 14px 16px;
+    background: #2563eb;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.chat-title {
+    font-weight: 600;
+}
+
+.chat-subtitle {
+    font-size: 12px;
+    opacity: .85;
+}
+
+.chat-close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+/* Messages */
+.chat-messages {
+    flex: 1;
+    padding: 14px;
+    overflow-y: auto;
+    background: #f8fafc;
+}
+
+/* Rows */
+.chat-row {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.chat-row.me {
+    justify-content: flex-end;
+}
+
+.chat-row.them {
+    justify-content: flex-start;
+}
+
+/* Bulles */
+.chat-bubble {
+    max-width: 75%;
+    padding: 10px 12px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    box-shadow: 0 2px 6px rgba(0,0,0,.08);
+}
+
+.chat-bubble.me {
+    background: #2563eb;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-bubble.them {
+    background: #fff;
+    color: #111827;
+    border-bottom-left-radius: 4px;
+}
+
+/* Meta */
+.chat-meta {
+    font-size: 11px;
+    opacity: .75;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Fichier */
+.chat-file {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 13px;
+    color: inherit;
+    text-decoration: underline;
+}
+
+/* Status */
+.chat-status {
+    margin-top: 4px;
+    text-align: right;
+    font-size: 11px;
+    opacity: .7;
+}
+
+/* Input bar */
+.chat-inputbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border-top: 1px solid #e5e7eb;
+    background: #fff;
+}
+
+.chat-input {
+    flex: 1;
+    resize: none;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 14px;
+    outline: none;
+}
+
+.chat-input:focus {
+    border-color: #2563eb;
+}
+
+/* Attach */
+.chat-attach {
+    cursor: pointer;
+    font-size: 18px;
+}
+
+/* Send */
+.chat-send {
+    border: none;
+    background: #2563eb;
+    color: #fff;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.chat-send:hover {
+    background: #1d4ed8;
+}
+
+/* Pulse notif */
+.chat-pulse {
+    animation: chatPulse 1.5s infinite;
+}
+
+@keyframes chatPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(37,99,235,.5); }
+    70%  { box-shadow: 0 0 0 12px rgba(37,99,235,0); }
+    100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+}

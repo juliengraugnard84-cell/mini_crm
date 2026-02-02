@@ -24,9 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ================= STATE ================= */
 
-    let lastSeenId  = 0;
-    let unreadCount = 0;
-    let isLoading   = false;
+    let isLoading = false;
 
     /* ================= HELPERS ================= */
 
@@ -50,22 +48,18 @@ document.addEventListener("DOMContentLoaded", () => {
         messagesBox.scrollTop = messagesBox.scrollHeight;
     }
 
-    function setBadge(n) {
+    function setBadge(count) {
         if (!badge) return;
 
-        unreadCount = Math.max(0, n);
-        if (unreadCount > 0) {
-            badge.textContent = unreadCount;
+        const n = Math.max(0, count);
+        if (n > 0) {
+            badge.textContent = n;
             badge.style.display = "flex";
             toggleBtn.classList.add("chat-pulse");
         } else {
             badge.style.display = "none";
             toggleBtn.classList.remove("chat-pulse");
         }
-    }
-
-    function resetBadge() {
-        setBadge(0);
     }
 
     /* ================= RENDER ================= */
@@ -123,15 +117,19 @@ document.addEventListener("DOMContentLoaded", () => {
     function openChat() {
         widget.classList.add("open");
         widget.setAttribute("aria-hidden", "false");
-        resetBadge();
+        toggleBtn.setAttribute("aria-expanded", "true");
+
+        setBadge(0);
         loadMessages(true);
         markAsRead();
+
         setTimeout(() => input.focus(), 100);
     }
 
     function closeChat() {
         widget.classList.remove("open");
         widget.setAttribute("aria-hidden", "true");
+        toggleBtn.setAttribute("aria-expanded", "false");
     }
 
     toggleBtn.addEventListener("click", () => {
@@ -155,21 +153,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
             const messages = data.messages || [];
 
-            let maxId = lastSeenId;
-            messages.forEach(m => {
-                maxId = Math.max(maxId, Number(m.id || 0));
-            });
+            // 🔔 BADGE = messages non lus et non envoyés par moi
+            const unread = messages.filter(
+                m => !m.is_read && !m.is_mine
+            ).length;
 
-            if (!isOpen() && maxId > lastSeenId) {
-                const delta = messages.filter(m => Number(m.id) > lastSeenId).length;
-                setBadge(unreadCount + delta);
+            if (!isOpen()) {
+                setBadge(unread);
             }
 
             messagesBox.innerHTML = "";
             messages.forEach(m => messagesBox.appendChild(renderMessage(m)));
 
-            if (isOpen()) lastSeenId = maxId;
-            if (forceScroll || isOpen()) scrollBottom();
+            if (forceScroll || isOpen()) {
+                scrollBottom();
+            }
 
         } catch (e) {
             console.error("Erreur chargement chat", e);
@@ -229,6 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             input.value = "";
             if (fileInput) fileInput.value = "";
+
             await loadMessages(true);
 
         } catch (e) {
@@ -257,7 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setInterval(() => {
         loadMessages(false);
         if (isOpen()) markAsRead();
-    }, 3000);
+    }, 5000);
 
     loadMessages(false);
 });

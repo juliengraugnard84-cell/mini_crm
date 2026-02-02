@@ -1,6 +1,5 @@
 <!-- ================= CHAT BULLE FLOTTANTE ================= -->
 
-<!-- Bouton flottant -->
 <button
     id="chat-toggle"
     class="chat-toggle"
@@ -26,6 +25,7 @@
     class="chat-widget"
     aria-hidden="true"
     role="dialog"
+    aria-modal="false"
     aria-label="Chat interne">
 
     <!-- HEADER -->
@@ -49,7 +49,7 @@
         id="chat-messages"
         class="chat-messages"
         role="log"
-        aria-live="polite"
+        aria-live="off"
         aria-relevant="additions">
     </div>
 
@@ -90,14 +90,6 @@
 <!-- ================= VARIABLES JS CHAT ================= -->
 
 <script>
-    /*
-      IMPORTANT
-      ----------
-      - Utilisation de |tojson
-      - Jamais de "null" en string
-      - Compatible avec chat_widget.js
-    */
-
     window.CHAT_CURRENT_USER_ID = {{ (current_user.id if current_user else None) | tojson }};
     window.CHAT_CURRENT_USERNAME = {{ (current_user.username if current_user else None) | tojson }};
     window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else None) | tojson }};
