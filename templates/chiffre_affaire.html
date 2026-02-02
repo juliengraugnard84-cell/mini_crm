@@ -18,7 +18,7 @@
         <div class="col-md-3">
             <label>Année</label>
             <select name="year" class="form-select">
-                {% for y in range(2022, (now().year + 1)) %}
+                {% for y in range(2022, current_year + 1) %}
                     <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>
                         {{ y }}
                     </option>
@@ -117,7 +117,7 @@
                 {% set total = 0 %}
                 <tr>
                     <td class="text-start fw-bold">{{ commercial }}</td>
-                    {% for m in range(1,13) %}
+                    {% for m in range(1, 13) %}
                         {% set val = mois.get(m, 0) %}
                         {% set total = total + val %}
                         <td>{{ val|round(2) if val else "—" }}</td>

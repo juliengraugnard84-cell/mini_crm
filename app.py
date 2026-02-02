@@ -1011,17 +1011,24 @@ def dashboard():
 
     if role == "commercial":
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM crm_clients WHERE owner_id=%s", (user_id,))
+            cur.execute(
+                "SELECT COUNT(*) FROM crm_clients WHERE owner_id=%s",
+                (user_id,)
+            )
             nb_clients = cur.fetchone()[0]
 
-            cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus WHERE commercial=%s", (username,))
+            cur.execute(
+                "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE commercial=%s",
+                (username,)
+            )
             ca_total_com = cur.fetchone()[0]
 
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                  AND date_trunc('month', date::date)=date_trunc('month', CURRENT_DATE)
+                  AND date_trunc('month', date::date)
+                      = date_trunc('month', CURRENT_DATE)
             """, (username,))
             ca_mois_com = cur.fetchone()[0]
 
@@ -1069,7 +1076,13 @@ def add_revenu():
         cur.execute("""
             INSERT INTO revenus (date, commercial, dossier, client_id, montant)
             VALUES (%s, %s, %s, %s, %s)
-        """, (date_val, user["username"], client["name"], client_id, float(montant)))
+        """, (
+            date_val,
+            user["username"],
+            client["name"],
+            client_id,
+            float(montant),
+        ))
 
     conn.commit()
     flash("Chiffre d’affaires ajouté.", "success")
@@ -1085,6 +1098,7 @@ def chiffre_affaire():
     conn = get_db()
 
     year = request.args.get("year", type=int) or datetime.now().year
+    current_year = datetime.now().year   # ✅ CORRECTION ICI
     commercial_filter = request.args.get("commercial")
 
     with conn.cursor() as cur:
@@ -1101,7 +1115,8 @@ def chiffre_affaire():
             SELECT COALESCE(SUM(montant),0)
             FROM revenus
             WHERE EXTRACT(YEAR FROM date::date)=%s
-              AND EXTRACT(MONTH FROM date::date)=EXTRACT(MONTH FROM CURRENT_DATE)
+              AND EXTRACT(MONTH FROM date::date)
+                  = EXTRACT(MONTH FROM CURRENT_DATE)
         """, (year,))
         ca_mensuel_perso = cur.fetchone()[0]
 
@@ -1116,7 +1131,9 @@ def chiffre_affaire():
             params.append(commercial_filter)
 
         cur.execute(f"""
-            SELECT revenus.date, revenus.montant, revenus.commercial,
+            SELECT revenus.date,
+                   revenus.montant,
+                   revenus.commercial,
                    crm_clients.name AS client_name
             FROM revenus
             JOIN crm_clients ON crm_clients.id = revenus.client_id
@@ -1150,6 +1167,7 @@ def chiffre_affaire():
         historique_ca=[row_to_obj(h) for h in historique_ca],
         ca_mensuel_par_commercial=ca_mensuel_par_commercial,
         selected_year=year,
+        current_year=current_year,    # ✅ PASSÉ AU TEMPLATE
         selected_commercial=commercial_filter,
     )
 
