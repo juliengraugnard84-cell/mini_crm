@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">📅 Planning administrateur</h1>
+
+<div class="row">
+
+    <!-- ================= COTATIONS ================= -->
+    <div class="col-md-6">
+        <h4 class="mb-3">🔵 Cotations à venir</h4>
+
+        {% if cotations %}
+            <ul class="list-group">
+                {% for c in cotations %}
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>{{ c.client_name }}</strong><br>
+                            <small class="text-muted">
+                                {{ c.commercial_name or "—" }}
+                            </small>
+                        </div>
+                        <span class="badge bg-primary">
+                            {{ format_date(c.date_negociation) }}
+                        </span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-muted">Aucune cotation à venir.</p>
+        {% endif %}
+    </div>
+
+    <!-- ================= MISES À JOUR ================= -->
+    <div class="col-md-6">
+        <h4 class="mb-3">🟠 Mises à jour prévues</h4>
+
+        {% if updates %}
+            <ul class="list-group">
+                {% for u in updates %}
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ u.client_name }}</strong>
+                            <span class="badge bg-warning text-dark">
+                                {{ format_date(u.update_date) }}
+                            </span>
+                        </div>
+                        <small class="text-muted">
+                            {{ u.commercial_name }}
+                        </small>
+                        {% if u.commentaire %}
+                            <div class="mt-1">
+                                <small>{{ u.commentaire }}</small>
+                            </div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-muted">Aucune mise à jour prévue.</p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

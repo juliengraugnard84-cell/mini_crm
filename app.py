@@ -1489,6 +1489,52 @@ def admin_dossiers():
         "admin_dossiers.html",
         stats=[row_to_obj(r) for r in rows],
     )
+############################################################
+# 10 TER. ADMIN — PLANNING (COTATIONS & MISES À JOUR À VENIR)
+############################################################
+
+@app.route("/admin/planning")
+@admin_required
+def admin_planning():
+    conn = get_db()
+
+    # ================= COTATIONS À VENIR =================
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                cotations.id,
+                cotations.date_negociation,
+                crm_clients.name AS client_name,
+                users.username AS commercial_name
+            FROM cotations
+            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN users ON users.id = cotations.created_by
+            WHERE cotations.date_negociation >= CURRENT_DATE
+            ORDER BY cotations.date_negociation ASC
+        """)
+        cotations = cur.fetchall()
+
+    # ================= MISES À JOUR À VENIR =================
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                client_updates.id,
+                client_updates.update_date,
+                client_updates.commentaire,
+                client_updates.client_id,
+                client_updates.client_name,
+                client_updates.commercial_name
+            FROM client_updates
+            WHERE client_updates.update_date >= CURRENT_DATE
+            ORDER BY client_updates.update_date ASC
+        """)
+        updates = cur.fetchall()
+
+    return render_template(
+        "admin_planning.html",
+        cotations=[row_to_obj(c) for c in cotations],
+        updates=[row_to_obj(u) for u in updates],
+    )
 
 
 @app.route("/admin/dossiers/<int:commercial_id>")
