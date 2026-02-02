@@ -18,7 +18,7 @@
         {% for s in stats %}
         <tr>
             <td>
-                <a href="{{ url_for('admin_dossiers_detail', commercial_id=s.commercial_id) }}">
+                <a href="{{ url_for('admin_dossiers_detail', commercial=s.commercial) }}">
                     {{ s.commercial }}
                 </a>
             </td>

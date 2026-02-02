@@ -1471,16 +1471,15 @@ def admin_dossiers():
     with conn.cursor() as cur:
         cur.execute("""
             SELECT
-                u.id AS commercial_id,
                 u.username AS commercial,
-                COUNT(*) FILTER (WHERE c.status = 'en_cours') AS en_cours,
-                COUNT(*) FILTER (WHERE c.status = 'gagne') AS gagnes,
-                COUNT(*) FILTER (WHERE c.status = 'perdu') AS perdus,
+                COUNT(*) FILTER (WHERE COALESCE(c.status,'en_cours') = 'en_cours') AS en_cours,
+                COUNT(*) FILTER (WHERE COALESCE(c.status,'en_cours') = 'gagne') AS gagnes,
+                COUNT(*) FILTER (WHERE COALESCE(c.status,'en_cours') = 'perdu') AS perdus,
                 COUNT(c.id) AS total
             FROM users u
             LEFT JOIN crm_clients c ON c.owner_id = u.id
             WHERE u.role = 'commercial'
-            GROUP BY u.id, u.username
+            GROUP BY u.username
             ORDER BY u.username
         """)
         rows = cur.fetchall()
@@ -1489,6 +1488,86 @@ def admin_dossiers():
         "admin_dossiers.html",
         stats=[row_to_obj(r) for r in rows],
     )
+
+
+# =========================================================
+# DETAIL PAR COMMERCIAL (ADMIN)
+# URL: /admin/dossiers/<commercial>
+# =========================================================
+@app.route("/admin/dossiers/<string:commercial>")
+@admin_required
+def admin_dossiers_detail(commercial):
+    commercial = (commercial or "").strip()
+    if not commercial:
+        return redirect(url_for("admin_dossiers"))
+
+    conn = get_db()
+
+    # 1) Récupérer l'ID du commercial
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, username
+            FROM users
+            WHERE role = 'commercial'
+              AND username = %s
+            """,
+            (commercial,),
+        )
+        u = cur.fetchone()
+
+    if not u:
+        flash("Commercial introuvable.", "danger")
+        return redirect(url_for("admin_dossiers"))
+
+    commercial_id = u["id"]
+    commercial_username = u["username"]
+
+    # 2) Récupérer les dossiers de ce commercial, triés par statut
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                id,
+                name,
+                status,
+                created_at
+            FROM crm_clients
+            WHERE owner_id = %s
+            ORDER BY
+                CASE COALESCE(status,'en_cours')
+                    WHEN 'en_cours' THEN 1
+                    WHEN 'gagne' THEN 2
+                    WHEN 'perdu' THEN 3
+                    ELSE 4
+                END,
+                created_at DESC
+            """,
+            (commercial_id,),
+        )
+        clients = cur.fetchall()
+
+    en_cours = []
+    gagnes = []
+    perdus = []
+
+    for c in clients:
+        st = (c["status"] or "en_cours").lower()
+        if st == "gagne":
+            gagnes.append(row_to_obj(c))
+        elif st == "perdu":
+            perdus.append(row_to_obj(c))
+        else:
+            en_cours.append(row_to_obj(c))
+
+    return render_template(
+        "admin_dossiers_detail.html",
+        commercial=commercial_username,
+        en_cours=en_cours,
+        gagnes=gagnes,
+        perdus=perdus,
+    )
+
 ############################################################
 # 10 TER. ADMIN — PLANNING (COTATIONS & MISES À JOUR À VENIR)
 ############################################################
