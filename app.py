@@ -1491,68 +1491,49 @@ def admin_dossiers():
 
 
 ############################################################
-# 10 BIS (DETAIL). ADMIN — DÉTAIL DES DOSSIERS PAR COMMERCIAL
-# URL : /admin/dossiers/<username>
+# 10 BIS. ADMIN — SUIVI DES DOSSIERS PAR COMMERCIAL (LECTURE SEULE)
+# ✅ Corrigé : stats fiables même si status est NULL / vide / casse différente
+# ✅ Ajoute commercial_id pour construire les liens vers la page détail
 ############################################################
 
-@app.route("/admin/dossiers/<string:commercial>")
+@app.route("/admin/dossiers")
 @admin_required
-def admin_dossiers_detail(commercial):
-    commercial = (commercial or "").strip()
-    if not commercial:
-        return redirect(url_for("admin_dossiers"))
-
+def admin_dossiers():
     conn = get_db()
 
-    # 🔒 Vérifie que le commercial existe
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT id, username
-            FROM users
-            WHERE role = 'commercial'
-              AND username = %s
-        """, (commercial,))
-        user = cur.fetchone()
+            SELECT
+                u.id AS commercial_id,
+                u.username AS commercial,
 
-    if not user:
-        flash("Commercial introuvable.", "danger")
-        return redirect(url_for("admin_dossiers"))
+                COUNT(*) FILTER (
+                    WHERE COALESCE(NULLIF(LOWER(c.status), ''), 'en_cours') = 'en_cours'
+                ) AS en_cours,
 
-    commercial_id = user["id"]
+                COUNT(*) FILTER (
+                    WHERE COALESCE(NULLIF(LOWER(c.status), ''), 'en_cours') = 'gagne'
+                ) AS gagnes,
 
-    # 📂 Récupération des dossiers du commercial
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT id, name, status, created_at
-            FROM crm_clients
-            WHERE owner_id = %s
-            ORDER BY
-                CASE COALESCE(status,'en_cours')
-                    WHEN 'en_cours' THEN 1
-                    WHEN 'gagne' THEN 2
-                    WHEN 'perdu' THEN 3
-                    ELSE 4
-                END,
-                created_at DESC
-        """, (commercial_id,))
+                COUNT(*) FILTER (
+                    WHERE COALESCE(NULLIF(LOWER(c.status), ''), 'en_cours') = 'perdu'
+                ) AS perdus,
+
+                COUNT(c.id) AS total
+
+            FROM users u
+            LEFT JOIN crm_clients c ON c.owner_id = u.id
+            WHERE u.role = 'commercial'
+            GROUP BY u.id, u.username
+            ORDER BY u.username
+        """)
         rows = cur.fetchall()
 
-    en_cours, gagnes, perdus = [], [], []
-    for r in rows:
-        status = (r["status"] or "en_cours").lower()
-        if status == "gagne":
-            gagnes.append(row_to_obj(r))
-        elif status == "perdu":
-            perdus.append(row_to_obj(r))
-        else:
-            en_cours.append(row_to_obj(r))
-
     return render_template(
-        "admin_dossiers_detail.html",
-        commercial=row_to_obj(user),
-        en_cours=en_cours,
-        gagnes=gagnes,
-        perdus=perdus,
+        "admin_dossiers.html",
+        stats=[row_to_obj(r) for r in rows],
+    )
+
     )
 ############################################################
 # 10 TER. ADMIN — PLANNING (COTATIONS & MISES À JOUR À VENIR)
