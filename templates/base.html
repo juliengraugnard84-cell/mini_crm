@@ -29,7 +29,7 @@
 
         <nav class="sidebar-nav">
 
-            <!-- TOUS LES UTILISATEURS -->
+            <!-- ================= TOUS LES UTILISATEURS ================= -->
             <a href="{{ url_for('dashboard') }}"
                class="{% if request.path.startswith('/dashboard') %}active{% endif %}">
                 Tableau de bord
@@ -40,15 +40,13 @@
                 Clients
             </a>
 
-            <!-- ✅ CHIFFRE D’AFFAIRES : ADMIN UNIQUEMENT -->
-            {% if current_user and current_user.role == "admin" %}
+            <!-- ✅ CHIFFRE D’AFFAIRES : TOUS (admin + commercial) -->
             <a href="/chiffre-affaire"
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
                 Chiffre d’affaires
             </a>
-            {% endif %}
 
-            <!-- ================= ADMIN ================= -->
+            <!-- ================= ADMIN UNIQUEMENT ================= -->
             {% if current_user and current_user.role == "admin" %}
 
                 <a href="{{ url_for('admin_updates') }}"
@@ -124,8 +122,8 @@
 <!-- ================= CHAT ================= -->
 {% if current_user %}
 
-<button id="chat-toggle" class="chat-toggle" type="button">💬
-    <span id="chat-badge" class="chat-badge" style="display:none;">0</span>
+<button id="chat-toggle" class="chat-toggle" type="button">
+    💬 <span id="chat-badge" class="chat-badge" style="display:none;">0</span>
 </button>
 
 <div id="chat-widget" class="chat-widget">
