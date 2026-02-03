@@ -983,8 +983,8 @@ def dashboard():
             ORDER BY date::date DESC, id DESC
             LIMIT 1
         """)
-        last_rev_row = cur.fetchone()
-        last_rev = row_to_obj(last_rev_row) if last_rev_row else None
+        row = cur.fetchone()
+        last_rev = row_to_obj(row) if row else None
 
     # =========================
     # DOCUMENTS (S3)
@@ -1008,9 +1008,7 @@ def dashboard():
 
     if role == "admin":
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0"
-            )
+            cur.execute("SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0")
             unread_cotations = cur.fetchone()[0]
 
             cur.execute("""
@@ -1145,13 +1143,14 @@ def chiffre_affaire():
 
     ca_mensuel_par_commercial = defaultdict(lambda: defaultdict(float))
     historique_ca = []
+    total_ca = 0
 
     with conn.cursor() as cur:
-        # CA GLOBAL (info)
-        cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
-        total_ca = cur.fetchone()[0]
-
+        # CA GLOBAL (ADMIN UNIQUEMENT)
         if role == "admin":
+            cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
+            total_ca = cur.fetchone()[0]
+
             params = [selected_year]
             sql = """
                 SELECT
@@ -1161,6 +1160,7 @@ def chiffre_affaire():
                 FROM revenus
                 WHERE EXTRACT(YEAR FROM date::date) = %s
             """
+
             if selected_commercial:
                 sql += " AND commercial ILIKE %s"
                 params.append(f"%{selected_commercial}%")
@@ -1180,6 +1180,9 @@ def chiffre_affaire():
             """)
             historique_ca = [row_to_obj(r) for r in cur.fetchall()]
 
+        # =========================
+        # COMMERCIAL : UNIQUEMENT SON CA
+        # =========================
         else:
             cur.execute("""
                 SELECT
@@ -1196,14 +1199,16 @@ def chiffre_affaire():
                 ca_mensuel_par_commercial[username][int(r["mois"])] = float(r["total"])
 
     ca_annuel_perso = sum(ca_mensuel_par_commercial.get(username, {}).values())
-    ca_mensuel_perso = ca_mensuel_par_commercial.get(username, {}).get(datetime.now().month, 0)
+    ca_mensuel_perso = ca_mensuel_par_commercial.get(username, {}).get(
+        datetime.now().month, 0
+    )
 
     return render_template(
         "chiffre_affaire.html",
         ca_mensuel_par_commercial=ca_mensuel_par_commercial,
         ca_annuel_perso=ca_annuel_perso,
         ca_mensuel_perso=ca_mensuel_perso,
-        total_ca=total_ca,
+        total_ca=total_ca if role == "admin" else None,
         historique_ca=historique_ca,
         selected_year=selected_year,
         selected_commercial=selected_commercial,
