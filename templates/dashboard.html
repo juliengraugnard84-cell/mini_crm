@@ -64,7 +64,9 @@
 
     <div class="kpi-tile">
         <div class="kpi-label">Chiffre d’affaires total</div>
-        <div class="kpi-value">{{ "%.2f"|format(total_ca) }} €</div>
+        <div class="kpi-value">
+            {{ "%.2f"|format(total_ca) if total_ca is not none else "0.00" }} €
+        </div>
     </div>
 
     <div class="kpi-tile">
@@ -81,26 +83,34 @@
 <!-- ================= PIPELINE ================= -->
 <h3 class="mb-3">Pipeline global des dossiers</h3>
 
+{% set p = pipeline if pipeline is defined else {'en_cours': 0, 'gagnes': 0, 'perdus': 0} %}
+
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:36px;">
     <div class="card border-0 shadow-sm">
         <div class="card-header fw-bold bg-white">
-            🟡 En cours ({{ pipeline.en_cours }})
+            🟡 En cours ({{ p.en_cours or 0 }})
         </div>
-        <div class="card-body text-muted">Vue consolidée des dossiers.</div>
+        <div class="card-body text-muted">
+            Vue consolidée des dossiers.
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm">
         <div class="card-header fw-bold bg-white">
-            🟢 Gagnés ({{ pipeline.gagnes }})
+            🟢 Gagnés ({{ p.gagnes or 0 }})
         </div>
-        <div class="card-body text-muted">Vue consolidée des dossiers.</div>
+        <div class="card-body text-muted">
+            Vue consolidée des dossiers.
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm">
         <div class="card-header fw-bold bg-white">
-            🔴 Perdus ({{ pipeline.perdus }})
+            🔴 Perdus ({{ p.perdus or 0 }})
         </div>
-        <div class="card-body text-muted">Vue consolidée des dossiers.</div>
+        <div class="card-body text-muted">
+            Vue consolidée des dossiers.
+        </div>
     </div>
 </div>
 
@@ -125,7 +135,7 @@
                 <tr onclick="window.location='{{ url_for('client_detail', client_id=c.id) }}'">
                     <td><strong>{{ c.name }}</strong></td>
                     <td>{{ c.email or "—" }}</td>
-                    <td>{{ format_date(c.created_at) }}</td>
+                    <td>{{ format_date(c.created_at) if c.created_at else "—" }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
