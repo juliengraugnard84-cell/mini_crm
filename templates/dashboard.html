@@ -50,7 +50,6 @@
 .page-header p {
     margin-bottom: 0;
 }
-
 </style>
 
 {# ============================================================
@@ -59,76 +58,48 @@
 {% if current_user and current_user.role == 'commercial' %}
 
 <div class="page-header mb-4">
-    <div class="text-muted small mb-1">
-        Commercial connecté
-    </div>
+    <div class="text-muted small mb-1">Commercial connecté</div>
     <h1>Mon tableau de bord</h1>
     <p class="text-muted">Suivi de mon activité commerciale</p>
 </div>
 
-<!-- ================= KPI COMMERCIAL ================= -->
 <div class="kpi-grid">
-
     <div class="kpi-tile">
         <div class="kpi-label">Mes dossiers</div>
-        <div class="kpi-value">
-            {{ commercial_stats.nb_clients if commercial_stats is defined else 0 }}
-        </div>
+        <div class="kpi-value">{{ commercial_stats.nb_clients if commercial_stats else 0 }}</div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">Mon chiffre d’affaires total</div>
         <div class="kpi-value">
-            {{ "%.2f"|format(commercial_stats.ca_total) if commercial_stats is defined else "0.00" }} €
+            {{ "%.2f"|format(commercial_stats.ca_total) if commercial_stats else "0.00" }} €
         </div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">Mon chiffre d’affaires du mois</div>
         <div class="kpi-value">
-            {{ "%.2f"|format(commercial_stats.ca_mois) if commercial_stats is defined else "0.00" }} €
+            {{ "%.2f"|format(commercial_stats.ca_mois) if commercial_stats else "0.00" }} €
         </div>
     </div>
-
-    <div class="kpi-tile" style="border-left-color:#f59e0b;">
-        <div class="kpi-label">Cotations en attente</div>
-        <div class="kpi-value">
-            {{ commercial_stats.cotations_attente if commercial_stats is defined else 0 }}
-        </div>
-    </div>
-
 </div>
 
-<!-- ================= PIPELINE COMMERCIAL ================= -->
 <h3 class="mb-3">Mon pipeline</h3>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:36px;">
 
-{% for label, color, items in [
-    ('🟡 En cours', '', pipeline_en_cours if pipeline_en_cours is defined else []),
-    ('🟢 Gagnés', 'success', pipeline_gagnes if pipeline_gagnes is defined else []),
-    ('🔴 Perdus', 'danger', pipeline_perdus if pipeline_perdus is defined else [])
+{% for label, items in [
+    ('🟡 En cours', pipeline.en_cours if pipeline is defined else 0),
+    ('🟢 Gagnés', pipeline.gagnes if pipeline is defined else 0),
+    ('🔴 Perdus', pipeline.perdus if pipeline is defined else 0)
 ] %}
 
 <div class="card border-0 shadow-sm">
     <div class="card-header fw-bold bg-white">
-        {{ label }} ({{ items|length }})
+        {{ label }} ({{ items }})
     </div>
-
-    <div class="card-body d-flex flex-column gap-2">
-        {% if items %}
-            {% for c in items %}
-            <a href="{{ url_for('client_detail', client_id=c.id) }}"
-               class="pipeline-card text-decoration-none text-dark">
-                <strong>{{ c.name }}</strong>
-                <small class="text-muted d-block">
-                    {{ c.commercial or "—" }}
-                </small>
-            </a>
-            {% endfor %}
-        {% else %}
-            <p class="text-muted mb-0">Aucun dossier.</p>
-        {% endif %}
+    <div class="card-body">
+        <p class="text-muted mb-0">Vue agrégée.</p>
     </div>
 </div>
 
@@ -141,110 +112,59 @@
 {% else %}
 
 <div class="page-header mb-4">
-    <div class="text-muted small mb-1">
-        Admin connecté
-    </div>
+    <div class="text-muted small mb-1">Admin connecté</div>
     <h1>Tableau de bord</h1>
     <p class="text-muted">Vue d’ensemble de l’activité</p>
 </div>
 
-<!-- ================= KPI ADMIN ================= -->
 <div class="kpi-grid">
-
     <div class="kpi-tile">
         <div class="kpi-label">Dossiers clients</div>
-        <div class="kpi-value">
-            {{ total_clients if total_clients is defined else 0 }}
-        </div>
+        <div class="kpi-value">{{ total_clients or 0 }}</div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">Chiffre d’affaires total</div>
-        <div class="kpi-value">
-            {{ "%.2f"|format(total_ca) if total_ca is defined else "0.00" }} €
-        </div>
+        <div class="kpi-value">{{ "%.2f"|format(total_ca) }} €</div>
     </div>
 
     <div class="kpi-tile">
         <div class="kpi-label">Documents stockés</div>
-        <div class="kpi-value">
-            {{ total_docs if total_docs is defined else 0 }}
-        </div>
+        <div class="kpi-value">{{ total_docs or 0 }}</div>
     </div>
 
     <div class="kpi-tile" style="border-left-color:#ef4444;">
         <div class="kpi-label">Nouvelles cotations</div>
-        <div class="kpi-value">
-            {{ unread_cotations if unread_cotations is defined else 0 }}
-        </div>
+        <div class="kpi-value">{{ unread_cotations or 0 }}</div>
     </div>
-
 </div>
 
-<!-- ================= PIPELINE ADMIN ================= -->
 <h3 class="mb-3">Pipeline global des dossiers</h3>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:36px;">
 
-{% for label, color, items in [
-    ('🟡 En cours', 'secondary', pipeline_en_cours if pipeline_en_cours is defined else []),
-    ('🟢 Gagnés', 'success', pipeline_gagnes if pipeline_gagnes is defined else []),
-    ('🔴 Perdus', 'danger', pipeline_perdus if pipeline_perdus is defined else [])
+{% for label, count in [
+    ('🟡 En cours', pipeline.en_cours if pipeline is defined else 0),
+    ('🟢 Gagnés', pipeline.gagnes if pipeline is defined else 0),
+    ('🔴 Perdus', pipeline.perdus if pipeline is defined else 0)
 ] %}
 
 <div class="card border-0 shadow-sm">
     <div class="card-header fw-bold bg-white">
-        {{ label }} ({{ items|length }})
+        {{ label }} ({{ count }})
     </div>
-
-    <div class="card-body d-flex flex-column gap-2">
-        {% if items %}
-            {% for c in items %}
-            <div class="pipeline-card">
-
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="text-decoration-none text-dark">
-                    <strong>{{ c.name }}</strong>
-                </a>
-
-                <small class="text-muted d-block">
-                    {{ c.commercial or "—" }}
-                </small>
-
-                <form method="post"
-                      action="{{ url_for('update_client_status', client_id=c.id) }}"
-                      class="mt-2"
-                      onclick="event.stopPropagation();">
-
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-                    <select name="status"
-                            class="form-select form-select-sm"
-                            onchange="this.form.submit()">
-                        <option value="en_cours" {% if c.status == 'en_cours' %}selected{% endif %}>🟡 En cours</option>
-                        <option value="gagne" {% if c.status == 'gagne' %}selected{% endif %}>🟢 Gagné</option>
-                        <option value="perdu" {% if c.status == 'perdu' %}selected{% endif %}>🔴 Perdu</option>
-                    </select>
-                </form>
-
-            </div>
-            {% endfor %}
-        {% else %}
-            <p class="text-muted mb-0">Aucun dossier.</p>
-        {% endif %}
+    <div class="card-body">
+        <p class="text-muted mb-0">Vue consolidée des dossiers.</p>
     </div>
 </div>
 
 {% endfor %}
 </div>
 
-<!-- ================= DERNIERS DOSSIERS ================= -->
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white fw-bold">
-        Derniers dossiers créés
-    </div>
+    <div class="card-header bg-white fw-bold">Derniers dossiers créés</div>
 
-    {% if last_clients is defined and last_clients %}
+    {% if last_clients %}
     <div class="table-responsive">
         <table class="table mb-0">
             <thead>

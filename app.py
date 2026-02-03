@@ -939,7 +939,6 @@ def logout():
     flash("Déconnexion effectuée.", "info")
     return redirect(url_for("login"))
 
-
 ###########################################################
 # 8. DASHBOARD + SEARCH + OUVERTURE COTATION + CHIFFRE D’AFFAIRES
 ############################################################
@@ -959,6 +958,7 @@ def dashboard():
     user_id = user.get("id")
     username = user.get("username")
 
+    # ================= KPI GLOBAUX =================
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM crm_clients")
         total_clients = cur.fetchone()[0]
@@ -982,6 +982,7 @@ def dashboard():
         """)
         last_rev = cur.fetchone()
 
+    # ================= DOCUMENTS =================
     total_docs = 0
     if not LOCAL_MODE and s3:
         try:
@@ -990,6 +991,39 @@ def dashboard():
         except Exception:
             total_docs = 0
 
+    # ================= PIPELINE GLOBAL (FIX PRINCIPAL) =================
+    pipeline = {
+        "en_cours": 0,
+        "gagnes": 0,
+        "perdus": 0,
+    }
+
+    if role == "admin":
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(LOWER(status), 'en_cours')
+                              IN ('en_cours', 'nouveau')
+                    ) AS en_cours,
+
+                    COUNT(*) FILTER (
+                        WHERE LOWER(status) = 'gagne'
+                    ) AS gagnes,
+
+                    COUNT(*) FILTER (
+                        WHERE LOWER(status) = 'perdu'
+                    ) AS perdus
+                FROM crm_clients
+            """)
+            row = cur.fetchone()
+
+            if row:
+                pipeline["en_cours"] = row["en_cours"] or 0
+                pipeline["gagnes"] = row["gagnes"] or 0
+                pipeline["perdus"] = row["perdus"] or 0
+
+    # ================= COTATIONS NON LUES (ADMIN) =================
     unread_cotations = 0
     cotations_admin = []
 
@@ -1007,6 +1041,7 @@ def dashboard():
             """)
             cotations_admin = cur.fetchall()
 
+    # ================= STATS COMMERCIAL =================
     commercial_stats = None
 
     if role == "commercial":
@@ -1048,6 +1083,7 @@ def dashboard():
         unread_cotations=unread_cotations,
         cotations_admin=[row_to_obj(r) for r in cotations_admin],
         commercial_stats=commercial_stats,
+        pipeline=pipeline,  # ✅ INJECTION PIPELINE
     )
 
 
@@ -1102,7 +1138,6 @@ def chiffre_affaire():
     commercial_filter = request.args.get("commercial")
 
     with conn.cursor() as cur:
-        # ✅ LISTE STABLE DES COMMERCIAUX (POUR LE FILTRE)
         cur.execute("""
             SELECT DISTINCT commercial
             FROM revenus
@@ -1111,7 +1146,6 @@ def chiffre_affaire():
         """)
         all_commerciaux = [r["commercial"] for r in cur.fetchall()]
 
-        # KPI annuel
         cur.execute("""
             SELECT COALESCE(SUM(montant),0)
             FROM revenus
@@ -1119,7 +1153,6 @@ def chiffre_affaire():
         """, (year,))
         ca_annuel_perso = cur.fetchone()[0]
 
-        # KPI mensuel (mois courant de l’année filtrée)
         cur.execute("""
             SELECT COALESCE(SUM(montant),0)
             FROM revenus
@@ -1175,7 +1208,7 @@ def chiffre_affaire():
         clients=[row_to_obj(c) for c in clients],
         historique_ca=[row_to_obj(h) for h in historique_ca],
         ca_mensuel_par_commercial=ca_mensuel_par_commercial,
-        all_commerciaux=all_commerciaux,      # ✅ AJOUT
+        all_commerciaux=all_commerciaux,
         selected_year=year,
         current_year=current_year,
         selected_commercial=commercial_filter,
