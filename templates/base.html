@@ -19,7 +19,6 @@
     <!-- ================= SIDEBAR ================= -->
     <aside class="sidebar">
         <div class="sidebar-header">
-            <!-- ✅ LOGO TEXTE UNIQUEMENT -->
             <div class="company">
                 <strong>SYNERGYGROUP</strong><br>
                 <small>
@@ -41,7 +40,8 @@
                 Clients
             </a>
 
-            <a href="{{ url_for('chiffre_affaire') }}"
+            <!-- ✅ LIEN CORRIGÉ (SANS url_for) -->
+            <a href="/chiffre-affaire"
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
                 Chiffre d’affaires
             </a>
@@ -119,15 +119,14 @@
     </div>
 </div>
 
-<!-- ================= CHAT BULLE (GLOBAL) ================= -->
+<!-- ================= CHAT BULLE ================= -->
 {% if current_user %}
 
-<button id="chat-toggle" class="chat-toggle" type="button" aria-label="Ouvrir le chat">
-    💬
+<button id="chat-toggle" class="chat-toggle" type="button">💬
     <span id="chat-badge" class="chat-badge" style="display:none;">0</span>
 </button>
 
-<div id="chat-widget" class="chat-widget" aria-hidden="true">
+<div id="chat-widget" class="chat-widget">
     <div class="chat-header">
         <div>
             <div class="chat-title">Chat interne</div>
@@ -139,17 +138,15 @@
     <div id="chat-messages" class="chat-messages"></div>
 
     <form id="chat-form" class="chat-inputbar" enctype="multipart/form-data">
-        <label class="chat-attach" title="Joindre un fichier">
-            📎
+        <label class="chat-attach">📎
             <input id="chat-file" type="file" name="file">
         </label>
 
-        <textarea
-            id="chat-input"
-            name="message"
-            class="chat-input"
-            rows="1"
-            placeholder="Écrire un message…"></textarea>
+        <textarea id="chat-input"
+                  name="message"
+                  class="chat-input"
+                  rows="1"
+                  placeholder="Écrire un message…"></textarea>
 
         <button class="chat-send" type="submit">➤</button>
     </form>
@@ -163,7 +160,6 @@
 
 {% endif %}
 
-<!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='chat_widget.js') }}"></script>
 
