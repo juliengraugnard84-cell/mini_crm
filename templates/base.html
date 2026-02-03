@@ -40,8 +40,8 @@
                 Clients
             </a>
 
-            <!-- ✅ CHIFFRE D’AFFAIRES : TOUS (admin + commercial) -->
-            <a href="/chiffre-affaire"
+            <!-- ✅ CHIFFRE D’AFFAIRES : ADMIN + COMMERCIAL (CORRIGÉ) -->
+            <a href="{{ url_for('chiffre_affaire') }}"
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
                 Chiffre d’affaires
             </a>
