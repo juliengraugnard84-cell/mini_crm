@@ -1122,6 +1122,62 @@ def dashboard():
 
 
 # =========================
+# AJOUT CHIFFRE D’AFFAIRES (ADMIN)
+# endpoint attendu par le template : url_for('add_revenu')
+# =========================
+@app.route("/chiffre-affaire/add", methods=["POST"], endpoint="add_revenu")
+@login_required
+def add_revenu():
+    conn = get_db()
+    user = session.get("user") or {}
+
+    role = user.get("role")
+    username = user.get("username")
+
+    # 🔒 Sécurité : seul admin peut ajouter via ce formulaire
+    if role != "admin":
+        abort(403)
+
+    date_val = request.form.get("date")
+    client_id = request.form.get("client_id")
+    montant = request.form.get("montant")
+
+    if not date_val or not client_id or not montant:
+        flash("Tous les champs sont obligatoires.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    try:
+        montant_f = float(montant)
+    except Exception:
+        flash("Montant invalide.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    # Nom client pour dossier (optionnel mais conservé)
+    dossier_name = None
+    with conn.cursor() as cur:
+        cur.execute("SELECT name FROM crm_clients WHERE id=%s", (client_id,))
+        row = cur.fetchone()
+        if row and row.get("name"):
+            dossier_name = row["name"]
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO revenus (date, commercial, dossier, client_id, montant)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            date_val,
+            username,                 # admin qui saisit
+            dossier_name,
+            client_id,
+            montant_f,
+        ))
+
+    conn.commit()
+    flash("Chiffre d’affaires ajouté.", "success")
+    return redirect(url_for("chiffre_affaire"))
+
+
+# =========================
 # CHIFFRE D’AFFAIRES
 # =========================
 @app.route("/chiffre-affaire")
@@ -1133,18 +1189,31 @@ def chiffre_affaire():
     role = user.get("role")
     username = user.get("username")
 
-    selected_year = int(request.args.get("year", datetime.now().year))
-    selected_commercial = request.args.get("commercial")
+    current_year = datetime.now().year
+    selected_year = request.args.get("year", type=int) or current_year
+    selected_commercial = (request.args.get("commercial") or "").strip() or None
 
     ca_mensuel_par_commercial = defaultdict(lambda: defaultdict(float))
     historique_ca = []
-    total_ca = 0
+    clients = []
+    total_ca_global = 0.0
+
+    # KPI (annuel / mensuel) : dépend du rôle
+    ca_annuel_perso = 0.0
+    ca_mensuel_perso = 0.0
 
     with conn.cursor() as cur:
-        # CA GLOBAL (ADMIN UNIQUEMENT)
+        # ✅ CA global (info) : tu as demandé qu’on puisse l’indiquer sans détails
+        cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
+        total_ca_global = float(cur.fetchone()[0] or 0)
+
+        # =========================
+        # ADMIN : vue globale + filtre commercial
+        # =========================
         if role == "admin":
-            cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
-            total_ca = cur.fetchone()[0]
+            # Liste clients pour formulaire ajout
+            cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
+            clients = [row_to_obj(r) for r in cur.fetchall()]
 
             params = [selected_year]
             sql = """
@@ -1164,8 +1233,32 @@ def chiffre_affaire():
             cur.execute(sql, params)
 
             for r in cur.fetchall():
-                ca_mensuel_par_commercial[r["commercial"]][int(r["mois"])] = float(r["total"])
+                if r.get("commercial"):
+                    ca_mensuel_par_commercial[r["commercial"]][int(r["mois"])] = float(r["total"] or 0)
 
+            # KPI admin = global (ou global filtré si filtre commercial)
+            params_kpi = [selected_year]
+            where_kpi = "WHERE EXTRACT(YEAR FROM date::date) = %s"
+            if selected_commercial:
+                where_kpi += " AND commercial ILIKE %s"
+                params_kpi.append(f"%{selected_commercial}%")
+
+            cur.execute(f"""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                {where_kpi}
+            """, params_kpi)
+            ca_annuel_perso = float(cur.fetchone()[0] or 0)
+
+            cur.execute(f"""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                {where_kpi}
+                  AND EXTRACT(MONTH FROM date::date) = EXTRACT(MONTH FROM CURRENT_DATE)
+            """, params_kpi)
+            ca_mensuel_perso = float(cur.fetchone()[0] or 0)
+
+            # Historique détaillé admin (200 dernières lignes)
             cur.execute("""
                 SELECT r.date, c.name AS client_name, r.commercial, r.montant
                 FROM revenus r
@@ -1176,7 +1269,7 @@ def chiffre_affaire():
             historique_ca = [row_to_obj(r) for r in cur.fetchall()]
 
         # =========================
-        # COMMERCIAL : UNIQUEMENT SON CA
+        # COMMERCIAL : uniquement SON CA
         # =========================
         else:
             cur.execute("""
@@ -1191,21 +1284,30 @@ def chiffre_affaire():
             """, (username, selected_year))
 
             for r in cur.fetchall():
-                ca_mensuel_par_commercial[username][int(r["mois"])] = float(r["total"])
+                ca_mensuel_par_commercial[username][int(r["mois"])] = float(r["total"] or 0)
 
-    ca_annuel_perso = sum(ca_mensuel_par_commercial.get(username, {}).values())
-    ca_mensuel_perso = ca_mensuel_par_commercial.get(username, {}).get(
-        datetime.now().month, 0
-    )
+            ca_annuel_perso = sum(ca_mensuel_par_commercial.get(username, {}).values())
+            ca_mensuel_perso = ca_mensuel_par_commercial.get(username, {}).get(datetime.now().month, 0.0)
 
     return render_template(
         "chiffre_affaire.html",
+        # graph data
         ca_mensuel_par_commercial=ca_mensuel_par_commercial,
+
+        # KPI
         ca_annuel_perso=ca_annuel_perso,
         ca_mensuel_perso=ca_mensuel_perso,
-        total_ca=total_ca if role == "admin" else None,
+
+        # info global (affiché côté commercial uniquement dans ton template)
+        total_ca=total_ca_global,
+
+        # admin
         historique_ca=historique_ca,
+        clients=clients,
+
+        # filtres / années
         selected_year=selected_year,
+        current_year=current_year,
         selected_commercial=selected_commercial,
     )
 
@@ -1213,6 +1315,7 @@ def chiffre_affaire():
 ############################################################
 # 9. ADMIN — UTILISATEURS (GESTION COMPLÈTE ET SÉCURISÉE)
 ############################################################
+
 
 @app.route("/admin/users", methods=["GET", "POST"])
 @admin_required
