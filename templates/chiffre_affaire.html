@@ -193,21 +193,13 @@
                     'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
     const colors = ['#2563eb', '#16a34a', '#dc2626', '#7c3aed'];
-
     const datasets = [];
     let i = 0;
 
     for (const commercial in rawData) {
-        const mois = rawData[commercial];
-        const data = [];
-
-        for (let m = 1; m <= 12; m++) {
-            data.push(mois[m] || 0);
-        }
-
         datasets.push({
             label: commercial,
-            data,
+            data: Array.from({ length: 12 }, (_, m) => rawData[commercial][m + 1] || 0),
             borderColor: colors[i % colors.length],
             tension: 0.3,
             fill: false
@@ -220,9 +212,7 @@
         data: { labels, datasets },
         options: {
             responsive: true,
-            plugins: {
-                legend: { position: 'bottom' }
-            },
+            plugins: { legend: { position: 'bottom' } },
             scales: {
                 y: {
                     beginAtZero: true,
