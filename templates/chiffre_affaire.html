@@ -9,9 +9,9 @@
     <p class="text-muted">Suivi des performances financières</p>
 </div>
 
-<!-- ================= FILTRES ================= -->
+<!-- ================= FILTRES (ADMIN) ================= -->
 {% if current_user and current_user.role == 'admin' %}
-<form method="GET" class="card mb-4">
+<form method="GET" class="card mb-4 p-3">
     <h5>Filtres</h5>
 
     <div class="row g-3 align-items-end">
@@ -26,7 +26,6 @@
             </select>
         </div>
 
-        <!-- ✅ COMMERCIAL : SAISIE LIBRE -->
         <div class="col-md-4">
             <label>Commercial</label>
             <input
@@ -47,6 +46,7 @@
 
 <!-- ================= KPI ================= -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-bottom:32px;">
+
     <div class="kpi-tile">
         <div class="kpi-label">Chiffre d’affaires annuel</div>
         <div class="kpi-value">{{ ca_annuel_perso|round(2) }} €</div>
@@ -56,11 +56,19 @@
         <div class="kpi-label">Chiffre d’affaires mensuel</div>
         <div class="kpi-value">{{ ca_mensuel_perso|round(2) }} €</div>
     </div>
+
+    {% if current_user.role == 'commercial' and total_ca is defined %}
+    <div class="kpi-tile">
+        <div class="kpi-label">CA global (information)</div>
+        <div class="kpi-value">{{ total_ca|round(2) }} €</div>
+    </div>
+    {% endif %}
+
 </div>
 
-<!-- ================= AJOUT CA ================= -->
+<!-- ================= AJOUT CA (ADMIN) ================= -->
 {% if current_user and current_user.role == 'admin' %}
-<div class="card mb-5">
+<div class="card mb-5 p-3">
     <h5>Ajouter un chiffre d’affaires</h5>
 
     <form method="POST" action="{{ url_for('add_revenu') }}">
@@ -95,17 +103,23 @@
 </div>
 {% endif %}
 
-<!-- ================= GRAPHIQUE CA ================= -->
-{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
-<div class="card mb-5">
-    <h5>Graphique — CA mensuel par commercial ({{ selected_year }})</h5>
-    <canvas id="caChart" height="110"></canvas>
+<!-- ================= GRAPHIQUE ================= -->
+{% if ca_mensuel_par_commercial %}
+<div class="card mb-5 p-3">
+    <h5>
+        {% if current_user.role == 'admin' %}
+            Graphique — CA mensuel par commercial ({{ selected_year }})
+        {% else %}
+            Mon chiffre d’affaires mensuel ({{ selected_year }})
+        {% endif %}
+    </h5>
+    <canvas id="caChart" height="120"></canvas>
 </div>
 {% endif %}
 
-<!-- ================= TABLEAU CA MENSUEL ================= -->
-{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
-<div class="card mb-5">
+<!-- ================= TABLEAU ADMIN ================= -->
+{% if current_user.role == 'admin' and ca_mensuel_par_commercial %}
+<div class="card mb-5 p-3">
     <h5>CA mensuel par commercial — {{ selected_year }}</h5>
 
     <div class="table-responsive">
@@ -138,9 +152,9 @@
 </div>
 {% endif %}
 
-<!-- ================= HISTORIQUE ================= -->
-{% if current_user and current_user.role == 'admin' and historique_ca %}
-<div class="card mb-4">
+<!-- ================= HISTORIQUE (ADMIN) ================= -->
+{% if current_user.role == 'admin' and historique_ca %}
+<div class="card mb-4 p-3">
     <h5>Historique détaillé</h5>
 
     <table class="table table-sm align-middle">
@@ -167,7 +181,7 @@
 {% endif %}
 
 <!-- ================= JS GRAPHIQUE ================= -->
-{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
+{% if ca_mensuel_par_commercial %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function () {
@@ -178,10 +192,7 @@
     const labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
                     'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
-    const colors = [
-        '#2563eb', '#16a34a', '#dc2626',
-        '#7c3aed', '#ea580c', '#0891b2'
-    ];
+    const colors = ['#2563eb', '#16a34a', '#dc2626', '#7c3aed'];
 
     const datasets = [];
     let i = 0;
@@ -196,9 +207,8 @@
 
         datasets.push({
             label: commercial,
-            data: data,
+            data,
             borderColor: colors[i % colors.length],
-            backgroundColor: colors[i % colors.length] + '33',
             tension: 0.3,
             fill: false
         });
@@ -216,9 +226,7 @@
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        callback: v => v + ' €'
-                    }
+                    ticks: { callback: v => v + ' €' }
                 }
             }
         }

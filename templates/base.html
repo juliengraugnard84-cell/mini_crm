@@ -40,13 +40,15 @@
                 Clients
             </a>
 
-            <!-- ✅ LIEN CORRIGÉ (SANS url_for) -->
+            <!-- ✅ CHIFFRE D’AFFAIRES : ADMIN UNIQUEMENT -->
+            {% if current_user and current_user.role == "admin" %}
             <a href="/chiffre-affaire"
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
                 Chiffre d’affaires
             </a>
+            {% endif %}
 
-            <!-- ADMIN UNIQUEMENT -->
+            <!-- ================= ADMIN ================= -->
             {% if current_user and current_user.role == "admin" %}
 
                 <a href="{{ url_for('admin_updates') }}"
@@ -119,7 +121,7 @@
     </div>
 </div>
 
-<!-- ================= CHAT BULLE ================= -->
+<!-- ================= CHAT ================= -->
 {% if current_user %}
 
 <button id="chat-toggle" class="chat-toggle" type="button">💬

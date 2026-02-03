@@ -958,16 +958,15 @@ def dashboard():
     user_id = user.get("id")
     username = user.get("username")
 
+    # =========================
+    # DONNÉES GLOBALES
+    # =========================
     with conn.cursor() as cur:
-        # =========================
         # TOTAL CLIENTS
-        # =========================
         cur.execute("SELECT COUNT(*) FROM crm_clients")
         total_clients = cur.fetchone()[0]
 
-        # =========================
         # DERNIERS DOSSIERS
-        # =========================
         cur.execute("""
             SELECT id, name, email, created_at
             FROM crm_clients
@@ -976,15 +975,11 @@ def dashboard():
         """)
         last_clients = [row_to_obj(r) for r in cur.fetchall()]
 
-        # =========================
         # CA TOTAL
-        # =========================
         cur.execute("SELECT COALESCE(SUM(montant), 0) FROM revenus")
         total_ca = cur.fetchone()[0]
 
-        # =========================
         # DERNIER REVENU
-        # =========================
         cur.execute("""
             SELECT montant, date, commercial
             FROM revenus
@@ -1067,6 +1062,7 @@ def dashboard():
     pipeline_perdus = []
 
     if role == "commercial":
+        rows = []
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, name, status
@@ -1122,6 +1118,9 @@ def dashboard():
             "cotations_attente": 0,
         }
 
+    # =========================
+    # RENDER
+    # =========================
     return render_template(
         "dashboard.html",
         total_clients=total_clients,
