@@ -823,6 +823,8 @@ def csrf_protect():
 # 6. VARIABLES GLOBALES POUR LES TEMPLATES
 ############################################################
 
+from datetime import datetime
+
 @app.context_processor
 def inject_globals():
     """
@@ -868,17 +870,10 @@ def inject_globals():
         format_date=format_date_safe,
         unread_cotations=unread_cotations,
         unread_updates=unread_updates,
+
+        # ✅ FIX CRITIQUE — utilisé par chiffre_affaire.html
+        current_year=datetime.now().year,
     )
-
-
-# ============================
-# FIN PARTIE 1/4
-# ============================
-# ============================
-# app.py — VERSION COMPLÈTE CORRIGÉE (PARTIE 2/4)
-# (AUTH + DASHBOARD + CHIFFRE D’AFFAIRES + ADMIN USERS + ADMIN COTATIONS)
-# ============================
-
 
 ############################################################
 # 7. LOGIN / LOGOUT — VERSION ROBUSTE & ALIGNÉE DB
