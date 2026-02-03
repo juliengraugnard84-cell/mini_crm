@@ -26,17 +26,16 @@
             </select>
         </div>
 
+        <!-- ✅ COMMERCIAL : SAISIE LIBRE -->
         <div class="col-md-4">
             <label>Commercial</label>
-            <select name="commercial" class="form-select">
-                <option value="">— Tous —</option>
-                {% for commercial in all_commerciaux %}
-                    <option value="{{ commercial }}"
-                        {% if commercial == selected_commercial %}selected{% endif %}>
-                        {{ commercial }}
-                    </option>
-                {% endfor %}
-            </select>
+            <input
+                type="text"
+                name="commercial"
+                class="form-control"
+                placeholder="Nom du commercial (optionnel)"
+                value="{{ selected_commercial or '' }}"
+            >
         </div>
 
         <div class="col-md-3">
@@ -93,6 +92,14 @@
             <button class="btn btn-success">Ajouter</button>
         </div>
     </form>
+</div>
+{% endif %}
+
+<!-- ================= GRAPHIQUE CA ================= -->
+{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
+<div class="card mb-5">
+    <h5>Graphique — CA mensuel par commercial ({{ selected_year }})</h5>
+    <canvas id="caChart" height="110"></canvas>
 </div>
 {% endif %}
 
@@ -157,6 +164,67 @@
         </tbody>
     </table>
 </div>
+{% endif %}
+
+<!-- ================= JS GRAPHIQUE ================= -->
+{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function () {
+    const ctx = document.getElementById('caChart');
+    if (!ctx) return;
+
+    const rawData = {{ ca_mensuel_par_commercial | tojson }};
+    const labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+                    'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+    const colors = [
+        '#2563eb', '#16a34a', '#dc2626',
+        '#7c3aed', '#ea580c', '#0891b2'
+    ];
+
+    const datasets = [];
+    let i = 0;
+
+    for (const commercial in rawData) {
+        const mois = rawData[commercial];
+        const data = [];
+
+        for (let m = 1; m <= 12; m++) {
+            data.push(mois[m] || 0);
+        }
+
+        datasets.push({
+            label: commercial,
+            data: data,
+            borderColor: colors[i % colors.length],
+            backgroundColor: colors[i % colors.length] + '33',
+            tension: 0.3,
+            fill: false
+        });
+        i++;
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: v => v + ' €'
+                    }
+                }
+            }
+        }
+    });
+})();
+</script>
 {% endif %}
 
 {% endblock %}
