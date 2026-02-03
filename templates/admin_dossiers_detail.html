@@ -1,12 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Dossiers — {{ commercial }}{% endblock %}
+{% block title %}Dossiers — {{ commercial.username }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
+
+    <!-- ================= PAGE HEADER ================= -->
     <div class="d-flex align-items-center justify-content-between mb-3">
         <div>
-            <h2 class="mb-0">📁 Dossiers de {{ commercial }}</h2>
-            <small class="text-muted">Détail par statut</small>
+            <h2 class="mb-0">
+                📁 Dossiers du commercial : {{ commercial.username }}
+            </h2>
+            <small class="text-muted">
+                Détail des dossiers par statut
+            </small>
         </div>
         <a class="btn btn-outline-secondary" href="{{ url_for('admin_dossiers') }}">
             ← Retour
@@ -15,7 +21,7 @@
 
     <div class="row g-3">
 
-        <!-- EN COURS -->
+        <!-- ================= EN COURS ================= -->
         <div class="col-12 col-lg-4">
             <div class="card h-100">
                 <div class="card-header fw-bold">
@@ -36,13 +42,15 @@
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <div class="text-muted">Aucun dossier en cours.</div>
+                        <div class="text-muted">
+                            Aucun dossier en cours.
+                        </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- GAGNÉS -->
+        <!-- ================= GAGNÉS ================= -->
         <div class="col-12 col-lg-4">
             <div class="card h-100">
                 <div class="card-header fw-bold">
@@ -63,13 +71,15 @@
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <div class="text-muted">Aucun dossier gagné.</div>
+                        <div class="text-muted">
+                            Aucun dossier gagné.
+                        </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- PERDUS -->
+        <!-- ================= PERDUS ================= -->
         <div class="col-12 col-lg-4">
             <div class="card h-100">
                 <div class="card-header fw-bold">
@@ -90,7 +100,9 @@
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <div class="text-muted">Aucun dossier perdu.</div>
+                        <div class="text-muted">
+                            Aucun dossier perdu.
+                        </div>
                     {% endif %}
                 </div>
             </div>

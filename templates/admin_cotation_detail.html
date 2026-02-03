@@ -12,7 +12,7 @@
 </div>
 
 <!-- ================= INFORMATIONS GÉNÉRALES ================= -->
-<div class="card">
+<div class="card mb-4">
     <h5>Informations générales</h5>
 
     <div class="info-grid">
@@ -21,7 +21,6 @@
             <strong>{{ cotation.client_name }}</strong>
         </div>
 
-        <!-- ✅ AJOUT : COMMERCIAL -->
         <div class="info-item">
             <span>Commercial</span>
             <strong>{{ cotation.commercial_name or "—" }}</strong>
@@ -49,13 +48,17 @@
 
         <div class="info-item">
             <span>Statut</span>
-            <strong>{{ cotation.status }}</strong>
+            <strong>
+                <span class="badge bg-primary">
+                    {{ cotation.status }}
+                </span>
+            </strong>
         </div>
     </div>
 </div>
 
 <!-- ================= DONNÉES TECHNIQUES ================= -->
-<div class="card">
+<div class="card mb-4">
     <h5>Données techniques</h5>
 
     <div class="info-grid">
@@ -82,13 +85,13 @@
 </div>
 
 <!-- ================= ENTREPRISE / SIGNATAIRE ================= -->
-<div class="card">
+<div class="card mb-4">
     <h5>Entreprise & signataire</h5>
 
     <div class="info-grid">
         <div class="info-item">
             <span>Entreprise</span>
-            <strong>{{ cotation.entreprise_nom or "—" }}</strong>
+            <strong>{{ cotation.entreprise_nom or cotation.client_name or "—" }}</strong>
         </div>
 
         <div class="info-item">
@@ -108,27 +111,40 @@
 
         <div class="info-item">
             <span>Téléphone</span>
-            <strong>{{ cotation.signataire_tel or "—" }}</strong>
+            <strong>
+                {{ cotation.signataire_tel
+                   or cotation.signataire_mobile
+                   or "—" }}
+            </strong>
         </div>
     </div>
 </div>
 
 <!-- ================= COMMENTAIRE ================= -->
 {% if cotation.commentaire %}
-<div class="card">
+<div class="card mb-4">
     <h5>Commentaire du commercial</h5>
-    <p style="white-space:pre-line;">
+    <div class="alert alert-light" style="white-space:pre-line;">
         {{ cotation.commentaire }}
-    </p>
+    </div>
 </div>
 {% endif %}
 
 <!-- ================= ACTIONS ================= -->
-<div class="mt-4">
+<div class="d-flex justify-content-between mt-4">
     <a href="{{ url_for('admin_cotations') }}"
        class="btn btn-secondary">
         ← Retour aux demandes
     </a>
+
+    <form method="POST"
+          action="{{ url_for('delete_cotation_admin', cotation_id=cotation.id) }}"
+          onsubmit="return confirm('Supprimer définitivement cette demande ?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-danger">
+            Supprimer la demande
+        </button>
+    </form>
 </div>
 
 {% endblock %}
