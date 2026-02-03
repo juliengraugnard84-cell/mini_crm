@@ -959,11 +959,15 @@ def dashboard():
     username = user.get("username")
 
     with conn.cursor() as cur:
+        # =========================
         # TOTAL CLIENTS
+        # =========================
         cur.execute("SELECT COUNT(*) FROM crm_clients")
         total_clients = cur.fetchone()[0]
 
-        # ✅ DERNIERS DOSSIERS (ID OBLIGATOIRE POUR LES LIENS)
+        # =========================
+        # DERNIERS DOSSIERS (ID OBLIGATOIRE)
+        # =========================
         cur.execute("""
             SELECT id, name, email, created_at
             FROM crm_clients
@@ -972,11 +976,15 @@ def dashboard():
         """)
         last_clients = [row_to_obj(r) for r in cur.fetchall()]
 
+        # =========================
         # CA TOTAL
+        # =========================
         cur.execute("SELECT COALESCE(SUM(montant), 0) FROM revenus")
         total_ca = cur.fetchone()[0]
 
+        # =========================
         # DERNIER REVENU
+        # =========================
         cur.execute("""
             SELECT montant, date, commercial
             FROM revenus
@@ -986,18 +994,23 @@ def dashboard():
         last_rev_row = cur.fetchone()
         last_rev = row_to_obj(last_rev_row) if last_rev_row else None
 
-    # DOCUMENTS
+    # =========================
+    # DOCUMENTS (S3)
+    # =========================
     total_docs = 0
     if not LOCAL_MODE and s3:
         try:
             items = s3_list_all_objects(AWS_BUCKET)
-            total_docs = len(
-                [i for i in items if not i.get("Key", "").endswitha("/") is False]
-            )
+            total_docs = len([
+                i for i in items
+                if i.get("Key") and not i["Key"].endswith("/")
+            ])
         except Exception:
             total_docs = 0
 
-    # COTATIONS ADMIN
+    # =========================
+    # COTATIONS (ADMIN)
+    # =========================
     unread_cotations = 0
     cotations_admin = []
 
@@ -1022,7 +1035,41 @@ def dashboard():
             """)
             cotations_admin = [row_to_obj(r) for r in cur.fetchall()]
 
+    # =========================
+    # PIPELINE GLOBAL (ADMIN)
+    # =========================
+    pipeline = {
+        "en_cours": 0,
+        "gagnes": 0,
+        "perdus": 0,
+    }
+
+    if role == "admin":
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(LOWER(status), 'en_cours')
+                        IN ('en_cours', 'nouveau')
+                    ) AS en_cours,
+                    COUNT(*) FILTER (
+                        WHERE LOWER(status) = 'gagne'
+                    ) AS gagnes,
+                    COUNT(*) FILTER (
+                        WHERE LOWER(status) = 'perdu'
+                    ) AS perdus
+                FROM crm_clients
+            """)
+            row = cur.fetchone()
+
+        if row:
+            pipeline["en_cours"] = row["en_cours"] or 0
+            pipeline["gagnes"] = row["gagnes"] or 0
+            pipeline["perdus"] = row["perdus"] or 0
+
+    # =========================
     # STATS COMMERCIAL
+    # =========================
     commercial_stats = None
 
     if role == "commercial":
@@ -1060,11 +1107,12 @@ def dashboard():
         total_clients=total_clients,
         total_ca=total_ca,
         total_docs=total_docs,
-        last_clients=last_clients,      # ✅ OBJETS AVEC id
+        last_clients=last_clients,
         last_rev=last_rev,
         unread_cotations=unread_cotations,
         cotations_admin=cotations_admin,
         commercial_stats=commercial_stats,
+        pipeline=pipeline,   # ✅ INJECTION CRITIQUE
     )
 
 
@@ -1199,6 +1247,7 @@ def chiffre_affaire():
         current_year=current_year,
         selected_commercial=commercial_filter,
     )
+
 
 
 ############################################################
