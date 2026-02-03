@@ -1735,6 +1735,7 @@ def documents():
                 "nom": key,
                 "key": key,
                 "taille": item.get("Size", 0),
+                "date": item.get("LastModified"),  # ✅ AJOUT DATE
                 "url": None,
             })
 
@@ -1781,6 +1782,50 @@ def upload_document():
 
 
 # =========================================================
+# LISTE DOCUMENTS CLIENT
+# =========================================================
+def list_client_documents(client_id: int):
+    """
+    Liste documents d’un client.
+    - PROD : URL signée
+    - LOCAL : liste visible sans URL
+    - + date d’upload (LastModified S3)
+    """
+    if not s3:
+        return []
+
+    prefix = client_s3_prefix(client_id)
+    docs = []
+
+    try:
+        items = s3_list_all_objects(AWS_BUCKET, prefix=prefix)
+
+        for item in items:
+            key = item.get("Key")
+            if not key or key.endswith("/"):
+                continue
+
+            docs.append(
+                {
+                    "nom": key.replace(prefix, "", 1),
+                    "key": key,
+                    "taille": item.get("Size", 0),
+                    "date": item.get("LastModified"),  # ✅ AJOUT DATE
+                    "url": (
+                        s3_presigned_url(key)
+                        if not LOCAL_MODE
+                        else None
+                    ),
+                }
+            )
+
+    except Exception as e:
+        logger.exception("Erreur list_client_documents : %r", e)
+
+    return docs
+
+
+# =========================================================
 # UPLOAD DOCUMENT PAR DOSSIER CLIENT
 # endpoint attendu : upload_client_document (templates)
 # =========================================================
@@ -1806,8 +1851,6 @@ def upload_client_document(client_id):
 
     try:
         filename = clean_filename(secure_filename(fichier.filename))
-
-        # ✅ dossier client cohérent (SOURCE DE VÉRITÉ UNIQUE)
         prefix = client_s3_prefix(client_id)
 
         key = _s3_make_non_overwriting_key(
@@ -1913,6 +1956,7 @@ def delete_document():
 # ALIAS COMPAT LEGACY
 # =========================================================
 app.view_functions.setdefault("documents_admin", documents)
+
 
 
 ############################################################
