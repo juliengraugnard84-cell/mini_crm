@@ -32,84 +32,22 @@
     color: #111827;
 }
 
-.pipeline-card {
-    background: #f9fafb;
-    border-radius: 10px;
-    padding: 12px 14px;
-    transition: all .15s ease;
-}
-
-.pipeline-card:hover {
-    background: #eef2ff;
-}
-
 .page-header h1 {
     font-weight: 800;
 }
 
-.page-header p {
-    margin-bottom: 0;
+/* ✅ LIGNES CLIQUABLES */
+.table-clickable tbody tr {
+    cursor: pointer;
+    transition: background .12s ease;
+}
+
+.table-clickable tbody tr:hover {
+    background: #f3f4f6;
 }
 </style>
 
-{# ============================================================
-   DASHBOARD COMMERCIAL
-   ============================================================ #}
-{% if current_user and current_user.role == 'commercial' %}
-
-<div class="page-header mb-4">
-    <div class="text-muted small mb-1">Commercial connecté</div>
-    <h1>Mon tableau de bord</h1>
-    <p class="text-muted">Suivi de mon activité commerciale</p>
-</div>
-
-<div class="kpi-grid">
-    <div class="kpi-tile">
-        <div class="kpi-label">Mes dossiers</div>
-        <div class="kpi-value">{{ commercial_stats.nb_clients if commercial_stats else 0 }}</div>
-    </div>
-
-    <div class="kpi-tile">
-        <div class="kpi-label">Mon chiffre d’affaires total</div>
-        <div class="kpi-value">
-            {{ "%.2f"|format(commercial_stats.ca_total) if commercial_stats else "0.00" }} €
-        </div>
-    </div>
-
-    <div class="kpi-tile">
-        <div class="kpi-label">Mon chiffre d’affaires du mois</div>
-        <div class="kpi-value">
-            {{ "%.2f"|format(commercial_stats.ca_mois) if commercial_stats else "0.00" }} €
-        </div>
-    </div>
-</div>
-
-<h3 class="mb-3">Mon pipeline</h3>
-
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:36px;">
-
-{% for label, items in [
-    ('🟡 En cours', pipeline.en_cours if pipeline is defined else 0),
-    ('🟢 Gagnés', pipeline.gagnes if pipeline is defined else 0),
-    ('🔴 Perdus', pipeline.perdus if pipeline is defined else 0)
-] %}
-
-<div class="card border-0 shadow-sm">
-    <div class="card-header fw-bold bg-white">
-        {{ label }} ({{ items }})
-    </div>
-    <div class="card-body">
-        <p class="text-muted mb-0">Vue agrégée.</p>
-    </div>
-</div>
-
-{% endfor %}
-</div>
-
-{# ============================================================
-   DASHBOARD ADMIN
-   ============================================================ #}
-{% else %}
+{% if current_user and current_user.role == 'admin' %}
 
 <div class="page-header mb-4">
     <div class="text-muted small mb-1">Admin connecté</div>
@@ -117,6 +55,7 @@
     <p class="text-muted">Vue d’ensemble de l’activité</p>
 </div>
 
+<!-- ================= KPI ADMIN ================= -->
 <div class="kpi-grid">
     <div class="kpi-tile">
         <div class="kpi-label">Dossiers clients</div>
@@ -139,34 +78,41 @@
     </div>
 </div>
 
+<!-- ================= PIPELINE ================= -->
 <h3 class="mb-3">Pipeline global des dossiers</h3>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:36px;">
-
-{% for label, count in [
-    ('🟡 En cours', pipeline.en_cours if pipeline is defined else 0),
-    ('🟢 Gagnés', pipeline.gagnes if pipeline is defined else 0),
-    ('🔴 Perdus', pipeline.perdus if pipeline is defined else 0)
-] %}
-
-<div class="card border-0 shadow-sm">
-    <div class="card-header fw-bold bg-white">
-        {{ label }} ({{ count }})
+    <div class="card border-0 shadow-sm">
+        <div class="card-header fw-bold bg-white">
+            🟡 En cours ({{ pipeline.en_cours }})
+        </div>
+        <div class="card-body text-muted">Vue consolidée des dossiers.</div>
     </div>
-    <div class="card-body">
-        <p class="text-muted mb-0">Vue consolidée des dossiers.</p>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header fw-bold bg-white">
+            🟢 Gagnés ({{ pipeline.gagnes }})
+        </div>
+        <div class="card-body text-muted">Vue consolidée des dossiers.</div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header fw-bold bg-white">
+            🔴 Perdus ({{ pipeline.perdus }})
+        </div>
+        <div class="card-body text-muted">Vue consolidée des dossiers.</div>
     </div>
 </div>
 
-{% endfor %}
-</div>
-
+<!-- ================= DERNIERS DOSSIERS ================= -->
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white fw-bold">Derniers dossiers créés</div>
+    <div class="card-header bg-white fw-bold">
+        Derniers dossiers créés
+    </div>
 
     {% if last_clients %}
     <div class="table-responsive">
-        <table class="table mb-0">
+        <table class="table table-clickable mb-0">
             <thead>
                 <tr>
                     <th>Dossier</th>
@@ -176,7 +122,7 @@
             </thead>
             <tbody>
                 {% for c in last_clients %}
-                <tr>
+                <tr onclick="window.location='{{ url_for('client_detail', client_id=c.id) }}'">
                     <td><strong>{{ c.name }}</strong></td>
                     <td>{{ c.email or "—" }}</td>
                     <td>{{ format_date(c.created_at) }}</td>
