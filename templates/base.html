@@ -40,11 +40,18 @@
                 Clients
             </a>
 
-            <!-- ✅ CHIFFRE D’AFFAIRES : ADMIN + COMMERCIAL (CORRIGÉ) -->
             <a href="{{ url_for('chiffre_affaire') }}"
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
                 Chiffre d’affaires
             </a>
+
+            <!-- ================= RESSOURCES (ADMIN + COMMERCIAUX) ================= -->
+            {% if current_user and current_user.role in ["admin", "commercial"] %}
+                <a href="{{ url_for('shared_resources') }}"
+                   class="{% if request.path.startswith('/ressources') %}active{% endif %}">
+                    Ressources
+                </a>
+            {% endif %}
 
             <!-- ================= ADMIN UNIQUEMENT ================= -->
             {% if current_user and current_user.role == "admin" %}
