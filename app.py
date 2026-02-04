@@ -1721,12 +1721,14 @@ def admin_planning():
 # - COMMERCIAL :
 #     - accès à SES dossiers clients
 #     - accès + upload aux ressources partagées
+# - RESSOURCES CLASSÉES : Mandats / Résiliations
 # - S3 privé + URL signée
 # - COMPATIBLE templates existants
 ############################################################
 
-SHARED_PREFIX = "clients/shared/"
 GLOBAL_PREFIX = "clients/global/"
+SHARED_PREFIX = "clients/shared/"
+SHARED_CATEGORIES = ("mandats", "resiliations")
 
 
 # =========================================================
@@ -1800,11 +1802,6 @@ def upload_document():
 # LISTE DOCUMENTS CLIENT
 # =========================================================
 def list_client_documents(client_id: int):
-    """
-    Liste documents d’un client.
-    - PROD : URL signée
-    - LOCAL : liste visible sans URL
-    """
     if not s3:
         return []
 
@@ -1876,15 +1873,20 @@ def upload_client_document(client_id):
 
 
 # =========================================================
-# RESSOURCES PARTAGÉES — LISTE (ADMIN + COMMERCIAUX)
+# RESSOURCES PARTAGÉES — LISTE (MANDATS / RÉSILIATIONS)
 # =========================================================
 @app.route("/ressources")
 @login_required
 def shared_resources():
-    fichiers = []
+    mandats = []
+    resiliations = []
 
     if LOCAL_MODE or not s3:
-        return render_template("ressources.html", fichiers=fichiers)
+        return render_template(
+            "ressources.html",
+            mandats=mandats,
+            resiliations=resiliations,
+        )
 
     try:
         items = s3_list_all_objects(AWS_BUCKET, prefix=SHARED_PREFIX)
@@ -1894,18 +1896,27 @@ def shared_resources():
             if not key or key.endswith("/"):
                 continue
 
-            fichiers.append({
+            doc = {
                 "nom": key.replace(SHARED_PREFIX, "", 1),
                 "key": key,
                 "taille": item.get("Size", 0),
                 "date": item.get("LastModified"),
-            })
+            }
+
+            if key.startswith(f"{SHARED_PREFIX}mandats/"):
+                mandats.append(doc)
+            elif key.startswith(f"{SHARED_PREFIX}resiliations/"):
+                resiliations.append(doc)
 
     except Exception as e:
         logger.exception("❌ Erreur chargement ressources partagées : %r", e)
         flash("Impossible de charger les ressources.", "danger")
 
-    return render_template("ressources.html", fichiers=fichiers)
+    return render_template(
+        "ressources.html",
+        mandats=mandats,
+        resiliations=resiliations,
+    )
 
 
 # =========================================================
@@ -1917,11 +1928,15 @@ def shared_resources_upload():
     user = session.get("user") or {}
     role = user.get("role")
 
-    # 🔒 Autorisés : admin + commerciaux uniquement
     if role not in ("admin", "commercial"):
         abort(403)
 
     fichier = request.files.get("file")
+    category = (request.form.get("category") or "").strip()
+
+    if category not in SHARED_CATEGORIES:
+        flash("Catégorie invalide.", "danger")
+        return redirect(url_for("shared_resources"))
 
     if not fichier or not allowed_file(fichier.filename):
         flash("Fichier invalide.", "danger")
@@ -1935,7 +1950,7 @@ def shared_resources_upload():
         filename = clean_filename(secure_filename(fichier.filename))
         key = _s3_make_non_overwriting_key(
             AWS_BUCKET,
-            f"{SHARED_PREFIX}{filename}"
+            f"{SHARED_PREFIX}{category}/{filename}"
         )
 
         s3_upload_fileobj(fichier, AWS_BUCKET, key)
@@ -1964,7 +1979,6 @@ def download_document():
         flash("Téléchargement indisponible en mode local.", "warning")
         return redirect(url_for("dashboard"))
 
-    # 🔐 Autorisation centralisée
     if not can_access_document_key(key):
         abort(403)
 
