@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Ressources (Admin + Commerciaux)</h2>
+
+{# =======================================================
+   UPLOAD — ADMIN + COMMERCIAUX
+   ======================================================= #}
+{% if current_user and current_user.role in ["admin", "commercial"] %}
+<form
+  method="POST"
+  action="{{ url_for('shared_resources_upload') }}"
+  enctype="multipart/form-data"
+  style="margin-bottom: 1rem;"
+>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="file" name="file" required>
+  <button type="submit">Uploader un document</button>
+</form>
+<hr>
+{% endif %}
+
+{# =======================================================
+   LISTE DES RESSOURCES
+   ======================================================= #}
+<table>
+  <thead>
+    <tr>
+      <th>Nom</th>
+      <th>Date</th>
+      <th>Taille</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+
+  {% if fichiers %}
+    {% for f in fichiers %}
+      <tr>
+        <td>{{ f.nom }}</td>
+        <td>{{ format_date(f.date) }}</td>
+        <td>{{ f.taille }}</td>
+        <td>
+          <a href="{{ url_for('download_document', key=f.key) }}">
+            Télécharger
+          </a>
+
+          {# SUPPRESSION — ADMIN UNIQUEMENT #}
+          {% if current_user and current_user.role == "admin" %}
+            <form
+              method="POST"
+              action="{{ url_for('delete_document') }}"
+              style="display:inline;"
+            >
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="key" value="{{ f.key }}">
+              <button
+                type="submit"
+                onclick="return confirm('Supprimer définitivement ce document ?')"
+              >
+                Supprimer
+              </button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  {% else %}
+    <tr>
+      <td colspan="4" style="text-align:center;">
+        Aucun document partagé pour le moment.
+      </td>
+    </tr>
+  {% endif %}
+
+  </tbody>
+</table>
+
+{% endblock %}

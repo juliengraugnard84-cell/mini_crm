@@ -725,13 +725,18 @@ def extract_client_id_from_s3_key(key: str):
 
 def can_access_document_key(key: str) -> bool:
     """
-    Vérifie si l'utilisateur courant peut accéder à un document S3 via sa key.
+    Règles d’accès aux documents S3.
 
-    Règles :
     - Admin : accès total
-    - Commercial : accès uniquement à ses clients
-    - clients/global/* : réservé admin
+    - Commercial :
+        - accès aux ressources partagées : clients/shared/*
+        - accès uniquement à SES clients
+        - pas d’accès aux documents globaux admin-only : clients/global/*
     """
+
+    if not key:
+        return False
+
     user = session.get("user") or {}
     role = user.get("role")
 
@@ -742,15 +747,21 @@ def can_access_document_key(key: str) -> bool:
     if role == "admin":
         return True
 
-    # ❌ commerciaux : pas d'accès aux documents globaux
+    # ✅ Ressources partagées (admin + commerciaux)
+    if key.startswith("clients/shared/"):
+        return True
+
+    # ❌ Documents globaux réservés admin
     if key.startswith("clients/global/"):
         return False
 
+    # 🔐 Documents liés à un client
     client_id = extract_client_id_from_s3_key(key)
     if not client_id:
         return False
 
     return can_access_client(client_id)
+
 
 
 ############################################################
@@ -1705,12 +1716,18 @@ def admin_planning():
 
 
 ###########################################################
-# 11. DOCUMENTS (GLOBAL + PAR DOSSIER)
+# 11. DOCUMENTS (GLOBAL + PAR DOSSIER + RESSOURCES PARTAGÉES)
 # - ADMIN : vue globale + upload + delete
-# - COMMERCIAL : accès UNIQUEMENT à ses dossiers
+# - COMMERCIAL :
+#     - accès à SES dossiers clients
+#     - accès + upload aux ressources partagées
 # - S3 privé + URL signée
 # - COMPATIBLE templates existants
 ############################################################
+
+SHARED_PREFIX = "clients/shared/"
+GLOBAL_PREFIX = "clients/global/"
+
 
 # =========================================================
 # LISTE GLOBALE DOCUMENTS (ADMIN)
@@ -1735,7 +1752,7 @@ def documents():
                 "nom": key,
                 "key": key,
                 "taille": item.get("Size", 0),
-                "date": item.get("LastModified"),  # ✅ AJOUT DATE
+                "date": item.get("LastModified"),
                 "url": None,
             })
 
@@ -1747,8 +1764,7 @@ def documents():
 
 
 # =========================================================
-# UPLOAD DOCUMENT GLOBAL (ADMIN)
-# endpoint attendu : upload_document
+# UPLOAD DOCUMENT GLOBAL (ADMIN ONLY)
 # =========================================================
 @app.route("/documents/upload", methods=["POST"], endpoint="upload_document")
 @admin_required
@@ -1765,17 +1781,16 @@ def upload_document():
 
     try:
         filename = clean_filename(secure_filename(fichier.filename))
-        prefix = "clients/global/"
         key = _s3_make_non_overwriting_key(
             AWS_BUCKET,
-            f"{prefix}{filename}"
+            f"{GLOBAL_PREFIX}{filename}"
         )
 
         s3_upload_fileobj(fichier, AWS_BUCKET, key)
-        flash("Document uploadé.", "success")
+        flash("Document global uploadé.", "success")
 
     except Exception as e:
-        logger.exception("❌ Erreur upload document : %r", e)
+        logger.exception("❌ Erreur upload document global : %r", e)
         flash("Erreur lors de l’upload.", "danger")
 
     return redirect(url_for("documents"))
@@ -1789,7 +1804,6 @@ def list_client_documents(client_id: int):
     Liste documents d’un client.
     - PROD : URL signée
     - LOCAL : liste visible sans URL
-    - + date d’upload (LastModified S3)
     """
     if not s3:
         return []
@@ -1805,19 +1819,13 @@ def list_client_documents(client_id: int):
             if not key or key.endswith("/"):
                 continue
 
-            docs.append(
-                {
-                    "nom": key.replace(prefix, "", 1),
-                    "key": key,
-                    "taille": item.get("Size", 0),
-                    "date": item.get("LastModified"),  # ✅ AJOUT DATE
-                    "url": (
-                        s3_presigned_url(key)
-                        if not LOCAL_MODE
-                        else None
-                    ),
-                }
-            )
+            docs.append({
+                "nom": key.replace(prefix, "", 1),
+                "key": key,
+                "taille": item.get("Size", 0),
+                "date": item.get("LastModified"),
+                "url": s3_presigned_url(key) if not LOCAL_MODE else None,
+            })
 
     except Exception as e:
         logger.exception("Erreur list_client_documents : %r", e)
@@ -1827,7 +1835,6 @@ def list_client_documents(client_id: int):
 
 # =========================================================
 # UPLOAD DOCUMENT PAR DOSSIER CLIENT
-# endpoint attendu : upload_client_document (templates)
 # =========================================================
 @app.route(
     "/clients/<int:client_id>/documents/upload",
@@ -1869,12 +1876,86 @@ def upload_client_document(client_id):
 
 
 # =========================================================
-# DOWNLOAD DOCUMENT (ADMIN + COMMERCIAL AUTORISÉ)
+# RESSOURCES PARTAGÉES — LISTE (ADMIN + COMMERCIAUX)
+# =========================================================
+@app.route("/ressources")
+@login_required
+def shared_resources():
+    fichiers = []
+
+    if LOCAL_MODE or not s3:
+        return render_template("ressources.html", fichiers=fichiers)
+
+    try:
+        items = s3_list_all_objects(AWS_BUCKET, prefix=SHARED_PREFIX)
+
+        for item in items:
+            key = item.get("Key")
+            if not key or key.endswith("/"):
+                continue
+
+            fichiers.append({
+                "nom": key.replace(SHARED_PREFIX, "", 1),
+                "key": key,
+                "taille": item.get("Size", 0),
+                "date": item.get("LastModified"),
+            })
+
+    except Exception as e:
+        logger.exception("❌ Erreur chargement ressources partagées : %r", e)
+        flash("Impossible de charger les ressources.", "danger")
+
+    return render_template("ressources.html", fichiers=fichiers)
+
+
+# =========================================================
+# RESSOURCES PARTAGÉES — UPLOAD (ADMIN + COMMERCIAUX)
+# =========================================================
+@app.route("/ressources/upload", methods=["POST"])
+@login_required
+def shared_resources_upload():
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    # 🔒 Autorisés : admin + commerciaux uniquement
+    if role not in ("admin", "commercial"):
+        abort(403)
+
+    fichier = request.files.get("file")
+
+    if not fichier or not allowed_file(fichier.filename):
+        flash("Fichier invalide.", "danger")
+        return redirect(url_for("shared_resources"))
+
+    if LOCAL_MODE or not s3:
+        flash("Upload indisponible en mode local.", "warning")
+        return redirect(url_for("shared_resources"))
+
+    try:
+        filename = clean_filename(secure_filename(fichier.filename))
+        key = _s3_make_non_overwriting_key(
+            AWS_BUCKET,
+            f"{SHARED_PREFIX}{filename}"
+        )
+
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
+        flash("Ressource partagée ajoutée.", "success")
+
+    except Exception as e:
+        logger.exception("❌ Erreur upload ressource partagée : %r", e)
+        flash("Erreur lors de l’upload.", "danger")
+
+    return redirect(url_for("shared_resources"))
+
+
+# =========================================================
+# DOWNLOAD DOCUMENT (RÈGLE CENTRALE — BLOC 5)
 # =========================================================
 @app.route("/documents/download")
 @login_required
 def download_document():
     key = (request.args.get("key") or "").strip()
+
     if not key:
         flash("Document introuvable.", "danger")
         return redirect(url_for("dashboard"))
@@ -1883,32 +1964,20 @@ def download_document():
         flash("Téléchargement indisponible en mode local.", "warning")
         return redirect(url_for("dashboard"))
 
-    user = session.get("user") or {}
-    role = user.get("role")
-
-    # ================= ADMIN =================
-    if role == "admin":
-        url = s3_presigned_url(key)
-        if not url:
-            flash("Accès impossible au document.", "danger")
-            return redirect(url_for("documents"))
-        return redirect(url)
-
-    # ================= COMMERCIAL =================
-    client_id = extract_client_id_from_s3_key(key)
-    if not client_id or not can_access_client(client_id):
+    # 🔐 Autorisation centralisée
+    if not can_access_document_key(key):
         abort(403)
 
     url = s3_presigned_url(key)
     if not url:
         flash("Accès impossible au document.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
+        return redirect(url_for("dashboard"))
 
     return redirect(url)
 
 
 # =========================================================
-# DELETE DOCUMENT (ADMIN + COMMERCIAL AUTORISÉ)
+# DELETE DOCUMENT
 # =========================================================
 @app.route("/documents/delete", methods=["POST"])
 @login_required
@@ -1923,33 +1992,18 @@ def delete_document():
         flash("Suppression indisponible en mode local.", "warning")
         return redirect(url_for("dashboard"))
 
-    user = session.get("user") or {}
-    role = user.get("role")
-
-    # ================= ADMIN =================
-    if role == "admin":
-        try:
-            s3.delete_object(Bucket=AWS_BUCKET, Key=key)
-            flash("Document supprimé.", "success")
-        except Exception as e:
-            logger.exception("❌ Erreur suppression admin : %r", e)
-            flash("Erreur lors de la suppression.", "danger")
-
-        return redirect(url_for("documents"))
-
-    # ================= COMMERCIAL =================
-    client_id = extract_client_id_from_s3_key(key)
-    if not client_id or not can_access_client(client_id):
+    # 🔐 Autorisation centralisée
+    if not can_access_document_key(key):
         abort(403)
 
     try:
         s3.delete_object(Bucket=AWS_BUCKET, Key=key)
         flash("Document supprimé.", "success")
     except Exception as e:
-        logger.exception("❌ Erreur suppression commercial : %r", e)
+        logger.exception("❌ Erreur suppression document : %r", e)
         flash("Erreur lors de la suppression.", "danger")
 
-    return redirect(url_for("client_detail", client_id=client_id))
+    return redirect(url_for("dashboard"))
 
 
 # =========================================================
