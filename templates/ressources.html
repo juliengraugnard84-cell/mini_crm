@@ -1,136 +1,173 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2>Ressources (Admin + Commerciaux)</h2>
+<div class="container-fluid">
 
-{# =======================================================
-   UPLOAD — ADMIN + COMMERCIAUX
-   ======================================================= #}
-{% if current_user and current_user.role in ["admin", "commercial"] %}
-<form
-  method="POST"
-  action="{{ url_for('shared_resources_upload') }}"
-  enctype="multipart/form-data"
-  style="margin-bottom: 1.5rem;"
->
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <!-- ================= HEADER ================= -->
+  <div class="mb-4">
+    <h2 class="mb-1">Ressources partagées</h2>
+    <p class="text-muted mb-0">
+      Mandats et lettres de résiliation accessibles aux administrateurs et commerciaux.
+    </p>
+  </div>
 
-  <label for="category"><strong>Type de document</strong></label><br>
-  <select name="category" id="category" required>
-    <option value="mandats">Mandats</option>
-    <option value="resiliations">Résiliations</option>
-  </select>
+  <!-- ================= UPLOAD ================= -->
+  {% if current_user and current_user.role in ["admin", "commercial"] %}
+  <div class="card mb-4 shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title mb-3">➕ Ajouter un document</h5>
 
-  <br><br>
+      <form method="POST"
+            action="{{ url_for('shared_resources_upload') }}"
+            enctype="multipart/form-data"
+            class="row g-3">
 
-  <input type="file" name="file" required>
-  <button type="submit">Uploader le document</button>
-</form>
-<hr>
-{% endif %}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-{# =======================================================
-   📂 MANDATS
-   ======================================================= #}
-<h3>📂 Mandats</h3>
+        <div class="col-md-4">
+          <label class="form-label">Type de document</label>
+          <select name="category" class="form-select" required>
+            <option value="mandats">Mandat</option>
+            <option value="resiliations">Résiliation</option>
+          </select>
+        </div>
 
-<table>
-  <thead>
-    <tr>
-      <th>Nom</th>
-      <th>Date</th>
-      <th>Taille</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
+        <div class="col-md-6">
+          <label class="form-label">Fichier</label>
+          <input type="file" name="file" class="form-control" required>
+        </div>
 
-  {% if mandats %}
-    {% for f in mandats %}
-      <tr>
-        <td>{{ f.nom }}</td>
-        <td>{{ format_date(f.date) }}</td>
-        <td>{{ f.taille }}</td>
-        <td>
-          <a href="{{ url_for('download_document', key=f.key) }}">Télécharger</a>
+        <div class="col-md-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">
+            Uploader
+          </button>
+        </div>
 
-          {% if current_user and current_user.role == "admin" %}
-            <form method="POST"
-                  action="{{ url_for('delete_document') }}"
-                  style="display:inline;">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <input type="hidden" name="key" value="{{ f.key }}">
-              <button type="submit"
-                      onclick="return confirm('Supprimer ce mandat ?')">
-                Supprimer
-              </button>
-            </form>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-  {% else %}
-    <tr>
-      <td colspan="4" style="text-align:center;">
-        Aucun mandat disponible.
-      </td>
-    </tr>
+      </form>
+    </div>
+  </div>
   {% endif %}
 
-  </tbody>
-</table>
+  <!-- ================= MANDATS ================= -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-light">
+      <strong>📂 Mandats</strong>
+    </div>
+    <div class="card-body p-0">
 
-<br>
+      <table class="table table-striped table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Nom</th>
+            <th style="width: 160px;">Date</th>
+            <th style="width: 120px;">Taille</th>
+            <th style="width: 160px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
 
-{# =======================================================
-   📂 RÉSILIATIONS
-   ======================================================= #}
-<h3>📂 Résiliations</h3>
+        {% if mandats %}
+          {% for f in mandats %}
+          <tr>
+            <td>{{ f.nom }}</td>
+            <td>{{ format_date(f.date) }}</td>
+            <td>{{ f.taille }}</td>
+            <td>
+              <a class="btn btn-sm btn-outline-primary"
+                 href="{{ url_for('download_document', key=f.key) }}">
+                Télécharger
+              </a>
 
-<table>
-  <thead>
-    <tr>
-      <th>Nom</th>
-      <th>Date</th>
-      <th>Taille</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
+              {% if current_user.role == "admin" %}
+              <form method="POST"
+                    action="{{ url_for('delete_document') }}"
+                    class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="key" value="{{ f.key }}">
+                <button type="submit"
+                        class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Supprimer ce mandat ?')">
+                  Supprimer
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="4" class="text-center text-muted py-4">
+              Aucun mandat disponible
+            </td>
+          </tr>
+        {% endif %}
 
-  {% if resiliations %}
-    {% for f in resiliations %}
-      <tr>
-        <td>{{ f.nom }}</td>
-        <td>{{ format_date(f.date) }}</td>
-        <td>{{ f.taille }}</td>
-        <td>
-          <a href="{{ url_for('download_document', key=f.key) }}">Télécharger</a>
+        </tbody>
+      </table>
 
-          {% if current_user and current_user.role == "admin" %}
-            <form method="POST"
-                  action="{{ url_for('delete_document') }}"
-                  style="display:inline;">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <input type="hidden" name="key" value="{{ f.key }}">
-              <button type="submit"
-                      onclick="return confirm('Supprimer cette résiliation ?')">
-                Supprimer
-              </button>
-            </form>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-  {% else %}
-    <tr>
-      <td colspan="4" style="text-align:center;">
-        Aucune résiliation disponible.
-      </td>
-    </tr>
-  {% endif %}
+    </div>
+  </div>
 
-  </tbody>
-</table>
+  <!-- ================= RÉSILIATIONS ================= -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-light">
+      <strong>📂 Résiliations</strong>
+    </div>
+    <div class="card-body p-0">
+
+      <table class="table table-striped table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Nom</th>
+            <th style="width: 160px;">Date</th>
+            <th style="width: 120px;">Taille</th>
+            <th style="width: 160px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+
+        {% if resiliations %}
+          {% for f in resiliations %}
+          <tr>
+            <td>{{ f.nom }}</td>
+            <td>{{ format_date(f.date) }}</td>
+            <td>{{ f.taille }}</td>
+            <td>
+              <a class="btn btn-sm btn-outline-primary"
+                 href="{{ url_for('download_document', key=f.key) }}">
+                Télécharger
+              </a>
+
+              {% if current_user.role == "admin" %}
+              <form method="POST"
+                    action="{{ url_for('delete_document') }}"
+                    class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="key" value="{{ f.key }}">
+                <button type="submit"
+                        class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Supprimer cette résiliation ?')">
+                  Supprimer
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="4" class="text-center text-muted py-4">
+              Aucune résiliation disponible
+            </td>
+          </tr>
+        {% endif %}
+
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+
+</div>
 
 {% endblock %}
