@@ -993,7 +993,10 @@ def dashboard():
     if not LOCAL_MODE and s3:
         try:
             items = s3_list_all_objects(AWS_BUCKET)
-            total_docs = len([i for i in items if i.get("Key") and not i["Key"].endswith("/")])
+            total_docs = len([
+                i for i in items
+                if i.get("Key") and not i["Key"].endswith("/")
+            ])
         except Exception:
             total_docs = 0
 
@@ -1030,6 +1033,7 @@ def dashboard():
                 FROM crm_clients
             """)
             r = cur.fetchone()
+
         if r:
             pipeline["en_cours"] = r["en_cours"] or 0
             pipeline["gagnes"] = r["gagnes"] or 0
@@ -1060,17 +1064,24 @@ def dashboard():
     commercial_stats = None
     if role == "commercial":
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM crm_clients WHERE owner_id=%s", (user_id,))
+            cur.execute(
+                "SELECT COUNT(*) FROM crm_clients WHERE owner_id=%s",
+                (user_id,)
+            )
             nb_clients = cur.fetchone()[0]
 
-            cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus WHERE commercial=%s", (username,))
+            cur.execute(
+                "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE commercial=%s",
+                (username,)
+            )
             ca_total_com = cur.fetchone()[0]
 
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                  AND date_trunc('month', date::date)=date_trunc('month', CURRENT_DATE)
+                  AND date_trunc('month', date::date)
+                      = date_trunc('month', CURRENT_DATE)
             """, (username,))
             ca_mois_com = cur.fetchone()[0]
 
@@ -1099,7 +1110,7 @@ def dashboard():
 
 
 # =========================
-# AJOUT CHIFFRE D’AFFAIRES (ADMIN)
+# AJOUT CHIFFRE D’AFFAIRES (ADMIN) — COMMERCIAL SAISI MANUELLEMENT
 # =========================
 @app.route("/chiffre-affaire/add", methods=["POST"], endpoint="add_revenu")
 @login_required
@@ -1111,10 +1122,10 @@ def add_revenu():
 
     date_val = request.form.get("date")
     client_id = request.form.get("client_id")
-    commercial_id = request.form.get("commercial_id")
+    commercial_name = (request.form.get("commercial_name") or "").strip()
     montant = request.form.get("montant")
 
-    if not date_val or not client_id or not commercial_id or not montant:
+    if not date_val or not client_id or not commercial_name or not montant:
         flash("Tous les champs sont obligatoires.", "danger")
         return redirect(url_for("chiffre_affaire"))
 
@@ -1125,19 +1136,6 @@ def add_revenu():
         return redirect(url_for("chiffre_affaire"))
 
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT username FROM users WHERE id=%s AND role='commercial'",
-            (commercial_id,),
-        )
-        row = cur.fetchone()
-
-    if not row:
-        flash("Commercial invalide.", "danger")
-        return redirect(url_for("chiffre_affaire"))
-
-    commercial_username = row["username"]
-
-    with conn.cursor() as cur:
         cur.execute("SELECT name FROM crm_clients WHERE id=%s", (client_id,))
         r = cur.fetchone()
         dossier_name = r["name"] if r else None
@@ -1145,8 +1143,14 @@ def add_revenu():
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO revenus (date, commercial, dossier, client_id, montant)
-            VALUES (%s,%s,%s,%s,%s)
-        """, (date_val, commercial_username, dossier_name, client_id, montant_f))
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            date_val,
+            commercial_name,
+            dossier_name,
+            client_id,
+            montant_f,
+        ))
 
     conn.commit()
     flash("Chiffre d’affaires ajouté.", "success")
@@ -1211,6 +1215,7 @@ def chiffre_affaire():
                 FROM revenus
                 WHERE EXTRACT(YEAR FROM date::date) = %s
             """
+
             if selected_commercial:
                 sql += " AND commercial ILIKE %s"
                 params.append(f"%{selected_commercial}%")
@@ -1230,7 +1235,9 @@ def chiffre_affaire():
             """)
             historique_ca = [row_to_obj(r) for r in cur.fetchall()]
 
-            ca_annuel_perso = sum(sum(m.values()) for m in ca_mensuel_par_commercial.values())
+            ca_annuel_perso = sum(
+                sum(m.values()) for m in ca_mensuel_par_commercial.values()
+            )
 
         else:
             cur.execute("""
@@ -1246,7 +1253,9 @@ def chiffre_affaire():
                 ca_mensuel_par_commercial[username][int(r["mois"])] = float(r["total"] or 0)
 
             ca_annuel_perso = sum(ca_mensuel_par_commercial[username].values())
-            ca_mensuel_perso = ca_mensuel_par_commercial[username].get(datetime.now().month, 0.0)
+            ca_mensuel_perso = ca_mensuel_par_commercial[username].get(
+                datetime.now().month, 0.0
+            )
 
     return render_template(
         "chiffre_affaire.html",
@@ -1260,6 +1269,7 @@ def chiffre_affaire():
         current_year=current_year,
         selected_commercial=selected_commercial,
     )
+
 
 
 ############################################################

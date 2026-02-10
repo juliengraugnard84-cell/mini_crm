@@ -57,7 +57,7 @@
         <div class="kpi-value">{{ ca_mensuel_perso|round(2) }} €</div>
     </div>
 
-    {% if current_user and current_user.role == 'commercial' and total_ca is defined %}
+    {% if current_user.role == 'commercial' and total_ca is defined %}
     <div class="kpi-tile">
         <div class="kpi-label">CA global (information)</div>
         <div class="kpi-value">{{ total_ca|round(2) }} €</div>
@@ -90,16 +90,16 @@
                 </select>
             </div>
 
-            <!-- ✅ CHAMP COMMERCIAL -->
+            <!-- ✅ COMMERCIAL SAISI MANUELLEMENT -->
             <div class="col-md-3">
                 <label>Commercial</label>
-                <select name="commercial_id" class="form-select" required>
-                    <option value="">— Sélectionner —</option>
-                    {# Compat: accepte u.name (si fourni) sinon retombe sur u.username #}
-                    {% for u in commerciaux %}
-                        <option value="{{ u.id }}">{{ u.name if u.name is defined and u.name else u.username }}</option>
-                    {% endfor %}
-                </select>
+                <input
+                    type="text"
+                    name="commercial_name"
+                    class="form-control"
+                    placeholder="Nom du commercial"
+                    required
+                >
             </div>
 
             <div class="col-md-2">
@@ -119,7 +119,7 @@
 {% if ca_mensuel_par_commercial %}
 <div class="card mb-5 p-3">
     <h5>
-        {% if current_user and current_user.role == 'admin' %}
+        {% if current_user.role == 'admin' %}
             Graphique — CA mensuel par commercial ({{ selected_year }})
         {% else %}
             Mon chiffre d’affaires mensuel ({{ selected_year }})
@@ -130,7 +130,7 @@
 {% endif %}
 
 <!-- ================= TABLEAU ADMIN ================= -->
-{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
+{% if current_user.role == 'admin' and ca_mensuel_par_commercial %}
 <div class="card mb-5 p-3">
     <h5>CA mensuel par commercial — {{ selected_year }}</h5>
 
@@ -165,7 +165,7 @@
 {% endif %}
 
 <!-- ================= HISTORIQUE (ADMIN) ================= -->
-{% if current_user and current_user.role == 'admin' and historique_ca %}
+{% if current_user.role == 'admin' and historique_ca %}
 <div class="card mb-4 p-3">
     <h5>Historique détaillé</h5>
 
@@ -186,73 +186,22 @@
                 <td>{{ r.client_name }}</td>
                 <td>{{ r.commercial }}</td>
                 <td><strong>{{ r.montant|round(2) }} €</strong></td>
-
                 <td class="text-end">
-                    {# Supprimer uniquement si l'id est présent (compat: anciennes requêtes) #}
-                    {% if r.id is defined and r.id %}
                     <form
                         method="POST"
                         action="{{ url_for('delete_revenu', revenu_id=r.id) }}"
-                        onsubmit="return confirm('Supprimer définitivement ce chiffre d’affaires ?');"
+                        onsubmit="return confirm('Supprimer ce chiffre d’affaires ?');"
                         style="display:inline;"
                     >
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button class="btn btn-sm btn-danger">Supprimer</button>
                     </form>
-                    {% else %}
-                        <span class="text-muted">—</span>
-                    {% endif %}
                 </td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
 </div>
-{% endif %}
-
-<!-- ================= JS GRAPHIQUE ================= -->
-{% if ca_mensuel_par_commercial %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-(function () {
-    const ctx = document.getElementById('caChart');
-    if (!ctx) return;
-
-    const rawData = {{ ca_mensuel_par_commercial | tojson }};
-    const labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-                    'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
-
-    const colors = ['#2563eb', '#16a34a', '#dc2626', '#7c3aed'];
-    const datasets = [];
-    let i = 0;
-
-    for (const commercial in rawData) {
-        datasets.push({
-            label: commercial,
-            data: Array.from({ length: 12 }, (_, m) => rawData[commercial][m + 1] || 0),
-            borderColor: colors[i % colors.length],
-            tension: 0.3,
-            fill: false
-        });
-        i++;
-    }
-
-    new Chart(ctx, {
-        type: 'line',
-        data: { labels, datasets },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: { callback: v => v + ' €' }
-                }
-            }
-        }
-    });
-})();
-</script>
 {% endif %}
 
 {% endblock %}
