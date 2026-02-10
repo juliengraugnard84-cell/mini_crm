@@ -1009,8 +1009,12 @@ def dashboard():
             unread_cotations = cur.fetchone()[0]
 
             cur.execute("""
-                SELECT cotations.id, cotations.client_id, cotations.date_creation,
-                       cotations.status, crm_clients.name AS client_name
+                SELECT
+                    cotations.id,
+                    cotations.client_id,
+                    cotations.date_creation,
+                    cotations.status,
+                    crm_clients.name AS client_name
                 FROM cotations
                 JOIN crm_clients ON crm_clients.id = cotations.client_id
                 WHERE COALESCE(cotations.is_read,0)=0
@@ -1257,6 +1261,11 @@ def chiffre_affaire():
                 datetime.now().month, 0.0
             )
 
+    # 🔧 FIX CRITIQUE — Chart.js (defaultdict → dict JSON-safe)
+    ca_mensuel_par_commercial = {
+        k: dict(v) for k, v in ca_mensuel_par_commercial.items()
+    }
+
     return render_template(
         "chiffre_affaire.html",
         ca_mensuel_par_commercial=ca_mensuel_par_commercial,
@@ -1269,6 +1278,7 @@ def chiffre_affaire():
         current_year=current_year,
         selected_commercial=selected_commercial,
     )
+
 
 
 
