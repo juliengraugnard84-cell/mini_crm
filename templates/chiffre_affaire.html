@@ -57,7 +57,7 @@
         <div class="kpi-value">{{ ca_mensuel_perso|round(2) }} €</div>
     </div>
 
-    {% if current_user.role == 'commercial' and total_ca is defined %}
+    {% if current_user and current_user.role == 'commercial' and total_ca is defined %}
     <div class="kpi-tile">
         <div class="kpi-label">CA global (information)</div>
         <div class="kpi-value">{{ total_ca|round(2) }} €</div>
@@ -90,13 +90,14 @@
                 </select>
             </div>
 
-            <!-- ✅ NOUVEAU CHAMP COMMERCIAL -->
+            <!-- ✅ CHAMP COMMERCIAL -->
             <div class="col-md-3">
                 <label>Commercial</label>
                 <select name="commercial_id" class="form-select" required>
                     <option value="">— Sélectionner —</option>
+                    {# Compat: accepte u.name (si fourni) sinon retombe sur u.username #}
                     {% for u in commerciaux %}
-                        <option value="{{ u.id }}">{{ u.name }}</option>
+                        <option value="{{ u.id }}">{{ u.name if u.name is defined and u.name else u.username }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -118,7 +119,7 @@
 {% if ca_mensuel_par_commercial %}
 <div class="card mb-5 p-3">
     <h5>
-        {% if current_user.role == 'admin' %}
+        {% if current_user and current_user.role == 'admin' %}
             Graphique — CA mensuel par commercial ({{ selected_year }})
         {% else %}
             Mon chiffre d’affaires mensuel ({{ selected_year }})
@@ -129,7 +130,7 @@
 {% endif %}
 
 <!-- ================= TABLEAU ADMIN ================= -->
-{% if current_user.role == 'admin' and ca_mensuel_par_commercial %}
+{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
 <div class="card mb-5 p-3">
     <h5>CA mensuel par commercial — {{ selected_year }}</h5>
 
@@ -164,7 +165,7 @@
 {% endif %}
 
 <!-- ================= HISTORIQUE (ADMIN) ================= -->
-{% if current_user.role == 'admin' and historique_ca %}
+{% if current_user and current_user.role == 'admin' and historique_ca %}
 <div class="card mb-4 p-3">
     <h5>Historique détaillé</h5>
 
@@ -175,6 +176,7 @@
                 <th>Dossier</th>
                 <th>Commercial</th>
                 <th>Montant</th>
+                <th class="text-end">Action</th>
             </tr>
         </thead>
         <tbody>
@@ -184,6 +186,23 @@
                 <td>{{ r.client_name }}</td>
                 <td>{{ r.commercial }}</td>
                 <td><strong>{{ r.montant|round(2) }} €</strong></td>
+
+                <td class="text-end">
+                    {# Supprimer uniquement si l'id est présent (compat: anciennes requêtes) #}
+                    {% if r.id is defined and r.id %}
+                    <form
+                        method="POST"
+                        action="{{ url_for('delete_revenu', revenu_id=r.id) }}"
+                        onsubmit="return confirm('Supprimer définitivement ce chiffre d’affaires ?');"
+                        style="display:inline;"
+                    >
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="btn btn-sm btn-danger">Supprimer</button>
+                    </form>
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
             </tr>
         {% endfor %}
         </tbody>

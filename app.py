@@ -965,9 +965,6 @@ def dashboard():
     user_id = user.get("id")
     username = user.get("username")
 
-    # =========================
-    # DONNÉES GLOBALES
-    # =========================
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM crm_clients")
         total_clients = cur.fetchone()[0]
@@ -992,23 +989,14 @@ def dashboard():
         row = cur.fetchone()
         last_rev = row_to_obj(row) if row else None
 
-    # =========================
-    # DOCUMENTS (S3)
-    # =========================
     total_docs = 0
     if not LOCAL_MODE and s3:
         try:
             items = s3_list_all_objects(AWS_BUCKET)
-            total_docs = len([
-                i for i in items
-                if i.get("Key") and not i["Key"].endswith("/")
-            ])
+            total_docs = len([i for i in items if i.get("Key") and not i["Key"].endswith("/")])
         except Exception:
             total_docs = 0
 
-    # =========================
-    # COTATIONS (ADMIN)
-    # =========================
     unread_cotations = 0
     cotations_admin = []
 
@@ -1018,12 +1006,8 @@ def dashboard():
             unread_cotations = cur.fetchone()[0]
 
             cur.execute("""
-                SELECT
-                    cotations.id,
-                    cotations.client_id,
-                    cotations.date_creation,
-                    cotations.status,
-                    crm_clients.name AS client_name
+                SELECT cotations.id, cotations.client_id, cotations.date_creation,
+                       cotations.status, crm_clients.name AS client_name
                 FROM cotations
                 JOIN crm_clients ON crm_clients.id = cotations.client_id
                 WHERE COALESCE(cotations.is_read,0)=0
@@ -1031,9 +1015,6 @@ def dashboard():
             """)
             cotations_admin = [row_to_obj(r) for r in cur.fetchall()]
 
-    # =========================
-    # PIPELINE GLOBAL (ADMIN)
-    # =========================
     pipeline = {"en_cours": 0, "gagnes": 0, "perdus": 0}
 
     if role == "admin":
@@ -1041,23 +1022,19 @@ def dashboard():
             cur.execute("""
                 SELECT
                     COUNT(*) FILTER (
-                        WHERE COALESCE(LOWER(status), 'en_cours')
-                        IN ('en_cours', 'nouveau')
+                        WHERE COALESCE(LOWER(status),'en_cours')
+                        IN ('en_cours','nouveau')
                     ) AS en_cours,
-                    COUNT(*) FILTER (WHERE LOWER(status) = 'gagne') AS gagnes,
-                    COUNT(*) FILTER (WHERE LOWER(status) = 'perdu') AS perdus
+                    COUNT(*) FILTER (WHERE LOWER(status)='gagne') AS gagnes,
+                    COUNT(*) FILTER (WHERE LOWER(status)='perdu') AS perdus
                 FROM crm_clients
             """)
             r = cur.fetchone()
-
         if r:
             pipeline["en_cours"] = r["en_cours"] or 0
             pipeline["gagnes"] = r["gagnes"] or 0
             pipeline["perdus"] = r["perdus"] or 0
 
-    # =========================
-    # PIPELINE COMMERCIAL
-    # =========================
     pipeline_en_cours, pipeline_gagnes, pipeline_perdus = [], [], []
 
     if role == "commercial":
@@ -1065,46 +1042,35 @@ def dashboard():
             cur.execute("""
                 SELECT id, name, status
                 FROM crm_clients
-                WHERE owner_id = %s
+                WHERE owner_id=%s
                 ORDER BY created_at DESC
             """, (user_id,))
             rows = cur.fetchall()
 
         for r in rows:
-            status = (r["status"] or "en_cours").lower()
+            st = (r["status"] or "en_cours").lower()
             obj = row_to_obj(r)
-            if status == "gagne":
+            if st == "gagne":
                 pipeline_gagnes.append(obj)
-            elif status == "perdu":
+            elif st == "perdu":
                 pipeline_perdus.append(obj)
             else:
                 pipeline_en_cours.append(obj)
 
-    # =========================
-    # STATS COMMERCIAL
-    # =========================
     commercial_stats = None
-
     if role == "commercial":
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT COUNT(*) FROM crm_clients WHERE owner_id=%s",
-                (user_id,),
-            )
+            cur.execute("SELECT COUNT(*) FROM crm_clients WHERE owner_id=%s", (user_id,))
             nb_clients = cur.fetchone()[0]
 
-            cur.execute(
-                "SELECT COALESCE(SUM(montant),0) FROM revenus WHERE commercial=%s",
-                (username,),
-            )
+            cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus WHERE commercial=%s", (username,))
             ca_total_com = cur.fetchone()[0]
 
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                  AND date_trunc('month', date::date)
-                      = date_trunc('month', CURRENT_DATE)
+                  AND date_trunc('month', date::date)=date_trunc('month', CURRENT_DATE)
             """, (username,))
             ca_mois_com = cur.fetchone()[0]
 
@@ -1133,16 +1099,15 @@ def dashboard():
 
 
 # =========================
-# AJOUT CHIFFRE D’AFFAIRES (ADMIN) — ✅ CORRIGÉ
+# AJOUT CHIFFRE D’AFFAIRES (ADMIN)
 # =========================
 @app.route("/chiffre-affaire/add", methods=["POST"], endpoint="add_revenu")
 @login_required
 def add_revenu():
-    conn = get_db()
-    user = session.get("user") or {}
-
-    if user.get("role") != "admin":
+    if session.get("user", {}).get("role") != "admin":
         abort(403)
+
+    conn = get_db()
 
     date_val = request.form.get("date")
     client_id = request.form.get("client_id")
@@ -1159,14 +1124,11 @@ def add_revenu():
         flash("Montant invalide.", "danger")
         return redirect(url_for("chiffre_affaire"))
 
-    # 🔎 Vérification commercial
     with conn.cursor() as cur:
-        cur.execute("""
-            SELECT username
-            FROM users
-            WHERE id = %s
-              AND role = 'commercial'
-        """, (commercial_id,))
+        cur.execute(
+            "SELECT username FROM users WHERE id=%s AND role='commercial'",
+            (commercial_id,),
+        )
         row = cur.fetchone()
 
     if not row:
@@ -1175,28 +1137,37 @@ def add_revenu():
 
     commercial_username = row["username"]
 
-    # Nom client pour dossier
-    dossier_name = None
     with conn.cursor() as cur:
         cur.execute("SELECT name FROM crm_clients WHERE id=%s", (client_id,))
         r = cur.fetchone()
-        if r:
-            dossier_name = r["name"]
+        dossier_name = r["name"] if r else None
 
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO revenus (date, commercial, dossier, client_id, montant)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (
-            date_val,
-            commercial_username,
-            dossier_name,
-            client_id,
-            montant_f,
-        ))
+            VALUES (%s,%s,%s,%s,%s)
+        """, (date_val, commercial_username, dossier_name, client_id, montant_f))
 
     conn.commit()
     flash("Chiffre d’affaires ajouté.", "success")
+    return redirect(url_for("chiffre_affaire"))
+
+
+# =========================
+# SUPPRESSION CHIFFRE D’AFFAIRES (ADMIN)
+# =========================
+@app.route("/chiffre-affaire/<int:revenu_id>/delete", methods=["POST"])
+@login_required
+def delete_revenu(revenu_id):
+    if session.get("user", {}).get("role") != "admin":
+        abort(403)
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM revenus WHERE id=%s", (revenu_id,))
+
+    conn.commit()
+    flash("Chiffre d’affaires supprimé.", "success")
     return redirect(url_for("chiffre_affaire"))
 
 
@@ -1240,7 +1211,6 @@ def chiffre_affaire():
                 FROM revenus
                 WHERE EXTRACT(YEAR FROM date::date) = %s
             """
-
             if selected_commercial:
                 sql += " AND commercial ILIKE %s"
                 params.append(f"%{selected_commercial}%")
@@ -1252,7 +1222,7 @@ def chiffre_affaire():
                 ca_mensuel_par_commercial[r["commercial"]][int(r["mois"])] = float(r["total"] or 0)
 
             cur.execute("""
-                SELECT r.date, c.name AS client_name, r.commercial, r.montant
+                SELECT r.id, r.date, c.name AS client_name, r.commercial, r.montant
                 FROM revenus r
                 LEFT JOIN crm_clients c ON c.id = r.client_id
                 ORDER BY r.date DESC
@@ -1260,17 +1230,15 @@ def chiffre_affaire():
             """)
             historique_ca = [row_to_obj(r) for r in cur.fetchall()]
 
-            ca_annuel_perso = sum(
-                sum(m.values()) for m in ca_mensuel_par_commercial.values()
-            )
+            ca_annuel_perso = sum(sum(m.values()) for m in ca_mensuel_par_commercial.values())
 
         else:
             cur.execute("""
                 SELECT EXTRACT(MONTH FROM date::date) AS mois,
                        SUM(montant) AS total
                 FROM revenus
-                WHERE commercial = %s
-                  AND EXTRACT(YEAR FROM date::date) = %s
+                WHERE commercial=%s
+                  AND EXTRACT(YEAR FROM date::date)=%s
                 GROUP BY mois
             """, (username, selected_year))
 
