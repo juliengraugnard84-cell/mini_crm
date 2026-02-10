@@ -90,7 +90,7 @@
                 </select>
             </div>
 
-            <!-- ✅ COMMERCIAL SAISI MANUELLEMENT -->
+            <!-- COMMERCIAL SAISI MANUELLEMENT -->
             <div class="col-md-3">
                 <label>Commercial</label>
                 <input
@@ -202,6 +202,55 @@
         </tbody>
     </table>
 </div>
+{% endif %}
+
+<!-- ================= JS GRAPHIQUE ================= -->
+{% if ca_mensuel_par_commercial %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function () {
+    const canvas = document.getElementById('caChart');
+    if (!canvas) return;
+
+    const rawData = {{ ca_mensuel_par_commercial | tojson }};
+    const labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+                    'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+    const colors = ['#2563eb', '#16a34a', '#dc2626', '#7c3aed', '#f59e0b'];
+    const datasets = [];
+    let i = 0;
+
+    for (const commercial in rawData) {
+        datasets.push({
+            label: commercial,
+            data: Array.from({ length: 12 }, (_, m) => rawData[commercial][m + 1] || 0),
+            borderColor: colors[i % colors.length],
+            tension: 0.3,
+            fill: false
+        });
+        i++;
+    }
+
+    new Chart(canvas, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => value + ' €'
+                    }
+                }
+            }
+        }
+    });
+})();
+</script>
 {% endif %}
 
 {% endblock %}
