@@ -118,7 +118,6 @@ if is_production:
 # Limite upload (évite DOS)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
-
 ###########################################################
 # 3. BASE DE DONNÉES (POSTGRESQL – PROD SAFE)
 ############################################################
@@ -317,6 +316,7 @@ def init_db():
 
             # crm_clients
             _try_add_column(conn, "crm_clients", "siret TEXT")
+            _try_add_column(conn, "crm_clients", "gerant_nom TEXT")
 
             # cotations
             _try_add_column(conn, "cotations", "type_compteur TEXT")
@@ -336,6 +336,7 @@ def init_db():
 # 🚨 IMPORTANT
 # ❌ NE PAS APPELER init_db() AUTOMATIQUEMENT
 # ✅ À exécuter UNE SEULE FOIS manuellement si nécessaire
+
 
 
 ############################################################
@@ -2006,6 +2007,7 @@ def new_client():
         phone = (request.form.get("phone") or "").strip()
         address = (request.form.get("address") or "").strip()
         siret = (request.form.get("siret") or "").strip()
+        gerant_nom = (request.form.get("gerant_nom") or "").strip()
 
         # 🔹 owner_id via saisie manuelle du commercial
         if role == "admin":
@@ -2041,13 +2043,27 @@ def new_client():
             cur.execute(
                 """
                 INSERT INTO crm_clients (
-                    name, email, phone, address, siret,
-                    owner_id, status
+                    name,
+                    email,
+                    phone,
+                    address,
+                    siret,
+                    gerant_nom,
+                    owner_id,
+                    status
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, 'en_cours')
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'en_cours')
                 RETURNING id
                 """,
-                (name, email, phone, address, siret, owner_id),
+                (
+                    name,
+                    email,
+                    phone,
+                    address,
+                    siret,
+                    gerant_nom,
+                    owner_id,
+                ),
             )
             client_id = cur.fetchone()[0]
 
@@ -2238,105 +2254,6 @@ def client_detail(client_id):
         can_request_update=True,
     )
 
-
-# =========================
-# COTATION — CRÉATION (COMMERCIAL / ADMIN)
-# =========================
-@app.route("/clients/<int:client_id>/cotation", methods=["POST"], endpoint="create_cotation")
-@login_required
-def create_cotation(client_id):
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-    user = session.get("user") or {}
-
-    date_negociation = request.form.get("date_negociation")
-    heure_negociation = request.form.get("heure_negociation")
-    energie_type = request.form.get("energie_type")
-    type_compteur = request.form.get("type_compteur")
-    pdl_pce = request.form.get("pdl_pce")
-    date_echeance = request.form.get("date_echeance")
-    fournisseur_actuel = request.form.get("fournisseur_actuel")
-    entreprise_nom = request.form.get("entreprise_nom")
-    siret = request.form.get("siret")
-    signataire_nom = request.form.get("signataire_nom")
-    signataire_tel = request.form.get("signataire_tel")
-    signataire_email = request.form.get("signataire_email")
-    commentaire = request.form.get("commentaire")
-
-    if not date_negociation or not energie_type or not pdl_pce:
-        flash("Champs obligatoires manquants pour la cotation.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO cotations (
-                client_id,
-                date_negociation,
-                heure_negociation,
-                energie_type,
-                type_compteur,
-                pdl_pce,
-                date_echeance,
-                fournisseur_actuel,
-                entreprise_nom,
-                siret,
-                signataire_nom,
-                signataire_tel,
-                signataire_email,
-                commentaire,
-                created_by,
-                is_read,
-                status
-            )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,'nouvelle')
-            """,
-            (
-                client_id,
-                date_negociation,
-                heure_negociation,
-                energie_type,
-                type_compteur,
-                pdl_pce,
-                date_echeance,
-                fournisseur_actuel,
-                entreprise_nom,
-                siret,
-                signataire_nom,
-                signataire_tel,
-                signataire_email,
-                commentaire,
-                user.get("id"),
-            ),
-        )
-
-    conn.commit()
-    flash("Demande de cotation envoyée.", "success")
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# CLIENT — SUPPRESSION (ADMIN)
-# =========================
-@app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
-@admin_required
-def delete_client(client_id):
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM crm_clients WHERE id=%s", (client_id,))
-        if not cur.fetchone():
-            flash("Dossier client introuvable.", "danger")
-            return redirect(url_for("clients"))
-
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
-
-    conn.commit()
-    flash("Dossier client supprimé définitivement.", "success")
-    return redirect(url_for("clients"))
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)

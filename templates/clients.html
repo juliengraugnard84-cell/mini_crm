@@ -21,85 +21,98 @@
 <!-- ================= CRÉATION CLIENT ================= -->
 <div id="newClientForm" class="collapse mb-4">
     <div class="card">
-        <h5 class="mb-3">Créer un nouveau dossier client</h5>
+        <div class="card-body">
+            <h5 class="mb-3">Créer un nouveau dossier client</h5>
 
-        <form method="post" action="{{ url_for('new_client') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <form method="post" action="{{ url_for('new_client') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-            <div class="row g-3">
+                <div class="row g-3">
 
-                <div class="col-md-6">
-                    <label class="form-label">Nom du client *</label>
-                    <input type="text"
-                           name="name"
-                           class="form-control"
-                           required>
+                    <div class="col-md-6">
+                        <label class="form-label">Nom du client *</label>
+                        <input type="text"
+                               name="name"
+                               class="form-control"
+                               required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Nom du gérant</label>
+                        <input type="text"
+                               name="gerant_nom"
+                               class="form-control">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <input type="email"
+                               name="email"
+                               class="form-control">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Téléphone</label>
+                        <input type="text"
+                               name="phone"
+                               class="form-control">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Adresse</label>
+                        <input type="text"
+                               name="address"
+                               class="form-control">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">SIRET</label>
+                        <input type="text"
+                               name="siret"
+                               class="form-control">
+                    </div>
+
+                    <!-- COMMERCIAL (ADMIN UNIQUEMENT) -->
+                    {% if current_user and current_user.role == "admin" %}
+                    <div class="col-md-6">
+                        <label class="form-label">Commercial *</label>
+                        <input type="text"
+                               name="commercial_name"
+                               class="form-control"
+                               placeholder="Ex : Julien, Admin, Jeremy"
+                               required>
+                    </div>
+                    {% endif %}
+
                 </div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Email</label>
-                    <input type="email"
-                           name="email"
-                           class="form-control">
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-success">
+                        ✔ Créer le dossier
+                    </button>
                 </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Téléphone</label>
-                    <input type="text"
-                           name="phone"
-                           class="form-control">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Adresse</label>
-                    <input type="text"
-                           name="address"
-                           class="form-control">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">SIRET</label>
-                    <input type="text"
-                           name="siret"
-                           class="form-control">
-                </div>
-
-                <!-- ✅ CHAMP COMMERCIAL MANUEL (SAFE) -->
-                <div class="col-md-6">
-                    <label class="form-label">Commercial *</label>
-                    <input type="text"
-                           name="commercial_name"
-                           class="form-control"
-                           placeholder="Ex : Julien, Admin, Jeremy"
-                           required>
-                </div>
-
-            </div>
-
-            <div class="mt-4">
-                <button type="submit" class="btn btn-success">
-                    ✔ Créer le dossier
-                </button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
 <!-- ================= SEARCH ================= -->
 <div class="card mb-4">
-    <form method="get"
-          action="{{ url_for('clients') }}"
-          style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-        <input type="text"
-               name="q"
-               placeholder="Rechercher un dossier…"
-               value="{{ q if q is defined else '' }}"
-               class="form-control"
-               style="max-width:320px;">
-        <button type="submit" class="btn btn-secondary">
-            Rechercher
-        </button>
-    </form>
+    <div class="card-body">
+        <form method="get"
+              action="{{ url_for('clients') }}"
+              style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <input type="text"
+                   name="q"
+                   placeholder="Rechercher un dossier…"
+                   value="{{ q if q is defined else '' }}"
+                   class="form-control"
+                   style="max-width:320px;">
+            <button type="submit" class="btn btn-secondary">
+                Rechercher
+            </button>
+        </form>
+    </div>
 </div>
 
 <h2 class="mb-4">
