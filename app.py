@@ -876,6 +876,13 @@ def inject_globals():
             unread_cotations = 0
             unread_updates = 0
 
+    # ✅ Liste des endpoints Flask réellement chargés (anti BuildError)
+    # (dict_keys → list) pour être Jinja-friendly
+    try:
+        available_endpoints = list(app.view_functions.keys())
+    except Exception:
+        available_endpoints = []
+
     return dict(
         current_user=current_user,
         csrf_token=session.get("csrf_token"),
@@ -885,7 +892,11 @@ def inject_globals():
 
         # ✅ FIX CRITIQUE — utilisé par chiffre_affaire.html
         current_year=datetime.now().year,
+
+        # ✅ Utilisé par les templates pour éviter url_for sur une route absente
+        available_endpoints=available_endpoints,
     )
+
 
 ############################################################
 # 7. LOGIN / LOGOUT — VERSION ROBUSTE & ALIGNÉE DB

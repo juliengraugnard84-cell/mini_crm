@@ -3,6 +3,8 @@
 
 {% block content %}
 
+{% set endpoints = current_app.view_functions.keys() %}
+
 <!-- ================= PAGE HEADER ================= -->
 <div class="page-header mb-4 d-flex justify-content-between align-items-center">
     <div>
@@ -12,7 +14,7 @@
 
     {% if current_user
           and current_user.role == 'admin'
-          and (available_endpoints is not defined or 'delete_client' in available_endpoints) %}
+          and 'delete_client' in endpoints %}
     <form method="post"
           action="{{ url_for('delete_client', client_id=client.id) }}"
           onsubmit="return confirm('SUPPRIMER DÉFINITIVEMENT ce dossier client ?');">
@@ -27,7 +29,7 @@
 <!-- ================= STATUT DOSSIER ================= -->
 {% if current_user
       and (current_user.role == "admin" or current_user.id == client.owner_id)
-      and (available_endpoints is not defined or 'update_client_status' in available_endpoints) %}
+      and 'update_client_status' in endpoints %}
 <div class="card mb-4">
     <div class="card-header">
         <strong>Statut du dossier</strong>
@@ -122,7 +124,7 @@
 <div class="tab-pane fade show active" id="cotations">
 {% if current_user
       and current_user.role in ['commercial', 'admin']
-      and (available_endpoints is not defined or 'create_cotation' in available_endpoints) %}
+      and 'create_cotation' in endpoints %}
 <div class="card">
     <div class="card-body">
         <h5 class="mb-3">Nouvelle demande de cotation</h5>
@@ -224,8 +226,6 @@
 </div>
 {% endif %}
 </div>
-
-<!-- Les autres onglets (Documents / Updates) restent strictement inchangés -->
 
 </div>
 {% endblock %}
