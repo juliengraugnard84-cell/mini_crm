@@ -2020,22 +2020,18 @@ def new_client():
         siret = (request.form.get("siret") or "").strip()
         gerant_nom = (request.form.get("gerant_nom") or "").strip()
 
-        # 🔹 owner_id via saisie manuelle du commercial
         if role == "admin":
             commercial_name = (request.form.get("commercial_name") or "").strip()
             owner_id = None
 
             if commercial_name:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        """
+                    cur.execute("""
                         SELECT id
                         FROM users
                         WHERE LOWER(username) = LOWER(%s)
                         AND role IN ('admin', 'commercial')
-                        """,
-                        (commercial_name,),
-                    )
+                    """, (commercial_name,))
                     row = cur.fetchone()
                 if row:
                     owner_id = row["id"]
@@ -2051,31 +2047,17 @@ def new_client():
             return redirect(url_for("clients"))
 
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 INSERT INTO crm_clients (
-                    name,
-                    email,
-                    phone,
-                    address,
-                    siret,
-                    gerant_nom,
-                    owner_id,
-                    status
+                    name, email, phone, address,
+                    siret, gerant_nom, owner_id, status
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, 'en_cours')
                 RETURNING id
-                """,
-                (
-                    name,
-                    email,
-                    phone,
-                    address,
-                    siret,
-                    gerant_nom,
-                    owner_id,
-                ),
-            )
+            """, (
+                name, email, phone, address,
+                siret, gerant_nom, owner_id
+            ))
             client_id = cur.fetchone()[0]
 
         conn.commit()
@@ -2086,7 +2068,7 @@ def new_client():
 
 
 # =========================
-# CLIENT — LISTE + RECHERCHE + PIPELINE
+# CLIENT — LISTE
 # =========================
 @app.route("/clients")
 @login_required
@@ -2101,49 +2083,38 @@ def clients():
     with conn.cursor() as cur:
         if role == "admin":
             if q:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
-                    """,
-                    (f"%{q}%",),
-                )
+                """, (f"%{q}%",))
             else:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     ORDER BY crm_clients.created_at DESC
-                    """
-                )
+                """)
         else:
             if q:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.owner_id = %s
                       AND crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
-                    """,
-                    (user_id, f"%{q}%"),
-                )
+                """, (user_id, f"%{q}%"))
             else:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.owner_id = %s
                     ORDER BY crm_clients.created_at DESC
-                    """,
-                    (user_id,),
-                )
+                """, (user_id,))
 
         rows = cur.fetchall()
 
@@ -2194,10 +2165,8 @@ def update_client_status(client_id):
         abort(403)
 
     with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE crm_clients SET status=%s WHERE id=%s",
-            (status, client_id),
-        )
+        cur.execute("UPDATE crm_clients SET status=%s WHERE id=%s",
+                    (status, client_id))
 
     conn.commit()
     flash("Statut du dossier mis à jour.", "success")
@@ -2205,7 +2174,7 @@ def update_client_status(client_id):
 
 
 # =========================
-# CLIENT — DÉTAIL (FICHE)
+# CLIENT — DÉTAIL
 # =========================
 @app.route("/clients/<int:client_id>", endpoint="client_detail")
 @login_required
@@ -2216,15 +2185,12 @@ def client_detail(client_id):
     conn = get_db()
 
     with conn.cursor() as cur:
-        cur.execute(
-            """
+        cur.execute("""
             SELECT crm_clients.*, users.username AS commercial
             FROM crm_clients
             LEFT JOIN users ON users.id = crm_clients.owner_id
             WHERE crm_clients.id = %s
-            """,
-            (client_id,),
-        )
+        """, (client_id,))
         client = cur.fetchone()
 
     if not client:
@@ -2233,27 +2199,19 @@ def client_detail(client_id):
     documents = list_client_documents(client_id)
 
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT *
-            FROM client_updates
+        cur.execute("""
+            SELECT * FROM client_updates
             WHERE client_id = %s
             ORDER BY created_at DESC
-            """,
-            (client_id,),
-        )
+        """, (client_id,))
         updates = cur.fetchall()
 
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT *
-            FROM cotations
+        cur.execute("""
+            SELECT * FROM cotations
             WHERE client_id = %s
             ORDER BY date_creation DESC
-            """,
-            (client_id,),
-        )
+        """, (client_id,))
         cotations = cur.fetchall()
 
     return render_template(
@@ -2264,6 +2222,72 @@ def client_detail(client_id):
         client_cotations=[row_to_obj(c) for c in cotations],
         can_request_update=True,
     )
+
+
+# =========================
+# CLIENT — CRÉATION DEMANDE DE COTATION
+# =========================
+@app.route(
+    "/clients/<int:client_id>/cotation",
+    methods=["POST"],
+    endpoint="create_cotation"
+)
+@login_required
+def create_cotation(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO cotations (
+                client_id,
+                date_negociation,
+                heure_negociation,
+                energie_type,
+                type_compteur,
+                pdl_pce,
+                date_echeance,
+                fournisseur_actuel,
+                entreprise_nom,
+                siret,
+                signataire_nom,
+                signataire_tel,
+                signataire_email,
+                commentaire,
+                created_by,
+                status,
+                is_read
+            )
+            VALUES (
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                'nouvelle',
+                0
+            )
+        """, (
+            client_id,
+            request.form.get("date_negociation"),
+            request.form.get("heure_negociation"),
+            request.form.get("energie_type"),
+            request.form.get("type_compteur"),
+            request.form.get("pdl_pce"),
+            request.form.get("date_echeance"),
+            request.form.get("fournisseur_actuel"),
+            request.form.get("entreprise_nom"),
+            request.form.get("siret"),
+            request.form.get("signataire_nom"),
+            request.form.get("signataire_tel"),
+            request.form.get("signataire_email"),
+            request.form.get("commentaire"),
+            user.get("id"),
+        ))
+
+    conn.commit()
+    flash("Demande de cotation envoyée.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 ############################################################
