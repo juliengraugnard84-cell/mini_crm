@@ -964,6 +964,7 @@ def logout():
 from datetime import datetime
 from collections import defaultdict
 
+
 # =========================
 # DASHBOARD
 # =========================
@@ -1170,6 +1171,24 @@ def add_revenu():
 
     conn.commit()
     flash("Chiffre d’affaires ajouté.", "success")
+    return redirect(url_for("chiffre_affaire"))
+
+
+# =========================
+# SUPPRESSION CHIFFRE D’AFFAIRES (ADMIN)  ← RESTAURÉ
+# =========================
+@app.route("/chiffre-affaire/<int:revenu_id>/delete", methods=["POST"])
+@login_required
+def delete_revenu(revenu_id):
+    if session.get("user", {}).get("role") != "admin":
+        abort(403)
+
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM revenus WHERE id=%s", (revenu_id,))
+
+    conn.commit()
+    flash("Chiffre d’affaires supprimé.", "success")
     return redirect(url_for("chiffre_affaire"))
 
 
