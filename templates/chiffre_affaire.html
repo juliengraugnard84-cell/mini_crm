@@ -90,7 +90,6 @@
                 </select>
             </div>
 
-            <!-- COMMERCIAL SAISI MANUELLEMENT -->
             <div class="col-md-3">
                 <label>Commercial</label>
                 <input
@@ -147,15 +146,15 @@
             </thead>
             <tbody>
             {% for commercial, mois in ca_mensuel_par_commercial.items() %}
-                {% set total = 0 %}
                 <tr>
                     <td class="text-start fw-bold">{{ commercial }}</td>
                     {% for m in range(1, 13) %}
                         {% set val = mois.get(m, 0) %}
-                        {% set total = total + val %}
                         <td>{{ val|round(2) if val else "—" }}</td>
                     {% endfor %}
-                    <td class="fw-bold">{{ total|round(2) }} €</td>
+                    <td class="fw-bold">
+                        {{ totaux_par_commercial.get(commercial, 0)|round(2) }} €
+                    </td>
                 </tr>
             {% endfor %}
             </tbody>
