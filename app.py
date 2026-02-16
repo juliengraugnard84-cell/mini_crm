@@ -1126,6 +1126,54 @@ def dashboard():
 
 
 # =========================
+# AJOUT CHIFFRE D’AFFAIRES (ADMIN)
+# =========================
+@app.route("/chiffre-affaire/add", methods=["POST"])
+@login_required
+def add_revenu():
+    if session.get("user", {}).get("role") != "admin":
+        abort(403)
+
+    conn = get_db()
+
+    date_val = request.form.get("date")
+    client_id = request.form.get("client_id")
+    commercial_name = (request.form.get("commercial_name") or "").strip()
+    montant = request.form.get("montant")
+
+    if not date_val or not client_id or not commercial_name or not montant:
+        flash("Tous les champs sont obligatoires.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    try:
+        montant_f = float(montant)
+    except Exception:
+        flash("Montant invalide.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT name FROM crm_clients WHERE id=%s", (client_id,))
+        r = cur.fetchone()
+        dossier_name = r["name"] if r else None
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO revenus (date, commercial, dossier, client_id, montant)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            date_val,
+            commercial_name,
+            dossier_name,
+            client_id,
+            montant_f,
+        ))
+
+    conn.commit()
+    flash("Chiffre d’affaires ajouté.", "success")
+    return redirect(url_for("chiffre_affaire"))
+
+
+# =========================
 # CHIFFRE D’AFFAIRES
 # =========================
 @app.route("/chiffre-affaire")
@@ -1207,20 +1255,18 @@ def chiffre_affaire():
                 datetime.now().month, 0.0
             )
 
-    # 🔧 FIX CRITIQUE — Chart.js (defaultdict → dict JSON-safe)
     ca_mensuel_par_commercial = {
         k: dict(v) for k, v in ca_mensuel_par_commercial.items()
     }
 
-    # ✅ AJOUT SANS RIEN SUPPRIMER : TOTAL PAR COMMERCIAL
-    totaux_par_commercial = {}
-    for commercial, mois_dict in ca_mensuel_par_commercial.items():
-        totaux_par_commercial[commercial] = sum(mois_dict.values())
+    totaux_par_commercial = {
+        k: sum(v.values()) for k, v in ca_mensuel_par_commercial.items()
+    }
 
     return render_template(
         "chiffre_affaire.html",
         ca_mensuel_par_commercial=ca_mensuel_par_commercial,
-        totaux_par_commercial=totaux_par_commercial,  # ← NOUVEAU
+        totaux_par_commercial=totaux_par_commercial,
         ca_annuel_perso=ca_annuel_perso,
         ca_mensuel_perso=ca_mensuel_perso,
         total_ca=total_ca_global,
