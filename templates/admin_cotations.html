@@ -44,14 +44,17 @@
                     onclick="window.location='{{ url_for('admin_cotation_detail', cotation_id=c.id) }}'"
                 >
 
+                    <!-- ================= ID ================= -->
                     <td class="text-muted">
                         #{{ c.id }}
                     </td>
 
+                    <!-- ================= DATE CREATION ================= -->
                     <td>
                         {{ format_date(c.date_creation) if c.date_creation else "—" }}
                     </td>
 
+                    <!-- ================= DOSSIER ================= -->
                     <td>
                         <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
                            onclick="event.stopPropagation();">
@@ -59,22 +62,38 @@
                         </a>
                     </td>
 
+                    <!-- ================= COMMERCIAL ================= -->
                     <td>
                         {{ c.commercial_name or "—" }}
                     </td>
 
+                    <!-- ================= ENERGIE (CORRIGÉ) ================= -->
                     <td>
-                        {{ c.energie_type or "—" }}
+                        {% set energie = (c.energie_type or "").lower() %}
+                        {% if energie in ["gaz"] %}
+                            <span class="badge bg-warning text-dark">
+                                🔥 Gaz
+                            </span>
+                        {% elif energie in ["electricite", "électricité"] %}
+                            <span class="badge bg-info text-dark">
+                                ⚡ Électricité
+                            </span>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
                     </td>
 
+                    <!-- ================= DATE NEGOCIATION ================= -->
                     <td>
                         {{ format_date(c.date_negociation) if c.date_negociation else "—" }}
                     </td>
 
+                    <!-- ================= STATUT ================= -->
                     <td>
                         {{ c.status or "—" }}
                     </td>
 
+                    <!-- ================= LU ================= -->
                     <td>
                         {% if c.is_read %}
                             <span class="badge bg-success">Oui</span>
@@ -83,16 +102,17 @@
                         {% endif %}
                     </td>
 
+                    <!-- ================= ACTIONS ================= -->
                     <td class="text-end" onclick="event.stopPropagation();">
                         <div class="d-inline-flex gap-2">
 
-                            <!-- ================= OUVRIR ================= -->
+                            <!-- OUVRIR -->
                             <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
                                class="btn btn-outline-primary btn-sm">
                                 Ouvrir
                             </a>
 
-                            <!-- ================= SUPPRIMER ================= -->
+                            <!-- SUPPRIMER -->
                             <form method="post"
                                   action="{{ url_for('delete_cotation_admin', cotation_id=c.id) }}"
                                   onsubmit="return confirm('Supprimer définitivement cette cotation ?');">

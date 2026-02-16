@@ -26,19 +26,37 @@
             <strong>{{ cotation.commercial_name or "—" }}</strong>
         </div>
 
+        <!-- ================= ENERGIE (CORRIGÉ) ================= -->
         <div class="info-item">
             <span>Énergie</span>
-            <strong>{{ cotation.energie_type or "—" }}</strong>
+            <strong>
+                {% set energie = (cotation.energie_type or "").lower() %}
+                {% if energie in ["gaz"] %}
+                    <span class="badge bg-warning text-dark">
+                        🔥 Gaz
+                    </span>
+                {% elif energie in ["electricite", "électricité"] %}
+                    <span class="badge bg-info text-dark">
+                        ⚡ Électricité
+                    </span>
+                {% else %}
+                    —
+                {% endif %}
+            </strong>
         </div>
 
         <div class="info-item">
             <span>Date de création</span>
-            <strong>{{ format_date(cotation.date_creation) }}</strong>
+            <strong>
+                {{ format_date(cotation.date_creation) if cotation.date_creation else "—" }}
+            </strong>
         </div>
 
         <div class="info-item">
             <span>Date de négociation</span>
-            <strong>{{ format_date(cotation.date_negociation) }}</strong>
+            <strong>
+                {{ format_date(cotation.date_negociation) if cotation.date_negociation else "—" }}
+            </strong>
         </div>
 
         <div class="info-item">
@@ -50,7 +68,7 @@
             <span>Statut</span>
             <strong>
                 <span class="badge bg-primary">
-                    {{ cotation.status }}
+                    {{ cotation.status or "—" }}
                 </span>
             </strong>
         </div>
@@ -79,7 +97,9 @@
 
         <div class="info-item">
             <span>Date d’échéance</span>
-            <strong>{{ format_date(cotation.date_echeance) }}</strong>
+            <strong>
+                {{ format_date(cotation.date_echeance) if cotation.date_echeance else "—" }}
+            </strong>
         </div>
     </div>
 </div>
