@@ -2002,9 +2002,11 @@ app.view_functions.setdefault("documents_admin", documents)
 
 
 ############################################################
-# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL) + STATUT + COTATIONS
+# 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
+# + STATUT + COTATIONS
 # ⚠️ VERSION UNIQUE — AUCUN DOUBLON
 ############################################################
+
 
 # =========================
 # CLIENT — CRÉATION
@@ -2018,6 +2020,7 @@ def new_client():
     user_id = user.get("id")
 
     if request.method == "POST":
+
         name = (request.form.get("name") or "").strip()
         email = (request.form.get("email") or "").strip()
         phone = (request.form.get("phone") or "").strip()
@@ -2025,6 +2028,11 @@ def new_client():
         siret = (request.form.get("siret") or "").strip()
         gerant_nom = (request.form.get("gerant_nom") or "").strip()
 
+        if not name:
+            flash("Le nom du client est obligatoire.", "danger")
+            return redirect(url_for("clients"))
+
+        # Attribution propriétaire
         if role == "admin":
             commercial_name = (request.form.get("commercial_name") or "").strip()
             owner_id = None
@@ -2034,18 +2042,14 @@ def new_client():
                     cur.execute("""
                         SELECT id
                         FROM users
-                        WHERE LOWER(username) = LOWER(%s)
-                        AND role IN ('admin', 'commercial')
+                        WHERE LOWER(username)=LOWER(%s)
+                          AND role IN ('admin','commercial')
                     """, (commercial_name,))
                     row = cur.fetchone()
                 if row:
                     owner_id = row["id"]
         else:
             owner_id = user_id
-
-        if not name:
-            flash("Le nom du client est obligatoire.", "danger")
-            return redirect(url_for("clients"))
 
         if not owner_id:
             flash("Commercial introuvable. Vérifiez le nom saisi.", "danger")
@@ -2057,7 +2061,7 @@ def new_client():
                     name, email, phone, address,
                     siret, gerant_nom, owner_id, status
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'en_cours')
+                VALUES (%s,%s,%s,%s,%s,%s,%s,'en_cours')
                 RETURNING id
             """, (
                 name, email, phone, address,
@@ -2070,6 +2074,87 @@ def new_client():
         return redirect(url_for("client_detail", client_id=client_id))
 
     return redirect(url_for("clients"))
+
+
+# =========================
+# CLIENT — MODIFICATION INFOS
+# =========================
+@app.route("/clients/<int:client_id>/edit", methods=["POST"])
+@login_required
+def edit_client(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    address = (request.form.get("address") or "").strip()
+    siret = (request.form.get("siret") or "").strip()
+    gerant_nom = (request.form.get("gerant_nom") or "").strip()
+
+    if not name:
+        flash("Le nom du client est obligatoire.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    owner_id = None
+
+    # 🔒 Admin peut réassigner
+    if role == "admin":
+        commercial_name = (request.form.get("commercial_name") or "").strip()
+        if commercial_name:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id
+                    FROM users
+                    WHERE LOWER(username)=LOWER(%s)
+                      AND role IN ('admin','commercial')
+                """, (commercial_name,))
+                row = cur.fetchone()
+            if row:
+                owner_id = row["id"]
+
+    with conn.cursor() as cur:
+        if role == "admin" and owner_id:
+            cur.execute("""
+                UPDATE crm_clients
+                SET name=%s,
+                    email=%s,
+                    phone=%s,
+                    address=%s,
+                    siret=%s,
+                    gerant_nom=%s,
+                    owner_id=%s
+                WHERE id=%s
+            """, (
+                name, email, phone, address,
+                siret, gerant_nom,
+                owner_id,
+                client_id
+            ))
+        else:
+            cur.execute("""
+                UPDATE crm_clients
+                SET name=%s,
+                    email=%s,
+                    phone=%s,
+                    address=%s,
+                    siret=%s,
+                    gerant_nom=%s
+                WHERE id=%s
+            """, (
+                name, email, phone, address,
+                siret, gerant_nom,
+                client_id
+            ))
+
+    conn.commit()
+    flash("Informations client mises à jour.", "success")
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 # =========================
@@ -2108,7 +2193,7 @@ def clients():
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id = %s
+                    WHERE crm_clients.owner_id=%s
                       AND crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
                 """, (user_id, f"%{q}%"))
@@ -2117,18 +2202,19 @@ def clients():
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id = %s
+                    WHERE crm_clients.owner_id=%s
                     ORDER BY crm_clients.created_at DESC
                 """, (user_id,))
 
         rows = cur.fetchall()
 
     en_cours, gagnes, perdus = [], [], []
+
     for r in rows:
-        status = (r["status"] or "en_cours").lower()
-        if status == "gagne":
+        st = (r["status"] or "en_cours").lower()
+        if st == "gagne":
             gagnes.append(r)
-        elif status == "perdu":
+        elif st == "perdu":
             perdus.append(r)
         else:
             en_cours.append(r)
@@ -2148,6 +2234,7 @@ def clients():
 @app.route("/clients/<int:client_id>/status", methods=["POST"])
 @login_required
 def update_client_status(client_id):
+
     status = (request.form.get("status") or "").strip().lower()
     if status not in ("en_cours", "gagne", "perdu"):
         flash("Statut invalide.", "danger")
@@ -2158,6 +2245,7 @@ def update_client_status(client_id):
     user_id = user.get("id")
 
     conn = get_db()
+
     with conn.cursor() as cur:
         cur.execute("SELECT owner_id FROM crm_clients WHERE id=%s", (client_id,))
         row = cur.fetchone()
@@ -2170,8 +2258,10 @@ def update_client_status(client_id):
         abort(403)
 
     with conn.cursor() as cur:
-        cur.execute("UPDATE crm_clients SET status=%s WHERE id=%s",
-                    (status, client_id))
+        cur.execute(
+            "UPDATE crm_clients SET status=%s WHERE id=%s",
+            (status, client_id)
+        )
 
     conn.commit()
     flash("Statut du dossier mis à jour.", "success")
@@ -2184,6 +2274,7 @@ def update_client_status(client_id):
 @app.route("/clients/<int:client_id>", endpoint="client_detail")
 @login_required
 def client_detail(client_id):
+
     if not can_access_client(client_id):
         abort(403)
 
@@ -2194,7 +2285,7 @@ def client_detail(client_id):
             SELECT crm_clients.*, users.username AS commercial
             FROM crm_clients
             LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.id = %s
+            WHERE crm_clients.id=%s
         """, (client_id,))
         client = cur.fetchone()
 
@@ -2205,16 +2296,18 @@ def client_detail(client_id):
 
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT * FROM client_updates
-            WHERE client_id = %s
+            SELECT *
+            FROM client_updates
+            WHERE client_id=%s
             ORDER BY created_at DESC
         """, (client_id,))
         updates = cur.fetchall()
 
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT * FROM cotations
-            WHERE client_id = %s
+            SELECT *
+            FROM cotations
+            WHERE client_id=%s
             ORDER BY date_creation DESC
         """, (client_id,))
         cotations = cur.fetchall()
@@ -2293,7 +2386,6 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation envoyée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
-
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
