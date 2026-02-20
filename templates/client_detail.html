@@ -343,17 +343,25 @@
                                     <th>Énergie</th>
                                     <th>PDL/PCE</th>
                                     <th>Statut</th>
+                                    <th>Créée par</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for c in client_cotations %}
-                                <tr>
+                                <tr {% if current_user and c.created_by == current_user.id %}class="table-success"{% endif %}>
                                     <td>#{{ c.id }}</td>
                                     <td>{{ c.date_creation or "—" }}</td>
                                     <td>{{ c.date_negociation or "—" }}</td>
                                     <td>{{ c.energie_type or "—" }}</td>
                                     <td>{{ c.pdl_pce or "—" }}</td>
                                     <td>{{ c.status or "nouvelle" }}</td>
+                                    <td>
+                                        {% if current_user and c.created_by == current_user.id %}
+                                            Moi
+                                        {% else %}
+                                            {{ c.created_by or "—" }}
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
