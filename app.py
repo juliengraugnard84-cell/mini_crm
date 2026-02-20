@@ -2032,7 +2032,6 @@ def new_client():
             flash("Le nom du client est obligatoire.", "danger")
             return redirect(url_for("clients"))
 
-        # Attribution propriétaire
         if role == "admin":
             commercial_name = (request.form.get("commercial_name") or "").strip()
             owner_id = None
@@ -2103,7 +2102,6 @@ def edit_client(client_id):
 
     owner_id = None
 
-    # 🔒 Admin peut réassigner
     if role == "admin":
         commercial_name = (request.form.get("commercial_name") or "").strip()
         if commercial_name:
@@ -2279,6 +2277,9 @@ def client_detail(client_id):
         abort(403)
 
     conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -2303,13 +2304,26 @@ def client_detail(client_id):
         """, (client_id,))
         updates = cur.fetchall()
 
+    # 🔐 IMPORTANT
+    # Admin → voit toutes les cotations du client
+    # Commercial → voit uniquement celles qu’il a créées
     with conn.cursor() as cur:
-        cur.execute("""
-            SELECT *
-            FROM cotations
-            WHERE client_id=%s
-            ORDER BY date_creation DESC
-        """, (client_id,))
+        if role == "admin":
+            cur.execute("""
+                SELECT *
+                FROM cotations
+                WHERE client_id=%s
+                ORDER BY date_creation DESC
+            """, (client_id,))
+        else:
+            cur.execute("""
+                SELECT *
+                FROM cotations
+                WHERE client_id=%s
+                  AND created_by=%s
+                ORDER BY date_creation DESC
+            """, (client_id, user_id))
+
         cotations = cur.fetchall()
 
     return render_template(
@@ -2386,7 +2400,6 @@ def create_cotation(client_id):
     conn.commit()
     flash("Demande de cotation envoyée.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
-
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################

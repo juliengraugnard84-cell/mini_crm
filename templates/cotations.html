@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Mes cotations{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+    <h1>Cotations</h1>
+    <p class="text-muted mb-0">Historique des demandes de cotation</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <strong>Historique</strong>
+    </div>
+
+    <div class="card-body">
+        {% if cotations and cotations|length > 0 %}
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Client</th>
+                            <th>Date création</th>
+                            <th>Date négociation</th>
+                            <th>Énergie</th>
+                            <th>PDL/PCE</th>
+                            <th>Statut</th>
+                            <th style="width: 140px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in cotations %}
+                        <tr>
+                            <td>#{{ c.id }}</td>
+                            <td>{{ c.client_name or ("#"+(c.client_id|string)) }}</td>
+                            <td>{{ c.date_creation or "—" }}</td>
+                            <td>{{ c.date_negociation or "—" }}</td>
+                            <td>{{ c.energie_type or "—" }}</td>
+                            <td>{{ c.pdl_pce or "—" }}</td>
+                            <td>{{ c.status or "nouvelle" }}</td>
+                            <td>
+                                {% if available_endpoints and 'client_detail' in available_endpoints %}
+                                    <a class="btn btn-sm btn-outline-primary"
+                                       href="{{ url_for('client_detail', client_id=c.client_id) }}">
+                                        Ouvrir dossier
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted mb-0">Aucune demande de cotation trouvée.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -45,6 +45,17 @@
                 Chiffre d’affaires
             </a>
 
+            <!-- ================= COTATIONS (COMMERCIAL + ADMIN) ================= -->
+            {% if current_user
+                  and current_user.role in ["admin", "commercial"]
+                  and available_endpoints
+                  and 'cotations' in available_endpoints %}
+                <a href="{{ url_for('cotations') }}"
+                   class="{% if request.path.startswith('/cotations') %}active{% endif %}">
+                    Mes cotations
+                </a>
+            {% endif %}
+
             <!-- ================= RESSOURCES (ADMIN + COMMERCIAUX) ================= -->
             {% if current_user and current_user.role in ["admin", "commercial"] %}
                 <a href="{{ url_for('shared_resources') }}"
