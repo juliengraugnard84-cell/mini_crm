@@ -1697,12 +1697,19 @@ def admin_planning():
 #     - accès + upload aux ressources partagées
 # - RESSOURCES CLASSÉES : Mandats / Résiliations
 # - S3 privé + URL signée
+# - MULTI DOWNLOAD ZIP
 # - COMPATIBLE templates existants
 ############################################################
+
+import io
+import zipfile
+from flask import send_file
 
 GLOBAL_PREFIX = "clients/global/"
 SHARED_PREFIX = "clients/shared/"
 SHARED_CATEGORIES = ("mandats", "resiliations")
+
+MAX_MULTI_DOWNLOAD = 20  # sécurité mémoire
 
 
 # =========================================================
@@ -1814,6 +1821,7 @@ def list_client_documents(client_id: int):
 )
 @login_required
 def upload_client_document(client_id):
+
     if not can_access_client(client_id):
         abort(403)
 
@@ -1847,7 +1855,7 @@ def upload_client_document(client_id):
 
 
 # =========================================================
-# RESSOURCES PARTAGÉES — LISTE (MANDATS / RÉSILIATIONS)
+# RESSOURCES PARTAGÉES — LISTE
 # =========================================================
 @app.route("/ressources")
 @login_required
@@ -1894,7 +1902,7 @@ def shared_resources():
 
 
 # =========================================================
-# RESSOURCES PARTAGÉES — UPLOAD (ADMIN + COMMERCIAUX)
+# RESSOURCES PARTAGÉES — UPLOAD
 # =========================================================
 @app.route("/ressources/upload", methods=["POST"])
 @login_required
@@ -1938,7 +1946,7 @@ def shared_resources_upload():
 
 
 # =========================================================
-# DOWNLOAD DOCUMENT (RÈGLE CENTRALE — BLOC 5)
+# DOWNLOAD SIMPLE (EXISTANT — INCHANGÉ)
 # =========================================================
 @app.route("/documents/download")
 @login_required
@@ -1947,11 +1955,11 @@ def download_document():
 
     if not key:
         flash("Document introuvable.", "danger")
-        return redirect(url_for("dashboard"))
+        return redirect(request.referrer or url_for("dashboard"))
 
     if LOCAL_MODE or not s3:
         flash("Téléchargement indisponible en mode local.", "warning")
-        return redirect(url_for("dashboard"))
+        return redirect(request.referrer or url_for("dashboard"))
 
     if not can_access_document_key(key):
         abort(403)
@@ -1959,9 +1967,63 @@ def download_document():
     url = s3_presigned_url(key)
     if not url:
         flash("Accès impossible au document.", "danger")
-        return redirect(url_for("dashboard"))
+        return redirect(request.referrer or url_for("dashboard"))
 
     return redirect(url)
+
+
+# =========================================================
+# DOWNLOAD MULTIPLE (ZIP STABLE)
+# =========================================================
+@app.route("/documents/download-multiple", methods=["POST"])
+@login_required
+def download_multiple_documents():
+
+    keys = request.form.getlist("keys")
+
+    if not keys:
+        flash("Aucun document sélectionné.", "danger")
+        return redirect(request.referrer or url_for("dashboard"))
+
+    if len(keys) > MAX_MULTI_DOWNLOAD:
+        flash(f"Maximum {MAX_MULTI_DOWNLOAD} fichiers par téléchargement.", "danger")
+        return redirect(request.referrer or url_for("dashboard"))
+
+    if LOCAL_MODE or not s3:
+        flash("Téléchargement multiple indisponible en mode local.", "warning")
+        return redirect(request.referrer or url_for("dashboard"))
+
+    valid_keys = [k for k in keys if can_access_document_key(k)]
+
+    if not valid_keys:
+        abort(403)
+
+    memory_file = io.BytesIO()
+
+    try:
+        with zipfile.ZipFile(memory_file, "w", zipfile.ZIP_DEFLATED) as zf:
+
+            for key in valid_keys:
+                try:
+                    obj = s3.get_object(Bucket=AWS_BUCKET, Key=key)
+                    filename = key.split("/")[-1]
+                    zf.writestr(filename, obj["Body"].read())
+                except Exception as e:
+                    logger.exception("Erreur ajout ZIP : %r", e)
+
+        memory_file.seek(0)
+
+        return send_file(
+            memory_file,
+            as_attachment=True,
+            download_name="documents.zip",
+            mimetype="application/zip",
+        )
+
+    except Exception as e:
+        logger.exception("Erreur génération ZIP : %r", e)
+        flash("Erreur lors de la création du fichier ZIP.", "danger")
+        return redirect(request.referrer or url_for("dashboard"))
 
 
 # =========================================================
@@ -1974,13 +2036,12 @@ def delete_document():
 
     if not key:
         flash("Document introuvable.", "danger")
-        return redirect(url_for("dashboard"))
+        return redirect(request.referrer or url_for("dashboard"))
 
     if LOCAL_MODE or not s3:
         flash("Suppression indisponible en mode local.", "warning")
-        return redirect(url_for("dashboard"))
+        return redirect(request.referrer or url_for("dashboard"))
 
-    # 🔐 Autorisation centralisée
     if not can_access_document_key(key):
         abort(403)
 
@@ -1991,14 +2052,13 @@ def delete_document():
         logger.exception("❌ Erreur suppression document : %r", e)
         flash("Erreur lors de la suppression.", "danger")
 
-    return redirect(url_for("dashboard"))
+    return redirect(request.referrer or url_for("dashboard"))
 
 
 # =========================================================
 # ALIAS COMPAT LEGACY
 # =========================================================
 app.view_functions.setdefault("documents_admin", documents)
-
 
 
 ############################################################
