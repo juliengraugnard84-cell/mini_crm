@@ -1748,6 +1748,7 @@ def documents():
 
 # =========================================================
 # UPLOAD DOCUMENT GLOBAL (ADMIN ONLY)
+# (inchangé : un seul fichier, compatible templates existants)
 # =========================================================
 @app.route("/documents/upload", methods=["POST"], endpoint="upload_document")
 @admin_required
@@ -1813,6 +1814,8 @@ def list_client_documents(client_id: int):
 
 # =========================================================
 # UPLOAD DOCUMENT PAR DOSSIER CLIENT
+# ✅ Corrigé : support multi-upload (name="files" + multiple)
+# ✅ Compat : accepte encore l'ancien champ "file"
 # =========================================================
 @app.route(
     "/clients/<int:client_id>/documents/upload",
@@ -1825,31 +1828,60 @@ def upload_client_document(client_id):
     if not can_access_client(client_id):
         abort(403)
 
-    fichier = request.files.get("file")
-
-    if not fichier or not allowed_file(fichier.filename):
-        flash("Fichier invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
     if LOCAL_MODE or not s3:
         flash("Upload indisponible en mode local.", "warning")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    try:
-        filename = clean_filename(secure_filename(fichier.filename))
-        prefix = client_s3_prefix(client_id)
+    # ✅ Multi fichiers : <input name="files" multiple>
+    files = request.files.getlist("files")
 
-        key = _s3_make_non_overwriting_key(
-            AWS_BUCKET,
-            f"{prefix}{filename}"
+    # ✅ Compat legacy : <input name="file">
+    if not files:
+        legacy = request.files.get("file")
+        if legacy:
+            files = [legacy]
+
+    # Filtre sécurité : ignore entrées vides
+    files = [f for f in files if f and getattr(f, "filename", "")]
+
+    if not files:
+        flash("Aucun fichier sélectionné.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    success_count = 0
+    failed = []
+
+    for fichier in files:
+        # Validation extension
+        if not allowed_file(fichier.filename):
+            failed.append(fichier.filename or "fichier_invalide")
+            continue
+
+        try:
+            filename = clean_filename(secure_filename(fichier.filename))
+            prefix = client_s3_prefix(client_id)
+
+            key = _s3_make_non_overwriting_key(
+                AWS_BUCKET,
+                f"{prefix}{filename}"
+            )
+
+            s3_upload_fileobj(fichier, AWS_BUCKET, key)
+            success_count += 1
+
+        except Exception as e:
+            logger.exception("❌ Erreur upload document client : %r", e)
+            failed.append(fichier.filename or "fichier_erreur")
+
+    if success_count > 0 and not failed:
+        flash(f"{success_count} document(s) ajouté(s) au dossier client.", "success")
+    elif success_count > 0 and failed:
+        flash(
+            f"{success_count} upload(s) OK, {len(failed)} échec(s): {', '.join(failed)}",
+            "warning"
         )
-
-        s3_upload_fileobj(fichier, AWS_BUCKET, key)
-        flash("Document ajouté au dossier client.", "success")
-
-    except Exception as e:
-        logger.exception("❌ Erreur upload document client : %r", e)
-        flash("Erreur lors de l’upload du document.", "danger")
+    else:
+        flash(f"Aucun upload réussi. Échecs: {', '.join(failed)}", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
 
@@ -1903,6 +1935,7 @@ def shared_resources():
 
 # =========================================================
 # RESSOURCES PARTAGÉES — UPLOAD
+# (inchangé : un seul fichier, compatible templates existants)
 # =========================================================
 @app.route("/ressources/upload", methods=["POST"])
 @login_required
@@ -2002,11 +2035,20 @@ def download_multiple_documents():
 
     try:
         with zipfile.ZipFile(memory_file, "w", zipfile.ZIP_DEFLATED) as zf:
-
             for key in valid_keys:
                 try:
                     obj = s3.get_object(Bucket=AWS_BUCKET, Key=key)
                     filename = key.split("/")[-1]
+
+                    # ✅ évite collisions dans le ZIP si 2 fichiers ont le même nom
+                    if filename in zf.namelist():
+                        base, dot, ext = filename.rpartition(".")
+                        suffix = key.split("/")[-2].replace("/", "_")
+                        if dot:
+                            filename = f"{base}_{suffix}.{ext}"
+                        else:
+                            filename = f"{filename}_{suffix}"
+
                     zf.writestr(filename, obj["Body"].read())
                 except Exception as e:
                     logger.exception("Erreur ajout ZIP : %r", e)
@@ -2059,7 +2101,6 @@ def delete_document():
 # ALIAS COMPAT LEGACY
 # =========================================================
 app.view_functions.setdefault("documents_admin", documents)
-
 
 ############################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)

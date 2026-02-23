@@ -397,7 +397,10 @@
 
                     <div class="row g-2 align-items-center">
                         <div class="col-md-8">
-                            <input type="file" name="file" class="form-control" required>
+                            {# ✅ Upload MULTI : name="files" + multiple
+                               ✅ Compat backend : tu peux garder la route identique, elle fera request.files.getlist("files") #}
+                            <input type="file" name="files" class="form-control" multiple required>
+                            <small class="text-muted">Tu peux sélectionner plusieurs fichiers d’un coup.</small>
                         </div>
                         <div class="col-md-4 text-end">
                             <button class="btn btn-primary">Uploader</button>
@@ -407,122 +410,6 @@
                 {% endif %}
 
                 {% if documents and documents|length > 0 %}
-
-                    {% if available_endpoints and 'download_multiple_documents' in available_endpoints %}
-                    <form method="post" action="{{ url_for('download_multiple_documents') }}" class="mb-2">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle">
-                                <thead>
-                                    <tr>
-                                        <th style="width:40px;">
-                                            <input type="checkbox" id="select_all_docs" aria-label="Tout sélectionner">
-                                        </th>
-                                        <th>Nom</th>
-                                        <th style="width: 120px;">Taille</th>
-                                        <th style="width: 220px;">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for d in documents %}
-                                    <tr>
-                                        <td>
-                                            <input type="checkbox" name="keys" value="{{ d.key }}">
-                                        </td>
-                                        <td>{{ d.nom }}</td>
-                                        <td>{{ d.taille or 0 }} o</td>
-                                        <td>
-                                            {% if available_endpoints and 'download_document' in available_endpoints %}
-                                                <a class="btn btn-sm btn-outline-secondary"
-                                                   href="{{ url_for('download_document') }}?key={{ d.key | urlencode }}">
-                                                    Télécharger
-                                                </a>
-                                            {% endif %}
-
-                                            {% if available_endpoints and 'delete_document' in available_endpoints %}
-                                            <form method="post"
-                                                  action="{{ url_for('delete_document') }}"
-                                                  style="display:inline;"
-                                                  onsubmit="return confirm('Supprimer ce document ?');">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                                <input type="hidden" name="key" value="{{ d.key }}">
-                                                <button class="btn btn-sm btn-outline-danger">Supprimer</button>
-                                            </form>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="d-flex justify-content-between align-items-center mt-2">
-                            <small class="text-muted">
-                                <span id="selected_count">0</span> sélectionné(s)
-                            </small>
-                            <button type="submit" class="btn btn-success" id="btn_download_zip" disabled>
-                                Télécharger la sélection (ZIP)
-                            </button>
-                        </div>
-                    </form>
-
-                    <script>
-                    (function() {
-                        const selectAll = document.getElementById("select_all_docs");
-                        const selectedCount = document.getElementById("selected_count");
-                        const btnZip = document.getElementById("btn_download_zip");
-                        if (!selectAll || !selectedCount || !btnZip) return;
-
-                        function getCheckboxes() {
-                            return Array.from(document.querySelectorAll('input[name="keys"]'));
-                        }
-
-                        function refreshState() {
-                            const checkboxes = getCheckboxes();
-                            const checked = checkboxes.filter(cb => cb.checked).length;
-
-                            selectedCount.textContent = String(checked);
-                            btnZip.disabled = checked === 0;
-
-                            // checkbox "select all" état
-                            if (checkboxes.length === 0) {
-                                selectAll.checked = false;
-                                selectAll.indeterminate = false;
-                                return;
-                            }
-
-                            if (checked === 0) {
-                                selectAll.checked = false;
-                                selectAll.indeterminate = false;
-                            } else if (checked === checkboxes.length) {
-                                selectAll.checked = true;
-                                selectAll.indeterminate = false;
-                            } else {
-                                selectAll.checked = false;
-                                selectAll.indeterminate = true;
-                            }
-                        }
-
-                        selectAll.addEventListener("change", function() {
-                            const checkboxes = getCheckboxes();
-                            checkboxes.forEach(cb => cb.checked = selectAll.checked);
-                            refreshState();
-                        });
-
-                        document.addEventListener("change", function(e) {
-                            if (e.target && e.target.matches('input[name="keys"]')) {
-                                refreshState();
-                            }
-                        });
-
-                        // init
-                        refreshState();
-                    })();
-                    </script>
-
-                    {% else %}
-                    {# Fallback strict : tableau original sans multi-download #}
                     <div class="table-responsive">
                         <table class="table table-sm align-middle">
                             <thead>
@@ -561,8 +448,6 @@
                             </tbody>
                         </table>
                     </div>
-                    {% endif %}
-
                 {% else %}
                     <p class="text-muted mb-0">Aucun document pour ce dossier.</p>
                 {% endif %}
