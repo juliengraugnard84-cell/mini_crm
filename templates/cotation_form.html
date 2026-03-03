@@ -1,130 +1,173 @@
 {% extends "base.html" %}
-{% block title %}Nouvelle demande de cotation{% endblock %}
 
 {% block content %}
 
-<div class="page-header mb-4">
-    <h1>Nouvelle demande de cotation</h1>
-    <p class="text-muted">
-        Dossier : <strong>{{ client.name }}</strong>
-    </p>
-</div>
+<div class="container mt-4">
+    <h2 class="mb-4">Nouvelle demande de cotation</h2>
 
-<div class="card p-4">
-<form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <form method="POST"
+          action="{{ url_for('create_cotation', client_id=client.id) }}">
 
-    <div class="row g-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <!-- TYPE ÉNERGIE -->
-        <div class="col-md-4">
-            <label class="form-label">Type d’énergie *</label>
-            <select name="energie_type" class="form-control" required>
-                <option value="">— Sélectionner —</option>
-                <option value="electricite">Électricité</option>
-                <option value="gaz">Gaz</option>
-            </select>
+        <div class="row g-3">
+
+            <!-- NOM DOSSIER -->
+            <div class="col-md-6">
+                <label class="form-label">Nom du dossier</label>
+                <input type="text"
+                       class="form-control"
+                       value="{{ client.name }}"
+                       readonly>
+            </div>
+
+            <!-- COMMERCIAL -->
+            <div class="col-md-6">
+                <label class="form-label">Commercial</label>
+                <input type="text"
+                       class="form-control"
+                       value="{{ session.user.username }}"
+                       readonly>
+            </div>
+
+            <!-- DATE NEGOCIATION -->
+            <div class="col-md-4">
+                <label class="form-label">Date de négociation *</label>
+                <input type="date"
+                       name="date_negociation"
+                       class="form-control"
+                       required>
+            </div>
+
+            <!-- HEURE NEGOCIATION -->
+            <div class="col-md-4">
+                <label class="form-label">Heure de négociation</label>
+                <input type="time"
+                       name="heure_negociation"
+                       class="form-control">
+            </div>
+
+            <!-- TYPE ENERGIE -->
+            <div class="col-md-4">
+                <label class="form-label">Type d’énergie *</label>
+                <select name="energie_type"
+                        class="form-control"
+                        required>
+                    <option value="">— Sélectionner —</option>
+                    <option value="electricite">Électricité</option>
+                    <option value="gaz">Gaz</option>
+                </select>
+            </div>
+
+            <!-- TYPE COMPTEUR -->
+            <div class="col-md-6">
+                <label class="form-label">Type de compteur</label>
+                <input type="text"
+                       name="type_compteur"
+                       class="form-control">
+            </div>
+
+            <!-- PDL PCE -->
+            <div class="col-md-6">
+                <label class="form-label">PDL / PCE *</label>
+                <input type="text"
+                       name="pdl_pce"
+                       class="form-control"
+                       required>
+            </div>
+
+            <!-- DATE ECHEANCE -->
+            <div class="col-md-6">
+                <label class="form-label">Date d’échéance</label>
+                <input type="date"
+                       name="date_echeance"
+                       class="form-control">
+            </div>
+
+            <!-- FOURNISSEUR -->
+            <div class="col-md-6">
+                <label class="form-label">Fournisseur actuel</label>
+                <input type="text"
+                       name="fournisseur_actuel"
+                       class="form-control">
+            </div>
+
+            <!-- ENTREPRISE -->
+            <div class="col-md-6">
+                <label class="form-label">Entreprise</label>
+                <input type="text"
+                       name="entreprise_nom"
+                       class="form-control"
+                       value="{{ client.name }}">
+            </div>
+
+            <!-- SIRET -->
+            <div class="col-md-6">
+                <label class="form-label">SIRET</label>
+                <input type="text"
+                       name="siret"
+                       class="form-control"
+                       value="{{ client.siret }}">
+            </div>
+
+            <!-- SIGNATAIRE -->
+            <div class="col-md-6">
+                <label class="form-label">Nom du signataire</label>
+                <input type="text"
+                       name="signataire_nom"
+                       class="form-control">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Email signataire</label>
+                <input type="email"
+                       name="signataire_email"
+                       class="form-control">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Téléphone signataire</label>
+                <input type="text"
+                       name="signataire_tel"
+                       class="form-control">
+            </div>
+
+            <!-- 🔵 NOUVEAUX CHAMPS AJOUTÉS ICI -->
+
+            <!-- ADRESSE FACTURATION -->
+            <div class="col-md-6">
+                <label class="form-label">Adresse de facturation</label>
+                <input type="text"
+                       name="adresse_facturation"
+                       class="form-control">
+            </div>
+
+            <!-- ADRESSE CONSOMMATION -->
+            <div class="col-md-6">
+                <label class="form-label">Adresse de consommation</label>
+                <input type="text"
+                       name="adresse_consommation"
+                       class="form-control">
+            </div>
+
+            <!-- COMMENTAIRE -->
+            <div class="col-12">
+                <label class="form-label">Commentaire</label>
+                <textarea name="commentaire"
+                          class="form-control"
+                          rows="4"></textarea>
+            </div>
+
         </div>
 
-        <!-- TYPE COMPTEUR -->
-        <div class="col-md-4">
-            <label class="form-label">Type de compteur *</label>
-            <select name="type_compteur" class="form-control" required>
-                <option value="">— Sélectionner —</option>
-                <option>C5</option>
-                <option>C4</option>
-                <option>C2</option>
-                <option>T1</option>
-                <option>T2</option>
-                <option>T3</option>
-                <option>T4</option>
-            </select>
+        <div class="text-end mt-4">
+            <button type="submit"
+                    class="btn btn-warning">
+                Envoyer la demande de cotation
+            </button>
         </div>
 
-        <!-- HEURE NÉGOCIATION -->
-        <div class="col-md-4">
-            <label class="form-label">Heure de négociation</label>
-            <input type="time" name="heure_negociation" class="form-control">
-        </div>
-
-        <!-- PDL / PCE -->
-        <div class="col-md-6">
-            <label class="form-label">PDL / PCE *</label>
-            <input name="pdl_pce" class="form-control" required>
-        </div>
-
-        <!-- DATE ÉCHÉANCE -->
-        <div class="col-md-6">
-            <label class="form-label">Date d’échéance contrat</label>
-            <input type="date" name="date_echeance" class="form-control">
-        </div>
-
-        <!-- FOURNISSEUR -->
-        <div class="col-md-6">
-            <label class="form-label">Fournisseur actuel</label>
-            <input name="fournisseur_actuel" class="form-control">
-        </div>
-
-        <!-- ENTREPRISE -->
-        <div class="col-md-6">
-            <label class="form-label">Nom de l’entreprise</label>
-            <input name="entreprise_nom" class="form-control" value="{{ client.name }}">
-        </div>
-
-        <!-- SIRET -->
-        <div class="col-md-6">
-            <label class="form-label">SIRET</label>
-            <input name="siret" class="form-control" value="{{ client.siret }}">
-        </div>
-
-        <!-- SIGNATAIRE -->
-        <div class="col-md-6">
-            <label class="form-label">Nom & prénom du signataire</label>
-            <input name="signataire_nom" class="form-control">
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Email du signataire</label>
-            <input type="email" name="signataire_email" class="form-control">
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Téléphone fixe</label>
-            <input name="signataire_tel" class="form-control">
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Téléphone mobile</label>
-            <input name="signataire_mobile" class="form-control">
-        </div>
-
-        <!-- ADRESSE FACTURATION -->
-        <div class="col-md-6">
-            <label class="form-label">Adresse de facturation</label>
-            <input name="adresse_facturation" class="form-control">
-        </div>
-
-        <!-- ADRESSE CONSOMMATION -->
-        <div class="col-md-6">
-            <label class="form-label">Adresse de consommation</label>
-            <input name="adresse_consommation" class="form-control">
-        </div>
-
-        <!-- COMMENTAIRE -->
-        <div class="col-12">
-            <label class="form-label">Commentaire</label>
-            <textarea name="commentaire" class="form-control" rows="4"></textarea>
-        </div>
-
-    </div>
-
-    <div class="mt-4 d-flex justify-content-end">
-        <button type="submit" class="btn btn-warning btn-lg">
-            Envoyer la demande de cotation
-        </button>
-    </div>
-
-</form>
+    </form>
 </div>
 
 {% endblock %}
