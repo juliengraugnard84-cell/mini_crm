@@ -323,6 +323,10 @@ def init_db():
             _try_add_column(conn, "cotations", "heure_negociation TIME")
             _try_add_column(conn, "cotations", "signataire_mobile TEXT")
 
+            # ✅ NOUVELLES COLONNES ADRESSES (SAFE)
+            _try_add_column(conn, "cotations", "adresse_facturation TEXT")
+            _try_add_column(conn, "cotations", "adresse_consommation TEXT")
+
         conn.commit()
 
     except Exception:
@@ -336,9 +340,6 @@ def init_db():
 # 🚨 IMPORTANT
 # ❌ NE PAS APPELER init_db() AUTOMATIQUEMENT
 # ✅ À exécuter UNE SEULE FOIS manuellement si nécessaire
-
-
-
 ############################################################
 # 4. S3 — STOCKAGE DOCUMENTS (PROD SAFE)
 ############################################################
@@ -2405,9 +2406,6 @@ def client_detail(client_id):
         """, (client_id,))
         updates = cur.fetchall()
 
-    # 🔐 IMPORTANT
-    # Admin → voit toutes les cotations du client
-    # Commercial → voit uniquement celles qu’il a créées
     with conn.cursor() as cur:
         if role == "admin":
             cur.execute("""
@@ -2470,13 +2468,15 @@ def create_cotation(client_id):
                 signataire_nom,
                 signataire_tel,
                 signataire_email,
+                adresse_facturation,
+                adresse_consommation,
                 commentaire,
                 created_by,
                 status,
                 is_read
             )
             VALUES (
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                 'nouvelle',
                 0
             )
@@ -2494,6 +2494,8 @@ def create_cotation(client_id):
             request.form.get("signataire_nom"),
             request.form.get("signataire_tel"),
             request.form.get("signataire_email"),
+            request.form.get("adresse_facturation"),
+            request.form.get("adresse_consommation"),
             request.form.get("commentaire"),
             user.get("id"),
         ))

@@ -31,6 +31,8 @@
                     <th>Commercial</th>
                     <th>Énergie</th>
                     <th>Date négociation</th>
+                    <th>Adresse facturation</th>
+                    <th>Adresse consommation</th>
                     <th>Statut</th>
                     <th>Lu</th>
                     <th class="text-end">Actions</th>
@@ -86,6 +88,16 @@
                     <!-- ================= DATE NEGOCIATION ================= -->
                     <td>
                         {{ format_date(c.date_negociation) if c.date_negociation else "—" }}
+                    </td>
+
+                    <!-- ================= ADRESSE FACTURATION ================= -->
+                    <td>
+                        {{ c.adresse_facturation or "—" }}
+                    </td>
+
+                    <!-- ================= ADRESSE CONSOMMATION ================= -->
+                    <td>
+                        {{ c.adresse_consommation or "—" }}
                     </td>
 
                     <!-- ================= STATUT ================= -->
