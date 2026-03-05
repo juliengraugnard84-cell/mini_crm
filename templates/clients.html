@@ -154,15 +154,23 @@
                         <select name="status"
                                 class="form-select form-select-sm"
                                 onchange="this.form.submit()">
+
                             <option value="en_cours" {% if c.status == 'en_cours' %}selected{% endif %}>
                                 En cours
                             </option>
+
+                            <option value="en_attente" {% if c.status == 'en_attente' %}selected{% endif %}>
+                                En attente
+                            </option>
+
                             <option value="gagne" {% if c.status == 'gagne' %}selected{% endif %}>
                                 Gagné
                             </option>
+
                             <option value="perdu" {% if c.status == 'perdu' %}selected{% endif %}>
                                 Perdu
                             </option>
+
                         </select>
                     </form>
                     {% endif %}
@@ -170,6 +178,30 @@
                 {% endfor %}
             {% else %}
                 <p class="text-muted mb-0">Aucun dossier.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ================= EN ATTENTE ================= -->
+    <div class="card border-warning">
+        <div class="card-header fw-bold text-warning">
+            ⏳ En attente ({{ clients_en_attente|length if clients_en_attente is defined else 0 }})
+        </div>
+
+        <div class="card-body d-flex flex-column gap-2">
+            {% if clients_en_attente %}
+                {% for c in clients_en_attente %}
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="border border-warning rounded p-2 text-decoration-none text-dark">
+                    <strong>{{ c.name }}</strong><br>
+                    <small class="text-muted">
+                        Commercial : {{ c.commercial or "—" }}
+                    </small>
+                    <div class="text-warning fw-bold mt-1">⏳ En attente</div>
+                </a>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted mb-0">Aucun dossier en attente.</p>
             {% endif %}
         </div>
     </div>

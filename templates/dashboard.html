@@ -115,14 +115,20 @@
     </div>
 </div>
 
-{% set p = pipeline if pipeline is defined else {'en_cours':0,'gagnes':0,'perdus':0} %}
+{% set p = pipeline if pipeline is defined else {'en_cours':0,'en_attente':0,'gagnes':0,'perdus':0} %}
 
 <h3 class="mb-3">Pipeline global</h3>
 
 <div class="kpi-grid">
+
     <div class="pipeline-admin-tile">
         🟡 En cours
         <div class="pipeline-admin-value">{{ p.en_cours or 0 }}</div>
+    </div>
+
+    <div class="pipeline-admin-tile">
+        ⏳ En attente
+        <div class="pipeline-admin-value">{{ p.en_attente or 0 }}</div>
     </div>
 
     <div class="pipeline-admin-tile">
@@ -134,6 +140,7 @@
         🔴 Perdus
         <div class="pipeline-admin-value">{{ p.perdus or 0 }}</div>
     </div>
+
 </div>
 
 
@@ -172,6 +179,20 @@
         <div class="card-header fw-bold">🟡 En cours ({{ pipeline_en_cours|length }})</div>
         <div class="card-body">
             {% for c in pipeline_en_cours %}
+                <a href="{{ url_for('client_detail', client_id=c.id) }}"
+                   class="pipeline-card d-block mb-2 text-dark text-decoration-none">
+                    {{ c.name }}
+                </a>
+            {% else %}
+                <span class="text-muted">Aucun dossier</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header fw-bold">⏳ En attente ({{ pipeline_en_attente|length }})</div>
+        <div class="card-body">
+            {% for c in pipeline_en_attente %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
                    class="pipeline-card d-block mb-2 text-dark text-decoration-none">
                     {{ c.name }}

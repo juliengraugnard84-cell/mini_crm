@@ -5,7 +5,7 @@
 <h1 class="mb-4">📊 Récapitulatif des dossiers par commercial</h1>
 <p class="text-muted mb-3">
     Cliquez sur un commercial pour voir le détail de ses dossiers
-    (en cours / gagnés / perdus).
+    (en cours / en attente / gagnés / perdus).
 </p>
 
 <div class="table-responsive" style="max-width: 900px;">
@@ -13,15 +13,33 @@
         <thead>
             <tr>
                 <th>Commercial</th>
-                <th class="text-center">En cours</th>
-                <th class="text-center">Gagnés</th>
-                <th class="text-center">Perdus</th>
-                <th class="text-center">Total</th>
+
+                <th class="text-center">
+                    En cours
+                </th>
+
+                <th class="text-center">
+                    En attente
+                </th>
+
+                <th class="text-center">
+                    Gagnés
+                </th>
+
+                <th class="text-center">
+                    Perdus
+                </th>
+
+                <th class="text-center">
+                    Total
+                </th>
             </tr>
         </thead>
+
         <tbody>
             {% for s in stats %}
             <tr>
+
                 <td>
                     <a
                         href="{{ url_for('admin_dossiers_detail', commercial=s.commercial) }}"
@@ -35,6 +53,10 @@
                     {{ s.en_cours }}
                 </td>
 
+                <td class="text-center" style="color: #ca8a04; font-weight: 600;">
+                    {{ s.en_attente or 0 }}
+                </td>
+
                 <td class="text-center" style="color: #16a34a; font-weight: 600;">
                     {{ s.gagnes }}
                 </td>
@@ -46,15 +68,18 @@
                 <td class="text-center">
                     <strong>{{ s.total }}</strong>
                 </td>
+
             </tr>
+
             {% else %}
             <tr>
-                <td colspan="5" class="text-center text-muted py-4">
+                <td colspan="6" class="text-center text-muted py-4">
                     Aucun commercial trouvé.
                 </td>
             </tr>
             {% endfor %}
         </tbody>
+
     </table>
 </div>
 
