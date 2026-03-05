@@ -1166,6 +1166,46 @@ def dashboard():
     )
 
 
+# =========================================================
+# CHIFFRE D'AFFAIRES
+# =========================================================
+@app.route("/chiffre-affaire")
+@login_required
+def chiffre_affaire():
+
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                date,
+                commercial,
+                dossier,
+                client_id,
+                montant
+            FROM revenus
+            ORDER BY date DESC, id DESC
+        """)
+        rows = cur.fetchall()
+
+    revenus = [row_to_obj(r) for r in rows]
+
+    # regroupement par année / mois pour statistiques
+    stats = defaultdict(lambda: defaultdict(float))
+
+    for r in rows:
+        try:
+            d = r["date"]
+            if d:
+                stats[d.year][d.month] += float(r["montant"] or 0)
+        except Exception:
+            pass
+
+    return render_template(
+        "chiffre_affaire.html",
+        revenus=revenus,
+        stats=stats
+    )
 ############################################################
 # 9. ADMIN — UTILISATEURS (GESTION COMPLÈTE ET SÉCURISÉE)
 ############################################################
@@ -1617,7 +1657,6 @@ def documents():
 
 # =========================================================
 # UPLOAD DOCUMENT GLOBAL (ADMIN ONLY)
-# (inchangé : un seul fichier, compatible templates existants)
 # =========================================================
 @app.route("/documents/upload", methods=["POST"], endpoint="upload_document")
 @admin_required
@@ -1650,41 +1689,7 @@ def upload_document():
 
 
 # =========================================================
-# LISTE DOCUMENTS CLIENT
-# =========================================================
-def list_client_documents(client_id: int):
-    if not s3:
-        return []
-
-    prefix = client_s3_prefix(client_id)
-    docs = []
-
-    try:
-        items = s3_list_all_objects(AWS_BUCKET, prefix=prefix)
-
-        for item in items:
-            key = item.get("Key")
-            if not key or key.endswith("/"):
-                continue
-
-            docs.append({
-                "nom": key.replace(prefix, "", 1),
-                "key": key,
-                "taille": item.get("Size", 0),
-                "date": item.get("LastModified"),
-                "url": s3_presigned_url(key) if not LOCAL_MODE else None,
-            })
-
-    except Exception as e:
-        logger.exception("Erreur list_client_documents : %r", e)
-
-    return docs
-
-
-# =========================================================
 # UPLOAD DOCUMENT PAR DOSSIER CLIENT
-# ✅ Corrigé : support multi-upload (name="files" + multiple)
-# ✅ Compat : accepte encore l'ancien champ "file"
 # =========================================================
 @app.route(
     "/clients/<int:client_id>/documents/upload",
@@ -1701,16 +1706,13 @@ def upload_client_document(client_id):
         flash("Upload indisponible en mode local.", "warning")
         return redirect(url_for("client_detail", client_id=client_id))
 
-    # ✅ Multi fichiers : <input name="files" multiple>
     files = request.files.getlist("files")
 
-    # ✅ Compat legacy : <input name="file">
     if not files:
         legacy = request.files.get("file")
         if legacy:
             files = [legacy]
 
-    # Filtre sécurité : ignore entrées vides
     files = [f for f in files if f and getattr(f, "filename", "")]
 
     if not files:
@@ -1721,7 +1723,7 @@ def upload_client_document(client_id):
     failed = []
 
     for fichier in files:
-        # Validation extension
+
         if not allowed_file(fichier.filename):
             failed.append(fichier.filename or "fichier_invalide")
             continue
@@ -1804,7 +1806,6 @@ def shared_resources():
 
 # =========================================================
 # RESSOURCES PARTAGÉES — UPLOAD
-# (inchangé : un seul fichier, compatible templates existants)
 # =========================================================
 @app.route("/ressources/upload", methods=["POST"])
 @login_required
@@ -1848,7 +1849,7 @@ def shared_resources_upload():
 
 
 # =========================================================
-# DOWNLOAD SIMPLE (EXISTANT — INCHANGÉ)
+# DOWNLOAD SIMPLE
 # =========================================================
 @app.route("/documents/download")
 @login_required
@@ -1875,7 +1876,7 @@ def download_document():
 
 
 # =========================================================
-# DOWNLOAD MULTIPLE (ZIP STABLE)
+# DOWNLOAD MULTIPLE (ZIP)
 # =========================================================
 @app.route("/documents/download-multiple", methods=["POST"])
 @login_required
@@ -1909,7 +1910,6 @@ def download_multiple_documents():
                     obj = s3.get_object(Bucket=AWS_BUCKET, Key=key)
                     filename = key.split("/")[-1]
 
-                    # ✅ évite collisions dans le ZIP si 2 fichiers ont le même nom
                     if filename in zf.namelist():
                         base, dot, ext = filename.rpartition(".")
                         suffix = key.split("/")[-2].replace("/", "_")
@@ -1970,6 +1970,7 @@ def delete_document():
 # ALIAS COMPAT LEGACY
 # =========================================================
 app.view_functions.setdefault("documents_admin", documents)
+
 
 ############################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
