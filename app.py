@@ -1169,46 +1169,64 @@ def chiffre_affaire():
     role = user.get("role")
     username = user.get("username")
 
+    current_year = datetime.now().year
+    selected_year = int(request.args.get("year", current_year))
+    selected_commercial = request.args.get("commercial")
+
     with conn.cursor() as cur:
         cur.execute("""
             SELECT
-                date,
-                commercial,
-                dossier,
-                client_id,
-                montant
-            FROM revenus
-            ORDER BY date DESC, id DESC
+                r.id,
+                r.date,
+                r.commercial,
+                r.dossier,
+                r.client_id,
+                r.montant,
+                c.name AS client_name
+            FROM revenus r
+            LEFT JOIN crm_clients c ON c.id=r.client_id
+            ORDER BY r.date DESC, r.id DESC
         """)
         rows = cur.fetchall()
 
     revenus = [row_to_obj(r) for r in rows]
 
     stats = defaultdict(lambda: defaultdict(float))
+    ca_mensuel_par_commercial = defaultdict(lambda: defaultdict(float))
+    totaux_par_commercial = defaultdict(float)
 
     for r in rows:
         try:
             d = r["date"]
+            montant = float(r["montant"] or 0)
+            commercial = r["commercial"] or "Inconnu"
+
             if d:
-                stats[d.year][d.month] += float(r["montant"] or 0)
+                stats[d.year][d.month] += montant
+
+                if d.year == selected_year:
+                    ca_mensuel_par_commercial[commercial][d.month] += montant
+                    totaux_par_commercial[commercial] += montant
         except Exception:
             pass
 
     ca_total = 0
     ca_annuel_perso = 0
-    ca_mois_perso = 0
+    ca_mensuel_perso = 0
 
     with conn.cursor() as cur:
+
         cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
         ca_total = cur.fetchone()[0]
 
         if role == "commercial":
+
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
                   AND date_trunc('year', date::date)
-                      = date_trunc('year', CURRENT_DATE)
+                  = date_trunc('year', CURRENT_DATE)
             """, (username,))
             ca_annuel_perso = cur.fetchone()[0]
 
@@ -1217,9 +1235,15 @@ def chiffre_affaire():
                 FROM revenus
                 WHERE commercial=%s
                   AND date_trunc('month', date::date)
-                      = date_trunc('month', CURRENT_DATE)
+                  = date_trunc('month', CURRENT_DATE)
             """, (username,))
-            ca_mois_perso = cur.fetchone()[0]
+            ca_mensuel_perso = cur.fetchone()[0]
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
+        clients = [row_to_obj(r) for r in cur.fetchall()]
+
+    historique_ca = revenus
 
     return render_template(
         "chiffre_affaire.html",
@@ -1227,7 +1251,14 @@ def chiffre_affaire():
         stats=stats,
         ca_total=ca_total,
         ca_annuel_perso=ca_annuel_perso,
-        ca_mois_perso=ca_mois_perso
+        ca_mensuel_perso=ca_mensuel_perso,
+        ca_mensuel_par_commercial=ca_mensuel_par_commercial,
+        totaux_par_commercial=totaux_par_commercial,
+        historique_ca=historique_ca,
+        clients=clients,
+        current_year=current_year,
+        selected_year=selected_year,
+        selected_commercial=selected_commercial
     )
 ############################################################
 # 9. ADMIN — UTILISATEURS (GESTION COMPLÈTE ET SÉCURISÉE)
