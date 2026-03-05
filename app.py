@@ -1038,9 +1038,6 @@ def dashboard():
             """)
             cotations_admin = [row_to_obj(r) for r in cur.fetchall()]
 
-    # =========================
-    # PIPELINE ADMIN (AJOUT EN_ATTENTE)
-    # =========================
     pipeline = {
         "en_cours": 0,
         "en_attente": 0,
@@ -1079,9 +1076,6 @@ def dashboard():
             pipeline["gagnes"] = r["gagnes"] or 0
             pipeline["perdus"] = r["perdus"] or 0
 
-    # =========================
-    # PIPELINE COMMERCIAL
-    # =========================
     pipeline_en_cours = []
     pipeline_en_attente = []
     pipeline_gagnes = []
@@ -1113,9 +1107,6 @@ def dashboard():
             else:
                 pipeline_en_cours.append(obj)
 
-    # =========================
-    # STATS COMMERCIAL
-    # =========================
     commercial_stats = None
 
     if role == "commercial":
@@ -1174,6 +1165,9 @@ def dashboard():
 def chiffre_affaire():
 
     conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+    username = user.get("username")
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -1190,7 +1184,6 @@ def chiffre_affaire():
 
     revenus = [row_to_obj(r) for r in rows]
 
-    # regroupement par année / mois pour statistiques
     stats = defaultdict(lambda: defaultdict(float))
 
     for r in rows:
@@ -1201,10 +1194,40 @@ def chiffre_affaire():
         except Exception:
             pass
 
+    ca_total = 0
+    ca_annuel_perso = 0
+    ca_mois_perso = 0
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
+        ca_total = cur.fetchone()[0]
+
+        if role == "commercial":
+            cur.execute("""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                WHERE commercial=%s
+                  AND date_trunc('year', date::date)
+                      = date_trunc('year', CURRENT_DATE)
+            """, (username,))
+            ca_annuel_perso = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COALESCE(SUM(montant),0)
+                FROM revenus
+                WHERE commercial=%s
+                  AND date_trunc('month', date::date)
+                      = date_trunc('month', CURRENT_DATE)
+            """, (username,))
+            ca_mois_perso = cur.fetchone()[0]
+
     return render_template(
         "chiffre_affaire.html",
         revenus=revenus,
-        stats=stats
+        stats=stats,
+        ca_total=ca_total,
+        ca_annuel_perso=ca_annuel_perso,
+        ca_mois_perso=ca_mois_perso
     )
 ############################################################
 # 9. ADMIN — UTILISATEURS (GESTION COMPLÈTE ET SÉCURISÉE)
