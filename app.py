@@ -974,6 +974,7 @@ from collections import defaultdict
 @app.route("/dashboard")
 @login_required
 def dashboard():
+
     conn = get_db()
     user = session.get("user") or {}
 
@@ -982,6 +983,7 @@ def dashboard():
     username = user.get("username")
 
     with conn.cursor() as cur:
+
         cur.execute("SELECT COUNT(*) FROM crm_clients")
         total_clients = cur.fetchone()[0]
 
@@ -993,7 +995,7 @@ def dashboard():
         """)
         last_clients = [row_to_obj(r) for r in cur.fetchall()]
 
-        cur.execute("SELECT COALESCE(SUM(montant), 0) FROM revenus")
+        cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
         total_ca = cur.fetchone()[0]
 
         cur.execute("""
@@ -1020,8 +1022,14 @@ def dashboard():
     cotations_admin = []
 
     if role == "admin":
+
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM cotations WHERE COALESCE(is_read,0)=0")
+
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM cotations
+                WHERE COALESCE(is_read,0)=0
+            """)
             unread_cotations = cur.fetchone()[0]
 
             cur.execute("""
@@ -1032,7 +1040,8 @@ def dashboard():
                     cotations.status,
                     crm_clients.name AS client_name
                 FROM cotations
-                JOIN crm_clients ON crm_clients.id = cotations.client_id
+                JOIN crm_clients
+                ON crm_clients.id = cotations.client_id
                 WHERE COALESCE(cotations.is_read,0)=0
                 ORDER BY cotations.date_creation DESC
             """)
@@ -1046,28 +1055,32 @@ def dashboard():
     }
 
     if role == "admin":
+
         with conn.cursor() as cur:
+
             cur.execute("""
                 SELECT
+
                     COUNT(*) FILTER (
-                        WHERE COALESCE(LOWER(status),'en_cours')
-                        IN ('en_cours','nouveau')
+                        WHERE LOWER(COALESCE(status,'')) 
+                        IN ('en_cours','nouveau','')
                     ) AS en_cours,
 
                     COUNT(*) FILTER (
-                        WHERE LOWER(status)='en_attente'
+                        WHERE LOWER(COALESCE(status,''))='en_attente'
                     ) AS en_attente,
 
                     COUNT(*) FILTER (
-                        WHERE LOWER(status)='gagne'
+                        WHERE LOWER(COALESCE(status,''))='gagne'
                     ) AS gagnes,
 
                     COUNT(*) FILTER (
-                        WHERE LOWER(status)='perdu'
+                        WHERE LOWER(COALESCE(status,''))='perdu'
                     ) AS perdus
 
                 FROM crm_clients
             """)
+
             r = cur.fetchone()
 
         if r:
@@ -1082,16 +1095,20 @@ def dashboard():
     pipeline_perdus = []
 
     if role == "commercial":
+
         with conn.cursor() as cur:
+
             cur.execute("""
                 SELECT id, name, status
                 FROM crm_clients
                 WHERE owner_id=%s
                 ORDER BY created_at DESC
             """, (user_id,))
+
             rows = cur.fetchall()
 
         for r in rows:
+
             st = (r["status"] or "en_cours").lower()
             obj = row_to_obj(r)
 
@@ -1110,7 +1127,9 @@ def dashboard():
     commercial_stats = None
 
     if role == "commercial":
+
         with conn.cursor() as cur:
+
             cur.execute(
                 "SELECT COUNT(*) FROM crm_clients WHERE owner_id=%s",
                 (user_id,)
@@ -1127,8 +1146,8 @@ def dashboard():
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                  AND date_trunc('month', date::date)
-                      = date_trunc('month', CURRENT_DATE)
+                AND date_trunc('month', date::date)
+                    = date_trunc('month', CURRENT_DATE)
             """, (username,))
             ca_mois_com = cur.fetchone()[0]
 
@@ -1169,10 +1188,8 @@ def chiffre_affaire():
     role = user.get("role")
     username = user.get("username")
 
-    # ✅ Valeurs par défaut robustes (anti Undefined template)
     current_year = datetime.now().year
 
-    # Year: si param invalide → current_year
     try:
         selected_year = int(request.args.get("year", current_year))
     except Exception:
@@ -1181,31 +1198,26 @@ def chiffre_affaire():
     selected_commercial = (request.args.get("commercial") or "").strip()
     selected_commercial = selected_commercial if selected_commercial else None
 
-    # ✅ Base query + filtres
-    # - Admin: voit tout, filtre optionnel (année + commercial)
-    # - Commercial: ne voit que ses revenus
     where = []
     params = []
 
     if role == "commercial":
-        where.append("r.commercial = %s")
+        where.append("r.commercial=%s")
         params.append(username)
-        # pour un commercial, l'année sélectionnée sert au graphe/affichage
-        # mais l'accès reste limité à ses revenus (déjà filtré ci-dessus)
 
     if role == "admin":
-        # filtre année uniquement si fourni (toujours, car template propose un year)
-        where.append("EXTRACT(YEAR FROM r.date::date) = %s")
+
+        where.append("EXTRACT(YEAR FROM r.date::date)=%s")
         params.append(selected_year)
 
-        # filtre commercial optionnel
         if selected_commercial:
-            where.append("LOWER(r.commercial) = LOWER(%s)")
+            where.append("LOWER(r.commercial)=LOWER(%s)")
             params.append(selected_commercial)
 
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
     with conn.cursor() as cur:
+
         cur.execute(f"""
             SELECT
                 r.id,
@@ -1220,51 +1232,51 @@ def chiffre_affaire():
             {where_sql}
             ORDER BY r.date DESC, r.id DESC
         """, tuple(params))
+
         rows = cur.fetchall()
 
     revenus = [row_to_obj(r) for r in rows]
 
-    # ✅ stats globales (toutes années) — utiles au template si tu l'exploites
-    # Ici on les construit depuis "rows" (donc déjà filtré selon rôle)
     stats = defaultdict(lambda: defaultdict(float))
     ca_mensuel_par_commercial = defaultdict(lambda: defaultdict(float))
     totaux_par_commercial = defaultdict(float)
 
     for r in rows:
+
         try:
+
             d = r["date"]
             montant = float(r["montant"] or 0)
             commercial = r["commercial"] or "Inconnu"
 
             if d:
+
                 stats[d.year][d.month] += montant
 
-                # ✅ graphe/table: année sélectionnée
                 if d.year == selected_year:
                     ca_mensuel_par_commercial[commercial][d.month] += montant
                     totaux_par_commercial[commercial] += montant
+
         except Exception:
             pass
 
-    # ✅ KPI (toujours définis)
-    ca_total = 0.0
-    ca_annuel_perso = 0.0
-    ca_mensuel_perso = 0.0
+    ca_total = 0
+    ca_annuel_perso = 0
+    ca_mensuel_perso = 0
 
     with conn.cursor() as cur:
 
-        # CA total global (info)
         cur.execute("SELECT COALESCE(SUM(montant),0) FROM revenus")
         ca_total = cur.fetchone()[0] or 0
 
         if role == "commercial":
-            # KPI commercial = ses chiffres (année/mois courant)
+
             cur.execute("""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                  AND date_trunc('year', date::date)
-                  = date_trunc('year', CURRENT_DATE)
+                AND date_trunc('year',date::date)
+                    = date_trunc('year',CURRENT_DATE)
             """, (username,))
             ca_annuel_perso = cur.fetchone()[0] or 0
 
@@ -1272,21 +1284,18 @@ def chiffre_affaire():
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE commercial=%s
-                  AND date_trunc('month', date::date)
-                  = date_trunc('month', CURRENT_DATE)
+                AND date_trunc('month',date::date)
+                    = date_trunc('month',CURRENT_DATE)
             """, (username,))
             ca_mensuel_perso = cur.fetchone()[0] or 0
 
         else:
-            # KPI admin = cohérent avec filtres (année sélectionnée + commercial optionnel)
-            # annuel = total année sélectionnée
-            # mensuel = total mois courant (dans l'année sélectionnée si tu veux strict; sinon mois courant global)
-            # Ici: annuel = année sélectionnée ; mensuel = mois courant de l'année sélectionnée
-            admin_where = ["EXTRACT(YEAR FROM date::date) = %s"]
+
+            admin_where = ["EXTRACT(YEAR FROM date::date)=%s"]
             admin_params = [selected_year]
 
             if selected_commercial:
-                admin_where.append("LOWER(commercial) = LOWER(%s)")
+                admin_where.append("LOWER(commercial)=LOWER(%s)")
                 admin_params.append(selected_commercial)
 
             admin_where_sql = " AND ".join(admin_where)
@@ -1296,19 +1305,22 @@ def chiffre_affaire():
                 FROM revenus
                 WHERE {admin_where_sql}
             """, tuple(admin_params))
+
             ca_annuel_perso = cur.fetchone()[0] or 0
 
-            # mois courant de l'année sélectionnée
             cur.execute(f"""
                 SELECT COALESCE(SUM(montant),0)
                 FROM revenus
                 WHERE {admin_where_sql}
-                  AND EXTRACT(MONTH FROM date::date) = EXTRACT(MONTH FROM CURRENT_DATE)
+                AND EXTRACT(MONTH FROM date::date)
+                    = EXTRACT(MONTH FROM CURRENT_DATE)
             """, tuple(admin_params))
+
             ca_mensuel_perso = cur.fetchone()[0] or 0
 
     with conn.cursor() as cur:
-        cur.execute("SELECT id, name FROM crm_clients ORDER BY name")
+
+        cur.execute("SELECT id,name FROM crm_clients ORDER BY name")
         clients = [row_to_obj(r) for r in cur.fetchall()]
 
     historique_ca = revenus
@@ -1328,68 +1340,6 @@ def chiffre_affaire():
         selected_year=selected_year,
         selected_commercial=selected_commercial
     )
-
-
-# =========================================================
-# AJOUT CHIFFRE D'AFFAIRES
-# =========================================================
-@app.route("/revenus/add", methods=["POST"])
-@login_required
-def add_revenu():
-
-    user = session.get("user") or {}
-    if user.get("role") != "admin":
-        abort(403)
-
-    conn = get_db()
-
-    date = request.form.get("date")
-    client_id = request.form.get("client_id")
-    commercial = request.form.get("commercial_name")
-    montant = request.form.get("montant")
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO revenus (date, client_id, commercial, montant)
-                VALUES (%s,%s,%s,%s)
-            """, (date, client_id, commercial, montant))
-
-        conn.commit()
-        flash("Chiffre d’affaires ajouté.", "success")
-
-    except Exception as e:
-        logger.exception("Erreur ajout revenu : %r", e)
-        flash("Erreur lors de l'ajout du CA.", "danger")
-
-    return redirect(url_for("chiffre_affaire"))
-
-
-# =========================================================
-# SUPPRESSION CHIFFRE D'AFFAIRES
-# =========================================================
-@app.route("/revenus/delete/<int:revenu_id>", methods=["POST"])
-@login_required
-def delete_revenu(revenu_id):
-
-    user = session.get("user") or {}
-    if user.get("role") != "admin":
-        abort(403)
-
-    conn = get_db()
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM revenus WHERE id=%s", (revenu_id,))
-        conn.commit()
-
-        flash("Chiffre d’affaires supprimé.", "success")
-
-    except Exception as e:
-        logger.exception("Erreur suppression revenu : %r", e)
-        flash("Erreur lors de la suppression.", "danger")
-
-    return redirect(url_for("chiffre_affaire"))
 ############################################################
 # 9. ADMIN — UTILISATEURS (GESTION COMPLÈTE ET SÉCURISÉE)
 ############################################################
@@ -1398,11 +1348,10 @@ def delete_revenu(revenu_id):
 @app.route("/admin/users", methods=["GET", "POST"])
 @admin_required
 def admin_users():
+
     # =====================================================
     # 🧪 TEST TEMPORAIRE — À SUPPRIMER APRÈS VÉRIFICATION
     # =====================================================
-    # Si ce message s'affiche sur /admin/users,
-    # la route fonctionne correctement.
     # return "<h1>ADMIN USERS OK</h1>"
 
     conn = get_db()
@@ -1411,7 +1360,8 @@ def admin_users():
     # AJOUT UTILISATEUR (ADMIN / COMMERCIAL)
     # =====================================================
     if request.method == "POST":
-        username = (request.form.get("username") or "").strip()
+
+        username = (request.form.get("username") or "").strip().lower()
         password = (request.form.get("password") or "").strip()
         role = (request.form.get("role") or "").strip()
 
@@ -1425,34 +1375,43 @@ def admin_users():
 
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT 1 FROM users WHERE username = %s",
+                "SELECT 1 FROM users WHERE LOWER(username)=LOWER(%s)",
                 (username,),
             )
             if cur.fetchone():
                 flash("Nom d'utilisateur déjà utilisé.", "danger")
                 return redirect(url_for("admin_users"))
 
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO users (username, password_hash, role)
-                VALUES (%s, %s, %s)
-                """,
-                (
-                    username,
-                    generate_password_hash(password),
-                    role,
-                ),
-            )
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users (username, password_hash, role)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (
+                        username,
+                        generate_password_hash(password),
+                        role,
+                    ),
+                )
 
-        conn.commit()
-        flash("Utilisateur créé avec succès.", "success")
+            conn.commit()
+
+            flash("Utilisateur créé avec succès.", "success")
+
+        except Exception as e:
+            conn.rollback()
+            logger.exception("Erreur création utilisateur : %r", e)
+            flash("Erreur lors de la création.", "danger")
+
         return redirect(url_for("admin_users"))
 
     # =====================================================
     # LISTE DES UTILISATEURS
     # =====================================================
     with conn.cursor() as cur:
+
         cur.execute(
             """
             SELECT id, username, role
@@ -1460,6 +1419,7 @@ def admin_users():
             ORDER BY id ASC
             """
         )
+
         users = cur.fetchall()
 
     return render_template(
@@ -1474,23 +1434,39 @@ def admin_users():
 @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
 @admin_required
 def admin_delete_user(user_id):
+
     # 🔒 Protection admin principal
     if user_id == 1:
         flash("Impossible de supprimer l’administrateur principal.", "danger")
         return redirect(url_for("admin_users"))
 
     conn = get_db()
+
     with conn.cursor() as cur:
-        cur.execute("SELECT id FROM users WHERE id=%s", (user_id,))
+        cur.execute(
+            "SELECT id FROM users WHERE id=%s",
+            (user_id,)
+        )
         if not cur.fetchone():
             flash("Utilisateur introuvable.", "danger")
             return redirect(url_for("admin_users"))
 
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM users WHERE id=%s",
+                (user_id,)
+            )
 
-    conn.commit()
-    flash("Utilisateur supprimé.", "success")
+        conn.commit()
+
+        flash("Utilisateur supprimé.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur suppression utilisateur : %r", e)
+        flash("Erreur lors de la suppression.", "danger")
+
     return redirect(url_for("admin_users"))
 
 
@@ -1500,6 +1476,7 @@ def admin_delete_user(user_id):
 @app.route("/admin/users/<int:user_id>/reset_password", methods=["POST"])
 @admin_required
 def admin_reset_password(user_id):
+
     new_password = (request.form.get("new_password") or "").strip()
 
     if not new_password or len(new_password) < 10:
@@ -1507,30 +1484,41 @@ def admin_reset_password(user_id):
         return redirect(url_for("admin_users"))
 
     conn = get_db()
+
     with conn.cursor() as cur:
-        cur.execute("SELECT id FROM users WHERE id=%s", (user_id,))
+        cur.execute(
+            "SELECT id FROM users WHERE id=%s",
+            (user_id,)
+        )
         if not cur.fetchone():
             flash("Utilisateur introuvable.", "danger")
             return redirect(url_for("admin_users"))
 
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE users
-            SET password_hash = %s
-            WHERE id = %s
-            """,
-            (
-                generate_password_hash(new_password),
-                user_id,
-            ),
-        )
+    try:
 
-    conn.commit()
-    flash("Mot de passe réinitialisé.", "success")
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE users
+                SET password_hash = %s
+                WHERE id = %s
+                """,
+                (
+                    generate_password_hash(new_password),
+                    user_id,
+                ),
+            )
+
+        conn.commit()
+
+        flash("Mot de passe réinitialisé.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur reset password : %r", e)
+        flash("Erreur lors de la réinitialisation.", "danger")
+
     return redirect(url_for("admin_users"))
-
-
 ############################################################
 # 10. ADMIN — DEMANDES DE COTATION
 ############################################################
@@ -1616,8 +1604,9 @@ def delete_cotation_admin(cotation_id):
 # - Totaux fiables
 # - Statuts métiers réels :
 #   en_cours + nouveau + NULL => EN COURS
-#   gagne                     => GAGNÉ
-#   perdu                     => PERDU
+#   en_attente                 => EN ATTENTE
+#   gagne                      => GAGNÉ
+#   perdu                      => PERDU
 ############################################################
 
 @app.route("/admin/dossiers")
@@ -1634,16 +1623,19 @@ def admin_dossiers():
                 COUNT(*) FILTER (
                     WHERE
                         c.id IS NOT NULL
-                        AND COALESCE(LOWER(c.status), 'en_cours')
-                        IN ('en_cours', 'nouveau')
+                        AND LOWER(COALESCE(c.status,'')) IN ('en_cours','nouveau','')
                 ) AS en_cours,
 
                 COUNT(*) FILTER (
-                    WHERE LOWER(c.status) = 'gagne'
+                    WHERE LOWER(COALESCE(c.status,''))='en_attente'
+                ) AS en_attente,
+
+                COUNT(*) FILTER (
+                    WHERE LOWER(COALESCE(c.status,''))='gagne'
                 ) AS gagnes,
 
                 COUNT(*) FILTER (
-                    WHERE LOWER(c.status) = 'perdu'
+                    WHERE LOWER(COALESCE(c.status,''))='perdu'
                 ) AS perdus
 
             FROM users u
@@ -1655,10 +1647,18 @@ def admin_dossiers():
         rows = cur.fetchall()
 
     stats = []
+
     for r in rows:
         obj = row_to_obj(r)
-        # ✅ Total calculé côté Python (100 % fiable)
-        obj.total = (obj.en_cours or 0) + (obj.gagnes or 0) + (obj.perdus or 0)
+
+        # Total fiable
+        obj.total = (
+            (obj.en_cours or 0)
+            + (obj.en_attente or 0)
+            + (obj.gagnes or 0)
+            + (obj.perdus or 0)
+        )
+
         stats.append(obj)
 
     return render_template(
@@ -1675,7 +1675,9 @@ def admin_dossiers():
 @app.route("/admin/dossiers/<string:commercial>")
 @admin_required
 def admin_dossiers_detail(commercial):
+
     commercial = (commercial or "").strip()
+
     if not commercial:
         return redirect(url_for("admin_dossiers"))
 
@@ -1704,25 +1706,37 @@ def admin_dossiers_detail(commercial):
             FROM crm_clients
             WHERE owner_id = %s
             ORDER BY
-                CASE COALESCE(LOWER(status), 'en_cours')
+                CASE LOWER(COALESCE(status,''))
                     WHEN 'en_cours' THEN 1
-                    WHEN 'nouveau'  THEN 1
-                    WHEN 'gagne'    THEN 2
-                    WHEN 'perdu'    THEN 3
-                    ELSE 4
+                    WHEN 'nouveau' THEN 1
+                    WHEN '' THEN 1
+                    WHEN 'en_attente' THEN 2
+                    WHEN 'gagne' THEN 3
+                    WHEN 'perdu' THEN 4
+                    ELSE 5
                 END,
                 created_at DESC
         """, (commercial_id,))
         rows = cur.fetchall()
 
-    en_cours, gagnes, perdus = [], [], []
+    en_cours = []
+    en_attente = []
+    gagnes = []
+    perdus = []
 
     for r in rows:
+
         st = (r["status"] or "en_cours").lower()
+
         if st == "gagne":
             gagnes.append(row_to_obj(r))
+
         elif st == "perdu":
             perdus.append(row_to_obj(r))
+
+        elif st == "en_attente":
+            en_attente.append(row_to_obj(r))
+
         else:
             # en_cours + nouveau + NULL
             en_cours.append(row_to_obj(r))
@@ -1731,11 +1745,10 @@ def admin_dossiers_detail(commercial):
         "admin_dossiers_detail.html",
         commercial=row_to_obj(user),
         en_cours=en_cours,
+        en_attente=en_attente,
         gagnes=gagnes,
         perdus=perdus,
     )
-
-
 ############################################################
 # 10 TER. ADMIN — PLANNING (COTATIONS & MISES À JOUR)
 ############################################################
@@ -2202,23 +2215,19 @@ def new_client():
                         WHERE LOWER(username)=LOWER(%s)
                           AND role IN ('admin','commercial')
                     """, (commercial_name,))
-
                     row = cur.fetchone()
 
                 if row:
                     owner_id = row["id"]
 
         else:
-
             owner_id = user_id
 
         if not owner_id:
-
             flash("Commercial introuvable. Vérifiez le nom saisi.", "danger")
             return redirect(url_for("clients"))
 
         with conn.cursor() as cur:
-
             cur.execute("""
                 INSERT INTO crm_clients (
                     name, email, phone, address,
@@ -2270,9 +2279,7 @@ def edit_client(client_id):
     gerant_nom = (request.form.get("gerant_nom") or "").strip()
 
     if not name:
-
         flash("Le nom du client est obligatoire.", "danger")
-
         return redirect(url_for("client_detail", client_id=client_id))
 
     owner_id = None
@@ -2284,14 +2291,12 @@ def edit_client(client_id):
         if commercial_name:
 
             with conn.cursor() as cur:
-
                 cur.execute("""
                     SELECT id
                     FROM users
                     WHERE LOWER(username)=LOWER(%s)
                       AND role IN ('admin','commercial')
                 """, (commercial_name,))
-
                 row = cur.fetchone()
 
             if row:
@@ -2373,9 +2378,7 @@ def delete_client(client_id):
         row = cur.fetchone()
 
     if not row:
-
         flash("Dossier introuvable.", "danger")
-
         return redirect(url_for("clients"))
 
     if role != "admin" and row["owner_id"] != user_id:
@@ -2384,7 +2387,6 @@ def delete_client(client_id):
     try:
 
         with conn.cursor() as cur:
-
             cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
             cur.execute("DELETE FROM client_updates WHERE client_id=%s", (client_id,))
             cur.execute("DELETE FROM revenus WHERE client_id=%s", (client_id,))
@@ -2397,7 +2399,6 @@ def delete_client(client_id):
     except Exception as e:
 
         conn.rollback()
-
         logger.exception("Erreur suppression client : %r", e)
 
         flash("Erreur lors de la suppression.", "danger")
@@ -2497,208 +2498,6 @@ def clients():
         clients_perdus=[row_to_obj(r) for r in perdus],
         q=q,
     )
-
-
-# =========================
-# CLIENT — MISE À JOUR STATUT
-# =========================
-@app.route("/clients/<int:client_id>/status", methods=["POST"])
-@login_required
-def update_client_status(client_id):
-
-    status = (request.form.get("status") or "").strip().lower()
-
-    if status not in ("en_cours", "en_attente", "gagne", "perdu"):
-
-        flash("Statut invalide.", "danger")
-
-        return redirect(url_for("clients"))
-
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
-
-    conn = get_db()
-
-    with conn.cursor() as cur:
-
-        cur.execute("SELECT owner_id FROM crm_clients WHERE id=%s", (client_id,))
-
-        row = cur.fetchone()
-
-    if not row:
-
-        flash("Dossier introuvable.", "danger")
-
-        return redirect(url_for("clients"))
-
-    if role != "admin" and row["owner_id"] != user_id:
-        abort(403)
-
-    with conn.cursor() as cur:
-
-        cur.execute(
-            "UPDATE crm_clients SET status=%s WHERE id=%s",
-            (status, client_id)
-        )
-
-    conn.commit()
-
-    flash("Statut du dossier mis à jour.", "success")
-
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# CLIENT — DÉTAIL
-# =========================
-@app.route("/clients/<int:client_id>", endpoint="client_detail")
-@login_required
-def client_detail(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
-
-    with conn.cursor() as cur:
-
-        cur.execute("""
-            SELECT crm_clients.*, users.username AS commercial
-            FROM crm_clients
-            LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.id=%s
-        """, (client_id,))
-
-        client = cur.fetchone()
-
-    if not client:
-        abort(404)
-
-    documents = list_client_documents(client_id)
-
-    with conn.cursor() as cur:
-
-        cur.execute("""
-            SELECT *
-            FROM client_updates
-            WHERE client_id=%s
-            ORDER BY created_at DESC
-        """, (client_id,))
-
-        updates = cur.fetchall()
-
-    with conn.cursor() as cur:
-
-        if role == "admin":
-
-            cur.execute("""
-                SELECT *
-                FROM cotations
-                WHERE client_id=%s
-                ORDER BY date_creation DESC
-            """, (client_id,))
-
-        else:
-
-            cur.execute("""
-                SELECT *
-                FROM cotations
-                WHERE client_id=%s
-                  AND created_by=%s
-                ORDER BY date_creation DESC
-            """, (client_id, user_id))
-
-        cotations = cur.fetchall()
-
-    return render_template(
-        "client_detail.html",
-        client=row_to_obj(client),
-        documents=documents,
-        updates=[row_to_obj(u) for u in updates],
-        client_cotations=[row_to_obj(c) for c in cotations],
-        can_request_update=True,
-    )
-
-
-# =========================
-# CLIENT — CRÉATION DEMANDE DE COTATION
-# =========================
-@app.route(
-    "/clients/<int:client_id>/cotation",
-    methods=["POST"],
-    endpoint="create_cotation"
-)
-@login_required
-def create_cotation(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-
-    user = session.get("user") or {}
-
-    with conn.cursor() as cur:
-
-        cur.execute("""
-            INSERT INTO cotations (
-                client_id,
-                date_negociation,
-                heure_negociation,
-                energie_type,
-                type_compteur,
-                pdl_pce,
-                date_echeance,
-                fournisseur_actuel,
-                entreprise_nom,
-                siret,
-                adresse_facturation,
-                adresse_consommation,
-                signataire_nom,
-                signataire_tel,
-                signataire_mobile,
-                signataire_email,
-                commentaire,
-                created_by,
-                status,
-                is_read
-            )
-            VALUES (
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                'nouvelle',
-                0
-            )
-        """, (
-            client_id,
-            request.form.get("date_negociation"),
-            request.form.get("heure_negociation"),
-            request.form.get("energie_type"),
-            request.form.get("type_compteur"),
-            request.form.get("pdl_pce"),
-            request.form.get("date_echeance"),
-            request.form.get("fournisseur_actuel"),
-            request.form.get("entreprise_nom"),
-            request.form.get("siret"),
-            request.form.get("adresse_facturation"),
-            request.form.get("adresse_consommation"),
-            request.form.get("signataire_nom"),
-            request.form.get("signataire_tel"),
-            request.form.get("signataire_mobile"),
-            request.form.get("signataire_email"),
-            request.form.get("commentaire"),
-            user.get("id"),
-        ))
-
-    conn.commit()
-
-    flash("Demande de cotation envoyée.", "success")
-
-    return redirect(url_for("client_detail", client_id=client_id))
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
