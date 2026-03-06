@@ -2498,52 +2498,6 @@ def clients():
         clients_perdus=[row_to_obj(r) for r in perdus],
         q=q,
     )
-
-
-# =========================
-# CLIENT — DEMANDE DE MISE À JOUR (SUIVI CLIENT)
-# =========================
-@app.route("/clients/<int:client_id>/update", methods=["POST"])
-@login_required
-def update_client(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-
-    user = session.get("user") or {}
-
-    update_date = request.form.get("update_date")
-    commentaire = (request.form.get("update_commentaire") or "").strip()
-
-    if not update_date:
-        flash("La date de mise à jour est obligatoire.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    with conn.cursor() as cur:
-
-        cur.execute("""
-            INSERT INTO client_updates (
-                client_id,
-                update_date,
-                commentaire,
-                created_by,
-                is_read
-            )
-            VALUES (%s,%s,%s,%s,0)
-        """, (
-            client_id,
-            update_date,
-            commentaire,
-            user.get("id"),
-        ))
-
-    conn.commit()
-
-    flash("Demande de mise à jour enregistrée.", "success")
-
-    return redirect(url_for("client_detail", client_id=client_id))
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
