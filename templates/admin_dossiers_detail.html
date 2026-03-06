@@ -32,7 +32,7 @@
                         <ul class="list-group list-group-flush">
                             {% for c in en_cours %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <a href="{{ url_for('client_detail', client_id=c.id) }}">
+                                    <a href="/clients/{{ c.id }}">
                                         {{ c.name }}
                                     </a>
                                     <small class="text-muted">
@@ -61,7 +61,7 @@
                         <ul class="list-group list-group-flush">
                             {% for c in gagnes %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <a href="{{ url_for('client_detail', client_id=c.id) }}">
+                                    <a href="/clients/{{ c.id }}">
                                         {{ c.name }}
                                     </a>
                                     <small class="text-muted">
@@ -90,7 +90,7 @@
                         <ul class="list-group list-group-flush">
                             {% for c in perdus %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <a href="{{ url_for('client_detail', client_id=c.id) }}">
+                                    <a href="/clients/{{ c.id }}">
                                         {{ c.name }}
                                     </a>
                                     <small class="text-muted">
