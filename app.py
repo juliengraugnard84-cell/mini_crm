@@ -2168,7 +2168,9 @@ app.view_functions.setdefault("documents_admin", documents)
 @app.route("/clients/new", methods=["GET", "POST"])
 @login_required
 def new_client():
+
     conn = get_db()
+
     user = session.get("user") or {}
     role = user.get("role")
     user_id = user.get("id")
@@ -2187,10 +2189,12 @@ def new_client():
             return redirect(url_for("clients"))
 
         if role == "admin":
+
             commercial_name = (request.form.get("commercial_name") or "").strip()
             owner_id = None
 
             if commercial_name:
+
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT id
@@ -2198,18 +2202,23 @@ def new_client():
                         WHERE LOWER(username)=LOWER(%s)
                           AND role IN ('admin','commercial')
                     """, (commercial_name,))
+
                     row = cur.fetchone()
 
                 if row:
                     owner_id = row["id"]
+
         else:
+
             owner_id = user_id
 
         if not owner_id:
+
             flash("Commercial introuvable. Vérifiez le nom saisi.", "danger")
             return redirect(url_for("clients"))
 
         with conn.cursor() as cur:
+
             cur.execute("""
                 INSERT INTO crm_clients (
                     name, email, phone, address,
@@ -2218,9 +2227,15 @@ def new_client():
                 VALUES (%s,%s,%s,%s,%s,%s,%s,'en_cours')
                 RETURNING id
             """, (
-                name, email, phone, address,
-                siret, gerant_nom, owner_id
+                name,
+                email,
+                phone,
+                address,
+                siret,
+                gerant_nom,
+                owner_id
             ))
+
             client_id = cur.fetchone()[0]
 
         conn.commit()
@@ -2243,6 +2258,7 @@ def edit_client(client_id):
         abort(403)
 
     conn = get_db()
+
     user = session.get("user") or {}
     role = user.get("role")
 
@@ -2254,21 +2270,28 @@ def edit_client(client_id):
     gerant_nom = (request.form.get("gerant_nom") or "").strip()
 
     if not name:
+
         flash("Le nom du client est obligatoire.", "danger")
+
         return redirect(url_for("client_detail", client_id=client_id))
 
     owner_id = None
 
     if role == "admin":
+
         commercial_name = (request.form.get("commercial_name") or "").strip()
+
         if commercial_name:
+
             with conn.cursor() as cur:
+
                 cur.execute("""
                     SELECT id
                     FROM users
                     WHERE LOWER(username)=LOWER(%s)
                       AND role IN ('admin','commercial')
                 """, (commercial_name,))
+
                 row = cur.fetchone()
 
             if row:
@@ -2289,8 +2312,12 @@ def edit_client(client_id):
                     owner_id=%s
                 WHERE id=%s
             """, (
-                name, email, phone, address,
-                siret, gerant_nom,
+                name,
+                email,
+                phone,
+                address,
+                siret,
+                gerant_nom,
                 owner_id,
                 client_id
             ))
@@ -2307,8 +2334,12 @@ def edit_client(client_id):
                     gerant_nom=%s
                 WHERE id=%s
             """, (
-                name, email, phone, address,
-                siret, gerant_nom,
+                name,
+                email,
+                phone,
+                address,
+                siret,
+                gerant_nom,
                 client_id
             ))
 
@@ -2327,19 +2358,24 @@ def edit_client(client_id):
 def delete_client(client_id):
 
     conn = get_db()
+
     user = session.get("user") or {}
     role = user.get("role")
     user_id = user.get("id")
 
     with conn.cursor() as cur:
+
         cur.execute(
             "SELECT owner_id FROM crm_clients WHERE id=%s",
             (client_id,)
         )
+
         row = cur.fetchone()
 
     if not row:
+
         flash("Dossier introuvable.", "danger")
+
         return redirect(url_for("clients"))
 
     if role != "admin" and row["owner_id"] != user_id:
@@ -2473,7 +2509,9 @@ def update_client_status(client_id):
     status = (request.form.get("status") or "").strip().lower()
 
     if status not in ("en_cours", "en_attente", "gagne", "perdu"):
+
         flash("Statut invalide.", "danger")
+
         return redirect(url_for("clients"))
 
     user = session.get("user") or {}
@@ -2483,17 +2521,22 @@ def update_client_status(client_id):
     conn = get_db()
 
     with conn.cursor() as cur:
+
         cur.execute("SELECT owner_id FROM crm_clients WHERE id=%s", (client_id,))
+
         row = cur.fetchone()
 
     if not row:
+
         flash("Dossier introuvable.", "danger")
+
         return redirect(url_for("clients"))
 
     if role != "admin" and row["owner_id"] != user_id:
         abort(403)
 
     with conn.cursor() as cur:
+
         cur.execute(
             "UPDATE crm_clients SET status=%s WHERE id=%s",
             (status, client_id)
@@ -2656,7 +2699,6 @@ def create_cotation(client_id):
     flash("Demande de cotation envoyée.", "success")
 
     return redirect(url_for("client_detail", client_id=client_id))
-
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
