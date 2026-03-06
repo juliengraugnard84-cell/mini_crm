@@ -2176,6 +2176,146 @@ app.view_functions.setdefault("documents_admin", documents)
 
 
 # =========================
+# CLIENT — LISTE
+# =========================
+@app.route("/clients")
+@login_required
+def clients():
+
+    conn = get_db()
+    q = (request.args.get("q") or "").strip()
+
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
+
+    with conn.cursor() as cur:
+
+        if role == "admin":
+
+            if q:
+                cur.execute("""
+                    SELECT crm_clients.*, users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.name ILIKE %s
+                    ORDER BY crm_clients.created_at DESC
+                """, (f"%{q}%",))
+            else:
+                cur.execute("""
+                    SELECT crm_clients.*, users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    ORDER BY crm_clients.created_at DESC
+                """)
+
+        else:
+
+            if q:
+                cur.execute("""
+                    SELECT crm_clients.*, users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.owner_id=%s
+                      AND crm_clients.name ILIKE %s
+                    ORDER BY crm_clients.created_at DESC
+                """, (user_id, f"%{q}%"))
+            else:
+                cur.execute("""
+                    SELECT crm_clients.*, users.username AS commercial
+                    FROM crm_clients
+                    LEFT JOIN users ON users.id = crm_clients.owner_id
+                    WHERE crm_clients.owner_id=%s
+                    ORDER BY crm_clients.created_at DESC
+                """, (user_id,))
+
+        rows = cur.fetchall()
+
+    en_cours = []
+    en_attente = []
+    gagnes = []
+    perdus = []
+
+    for r in rows:
+
+        st = (r["status"] or "en_cours").lower()
+
+        if st == "gagne":
+            gagnes.append(r)
+        elif st == "perdu":
+            perdus.append(r)
+        elif st == "en_attente":
+            en_attente.append(r)
+        else:
+            en_cours.append(r)
+
+    return render_template(
+        "clients.html",
+        clients_en_cours=[row_to_obj(r) for r in en_cours],
+        clients_en_attente=[row_to_obj(r) for r in en_attente],
+        clients_gagnes=[row_to_obj(r) for r in gagnes],
+        clients_perdus=[row_to_obj(r) for r in perdus],
+        q=q,
+    )
+
+
+# =========================
+# CLIENT — DÉTAIL DOSSIER
+# =========================
+@app.route("/clients/<int:client_id>")
+@login_required
+def client_detail(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT crm_clients.*, users.username AS commercial
+            FROM crm_clients
+            LEFT JOIN users ON users.id = crm_clients.owner_id
+            WHERE crm_clients.id=%s
+        """, (client_id,))
+        row = cur.fetchone()
+
+    if not row:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    client = row_to_obj(row)
+
+    documents = list_client_documents(client_id)
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT *
+            FROM cotations
+            WHERE client_id=%s
+            ORDER BY date_creation DESC
+        """, (client_id,))
+        cotations = [row_to_obj(r) for r in cur.fetchall()]
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT *
+            FROM client_updates
+            WHERE client_id=%s
+            ORDER BY created_at DESC
+        """, (client_id,))
+        updates = [row_to_obj(r) for r in cur.fetchall()]
+
+    return render_template(
+        "client_detail.html",
+        client=client,
+        documents=documents,
+        cotations=cotations,
+        updates=updates,
+    )
+
+
+# =========================
 # CLIENT — CRÉATION
 # =========================
 @app.route("/clients/new", methods=["GET", "POST"])
@@ -2405,100 +2545,6 @@ def delete_client(client_id):
         flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — LISTE
-# =========================
-@app.route("/clients")
-@login_required
-def clients():
-
-    conn = get_db()
-
-    q = (request.args.get("q") or "").strip()
-
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
-
-    with conn.cursor() as cur:
-
-        if role == "admin":
-
-            if q:
-
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                """, (f"%{q}%",))
-
-            else:
-
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    ORDER BY crm_clients.created_at DESC
-                """)
-
-        else:
-
-            if q:
-
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
-                      AND crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                """, (user_id, f"%{q}%"))
-
-            else:
-
-                cur.execute("""
-                    SELECT crm_clients.*, users.username AS commercial
-                    FROM crm_clients
-                    LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
-                    ORDER BY crm_clients.created_at DESC
-                """, (user_id,))
-
-        rows = cur.fetchall()
-
-    en_cours = []
-    en_attente = []
-    gagnes = []
-    perdus = []
-
-    for r in rows:
-
-        st = (r["status"] or "en_cours").lower()
-
-        if st == "gagne":
-            gagnes.append(r)
-
-        elif st == "perdu":
-            perdus.append(r)
-
-        elif st == "en_attente":
-            en_attente.append(r)
-
-        else:
-            en_cours.append(r)
-
-    return render_template(
-        "clients.html",
-        clients_en_cours=[row_to_obj(r) for r in en_cours],
-        clients_en_attente=[row_to_obj(r) for r in en_attente],
-        clients_gagnes=[row_to_obj(r) for r in gagnes],
-        clients_perdus=[row_to_obj(r) for r in perdus],
-        q=q,
-    )
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
