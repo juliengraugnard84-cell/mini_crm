@@ -2228,6 +2228,7 @@ def new_client():
             return redirect(url_for("clients"))
 
         with conn.cursor() as cur:
+
             cur.execute("""
                 INSERT INTO crm_clients (
                     name, email, phone, address,
