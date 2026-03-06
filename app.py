@@ -2224,7 +2224,9 @@ def new_client():
             client_id = cur.fetchone()[0]
 
         conn.commit()
+
         flash("Dossier client créé.", "success")
+
         return redirect(url_for("client_detail", client_id=client_id))
 
     return redirect(url_for("clients"))
@@ -2273,7 +2275,9 @@ def edit_client(client_id):
                 owner_id = row["id"]
 
     with conn.cursor() as cur:
+
         if role == "admin" and owner_id:
+
             cur.execute("""
                 UPDATE crm_clients
                 SET name=%s,
@@ -2290,7 +2294,9 @@ def edit_client(client_id):
                 owner_id,
                 client_id
             ))
+
         else:
+
             cur.execute("""
                 UPDATE crm_clients
                 SET name=%s,
@@ -2307,7 +2313,9 @@ def edit_client(client_id):
             ))
 
     conn.commit()
+
     flash("Informations client mises à jour.", "success")
+
     return redirect(url_for("client_detail", client_id=client_id))
 
 
@@ -2338,18 +2346,24 @@ def delete_client(client_id):
         abort(403)
 
     try:
+
         with conn.cursor() as cur:
+
             cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
             cur.execute("DELETE FROM client_updates WHERE client_id=%s", (client_id,))
             cur.execute("DELETE FROM revenus WHERE client_id=%s", (client_id,))
             cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
 
         conn.commit()
+
         flash("Dossier client supprimé.", "success")
 
     except Exception as e:
+
         conn.rollback()
+
         logger.exception("Erreur suppression client : %r", e)
+
         flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("clients"))
@@ -2361,7 +2375,9 @@ def delete_client(client_id):
 @app.route("/clients")
 @login_required
 def clients():
+
     conn = get_db()
+
     q = (request.args.get("q") or "").strip()
 
     user = session.get("user") or {}
@@ -2369,8 +2385,11 @@ def clients():
     user_id = user.get("id")
 
     with conn.cursor() as cur:
+
         if role == "admin":
+
             if q:
+
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
@@ -2378,15 +2397,20 @@ def clients():
                     WHERE crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
                 """, (f"%{q}%",))
+
             else:
+
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     ORDER BY crm_clients.created_at DESC
                 """)
+
         else:
+
             if q:
+
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
@@ -2395,7 +2419,9 @@ def clients():
                       AND crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
                 """, (user_id, f"%{q}%"))
+
             else:
+
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
@@ -2406,17 +2432,24 @@ def clients():
 
         rows = cur.fetchall()
 
-    en_cours, en_attente, gagnes, perdus = [], [], [], []
+    en_cours = []
+    en_attente = []
+    gagnes = []
+    perdus = []
 
     for r in rows:
+
         st = (r["status"] or "en_cours").lower()
 
         if st == "gagne":
             gagnes.append(r)
+
         elif st == "perdu":
             perdus.append(r)
+
         elif st == "en_attente":
             en_attente.append(r)
+
         else:
             en_cours.append(r)
 
@@ -2429,6 +2462,200 @@ def clients():
         q=q,
     )
 
+
+# =========================
+# CLIENT — MISE À JOUR STATUT
+# =========================
+@app.route("/clients/<int:client_id>/status", methods=["POST"])
+@login_required
+def update_client_status(client_id):
+
+    status = (request.form.get("status") or "").strip().lower()
+
+    if status not in ("en_cours", "en_attente", "gagne", "perdu"):
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("clients"))
+
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
+
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT owner_id FROM crm_clients WHERE id=%s", (client_id,))
+        row = cur.fetchone()
+
+    if not row:
+        flash("Dossier introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    if role != "admin" and row["owner_id"] != user_id:
+        abort(403)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE crm_clients SET status=%s WHERE id=%s",
+            (status, client_id)
+        )
+
+    conn.commit()
+
+    flash("Statut du dossier mis à jour.", "success")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# CLIENT — DÉTAIL
+# =========================
+@app.route("/clients/<int:client_id>", endpoint="client_detail")
+@login_required
+def client_detail(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
+
+    with conn.cursor() as cur:
+
+        cur.execute("""
+            SELECT crm_clients.*, users.username AS commercial
+            FROM crm_clients
+            LEFT JOIN users ON users.id = crm_clients.owner_id
+            WHERE crm_clients.id=%s
+        """, (client_id,))
+
+        client = cur.fetchone()
+
+    if not client:
+        abort(404)
+
+    documents = list_client_documents(client_id)
+
+    with conn.cursor() as cur:
+
+        cur.execute("""
+            SELECT *
+            FROM client_updates
+            WHERE client_id=%s
+            ORDER BY created_at DESC
+        """, (client_id,))
+
+        updates = cur.fetchall()
+
+    with conn.cursor() as cur:
+
+        if role == "admin":
+
+            cur.execute("""
+                SELECT *
+                FROM cotations
+                WHERE client_id=%s
+                ORDER BY date_creation DESC
+            """, (client_id,))
+
+        else:
+
+            cur.execute("""
+                SELECT *
+                FROM cotations
+                WHERE client_id=%s
+                  AND created_by=%s
+                ORDER BY date_creation DESC
+            """, (client_id, user_id))
+
+        cotations = cur.fetchall()
+
+    return render_template(
+        "client_detail.html",
+        client=row_to_obj(client),
+        documents=documents,
+        updates=[row_to_obj(u) for u in updates],
+        client_cotations=[row_to_obj(c) for c in cotations],
+        can_request_update=True,
+    )
+
+
+# =========================
+# CLIENT — CRÉATION DEMANDE DE COTATION
+# =========================
+@app.route(
+    "/clients/<int:client_id>/cotation",
+    methods=["POST"],
+    endpoint="create_cotation"
+)
+@login_required
+def create_cotation(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    user = session.get("user") or {}
+
+    with conn.cursor() as cur:
+
+        cur.execute("""
+            INSERT INTO cotations (
+                client_id,
+                date_negociation,
+                heure_negociation,
+                energie_type,
+                type_compteur,
+                pdl_pce,
+                date_echeance,
+                fournisseur_actuel,
+                entreprise_nom,
+                siret,
+                adresse_facturation,
+                adresse_consommation,
+                signataire_nom,
+                signataire_tel,
+                signataire_mobile,
+                signataire_email,
+                commentaire,
+                created_by,
+                status,
+                is_read
+            )
+            VALUES (
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                'nouvelle',
+                0
+            )
+        """, (
+            client_id,
+            request.form.get("date_negociation"),
+            request.form.get("heure_negociation"),
+            request.form.get("energie_type"),
+            request.form.get("type_compteur"),
+            request.form.get("pdl_pce"),
+            request.form.get("date_echeance"),
+            request.form.get("fournisseur_actuel"),
+            request.form.get("entreprise_nom"),
+            request.form.get("siret"),
+            request.form.get("adresse_facturation"),
+            request.form.get("adresse_consommation"),
+            request.form.get("signataire_nom"),
+            request.form.get("signataire_tel"),
+            request.form.get("signataire_mobile"),
+            request.form.get("signataire_email"),
+            request.form.get("commentaire"),
+            user.get("id"),
+        ))
+
+    conn.commit()
+
+    flash("Demande de cotation envoyée.", "success")
+
+    return redirect(url_for("client_detail", client_id=client_id))
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
