@@ -2497,6 +2497,49 @@ def edit_client(client_id):
 
 
 # =========================
+# CLIENT — MISE À JOUR STATUT
+# (ROUTE MANQUANTE CORRIGÉE)
+# =========================
+@app.route("/clients/<int:client_id>/status", methods=["POST"])
+@admin_required
+def update_client_status(client_id):
+
+    conn = get_db()
+
+    status = (request.form.get("status") or "").strip().lower()
+
+    if status not in ("en_cours", "en_attente", "gagne", "perdu"):
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("clients"))
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM crm_clients WHERE id=%s",
+            (client_id,)
+        )
+        row = cur.fetchone()
+
+    if not row:
+        flash("Dossier introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE crm_clients
+            SET status=%s
+            WHERE id=%s
+            """,
+            (status, client_id)
+        )
+
+    conn.commit()
+
+    flash("Statut mis à jour.", "success")
+    return redirect(url_for("clients"))
+
+
+# =========================
 # CLIENT — SUPPRESSION DOSSIER
 # =========================
 @app.route("/clients/<int:client_id>/delete", methods=["POST"])

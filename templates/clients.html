@@ -72,7 +72,6 @@
                                class="form-control">
                     </div>
 
-                    <!-- COMMERCIAL (ADMIN UNIQUEMENT) -->
                     {% if current_user and current_user.role == "admin" %}
                     <div class="col-md-6">
                         <label class="form-label">Commercial *</label>
@@ -192,12 +191,47 @@
             {% if clients_en_attente %}
                 {% for c in clients_en_attente %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="border border-warning rounded p-2 text-decoration-none text-dark">
+                   class="border border-warning rounded p-2 text-decoration-none text-dark"
+                   style="transition:background .15s;"
+                   onmouseover="this.style.background='#fffdf5'"
+                   onmouseout="this.style.background='transparent'">
+
                     <strong>{{ c.name }}</strong><br>
                     <small class="text-muted">
                         Commercial : {{ c.commercial or "—" }}
                     </small>
+
+                    {% if current_user and current_user.role == 'admin' %}
+                    <form method="post"
+                          action="{{ url_for('update_client_status', client_id=c.id) }}"
+                          class="mt-2"
+                          onclick="event.stopPropagation();">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <select name="status"
+                                class="form-select form-select-sm"
+                                onchange="this.form.submit()">
+
+                            <option value="en_cours" {% if c.status == 'en_cours' %}selected{% endif %}>
+                                En cours
+                            </option>
+
+                            <option value="en_attente" {% if c.status == 'en_attente' %}selected{% endif %}>
+                                En attente
+                            </option>
+
+                            <option value="gagne" {% if c.status == 'gagne' %}selected{% endif %}>
+                                Gagné
+                            </option>
+
+                            <option value="perdu" {% if c.status == 'perdu' %}selected{% endif %}>
+                                Perdu
+                            </option>
+
+                        </select>
+                    </form>
+                    {% else %}
                     <div class="text-warning fw-bold mt-1">⏳ En attente</div>
+                    {% endif %}
                 </a>
                 {% endfor %}
             {% else %}
@@ -216,12 +250,47 @@
             {% if clients_gagnes %}
                 {% for c in clients_gagnes %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="border border-success rounded p-2 text-decoration-none text-dark">
+                   class="border border-success rounded p-2 text-decoration-none text-dark"
+                   style="transition:background .15s;"
+                   onmouseover="this.style.background='#f6fff8'"
+                   onmouseout="this.style.background='transparent'">
+
                     <strong>{{ c.name }}</strong><br>
                     <small class="text-muted">
                         Commercial : {{ c.commercial or "—" }}
                     </small>
+
+                    {% if current_user and current_user.role == 'admin' %}
+                    <form method="post"
+                          action="{{ url_for('update_client_status', client_id=c.id) }}"
+                          class="mt-2"
+                          onclick="event.stopPropagation();">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <select name="status"
+                                class="form-select form-select-sm"
+                                onchange="this.form.submit()">
+
+                            <option value="en_cours" {% if c.status == 'en_cours' %}selected{% endif %}>
+                                En cours
+                            </option>
+
+                            <option value="en_attente" {% if c.status == 'en_attente' %}selected{% endif %}>
+                                En attente
+                            </option>
+
+                            <option value="gagne" {% if c.status == 'gagne' %}selected{% endif %}>
+                                Gagné
+                            </option>
+
+                            <option value="perdu" {% if c.status == 'perdu' %}selected{% endif %}>
+                                Perdu
+                            </option>
+
+                        </select>
+                    </form>
+                    {% else %}
                     <div class="text-success fw-bold mt-1">✔ Gagné</div>
+                    {% endif %}
                 </a>
                 {% endfor %}
             {% else %}
@@ -240,12 +309,47 @@
             {% if clients_perdus %}
                 {% for c in clients_perdus %}
                 <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="border border-danger rounded p-2 text-decoration-none text-dark">
+                   class="border border-danger rounded p-2 text-decoration-none text-dark"
+                   style="transition:background .15s;"
+                   onmouseover="this.style.background='#fff7f7'"
+                   onmouseout="this.style.background='transparent'">
+
                     <strong>{{ c.name }}</strong><br>
                     <small class="text-muted">
                         Commercial : {{ c.commercial or "—" }}
                     </small>
+
+                    {% if current_user and current_user.role == 'admin' %}
+                    <form method="post"
+                          action="{{ url_for('update_client_status', client_id=c.id) }}"
+                          class="mt-2"
+                          onclick="event.stopPropagation();">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <select name="status"
+                                class="form-select form-select-sm"
+                                onchange="this.form.submit()">
+
+                            <option value="en_cours" {% if c.status == 'en_cours' %}selected{% endif %}>
+                                En cours
+                            </option>
+
+                            <option value="en_attente" {% if c.status == 'en_attente' %}selected{% endif %}>
+                                En attente
+                            </option>
+
+                            <option value="gagne" {% if c.status == 'gagne' %}selected{% endif %}>
+                                Gagné
+                            </option>
+
+                            <option value="perdu" {% if c.status == 'perdu' %}selected{% endif %}>
+                                Perdu
+                            </option>
+
+                        </select>
+                    </form>
+                    {% else %}
                     <div class="text-danger fw-bold mt-1">✖ Perdu</div>
+                    {% endif %}
                 </a>
                 {% endfor %}
             {% else %}
