@@ -1342,7 +1342,7 @@ def chiffre_affaire():
 
 
 # =========================================================
-# AJOUT REVENU (ROUTE MANQUANTE CORRIGÉE)
+# AJOUT REVENU
 # =========================================================
 @app.route("/revenus/add", methods=["POST"], endpoint="add_revenu")
 @login_required
@@ -1401,6 +1401,35 @@ def add_revenu():
         conn.rollback()
         logger.exception("Erreur ajout revenu : %r", e)
         flash("Erreur lors de l'ajout.", "danger")
+
+    return redirect(url_for("chiffre_affaire"))
+
+
+# =========================================================
+# SUPPRESSION REVENU
+# =========================================================
+@app.route("/revenus/<int:revenu_id>/delete", methods=["POST"], endpoint="delete_revenu")
+@admin_required
+def delete_revenu(revenu_id):
+
+    conn = get_db()
+
+    try:
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM revenus WHERE id = %s",
+                (revenu_id,)
+            )
+
+        conn.commit()
+        flash("Chiffre d’affaires supprimé.", "success")
+
+    except Exception as e:
+
+        conn.rollback()
+        logger.exception("Erreur suppression revenu : %r", e)
+        flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("chiffre_affaire"))
 
