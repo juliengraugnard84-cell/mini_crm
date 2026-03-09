@@ -959,7 +959,6 @@ def logout():
     session.clear()
     flash("Déconnexion effectuée.", "info")
     return redirect(url_for("login"))
-
 ###########################################################
 # 8. DASHBOARD + SEARCH + OUVERTURE COTATION + CHIFFRE D’AFFAIRES
 ###########################################################
@@ -1340,6 +1339,71 @@ def chiffre_affaire():
         selected_year=selected_year,
         selected_commercial=selected_commercial
     )
+
+
+# =========================================================
+# AJOUT REVENU (ROUTE MANQUANTE CORRIGÉE)
+# =========================================================
+@app.route("/revenus/add", methods=["POST"], endpoint="add_revenu")
+@login_required
+def add_revenu():
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    role = user.get("role")
+    username = user.get("username")
+
+    date_revenu = (request.form.get("date") or "").strip()
+    commercial = (request.form.get("commercial") or "").strip()
+    dossier = (request.form.get("dossier") or "").strip()
+    client_id = request.form.get("client_id")
+    montant = (request.form.get("montant") or "").strip()
+
+    try:
+        montant = float(montant)
+    except Exception:
+        flash("Montant invalide.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    if role == "commercial":
+        commercial = username
+
+    if not date_revenu or not montant:
+        flash("Champs obligatoires manquants.", "danger")
+        return redirect(url_for("chiffre_affaire"))
+
+    try:
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO revenus (
+                    date,
+                    commercial,
+                    dossier,
+                    client_id,
+                    montant
+                )
+                VALUES (%s,%s,%s,%s,%s)
+            """, (
+                date_revenu,
+                commercial,
+                dossier,
+                client_id if client_id else None,
+                montant
+            ))
+
+        conn.commit()
+        flash("Revenu ajouté avec succès.", "success")
+
+    except Exception as e:
+
+        conn.rollback()
+        logger.exception("Erreur ajout revenu : %r", e)
+        flash("Erreur lors de l'ajout.", "danger")
+
+    return redirect(url_for("chiffre_affaire"))
+
 ############################################################
 # 9. ADMIN — UTILISATEURS (GESTION COMPLÈTE ET SÉCURISÉE)
 ############################################################

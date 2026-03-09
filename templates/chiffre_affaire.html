@@ -57,7 +57,7 @@
         <div class="kpi-value">{{ (ca_mensuel_perso|default(0))|round(2) }} €</div>
     </div>
 
-    {% if current_user.role == 'commercial' and total_ca is defined %}
+    {% if current_user and current_user.role == 'commercial' and total_ca is defined %}
     <div class="kpi-tile">
         <div class="kpi-label">CA global (information)</div>
         <div class="kpi-value">{{ (total_ca|default(0))|round(2) }} €</div>
@@ -94,7 +94,7 @@
                 <label>Commercial</label>
                 <input
                     type="text"
-                    name="commercial_name"
+                    name="commercial"
                     class="form-control"
                     placeholder="Nom du commercial"
                     required
@@ -118,7 +118,7 @@
 {% if ca_mensuel_par_commercial %}
 <div class="card mb-5 p-3">
     <h5>
-        {% if current_user.role == 'admin' %}
+        {% if current_user and current_user.role == 'admin' %}
             Graphique — CA mensuel par commercial ({{ selected_year|default('') }})
         {% else %}
             Mon chiffre d’affaires mensuel ({{ selected_year|default('') }})
@@ -129,7 +129,7 @@
 {% endif %}
 
 <!-- ================= TABLEAU ADMIN ================= -->
-{% if current_user.role == 'admin' and ca_mensuel_par_commercial %}
+{% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
 <div class="card mb-5 p-3">
     <h5>CA mensuel par commercial — {{ selected_year|default('') }}</h5>
 
@@ -164,7 +164,7 @@
 {% endif %}
 
 <!-- ================= HISTORIQUE (ADMIN) ================= -->
-{% if current_user.role == 'admin' and historique_ca %}
+{% if current_user and current_user.role == 'admin' and historique_ca %}
 <div class="card mb-4 p-3">
     <h5>Historique détaillé</h5>
 
