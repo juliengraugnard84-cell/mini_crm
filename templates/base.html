@@ -64,6 +64,14 @@
                 </a>
             {% endif %}
 
+            <!-- ================= AGENDA NEGOCIATIONS (ADMIN + COMMERCIAUX) ================= -->
+            {% if current_user and current_user.role in ["admin", "commercial"] %}
+                <a href="{{ url_for('admin_planning') }}"
+                   class="{% if request.path.startswith('/admin/planning') %}active{% endif %}">
+                    📅 Agenda des négociations
+                </a>
+            {% endif %}
+
             <!-- ================= ADMIN UNIQUEMENT ================= -->
             {% if current_user and current_user.role == "admin" %}
 
@@ -86,12 +94,6 @@
                 <a href="{{ url_for('admin_dossiers') }}"
                    class="{% if request.path.startswith('/admin/dossiers') %}active{% endif %}">
                     📊 Suivi des dossiers commerciaux
-                </a>
-
-                <!-- ================= AGENDA NEGOCIATIONS ================= -->
-                <a href="{{ url_for('admin_planning') }}"
-                   class="{% if request.path.startswith('/admin/planning') %}active{% endif %}">
-                    📅 Agenda des négociations
                 </a>
 
                 <a href="{{ url_for('documents') }}"
