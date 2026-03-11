@@ -1847,7 +1847,7 @@ def admin_dossiers_detail(commercial):
 ############################################################
 
 @app.route("/admin/planning")
-@admin_required
+@login_required
 def admin_planning():
     conn = get_db()
 
@@ -1885,7 +1885,6 @@ def admin_planning():
         cotations=[row_to_obj(c) for c in cotations],
         updates=[row_to_obj(u) for u in updates],
     )
-
 
 ############################################################
 # 10 TER BIS. API CALENDRIER — NEGOCIATIONS
