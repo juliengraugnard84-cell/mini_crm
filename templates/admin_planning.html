@@ -61,4 +61,50 @@
     </div>
 
 </div>
+
+
+<!-- ========================================================= -->
+<!-- CALENDRIER DES NEGOCIATIONS -->
+<!-- ========================================================= -->
+
+<hr class="my-5">
+
+<h3 class="mb-4">🗓️ Calendrier des négociations</h3>
+
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<div id="calendar" style="background:white; padding:20px; border-radius:10px;"></div>
+
+<script>
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    let calendarEl = document.getElementById('calendar');
+
+    let calendar = new FullCalendar.Calendar(calendarEl, {
+
+        initialView: 'dayGridMonth',
+
+        locale: 'fr',
+
+        height: 650,
+
+        events: "/api/calendar",
+
+        eventClick: function(info) {
+
+            // ouvre la cotation admin
+            window.location = "/admin/cotations/" + info.event.id;
+
+        }
+
+    });
+
+    calendar.render();
+
+});
+
+</script>
+
 {% endblock %}

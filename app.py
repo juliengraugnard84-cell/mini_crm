@@ -1887,6 +1887,79 @@ def admin_planning():
     )
 
 
+############################################################
+# 10 TER BIS. API CALENDRIER — NEGOCIATIONS
+# (utilisé par FullCalendar dans le planning)
+############################################################
+
+@app.route("/api/calendar")
+@login_required
+def api_calendar():
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    role = user.get("role")
+    user_id = user.get("id")
+
+    with conn.cursor() as cur:
+
+        # ADMIN → voit toutes les négociations
+        if role == "admin":
+
+            cur.execute("""
+                SELECT
+                    cotations.id,
+                    cotations.date_negociation,
+                    cotations.heure_negociation,
+                    crm_clients.name AS client_name,
+                    users.username AS commercial_name
+                FROM cotations
+                JOIN crm_clients
+                    ON crm_clients.id = cotations.client_id
+                LEFT JOIN users
+                    ON users.id = cotations.created_by
+                WHERE cotations.date_negociation IS NOT NULL
+            """)
+
+        # COMMERCIAL → voit seulement ses négociations
+        else:
+
+            cur.execute("""
+                SELECT
+                    cotations.id,
+                    cotations.date_negociation,
+                    cotations.heure_negociation,
+                    crm_clients.name AS client_name,
+                    users.username AS commercial_name
+                FROM cotations
+                JOIN crm_clients
+                    ON crm_clients.id = cotations.client_id
+                LEFT JOIN users
+                    ON users.id = cotations.created_by
+                WHERE cotations.date_negociation IS NOT NULL
+                AND cotations.created_by = %s
+            """, (user_id,))
+
+        rows = cur.fetchall()
+
+    events = []
+
+    for r in rows:
+
+        if r["heure_negociation"]:
+            start = f"{r['date_negociation']}T{r['heure_negociation']}"
+        else:
+            start = f"{r['date_negociation']}"
+
+        events.append({
+            "id": r["id"],
+            "title": f"{r['client_name']} - {r['commercial_name']}",
+            "start": start
+        })
+
+    return jsonify(events)
+
 
 ###########################################################
 # 11. DOCUMENTS (GLOBAL + PAR DOSSIER + RESSOURCES PARTAGÉES)
