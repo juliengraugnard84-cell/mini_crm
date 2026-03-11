@@ -101,7 +101,46 @@ document.addEventListener("DOMContentLoaded", function () {
             right: "dayGridMonth,timeGridWeek,timeGridDay"
         },
 
-        events: "/api/calendar",
+        events: function(fetchInfo, successCallback, failureCallback) {
+
+            fetch("/api/calendar")
+                .then(response => response.json())
+                .then(data => {
+
+                    const colorMap = {
+                        "julien": "#0d6efd",
+                        "jeremy": "#198754",
+                        "hugo": "#fd7e14",
+                        "jeremie": "#6f42c1"
+                    };
+
+                    const coloredEvents = data.map(event => {
+
+                        let commercial = "";
+
+                        if (event.title.includes(" - ")) {
+                            commercial = event.title.split(" - ")[1].toLowerCase();
+                        }
+
+                        let color = colorMap[commercial] || "#6c757d";
+
+                        return {
+                            ...event,
+                            backgroundColor: color,
+                            borderColor: color
+                        };
+
+                    });
+
+                    successCallback(coloredEvents);
+
+                })
+                .catch(error => {
+                    console.error("Erreur chargement calendrier:", error);
+                    failureCallback(error);
+                });
+
+        },
 
         eventClick: function(info) {
             window.location.href = "/admin/cotations/" + info.event.id;
