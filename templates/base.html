@@ -88,6 +88,12 @@
                     📊 Suivi des dossiers commerciaux
                 </a>
 
+                <!-- ================= AGENDA NEGOCIATIONS ================= -->
+                <a href="{{ url_for('admin_planning') }}"
+                   class="{% if request.path.startswith('/admin/planning') %}active{% endif %}">
+                    📅 Agenda des négociations
+                </a>
+
                 <a href="{{ url_for('documents') }}"
                    class="{% if request.path.startswith('/documents') %}active{% endif %}">
                     Documents
