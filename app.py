@@ -1864,6 +1864,9 @@ def admin_dossiers_detail(commercial):
 def admin_planning():
     conn = get_db()
 
+    # =========================
+    # NEGOCIATIONS (COTATIONS)
+    # =========================
     with conn.cursor() as cur:
         cur.execute("""
             SELECT
@@ -1879,6 +1882,9 @@ def admin_planning():
         """)
         cotations = cur.fetchall()
 
+    # =========================
+    # DEMANDES DE MISE A JOUR
+    # =========================
     with conn.cursor() as cur:
         cur.execute("""
             SELECT
@@ -1893,10 +1899,13 @@ def admin_planning():
         """)
         updates = cur.fetchall()
 
+    # =========================
     # EVENEMENTS ADMIN
+    # =========================
     events = []
 
     try:
+
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
@@ -1904,7 +1913,9 @@ def admin_planning():
                     title,
                     description,
                     event_date,
-                    event_time
+                    event_time,
+                    end_time,
+                    all_day
                 FROM calendar_events
                 WHERE event_date >= CURRENT_DATE
                 ORDER BY event_date ASC
@@ -1937,7 +1948,11 @@ def add_calendar_event():
     title = (request.form.get("title") or "").strip()
     description = (request.form.get("description") or "").strip()
     event_date = (request.form.get("event_date") or "").strip()
-    event_time = (request.form.get("event_time") or "").strip()
+
+    start_time = (request.form.get("start_time") or "").strip()
+    end_time = (request.form.get("end_time") or "").strip()
+
+    all_day = request.form.get("all_day") == "on"
 
     if not title or not event_date:
         flash("Titre et date obligatoires.", "danger")
@@ -1952,14 +1967,18 @@ def add_calendar_event():
                     description,
                     event_date,
                     event_time,
+                    end_time,
+                    all_day,
                     created_by
                 )
-                VALUES (%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
             """, (
                 title,
                 description,
                 event_date,
-                event_time if event_time else None,
+                start_time if start_time else None,
+                end_time if end_time else None,
+                all_day,
                 user.get("id")
             ))
 
@@ -2032,7 +2051,9 @@ def api_calendar():
 
     events = []
 
+    # =====================================================
     # NEGOCIATIONS
+    # =====================================================
     for r in rows:
 
         if r["heure_negociation"]:
@@ -2046,7 +2067,9 @@ def api_calendar():
             "start": start
         })
 
+    # =====================================================
     # EVENEMENTS ADMIN
+    # =====================================================
     try:
 
         with conn.cursor() as cur:
@@ -2055,23 +2078,43 @@ def api_calendar():
                     id,
                     title,
                     event_date,
-                    event_time
+                    event_time,
+                    end_time,
+                    all_day
                 FROM calendar_events
             """)
             rows = cur.fetchall()
 
         for r in rows:
 
-            if r["event_time"]:
-                start = f"{r['event_date']}T{r['event_time']}"
-            else:
-                start = f"{r['event_date']}"
+            # Journée entière
+            if r.get("all_day"):
 
-            events.append({
-                "id": f"event_{r['id']}",
-                "title": r["title"],
-                "start": start
-            })
+                events.append({
+                    "id": f"event_{r['id']}",
+                    "title": r["title"],
+                    "start": str(r["event_date"]),
+                    "allDay": True
+                })
+
+            else:
+
+                if r["event_time"]:
+                    start = f"{r['event_date']}T{r['event_time']}"
+                else:
+                    start = str(r["event_date"])
+
+                if r.get("end_time"):
+                    end = f"{r['event_date']}T{r['end_time']}"
+                else:
+                    end = None
+
+                events.append({
+                    "id": f"event_{r['id']}",
+                    "title": r["title"],
+                    "start": start,
+                    "end": end
+                })
 
     except Exception:
         pass

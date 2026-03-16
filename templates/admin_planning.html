@@ -75,7 +75,7 @@
 
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-    <div class="col-md-4">
+    <div class="col-md-3">
         <input
             type="text"
             name="title"
@@ -84,7 +84,7 @@
             required>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-md-2">
         <input
             type="date"
             name="event_date"
@@ -96,7 +96,28 @@
         <input
             type="time"
             name="event_time"
+            id="start_time"
             class="form-control">
+    </div>
+
+    <div class="col-md-2">
+        <input
+            type="time"
+            name="end_time"
+            id="end_time"
+            class="form-control">
+    </div>
+
+    <div class="col-md-2 form-check d-flex align-items-center">
+        <input
+            type="checkbox"
+            name="all_day"
+            id="all_day"
+            value="1"
+            class="form-check-input me-2">
+        <label class="form-check-label">
+            Journée entière
+        </label>
     </div>
 
     <div class="col-md-3">
@@ -209,6 +230,40 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     calendar.render();
+
+});
+
+
+/* =====================================================
+   Gestion option "journée entière"
+===================================================== */
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const checkbox = document.getElementById("all_day");
+    const start = document.getElementById("start_time");
+    const end = document.getElementById("end_time");
+
+    if (!checkbox) return;
+
+    checkbox.addEventListener("change", function () {
+
+        if (this.checked) {
+
+            start.value = "";
+            end.value = "";
+
+            start.disabled = true;
+            end.disabled = true;
+
+        } else {
+
+            start.disabled = false;
+            end.disabled = false;
+
+        }
+
+    });
 
 });
 
