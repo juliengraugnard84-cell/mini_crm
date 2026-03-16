@@ -286,6 +286,19 @@ def init_db():
                 )
             """)
 
+            # ================= EVENEMENTS CALENDRIER =================
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS calendar_events (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    event_date DATE NOT NULL,
+                    event_time TIME,
+                    created_by INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # ================= LOG SUPPRESSION UPDATES =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS update_deletions_log (
@@ -1880,12 +1893,87 @@ def admin_planning():
         """)
         updates = cur.fetchall()
 
+    # EVENEMENTS ADMIN
+    events = []
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    id,
+                    title,
+                    description,
+                    event_date,
+                    event_time
+                FROM calendar_events
+                WHERE event_date >= CURRENT_DATE
+                ORDER BY event_date ASC
+            """)
+            rows = cur.fetchall()
+
+        events = [row_to_obj(r) for r in rows]
+
+    except Exception:
+        events = []
+
     return render_template(
         "admin_planning.html",
         cotations=[row_to_obj(c) for c in cotations],
         updates=[row_to_obj(u) for u in updates],
+        events=events
     )
 
+
+# ===============================
+# AJOUT EVENEMENT CALENDRIER
+# ===============================
+@app.route("/admin/calendar/add", methods=["POST"])
+@admin_required
+def add_calendar_event():
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    title = (request.form.get("title") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    event_date = (request.form.get("event_date") or "").strip()
+    event_time = (request.form.get("event_time") or "").strip()
+
+    if not title or not event_date:
+        flash("Titre et date obligatoires.", "danger")
+        return redirect(url_for("admin_planning"))
+
+    try:
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO calendar_events (
+                    title,
+                    description,
+                    event_date,
+                    event_time,
+                    created_by
+                )
+                VALUES (%s,%s,%s,%s,%s)
+            """, (
+                title,
+                description,
+                event_date,
+                event_time if event_time else None,
+                user.get("id")
+            ))
+
+        conn.commit()
+
+        flash("Événement ajouté au planning.", "success")
+
+    except Exception as e:
+
+        conn.rollback()
+        logger.exception("Erreur ajout evenement calendrier : %r", e)
+        flash("Erreur lors de l'ajout.", "danger")
+
+    return redirect(url_for("admin_planning"))
 ############################################################
 # 10 TER BIS. API CALENDRIER — NEGOCIATIONS
 # (utilisé par FullCalendar dans le planning)
@@ -1944,6 +2032,7 @@ def api_calendar():
 
     events = []
 
+    # NEGOCIATIONS
     for r in rows:
 
         if r["heure_negociation"]:
@@ -1952,13 +2041,42 @@ def api_calendar():
             start = f"{r['date_negociation']}"
 
         events.append({
-            "id": r["id"],
+            "id": f"cotation_{r['id']}",
             "title": f"{r['client_name']} - {r['commercial_name']}",
             "start": start
         })
 
-    return jsonify(events)
+    # EVENEMENTS ADMIN
+    try:
 
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    id,
+                    title,
+                    event_date,
+                    event_time
+                FROM calendar_events
+            """)
+            rows = cur.fetchall()
+
+        for r in rows:
+
+            if r["event_time"]:
+                start = f"{r['event_date']}T{r['event_time']}"
+            else:
+                start = f"{r['event_date']}"
+
+            events.append({
+                "id": f"event_{r['id']}",
+                "title": r["title"],
+                "start": start
+            })
+
+    except Exception:
+        pass
+
+    return jsonify(events)
 
 ###########################################################
 # 11. DOCUMENTS (GLOBAL + PAR DOSSIER + RESSOURCES PARTAGÉES)

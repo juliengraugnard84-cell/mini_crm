@@ -64,6 +64,59 @@
 
 
 <!-- ========================================================= -->
+<!-- EVENEMENTS ADMIN -->
+<!-- ========================================================= -->
+
+<hr class="my-5">
+
+<h3 class="mb-3">➕ Ajouter un événement</h3>
+
+<form method="POST" action="/admin/calendar/add" class="row g-3 mb-4">
+
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="col-md-4">
+        <input
+            type="text"
+            name="title"
+            class="form-control"
+            placeholder="Titre de l'événement"
+            required>
+    </div>
+
+    <div class="col-md-3">
+        <input
+            type="date"
+            name="event_date"
+            class="form-control"
+            required>
+    </div>
+
+    <div class="col-md-2">
+        <input
+            type="time"
+            name="event_time"
+            class="form-control">
+    </div>
+
+    <div class="col-md-3">
+        <input
+            type="text"
+            name="description"
+            class="form-control"
+            placeholder="Description (optionnel)">
+    </div>
+
+    <div class="col-12">
+        <button class="btn btn-success">
+            Ajouter événement
+        </button>
+    </div>
+
+</form>
+
+
+<!-- ========================================================= -->
 <!-- CALENDRIER DES NEGOCIATIONS -->
 <!-- ========================================================= -->
 
@@ -118,7 +171,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                         let commercial = "";
 
-                        if (event.title.includes(" - ")) {
+                        if (event.title && event.title.includes(" - ")) {
                             commercial = event.title.split(" - ")[1].toLowerCase();
                         }
 
@@ -143,7 +196,14 @@ document.addEventListener("DOMContentLoaded", function () {
         },
 
         eventClick: function(info) {
-            window.location.href = "/admin/cotations/" + info.event.id;
+
+            if (info.event.id.startsWith("cotation_")) {
+
+                const cotationId = info.event.id.replace("cotation_", "");
+                window.location.href = "/admin/cotations/" + cotationId;
+
+            }
+
         }
 
     });
