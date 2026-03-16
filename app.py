@@ -2663,11 +2663,14 @@ def edit_client(client_id):
 
 # =========================
 # CLIENT — MISE À JOUR STATUT
-# (ROUTE MANQUANTE CORRIGÉE)
+# (ADMIN + COMMERCIAL AUTORISÉ)
 # =========================
 @app.route("/clients/<int:client_id>/status", methods=["POST"])
-@admin_required
+@login_required
 def update_client_status(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
 
     conn = get_db()
 
