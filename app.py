@@ -1993,6 +1993,36 @@ def add_calendar_event():
         flash("Erreur lors de l'ajout.", "danger")
 
     return redirect(url_for("admin_planning"))
+
+
+############################################################
+# SUPPRESSION EVENEMENT CALENDRIER
+############################################################
+@app.route("/admin/calendar/<int:event_id>/delete", methods=["POST"])
+@admin_required
+def delete_calendar_event(event_id):
+
+    conn = get_db()
+
+    try:
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM calendar_events WHERE id = %s",
+                (event_id,)
+            )
+
+        conn.commit()
+
+        flash("Événement supprimé.", "success")
+
+    except Exception as e:
+
+        conn.rollback()
+        logger.exception("Erreur suppression evenement calendrier : %r", e)
+        flash("Erreur lors de la suppression.", "danger")
+
+    return redirect(url_for("admin_planning"))
 ############################################################
 # 10 TER BIS. API CALENDRIER — NEGOCIATIONS
 # (utilisé par FullCalendar dans le planning)

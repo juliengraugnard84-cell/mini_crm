@@ -95,7 +95,7 @@
     <div class="col-md-2">
         <input
             type="time"
-            name="event_time"
+            name="start_time"
             id="start_time"
             class="form-control">
     </div>
@@ -218,10 +218,36 @@ document.addEventListener("DOMContentLoaded", function () {
 
         eventClick: function(info) {
 
+            // Cotation
             if (info.event.id.startsWith("cotation_")) {
 
                 const cotationId = info.event.id.replace("cotation_", "");
                 window.location.href = "/admin/cotations/" + cotationId;
+                return;
+
+            }
+
+            // Evénement admin → suppression
+            if (info.event.id.startsWith("event_")) {
+
+                const eventId = info.event.id.replace("event_", "");
+
+                if (confirm("Supprimer cet événement ?")) {
+
+                    const form = document.createElement("form");
+                    form.method = "POST";
+                    form.action = "/admin/calendar/" + eventId + "/delete";
+
+                    const csrf = document.createElement("input");
+                    csrf.type = "hidden";
+                    csrf.name = "csrf_token";
+                    csrf.value = "{{ csrf_token }}";
+
+                    form.appendChild(csrf);
+                    document.body.appendChild(form);
+                    form.submit();
+
+                }
 
             }
 
