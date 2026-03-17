@@ -2672,6 +2672,103 @@ def client_detail(client_id):
 
 
 # =========================
+# CLIENT — AJOUT COTATION
+# =========================
+@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
+@login_required
+def create_cotation(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    date_negociation = (request.form.get("date_negociation") or "").strip()
+    heure_negociation = (request.form.get("heure_negociation") or "").strip()
+    energie_type = (request.form.get("energie_type") or "").strip()
+    type_compteur = (request.form.get("type_compteur") or "").strip()
+    pdl_pce = (request.form.get("pdl_pce") or "").strip()
+    date_echeance = (request.form.get("date_echeance") or "").strip()
+    fournisseur_actuel = (request.form.get("fournisseur_actuel") or "").strip()
+    entreprise_nom = (request.form.get("entreprise_nom") or "").strip()
+    siret = (request.form.get("siret") or "").strip()
+    adresse_facturation = (request.form.get("adresse_facturation") or "").strip()
+    adresse_consommation = (request.form.get("adresse_consommation") or "").strip()
+    signataire_nom = (request.form.get("signataire_nom") or "").strip()
+    signataire_tel = (request.form.get("signataire_tel") or "").strip()
+    signataire_mobile = (request.form.get("signataire_mobile") or "").strip()
+    signataire_email = (request.form.get("signataire_email") or "").strip()
+    commentaire = (request.form.get("commentaire") or "").strip()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM crm_clients WHERE id = %s",
+                (client_id,)
+            )
+            row = cur.fetchone()
+
+        if not row:
+            flash("Client introuvable.", "danger")
+            return redirect(url_for("clients"))
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO cotations (
+                    client_id,
+                    date_negociation,
+                    energie_type,
+                    pdl_pce,
+                    date_echeance,
+                    fournisseur_actuel,
+                    entreprise_nom,
+                    siret,
+                    adresse_facturation,
+                    adresse_consommation,
+                    signataire_nom,
+                    signataire_tel,
+                    signataire_email,
+                    commentaire,
+                    created_by,
+                    type_compteur,
+                    heure_negociation,
+                    signataire_mobile
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                client_id,
+                date_negociation if date_negociation else None,
+                energie_type if energie_type else None,
+                pdl_pce if pdl_pce else None,
+                date_echeance if date_echeance else None,
+                fournisseur_actuel if fournisseur_actuel else None,
+                entreprise_nom if entreprise_nom else None,
+                siret if siret else None,
+                adresse_facturation if adresse_facturation else None,
+                adresse_consommation if adresse_consommation else None,
+                signataire_nom if signataire_nom else None,
+                signataire_tel if signataire_tel else None,
+                signataire_email if signataire_email else None,
+                commentaire if commentaire else None,
+                user.get("id"),
+                type_compteur if type_compteur else None,
+                heure_negociation if heure_negociation else None,
+                signataire_mobile if signataire_mobile else None,
+            ))
+
+        conn.commit()
+        flash("Demande de cotation envoyée.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur création cotation : %r", e)
+        flash("Erreur lors de la création.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
 # CLIENT — CRÉATION
 # =========================
 @app.route("/clients/new", methods=["GET", "POST"])

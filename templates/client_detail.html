@@ -345,7 +345,7 @@
             </div>
             <div class="card-body">
 
-                {% if client_cotations and client_cotations|length > 0 %}
+                {% if cotations and cotations|length > 0 %}
                     <div class="table-responsive">
                         <table class="table table-sm align-middle">
                             <thead>
@@ -361,7 +361,7 @@
                             </thead>
                             <tbody>
 
-                                {% for c in client_cotations %}
+                                {% for c in cotations %}
                                 <tr {% if current_user and c.created_by == current_user.id %}class="table-success"{% endif %}>
                                     <td>#{{ c.id }}</td>
                                     <td>{{ c.date_creation or "—" }}</td>
