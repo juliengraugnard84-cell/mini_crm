@@ -2652,6 +2652,40 @@ def clients():
 
 
 # =========================
+# CLIENT — UPDATE STATUS (FIX AJOUTÉ)
+# =========================
+@app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
+@admin_required
+def update_client_status(client_id):
+
+    conn = get_db()
+
+    new_status = (request.form.get("status") or "").strip().lower()
+
+    if new_status not in ("en_cours", "en_attente", "gagne", "perdu"):
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("clients"))
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE crm_clients
+                SET status = %s
+                WHERE id = %s
+            """, (new_status, client_id))
+
+        conn.commit()
+        flash("Statut mis à jour.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur update status : %r", e)
+        flash("Erreur lors de la mise à jour.", "danger")
+
+    return redirect(url_for("clients"))
+
+
+# =========================
 # CLIENT — DÉTAIL DOSSIER
 # =========================
 @app.route("/clients/<int:client_id>")
@@ -2774,10 +2808,10 @@ def create_cotation(client_id):
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
                 client_id,
-                parse_date_safe(date_negociation),   # ✅ FIX
+                parse_date_safe(date_negociation),
                 energie_type if energie_type else None,
                 pdl_pce if pdl_pce else None,
-                parse_date_safe(date_echeance),      # ✅ FIX BONUS
+                parse_date_safe(date_echeance),
                 fournisseur_actuel if fournisseur_actuel else None,
                 entreprise_nom if entreprise_nom else None,
                 siret if siret else None,
@@ -2789,7 +2823,7 @@ def create_cotation(client_id):
                 commentaire if commentaire else None,
                 user.get("id"),
                 type_compteur if type_compteur else None,
-                parse_time_safe(heure_negociation),  # ✅ FIX
+                parse_time_safe(heure_negociation),
                 signataire_mobile if signataire_mobile else None,
             ))
 
