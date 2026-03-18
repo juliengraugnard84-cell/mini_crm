@@ -2652,7 +2652,7 @@ def clients():
 
 
 # =========================
-# CLIENT — CRÉATION (FIX COMPLET)
+# CLIENT — CRÉATION (DEBUG ACTIF)
 # =========================
 @app.route("/clients/new", methods=["POST"], endpoint="new_client")
 @login_required
@@ -2676,7 +2676,6 @@ def new_client():
     owner_id = user.get("id")
     commercial = user.get("username")
 
-    # ADMIN → assignation commercial
     if user.get("role") == "admin" and commercial_name:
         with conn.cursor() as cur:
             cur.execute(
@@ -2720,8 +2719,7 @@ def new_client():
     except Exception as e:
         conn.rollback()
         print("🔥 ERREUR SQL CLIENT :", e)
-        logger.exception("Erreur création client : %r", e)
-        flash("Erreur lors de la création.", "danger")
+        raise  # 🔥 IMPORTANT → affiche l'erreur réelle
 
     return redirect(url_for("clients"))
 
