@@ -2652,7 +2652,82 @@ def clients():
 
 
 # =========================
-# CLIENT — UPDATE STATUS (FIX AJOUTÉ)
+# CLIENT — CRÉATION (FIX COMPLET)
+# =========================
+@app.route("/clients/new", methods=["POST"], endpoint="new_client")
+@login_required
+def new_client():
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    name = (request.form.get("name") or "").strip()
+    gerant_nom = (request.form.get("gerant_nom") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    address = (request.form.get("address") or "").strip()
+    siret = (request.form.get("siret") or "").strip()
+    commercial_name = (request.form.get("commercial_name") or "").strip()
+
+    if not name:
+        flash("Nom obligatoire.", "danger")
+        return redirect(url_for("clients"))
+
+    owner_id = user.get("id")
+    commercial = user.get("username")
+
+    # ADMIN → assignation commercial
+    if user.get("role") == "admin" and commercial_name:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, username FROM users WHERE LOWER(username)=LOWER(%s)",
+                (commercial_name,),
+            )
+            row = cur.fetchone()
+            if row:
+                owner_id = row["id"]
+                commercial = row["username"]
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO crm_clients (
+                    name,
+                    email,
+                    phone,
+                    address,
+                    commercial,
+                    owner_id,
+                    status,
+                    siret,
+                    gerant_nom
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,'en_cours',%s,%s)
+            """, (
+                name,
+                email if email else None,
+                phone if phone else None,
+                address if address else None,
+                commercial,
+                owner_id,
+                siret if siret else None,
+                gerant_nom if gerant_nom else None,
+            ))
+
+        conn.commit()
+        flash("Client créé avec succès.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        print("🔥 ERREUR SQL CLIENT :", e)
+        logger.exception("Erreur création client : %r", e)
+        flash("Erreur lors de la création.", "danger")
+
+    return redirect(url_for("clients"))
+
+
+# =========================
+# CLIENT — UPDATE STATUS
 # =========================
 @app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
 @admin_required
@@ -2838,6 +2913,7 @@ def create_cotation(client_id):
         flash("Erreur lors de la création.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
+
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
