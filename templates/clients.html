@@ -24,7 +24,8 @@
         <div class="card-body">
             <h5 class="mb-3">Créer un nouveau dossier client</h5>
 
-            <form method="post" action="{{ url_for('new_client') }}">
+            <form method="post"
+                  action="{% if 'new_client' in available_endpoints %}{{ url_for('new_client') }}{% else %}{{ url_for('clients') }}{% endif %}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
                 <div class="row g-3">
