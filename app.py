@@ -587,42 +587,63 @@ def _s3_make_non_overwriting_key(bucket: str, key: str) -> str:
 
 def list_client_documents(client_id: int):
     """
-    Liste documents d’un client.
-    - PROD : URL signée
-    - LOCAL : liste visible sans URL
+    Liste tous les documents d’un client.
+    
+    ✔ Compatible :
+    - nouveau format : clients/<slug>_<id>/
+    - ancien format : clients/<id>/
+    - anciens slugs après renommage
+
+    ✔ Optimisé :
+    - évite scan global S3 inutile
     """
+
     if not s3:
         return []
 
-    prefix = client_s3_prefix(client_id)
     docs = []
 
     try:
-        items = s3_list_all_objects(AWS_BUCKET, prefix=prefix)
+        prefixes = []
+
+        # 🔹 Nouveau format (actuel)
+        prefixes.append(client_s3_prefix(client_id))
+
+        # 🔹 Ancien format (legacy)
+        prefixes.append(f"clients/{client_id}/")
+
+        # 🔹 Scan intelligent des anciens slugs
+        base_prefix = "clients/"
+
+        items = s3_list_all_objects(AWS_BUCKET, prefix=base_prefix)
 
         for item in items:
             key = item.get("Key")
+
             if not key or key.endswith("/"):
                 continue
 
-            docs.append(
-                {
-                    "nom": key.replace(prefix, "", 1),
-                    "key": key,
-                    "taille": item.get("Size", 0),
-                    "url": (
-                        s3_presigned_url(key)
-                        if not LOCAL_MODE
-                        else None
-                    ),
-                }
-            )
+            # 🔎 On identifie le client depuis la clé
+            extracted_client_id = extract_client_id_from_s3_key(key)
+
+            if extracted_client_id != client_id:
+                continue
+
+            docs.append({
+                "nom": key.split("/")[-1],
+                "key": key,
+                "taille": item.get("Size", 0),
+                "url": (
+                    s3_presigned_url(key)
+                    if not LOCAL_MODE
+                    else None
+                ),
+            })
 
     except Exception as e:
         logger.exception("Erreur list_client_documents : %r", e)
 
     return docs
-
 
 
 ############################################################
