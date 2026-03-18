@@ -2551,6 +2551,21 @@ app.view_functions.setdefault("documents_admin", documents)
 # ⚠️ VERSION UNIQUE — AUCUN DOUBLON
 ############################################################
 
+from datetime import datetime
+
+# ✅ SAFE PARSE (CORRECTION BUG COTATION)
+def parse_date_safe(val):
+    try:
+        return datetime.strptime(val, "%Y-%m-%d").date()
+    except:
+        return None
+
+def parse_time_safe(val):
+    try:
+        return datetime.strptime(val, "%H:%M").time()
+    except:
+        return None
+
 
 # =========================
 # CLIENT — LISTE
@@ -2693,7 +2708,7 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — AJOUT COTATION
+# CLIENT — AJOUT COTATION (FIX 🔥)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
@@ -2759,10 +2774,10 @@ def create_cotation(client_id):
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
                 client_id,
-                date_negociation if date_negociation else None,
+                parse_date_safe(date_negociation),   # ✅ FIX
                 energie_type if energie_type else None,
                 pdl_pce if pdl_pce else None,
-                date_echeance if date_echeance else None,
+                parse_date_safe(date_echeance),      # ✅ FIX BONUS
                 fournisseur_actuel if fournisseur_actuel else None,
                 entreprise_nom if entreprise_nom else None,
                 siret if siret else None,
@@ -2774,297 +2789,21 @@ def create_cotation(client_id):
                 commentaire if commentaire else None,
                 user.get("id"),
                 type_compteur if type_compteur else None,
-                heure_negociation if heure_negociation else None,
+                parse_time_safe(heure_negociation),  # ✅ FIX
                 signataire_mobile if signataire_mobile else None,
             ))
 
         conn.commit()
+        print("✅ COTATION ENREGISTRÉE")
         flash("Demande de cotation envoyée.", "success")
 
     except Exception as e:
         conn.rollback()
+        print("🔥 ERREUR SQL COTATION :", e)
         logger.exception("Erreur création cotation : %r", e)
         flash("Erreur lors de la création.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# CLIENT — CRÉATION
-# =========================
-@app.route("/clients/new", methods=["GET", "POST"])
-@login_required
-def new_client():
-
-    conn = get_db()
-
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
-
-    if request.method == "POST":
-
-        name = (request.form.get("name") or "").strip()
-        email = (request.form.get("email") or "").strip()
-        phone = (request.form.get("phone") or "").strip()
-        address = (request.form.get("address") or "").strip()
-        siret = (request.form.get("siret") or "").strip()
-        gerant_nom = (request.form.get("gerant_nom") or "").strip()
-
-        if not name:
-            flash("Le nom du client est obligatoire.", "danger")
-            return redirect(url_for("clients"))
-
-        if role == "admin":
-
-            commercial_name = (request.form.get("commercial_name") or "").strip()
-            owner_id = None
-
-            if commercial_name:
-
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT id
-                        FROM users
-                        WHERE LOWER(username)=LOWER(%s)
-                          AND role IN ('admin','commercial')
-                    """, (commercial_name,))
-                    row = cur.fetchone()
-
-                if row:
-                    owner_id = row["id"]
-
-        else:
-            owner_id = user_id
-
-        if not owner_id:
-            flash("Commercial introuvable. Vérifiez le nom saisi.", "danger")
-            return redirect(url_for("clients"))
-
-        with conn.cursor() as cur:
-
-            cur.execute("""
-                INSERT INTO crm_clients (
-                    name, email, phone, address,
-                    siret, gerant_nom, owner_id, status
-                )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,'en_cours')
-                RETURNING id
-            """, (
-                name,
-                email,
-                phone,
-                address,
-                siret,
-                gerant_nom,
-                owner_id
-            ))
-
-            client_id = cur.fetchone()[0]
-
-        conn.commit()
-
-        flash("Dossier client créé.", "success")
-
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — MODIFICATION INFOS
-# =========================
-@app.route("/clients/<int:client_id>/edit", methods=["POST"])
-@login_required
-def edit_client(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-
-    user = session.get("user") or {}
-    role = user.get("role")
-
-    name = (request.form.get("name") or "").strip()
-    email = (request.form.get("email") or "").strip()
-    phone = (request.form.get("phone") or "").strip()
-    address = (request.form.get("address") or "").strip()
-    siret = (request.form.get("siret") or "").strip()
-    gerant_nom = (request.form.get("gerant_nom") or "").strip()
-
-    if not name:
-        flash("Le nom du client est obligatoire.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    owner_id = None
-
-    if role == "admin":
-
-        commercial_name = (request.form.get("commercial_name") or "").strip()
-
-        if commercial_name:
-
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT id
-                    FROM users
-                    WHERE LOWER(username)=LOWER(%s)
-                      AND role IN ('admin','commercial')
-                """, (commercial_name,))
-                row = cur.fetchone()
-
-            if row:
-                owner_id = row["id"]
-
-    with conn.cursor() as cur:
-
-        if role == "admin" and owner_id:
-
-            cur.execute("""
-                UPDATE crm_clients
-                SET name=%s,
-                    email=%s,
-                    phone=%s,
-                    address=%s,
-                    siret=%s,
-                    gerant_nom=%s,
-                    owner_id=%s
-                WHERE id=%s
-            """, (
-                name,
-                email,
-                phone,
-                address,
-                siret,
-                gerant_nom,
-                owner_id,
-                client_id
-            ))
-
-        else:
-
-            cur.execute("""
-                UPDATE crm_clients
-                SET name=%s,
-                    email=%s,
-                    phone=%s,
-                    address=%s,
-                    siret=%s,
-                    gerant_nom=%s
-                WHERE id=%s
-            """, (
-                name,
-                email,
-                phone,
-                address,
-                siret,
-                gerant_nom,
-                client_id
-            ))
-
-    conn.commit()
-
-    flash("Informations client mises à jour.", "success")
-
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# CLIENT — MISE À JOUR STATUT
-# (ADMIN + COMMERCIAL AUTORISÉ)
-# =========================
-@app.route("/clients/<int:client_id>/status", methods=["POST"])
-@login_required
-def update_client_status(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-
-    status = (request.form.get("status") or "").strip().lower()
-
-    if status not in ("en_cours", "en_attente", "gagne", "perdu"):
-        flash("Statut invalide.", "danger")
-        return redirect(url_for("clients"))
-
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT id FROM crm_clients WHERE id=%s",
-            (client_id,)
-        )
-        row = cur.fetchone()
-
-    if not row:
-        flash("Dossier introuvable.", "danger")
-        return redirect(url_for("clients"))
-
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE crm_clients
-            SET status=%s
-            WHERE id=%s
-            """,
-            (status, client_id)
-        )
-
-    conn.commit()
-
-    flash("Statut mis à jour.", "success")
-    return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — SUPPRESSION DOSSIER
-# =========================
-@app.route("/clients/<int:client_id>/delete", methods=["POST"])
-@login_required
-def delete_client(client_id):
-
-    conn = get_db()
-
-    user = session.get("user") or {}
-    role = user.get("role")
-    user_id = user.get("id")
-
-    with conn.cursor() as cur:
-
-        cur.execute(
-            "SELECT owner_id FROM crm_clients WHERE id=%s",
-            (client_id,)
-        )
-
-        row = cur.fetchone()
-
-    if not row:
-        flash("Dossier introuvable.", "danger")
-        return redirect(url_for("clients"))
-
-    if role != "admin" and row["owner_id"] != user_id:
-        abort(403)
-
-    try:
-
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
-            cur.execute("DELETE FROM client_updates WHERE client_id=%s", (client_id,))
-            cur.execute("DELETE FROM revenus WHERE client_id=%s", (client_id,))
-            cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
-
-        conn.commit()
-
-        flash("Dossier client supprimé.", "success")
-
-    except Exception as e:
-
-        conn.rollback()
-        logger.exception("Erreur suppression client : %r", e)
-
-        flash("Erreur lors de la suppression.", "danger")
-
-    return redirect(url_for("clients"))
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
