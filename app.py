@@ -3094,7 +3094,7 @@ def delete_update(update_id):
     return redirect(url_for("admin_updates"))
 
 ############################################################
-# 14. CHAT (BACKEND) — VERSION SAFE + MULTI UPLOAD
+# 14. CHAT (BACKEND) — VERSION SAFE + MULTI UPLOAD (FIX)
 ############################################################
 
 def _chat_store_file(file_storage):
@@ -3223,7 +3223,7 @@ def chat_messages():
 
 
 # =========================================================
-# SEND MESSAGE (MULTI FILES)
+# SEND MESSAGE (MULTI FILES FIX)
 # =========================================================
 @app.route("/chat/send", methods=["POST"])
 @login_required
@@ -3231,11 +3231,18 @@ def chat_send():
 
     message = (request.form.get("message") or "").strip()
 
-    # ✅ multi + fallback legacy
-    files = request.files.getlist("file")
+    # 🔥 FIX CRITIQUE FLASK (fichiers vides)
+    raw_files = request.files.getlist("file")
+
+    files = [
+        f for f in raw_files
+        if f and getattr(f, "filename", None)
+    ]
+
+    # fallback si Flask renvoie mal
     if not files:
         single = request.files.get("file")
-        if single:
+        if single and getattr(single, "filename", None):
             files = [single]
 
     user = session.get("user") or {}
@@ -3247,10 +3254,6 @@ def chat_send():
     # TRAITEMENT DES FICHIERS
     # =========================
     for file_obj in files:
-
-        # 🔥 ignore les faux inputs vides
-        if not file_obj or not getattr(file_obj, "filename", None):
-            continue
 
         file_key, file_name, file_error = _chat_store_file(file_obj)
 
