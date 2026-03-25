@@ -35,22 +35,18 @@ document.addEventListener("DOMContentLoaded", () => {
     let lastMessageId = null;
     let isFirstLoad = true;
 
-    /* ================= AUDIO ================= */
+    /* ================= AUDIO (FIX NAVIGATEUR) ================= */
 
-    function unlockAudio() {
-        if (audioUnlocked || !audio) return;
+    document.addEventListener("click", () => {
+        if (!audio || audioUnlocked) return;
 
-        audio.play()
-            .then(() => {
-                audio.pause();
-                audio.currentTime = 0;
-                audioUnlocked = true;
-            })
-            .catch(() => {});
-    }
-
-    document.addEventListener("click", unlockAudio);
-    document.addEventListener("keydown", unlockAudio);
+        audio.play().then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audioUnlocked = true;
+            console.log("🔓 Audio débloqué");
+        }).catch(() => {});
+    }, { once: true });
 
     function playSound() {
         if (!audio || !audioUnlocked) return;
@@ -62,6 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         audio.currentTime = 0;
         audio.play().catch(() => {});
+        console.log("🔊 Son joué");
     }
 
     /* ================= HELPERS ================= */
@@ -276,19 +273,18 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* ================= SEND ================= */
+    /* ================= SEND (MULTI FILES) ================= */
 
     async function sendMessage() {
 
         if (isSending) return;
 
-        const msg  = input.value.trim();
-        const file = fileInput?.files?.[0];
+        const msg   = input.value.trim();
+        const files = fileInput?.files ? Array.from(fileInput.files) : [];
 
-        if (!msg && !file) return;
+        if (!msg && files.length === 0) return;
 
-        // sécurité front
-        if (file && !CAN_UPLOAD) {
+        if (files.length > 0 && !CAN_UPLOAD) {
             alert("Vous n’êtes pas autorisé à envoyer des fichiers.");
             return;
         }
@@ -297,7 +293,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const fd = new FormData();
         if (msg) fd.append("message", msg);
-        if (file) fd.append("file", file);
+
+        // 🔥 MULTI UPLOAD
+        files.forEach(f => fd.append("file", f));
 
         const headers = {};
         if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
