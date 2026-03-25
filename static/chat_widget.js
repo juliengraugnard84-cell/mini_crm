@@ -15,6 +15,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID ?? null;
     const CSRF_TOKEN      = window.CHAT_CSRF_TOKEN ?? null;
 
+    const audio = document.getElementById("chat-sound");
+
     /* ================= SÉCURITÉ ================= */
 
     if (!toggleBtn || !widget || !form || !input || !messagesBox) {
@@ -25,6 +27,40 @@ document.addEventListener("DOMContentLoaded", () => {
     /* ================= STATE ================= */
 
     let isLoading = false;
+    let lastPlayedMessageId = null;
+    let audioUnlocked = false;
+    let lastSoundTime = 0;
+
+    /* ================= AUDIO ================= */
+
+    function unlockAudio() {
+        if (audioUnlocked || !audio) return;
+
+        audio.play()
+            .then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+                audioUnlocked = true;
+                console.log("🔓 Audio débloqué");
+            })
+            .catch(() => {});
+    }
+
+    document.addEventListener("click", unlockAudio);
+    document.addEventListener("keydown", unlockAudio);
+
+    function playSound() {
+        if (!audio || !audioUnlocked) return;
+
+        const now = Date.now();
+        if (now - lastSoundTime < 800) return; // anti spam
+
+        lastSoundTime = now;
+
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+        console.log("🔊 Son joué");
+    }
 
     /* ================= HELPERS ================= */
 
@@ -109,6 +145,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         row.appendChild(bubble);
+
+        /* 🔔 SON AU BON ENDROIT (FIX FINAL) */
+        if (!mine && m.id !== lastPlayedMessageId) {
+
+            // évite son au premier chargement
+            if (lastPlayedMessageId !== null) {
+                console.log("🔔 Nouveau message → son");
+                playSound();
+            }
+
+            lastPlayedMessageId = m.id;
+        }
+
         return row;
     }
 
@@ -153,7 +202,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
             const messages = data.messages || [];
 
-            // 🔔 BADGE = messages non lus et non envoyés par moi
             const unread = messages.filter(
                 m => !m.is_read && !m.is_mine
             ).length;
