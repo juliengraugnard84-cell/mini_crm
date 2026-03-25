@@ -18,6 +18,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const audio = document.getElementById("chat-sound");
 
+    /* ================= DEBUG CRITIQUE ================= */
+
+    if (fileInput) {
+        fileInput.addEventListener("change", () => {
+            console.log("📂 fichiers sélectionnés :", fileInput.files);
+        });
+    }
+
     /* ================= SÉCURITÉ ================= */
 
     if (!toggleBtn || !widget || !form || !input || !messagesBox) {
@@ -35,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let lastMessageId = null;
     let isFirstLoad = true;
 
-    /* ================= AUDIO (FIX NAVIGATEUR) ================= */
+    /* ================= AUDIO ================= */
 
     function unlockAudio() {
         if (!audio || audioUnlocked) return;
@@ -48,7 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }).catch(() => {});
     }
 
-    // 🔥 IMPORTANT → plusieurs events sinon ça bloque chez certains users
     document.addEventListener("click", unlockAudio);
     document.addEventListener("keydown", unlockAudio);
     window.addEventListener("focus", unlockAudio);
@@ -184,34 +191,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return row;
     }
 
-    /* ================= OPEN / CLOSE ================= */
-
-    function openChat() {
-        widget.classList.add("open");
-        widget.setAttribute("aria-hidden", "false");
-        toggleBtn.setAttribute("aria-expanded", "true");
-
-        setBadge(0);
-        loadMessages(true);
-        markAsRead();
-
-        setTimeout(() => input.focus(), 100);
-    }
-
-    function closeChat() {
-        widget.classList.remove("open");
-        widget.setAttribute("aria-hidden", "true");
-        toggleBtn.setAttribute("aria-expanded", "false");
-    }
-
-    toggleBtn.addEventListener("click", () => {
-        isOpen() ? closeChat() : openChat();
-    });
-
-    if (closeBtn) {
-        closeBtn.addEventListener("click", closeChat);
-    }
-
     /* ================= LOAD ================= */
 
     async function loadMessages(forceScroll = false) {
@@ -226,7 +205,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
             const messages = Array.isArray(data.messages) ? data.messages : [];
 
-            // 🔥 détection AVANT mise à jour id
             if (!isFirstLoad && hasNewIncomingMessage(messages)) {
                 playSound();
             }
@@ -235,30 +213,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 m => !m.is_read && Number(m.user_id) !== Number(CURRENT_USER_ID)
             ).length;
 
-            if (!isOpen()) {
-                setBadge(unread);
-            }
+            if (!isOpen()) setBadge(unread);
 
             messagesBox.innerHTML = "";
             messages.forEach(m => messagesBox.appendChild(renderMessage(m)));
 
-            if (forceScroll || isOpen()) {
-                scrollBottom();
-            }
+            if (forceScroll || isOpen()) scrollBottom();
 
-            // ✅ FIX CRITIQUE (ne pas écraser trop tôt)
-            if (isFirstLoad) {
-                const latestId = getLatestMessageId(messages);
-                if (latestId !== null) {
-                    lastMessageId = latestId;
-                }
-                isFirstLoad = false;
-            } else {
-                const latestId = getLatestMessageId(messages);
-                if (latestId !== null) {
-                    lastMessageId = latestId;
-                }
-            }
+            const latestId = getLatestMessageId(messages);
+            if (latestId !== null) lastMessageId = latestId;
+
+            if (isFirstLoad) isFirstLoad = false;
 
         } catch (e) {
             console.error("Erreur chargement chat", e);
@@ -267,24 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* ================= MARK READ ================= */
-
-    async function markAsRead() {
-        try {
-            const headers = {};
-            if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
-
-            await fetch("/chat/mark_read", {
-                method: "POST",
-                credentials: "same-origin",
-                headers
-            });
-        } catch (e) {
-            console.error("Erreur mark_read", e);
-        }
-    }
-
-    /* ================= SEND (MULTI FILES) ================= */
+    /* ================= SEND ================= */
 
     async function sendMessage() {
 
@@ -293,7 +241,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const msg   = input.value.trim();
         const files = fileInput?.files ? Array.from(fileInput.files) : [];
 
-        if (!msg && files.length === 0) return;
+        console.log("📤 SEND DEBUG:", { msg, files });
+
+        if (!msg && files.length === 0) {
+            console.warn("⛔ Rien à envoyer");
+            return;
+        }
 
         if (files.length > 0 && !CAN_UPLOAD) {
             alert("Vous n’êtes pas autorisé à envoyer des fichiers.");
@@ -305,14 +258,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const fd = new FormData();
         if (msg) fd.append("message", msg);
 
-        files.forEach(f => fd.append("file", f));
+        files.forEach(f => {
+            console.log("📎 ajout fichier:", f.name);
+            fd.append("file", f);
+        });
 
         const headers = {};
         if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
-
-        const sendBtn = form.querySelector(".chat-send");
-        input.disabled = true;
-        if (sendBtn) sendBtn.disabled = true;
 
         try {
             const res = await fetch("/chat/send", {
@@ -323,6 +275,8 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             const data = await res.json();
+
+            console.log("📥 RESPONSE:", data);
 
             if (!data.success) {
                 alert(data.message || "Erreur envoi message");
@@ -339,7 +293,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } finally {
             isSending = false;
             input.disabled = false;
-            if (sendBtn) sendBtn.disabled = false;
             input.focus();
         }
     }
@@ -349,18 +302,10 @@ document.addEventListener("DOMContentLoaded", () => {
         sendMessage();
     });
 
-    input.addEventListener("keydown", e => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-
-    /* ================= POLLING ================= */
+    /* ================= INIT ================= */
 
     setInterval(() => {
         loadMessages(false);
-        if (isOpen()) markAsRead();
     }, 5000);
 
     loadMessages(false);
