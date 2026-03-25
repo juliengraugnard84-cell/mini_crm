@@ -19,7 +19,8 @@
     </span>
 </button>
 
-<!-- Widget Chat -->
+<!-- ================= WIDGET CHAT ================= -->
+
 <div
     id="chat-widget"
     class="chat-widget"
@@ -75,8 +76,7 @@
             class="chat-input"
             rows="1"
             placeholder="Écrire un message…"
-            autocomplete="off">
-        </textarea>
+            autocomplete="off"></textarea>
 
         <button
             class="chat-send"
@@ -101,160 +101,400 @@
     window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else None) | tojson }};
 </script>
 
-<!-- ================= SOUND LOGIC FINAL (STABLE) ================= -->
+<!-- ================= CHAT SCRIPT COMPLET ================= -->
 
 <script>
+document.addEventListener("DOMContentLoaded", () => {
 
-let lastMessageId = null;
-let chatAudioUnlocked = false;
-let lastSoundTimestamp = 0;
+    /* ================= ELEMENTS ================= */
 
-// 🔊 Lecture du son (ultra safe)
-function playNotificationSound() {
+    const toggleBtn   = document.getElementById("chat-toggle");
+    const widget      = document.getElementById("chat-widget");
+    const closeBtn    = document.getElementById("chat-close");
+
+    const form        = document.getElementById("chat-form");
+    const input       = document.getElementById("chat-input");
+    const fileInput   = document.getElementById("chat-file");
+    const messagesBox = document.getElementById("chat-messages");
+    const badge       = document.getElementById("chat-badge");
+
+    const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID ?? null;
+    const CSRF_TOKEN      = window.CHAT_CSRF_TOKEN ?? null;
+
     const audio = document.getElementById("chat-sound");
 
-    if (!audio) {
-        console.warn("❌ Audio introuvable");
+    /* ================= SÉCURITÉ ================= */
+
+    if (!toggleBtn || !widget || !form || !input || !messagesBox) {
+        console.warn("Chat widget incomplet — initialisation annulée");
         return;
     }
 
-    if (!chatAudioUnlocked) {
-        console.warn("🔒 Audio non débloqué");
-        return;
+    /* ================= STATE ================= */
+
+    let isLoading = false;
+    let audioUnlocked = false;
+    let lastSoundTime = 0;
+
+    // mémorise le dernier message connu pour détecter les nouveaux
+    let lastMessageId = null;
+    let isFirstLoad = true;
+
+    /* ================= AUDIO ================= */
+
+    function unlockAudio() {
+        if (audioUnlocked || !audio) return;
+
+        audio.play()
+            .then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+                audioUnlocked = true;
+                console.log("🔓 Audio débloqué");
+            })
+            .catch(() => {});
     }
 
-    const now = Date.now();
+    document.addEventListener("click", unlockAudio, { passive: true });
+    document.addEventListener("keydown", unlockAudio);
 
-    // Anti spam / double déclenchement
-    if (now - lastSoundTimestamp < 800) return;
+    function playSound() {
+        if (!audio || !audioUnlocked) return;
 
-    lastSoundTimestamp = now;
+        const now = Date.now();
 
-    audio.currentTime = 0;
+        // anti double déclenchement
+        if (now - lastSoundTime < 800) return;
 
-    audio.play()
-        .then(() => console.log("🔊 Son joué"))
-        .catch(err => console.warn("❌ Erreur audio:", err));
-}
+        lastSoundTime = now;
+        audio.currentTime = 0;
 
+        audio.play().catch(() => {});
+        console.log("🔊 Son joué");
+    }
 
-// 🔓 Débloque audio navigateur (CRITIQUE)
-function unlockChatAudio() {
-    if (chatAudioUnlocked) return;
+    /* ================= HELPERS ================= */
 
-    const audio = document.getElementById("chat-sound");
-    if (!audio) return;
+    function isOpen() {
+        return widget.classList.contains("open");
+    }
 
-    audio.play()
-        .then(() => {
-            audio.pause();
-            audio.currentTime = 0;
-            chatAudioUnlocked = true;
-            console.log("🔓 Audio débloqué");
-        })
-        .catch(() => {});
-}
+    function escapeHTML(str) {
+        const div = document.createElement("div");
+        div.textContent = str ?? "";
+        return div.innerHTML;
+    }
 
-// événements user obligatoires
-document.addEventListener("click", unlockChatAudio);
-document.addEventListener("keydown", unlockChatAudio);
+    function formatTime(ts) {
+        if (!ts) return "";
+        const m = String(ts).match(/(\d{2}):(\d{2})/);
+        return m ? `${m[1]}:${m[2]}` : "";
+    }
 
+    function scrollBottom() {
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
 
+    function setBadge(count) {
+        if (!badge) return;
 
-/* =====================================================
-   🔔 1. HOOK FETCH (API)
-   ===================================================== */
+        const n = Math.max(0, count);
 
-(function () {
+        if (n > 0) {
+            badge.textContent = n;
+            badge.style.display = "flex";
+            toggleBtn.classList.add("chat-pulse");
+        } else {
+            badge.style.display = "none";
+            toggleBtn.classList.remove("chat-pulse");
+        }
+    }
 
-    const originalFetch = window.fetch;
+    function normalizeId(value) {
+        const n = Number(value);
+        return Number.isNaN(n) ? null : n;
+    }
 
-    window.fetch = async function (...args) {
+    function getLatestMessageId(messages) {
+        if (!Array.isArray(messages) || messages.length === 0) return null;
 
-        const response = await originalFetch.apply(this, args);
+        let maxId = null;
+
+        for (const m of messages) {
+            const id = normalizeId(m.id);
+            if (id !== null && (maxId === null || id > maxId)) {
+                maxId = id;
+            }
+        }
+
+        return maxId;
+    }
+
+    function hasNewIncomingMessage(messages) {
+        if (!Array.isArray(messages) || messages.length === 0) return false;
+        if (lastMessageId === null) return false;
+
+        const currentUserId = normalizeId(CURRENT_USER_ID);
+
+        return messages.some(m => {
+            const messageId = normalizeId(m.id);
+            const senderId = normalizeId(m.user_id);
+
+            if (messageId === null) return false;
+            if (messageId <= lastMessageId) return false;
+
+            // si on ne connaît pas l'utilisateur courant,
+            // on considère prudemment qu'on ne joue pas de son
+            if (currentUserId === null) return false;
+
+            return senderId !== currentUserId;
+        });
+    }
+
+    /* ================= RENDER ================= */
+
+    function renderMessage(m) {
+        const mine = CURRENT_USER_ID !== null &&
+                     Number(m.user_id) === Number(CURRENT_USER_ID);
+
+        const row = document.createElement("div");
+        row.className = `chat-row ${mine ? "me" : "them"}`;
+
+        const bubble = document.createElement("div");
+        bubble.className = `chat-bubble ${mine ? "me" : "them"}`;
+
+        const meta = document.createElement("div");
+        meta.className = "chat-meta";
+        meta.innerHTML = `
+            <span class="chat-user">${escapeHTML(mine ? "Vous" : (m.username || "Utilisateur"))}</span>
+            <span class="chat-time">${escapeHTML(formatTime(m.created_at))}</span>
+        `;
+        bubble.appendChild(meta);
+
+        if (m.message) {
+            const text = document.createElement("div");
+            text.className = "chat-text";
+            text.innerHTML = escapeHTML(m.message);
+            bubble.appendChild(text);
+        }
+
+        if (m.file_url) {
+            const file = document.createElement("a");
+            file.className = "chat-file";
+            file.href = m.file_url;
+            file.target = "_blank";
+            file.rel = "noopener";
+            file.innerHTML = `📎 ${escapeHTML(m.file_name || "fichier")}`;
+            bubble.appendChild(file);
+        }
+
+        if (mine) {
+            const status = document.createElement("div");
+            status.className = "chat-status";
+            status.innerHTML = m.is_read
+                ? `<span class="chat-read read">✓✓</span>`
+                : `<span class="chat-read sent">✓</span>`;
+            bubble.appendChild(status);
+        }
+
+        row.appendChild(bubble);
+        return row;
+    }
+
+    /* ================= OPEN / CLOSE ================= */
+
+    function openChat() {
+        widget.classList.add("open");
+        widget.setAttribute("aria-hidden", "false");
+        toggleBtn.setAttribute("aria-expanded", "true");
+
+        setBadge(0);
+        loadMessages(true);
+        markAsRead();
+
+        setTimeout(() => input.focus(), 100);
+    }
+
+    function closeChat() {
+        widget.classList.remove("open");
+        widget.setAttribute("aria-hidden", "true");
+        toggleBtn.setAttribute("aria-expanded", "false");
+    }
+
+    toggleBtn.addEventListener("click", () => {
+        if (isOpen()) {
+            closeChat();
+        } else {
+            openChat();
+        }
+    });
+
+    if (closeBtn) {
+        closeBtn.addEventListener("click", closeChat);
+    }
+
+    /* ================= LOAD ================= */
+
+    async function loadMessages(forceScroll = false) {
+        if (isLoading) return;
+        isLoading = true;
 
         try {
+            const res = await fetch("/chat/messages?limit=120", {
+                credentials: "same-origin"
+            });
 
-            const url = args[0];
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
 
-            if (typeof url === "string" && url.includes("/chat/messages")) {
+            const data = await res.json();
+            const messages = Array.isArray(data.messages) ? data.messages : [];
 
-                const clone = response.clone();
-                const data = await clone.json();
+            // joue le son uniquement si de nouveaux messages d'un autre utilisateur sont arrivés
+            if (!isFirstLoad && hasNewIncomingMessage(messages)) {
+                console.log("🔔 Nouveau message reçu");
+                playSound();
+            }
 
-                if (data && data.success && Array.isArray(data.messages)) {
+            const unread = messages.filter(m => {
+                const senderId = normalizeId(m.user_id);
+                const currentUserId = normalizeId(CURRENT_USER_ID);
+                return !m.is_read && senderId !== null && currentUserId !== null && senderId !== currentUserId;
+            }).length;
 
-                    const messages = data.messages;
+            if (!isOpen()) {
+                setBadge(unread);
+            }
 
-                    if (messages.length > 0) {
+            messagesBox.innerHTML = "";
+            messages.forEach(m => {
+                messagesBox.appendChild(renderMessage(m));
+            });
 
-                        const lastMsg = messages[messages.length - 1];
+            if (forceScroll || isOpen()) {
+                scrollBottom();
+            }
 
-                        if (lastMessageId && lastMsg.id !== lastMessageId) {
+            const latestId = getLatestMessageId(messages);
+            if (latestId !== null) {
+                lastMessageId = latestId;
+            }
 
-                            if (lastMsg.sender_id !== window.CHAT_CURRENT_USER_ID) {
-                                console.log("📡 Nouveau message (API)");
-                                playNotificationSound();
-                            }
-                        }
-
-                        lastMessageId = lastMsg.id;
-                    }
-                }
+            if (isFirstLoad) {
+                isFirstLoad = false;
             }
 
         } catch (e) {
-            console.warn("Chat fetch hook error:", e);
+            console.error("Erreur chargement chat", e);
+        } finally {
+            isLoading = false;
         }
-
-        return response;
-    };
-
-})();
-
-
-
-/* =====================================================
-   🔔 2. OBSERVER DOM (FIABLE)
-   ===================================================== */
-
-(function () {
-
-    const chatContainer = document.getElementById("chat-messages");
-
-    if (!chatContainer) {
-        console.warn("❌ chat-messages introuvable");
-        return;
     }
 
-    console.log("👀 Observer chat actif");
+    /* ================= MARK AS READ ================= */
 
-    const observer = new MutationObserver((mutations) => {
+    async function markAsRead() {
+        try {
+            const headers = {};
 
-        mutations.forEach((mutation) => {
+            if (CSRF_TOKEN) {
+                headers["X-CSRF-Token"] = CSRF_TOKEN;
+            }
 
-            mutation.addedNodes.forEach((node) => {
+            await fetch("/chat/mark_read", {
+                method: "POST",
+                credentials: "same-origin",
+                headers
+            });
+        } catch (e) {
+            console.error("Erreur mark_read", e);
+        }
+    }
 
-                if (!node.classList) return;
+    /* ================= SEND ================= */
 
-                if (
-                    node.classList.contains("chat-row") &&
-                    node.classList.contains("them")
-                ) {
-                    console.log("💬 Nouveau message (DOM)");
-                    playNotificationSound();
-                }
+    async function sendMessage() {
+        const msg = input.value.trim();
+        const file = fileInput?.files?.[0];
 
+        if (!msg && !file) return;
+
+        const fd = new FormData();
+
+        if (msg) fd.append("message", msg);
+        if (file) fd.append("file", file);
+
+        const headers = {};
+        if (CSRF_TOKEN) {
+            headers["X-CSRF-Token"] = CSRF_TOKEN;
+        }
+
+        const sendBtn = form.querySelector(".chat-send");
+
+        input.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
+        if (fileInput) fileInput.disabled = true;
+
+        try {
+            const res = await fetch("/chat/send", {
+                method: "POST",
+                body: fd,
+                credentials: "same-origin",
+                headers
             });
 
-        });
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
 
+            const data = await res.json();
+
+            if (!data.success) {
+                alert(data.message || "Erreur envoi message");
+                return;
+            }
+
+            input.value = "";
+            if (fileInput) fileInput.value = "";
+
+            await loadMessages(true);
+
+        } catch (e) {
+            console.error("Erreur envoi chat", e);
+            alert("Une erreur est survenue lors de l’envoi du message.");
+        } finally {
+            input.disabled = false;
+            if (sendBtn) sendBtn.disabled = false;
+            if (fileInput) fileInput.disabled = false;
+            input.focus();
+        }
+    }
+
+    form.addEventListener("submit", e => {
+        e.preventDefault();
+        sendMessage();
     });
 
-    observer.observe(chatContainer, {
-        childList: true
+    input.addEventListener("keydown", e => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
     });
 
-})();
+    /* ================= POLLING ================= */
 
+    setInterval(() => {
+        loadMessages(false);
+
+        if (isOpen()) {
+            markAsRead();
+        }
+    }, 5000);
+
+    /* ================= INIT ================= */
+
+    loadMessages(false);
+});
 </script>

@@ -3093,50 +3093,69 @@ def delete_update(update_id):
     flash("Demande de mise à jour supprimée.", "success")
     return redirect(url_for("admin_updates"))
 
-
 ############################################################
-# 14. CHAT (BACKEND)
+# 14. CHAT (BACKEND) — VERSION SAFE + MULTI UPLOAD
 ############################################################
 
 def _chat_store_file(file_storage):
     """
     Stockage d’une pièce jointe du chat en S3 PRIVÉ.
-    Retourne (file_key, file_name) ou (None, None)
+    Retourne (file_key, file_name, error_code)
     """
     if not file_storage:
-        return (None, None)
+        return (None, None, None)
+
+    if not getattr(file_storage, "filename", None):
+        return (None, None, "invalid_file")
 
     if not allowed_file(file_storage.filename):
-        return (None, None)
+        return (None, None, "invalid_file")
 
     file_name_original = secure_filename(file_storage.filename)
     file_name_clean = clean_filename(file_name_original)
 
     if LOCAL_MODE or not s3:
-        return (None, None)
+        return (None, None, "upload_unavailable")
 
     rnd = secrets.token_hex(6)
     key_raw = f"chat/{rnd}_{file_name_clean}"
-
     key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
 
     try:
         s3_upload_fileobj(file_storage, AWS_BUCKET, key)
-        return (key, file_name_original)
+        return (key, file_name_original, None)
+
     except ClientError as e:
         logger.error(
             "Erreur upload chat S3 (ClientError): %s",
             getattr(e, "response", None)
         )
-        return (None, None)
+        return (None, None, "upload_failed")
+
     except Exception as e:
         logger.exception("Erreur upload chat S3: %r", e)
-        return (None, None)
+        return (None, None, "upload_failed")
 
 
+def _serialize_chat_datetime(value):
+    if not value:
+        return ""
+    try:
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        try:
+            return str(value)
+        except Exception:
+            return ""
+
+
+# =========================================================
+# LOAD MESSAGES
+# =========================================================
 @app.route("/chat/messages")
 @login_required
 def chat_messages():
+
     limit = request.args.get("limit", "50")
 
     try:
@@ -3148,137 +3167,224 @@ def chat_messages():
     user_id = user.get("id")
 
     conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT
-                id,
-                user_id,
-                username,
-                message,
-                file_key,
-                file_name,
-                created_at,
-                COALESCE(is_read, 0) AS is_read
-            FROM chat_messages
-            ORDER BY id DESC
-            LIMIT %s
-            """,
-            (limit_int,),
-        )
-        rows = cur.fetchall()
 
-    messages = []
-    for r in reversed(rows):
-        messages.append(
-            {
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    id,
+                    user_id,
+                    username,
+                    message,
+                    file_key,
+                    file_name,
+                    created_at,
+                    COALESCE(is_read, 0) AS is_read
+                FROM chat_messages
+                ORDER BY id DESC
+                LIMIT %s
+            """, (limit_int,))
+            rows = cur.fetchall()
+
+        messages = []
+
+        for r in reversed(rows):
+
+            file_url = None
+
+            if r["file_key"] and not LOCAL_MODE and s3:
+                file_url = s3_presigned_url(r["file_key"])
+
+            messages.append({
                 "id": r["id"],
                 "user_id": r["user_id"],
                 "username": r["username"],
                 "message": r["message"],
                 "file_key": r["file_key"],
                 "file_name": r["file_name"],
-                "file_url": (
-                    s3_presigned_url(r["file_key"])
-                    if (r["file_key"] and not LOCAL_MODE and s3)
-                    else None
-                ),
-                "created_at": r["created_at"],
+                "file_url": file_url,
+                "created_at": _serialize_chat_datetime(r["created_at"]),
                 "is_read": bool(r["is_read"]),
                 "is_mine": r["user_id"] == user_id,
-            }
-        )
+            })
 
-    return jsonify({"success": True, "messages": messages})
+        return jsonify({
+            "success": True,
+            "messages": messages,
+        })
+
+    except Exception as e:
+        logger.exception("Erreur chargement messages chat : %r", e)
+        return jsonify({
+            "success": False,
+            "messages": [],
+            "message": "Impossible de charger les messages."
+        }), 500
 
 
+# =========================================================
+# SEND MESSAGE (MULTI FILES)
+# =========================================================
 @app.route("/chat/send", methods=["POST"])
 @login_required
 def chat_send():
+
     message = (request.form.get("message") or "").strip()
-    file_obj = request.files.get("file")
+
+    # ✅ support multi + legacy
+    files = request.files.getlist("file")
+    if not files:
+        single = request.files.get("file")
+        if single:
+            files = [single]
 
     user = session.get("user") or {}
 
-    # 🔒 SÉCURITÉ : seuls les ADMINS peuvent envoyer des fichiers
-    if file_obj and user.get("role") != "admin":
-        return jsonify(
-            {
-                "success": False,
-                "message": "L’envoi de documents est réservé à l’administrateur."
-            }
-        ), 403
+    uploaded_files = []
+    errors = []
 
-    file_key, file_name = _chat_store_file(file_obj)
+    # =========================
+    # TRAITEMENT DES FICHIERS
+    # =========================
+    for file_obj in files:
 
-    if not message and not file_key:
-        return jsonify(
-            {"success": False, "message": "Message ou fichier requis."}
-        ), 400
+        if not file_obj or not getattr(file_obj, "filename", None):
+            continue
+
+        file_key, file_name, file_error = _chat_store_file(file_obj)
+
+        if file_error:
+            errors.append(file_name or "fichier")
+            continue
+
+        uploaded_files.append((file_key, file_name))
+
+    # =========================
+    # VALIDATION
+    # =========================
+    if not message and not uploaded_files:
+        return jsonify({
+            "success": False,
+            "message": "Message ou fichier requis."
+        }), 400
 
     conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO chat_messages (
-                user_id,
-                username,
-                message,
-                file_key,
-                file_name,
-                is_read
-            )
-            VALUES (%s, %s, %s, %s, %s, 0)
-            RETURNING id
-            """,
-            (
-                user.get("id"),
-                user.get("username"),
-                message,
-                file_key,
-                file_name,
-            ),
-        )
-        new_id = cur.fetchone()[0]
 
-    conn.commit()
+    try:
 
-    return jsonify(
-        {
+        inserted_ids = []
+
+        # =========================
+        # MESSAGE SEUL
+        # =========================
+        if message and not uploaded_files:
+
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO chat_messages (
+                        user_id,
+                        username,
+                        message,
+                        is_read
+                    )
+                    VALUES (%s, %s, %s, 0)
+                    RETURNING id, created_at
+                """, (
+                    user.get("id"),
+                    user.get("username"),
+                    message,
+                ))
+
+                row = cur.fetchone()
+                inserted_ids.append(row["id"])
+
+        # =========================
+        # FICHIERS
+        # =========================
+        for file_key, file_name in uploaded_files:
+
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO chat_messages (
+                        user_id,
+                        username,
+                        message,
+                        file_key,
+                        file_name,
+                        is_read
+                    )
+                    VALUES (%s, %s, %s, %s, %s, 0)
+                    RETURNING id, created_at
+                """, (
+                    user.get("id"),
+                    user.get("username"),
+                    message if message else None,
+                    file_key,
+                    file_name,
+                ))
+
+                row = cur.fetchone()
+                inserted_ids.append(row["id"])
+
+        conn.commit()
+
+        return jsonify({
             "success": True,
-            "id": new_id,
-            "user_id": user.get("id"),
-            "username": user.get("username"),
-        }
-    )
+            "ids": inserted_ids,
+            "uploaded": len(uploaded_files),
+            "errors": errors,
+        })
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur envoi message chat : %r", e)
+
+        return jsonify({
+            "success": False,
+            "message": "Erreur lors de l’envoi du message."
+        }), 500
 
 
+# =========================================================
+# MARK AS READ
+# =========================================================
 @app.route("/chat/mark_read", methods=["POST"])
 @login_required
 def chat_mark_read():
-    """
-    Marque tous les messages NON envoyés par l'utilisateur courant comme lus
-    (équivalent WhatsApp quand la fenêtre est ouverte)
-    """
+
     u = session.get("user") or {}
     user_id = u.get("id")
 
+    if not user_id:
+        return jsonify({
+            "success": False,
+            "message": "Utilisateur non identifié."
+        }), 400
+
     conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE chat_messages
-            SET is_read = 1
-            WHERE COALESCE(is_read, 0) = 0
-              AND user_id <> %s
-            """,
-            (user_id,),
-        )
 
-    conn.commit()
-    return jsonify({"success": True})
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE chat_messages
+                SET is_read = 1
+                WHERE COALESCE(is_read, 0) = 0
+                  AND user_id <> %s
+            """, (user_id,))
 
+        conn.commit()
 
+        return jsonify({"success": True})
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur mark_read chat : %r", e)
+
+        return jsonify({
+            "success": False,
+            "message": "Impossible de marquer les messages comme lus."
+        }), 500
+    
 ############################################################
 # 15. ROOT
 ############################################################

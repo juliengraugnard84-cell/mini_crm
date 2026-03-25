@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID ?? null;
     const CSRF_TOKEN      = window.CHAT_CSRF_TOKEN ?? null;
+    const CAN_UPLOAD      = window.CHAT_CAN_UPLOAD ?? false;
 
     const audio = document.getElementById("chat-sound");
 
@@ -27,9 +28,12 @@ document.addEventListener("DOMContentLoaded", () => {
     /* ================= STATE ================= */
 
     let isLoading = false;
-    let lastPlayedMessageId = null;
+    let isSending = false;
     let audioUnlocked = false;
     let lastSoundTime = 0;
+
+    let lastMessageId = null;
+    let isFirstLoad = true;
 
     /* ================= AUDIO ================= */
 
@@ -41,7 +45,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 audio.pause();
                 audio.currentTime = 0;
                 audioUnlocked = true;
-                console.log("🔓 Audio débloqué");
             })
             .catch(() => {});
     }
@@ -53,13 +56,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!audio || !audioUnlocked) return;
 
         const now = Date.now();
-        if (now - lastSoundTime < 800) return; // anti spam
+        if (now - lastSoundTime < 800) return;
 
         lastSoundTime = now;
 
         audio.currentTime = 0;
         audio.play().catch(() => {});
-        console.log("🔊 Son joué");
     }
 
     /* ================= HELPERS ================= */
@@ -88,6 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!badge) return;
 
         const n = Math.max(0, count);
+
         if (n > 0) {
             badge.textContent = n;
             badge.style.display = "flex";
@@ -96,6 +99,37 @@ document.addEventListener("DOMContentLoaded", () => {
             badge.style.display = "none";
             toggleBtn.classList.remove("chat-pulse");
         }
+    }
+
+    function getLatestMessageId(messages) {
+        if (!Array.isArray(messages) || messages.length === 0) return null;
+
+        let maxId = null;
+
+        for (const m of messages) {
+            const id = Number(m.id);
+            if (!Number.isNaN(id) && (maxId === null || id > maxId)) {
+                maxId = id;
+            }
+        }
+
+        return maxId;
+    }
+
+    function hasNewIncomingMessage(messages) {
+        if (!Array.isArray(messages) || messages.length === 0) return false;
+        if (lastMessageId === null) return false;
+
+        return messages.some(m => {
+            const messageId = Number(m.id);
+            const senderId = Number(m.user_id);
+
+            return (
+                !Number.isNaN(messageId) &&
+                messageId > lastMessageId &&
+                senderId !== Number(CURRENT_USER_ID)
+            );
+        });
     }
 
     /* ================= RENDER ================= */
@@ -145,19 +179,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         row.appendChild(bubble);
-
-        /* 🔔 SON AU BON ENDROIT (FIX FINAL) */
-        if (!mine && m.id !== lastPlayedMessageId) {
-
-            // évite son au premier chargement
-            if (lastPlayedMessageId !== null) {
-                console.log("🔔 Nouveau message → son");
-                playSound();
-            }
-
-            lastPlayedMessageId = m.id;
-        }
-
         return row;
     }
 
@@ -199,11 +220,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("/chat/messages?limit=120", {
                 credentials: "same-origin"
             });
+
             const data = await res.json();
-            const messages = data.messages || [];
+            const messages = Array.isArray(data.messages) ? data.messages : [];
+
+            if (!isFirstLoad && hasNewIncomingMessage(messages)) {
+                playSound();
+            }
 
             const unread = messages.filter(
-                m => !m.is_read && !m.is_mine
+                m => !m.is_read && Number(m.user_id) !== Number(CURRENT_USER_ID)
             ).length;
 
             if (!isOpen()) {
@@ -217,6 +243,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 scrollBottom();
             }
 
+            const latestId = getLatestMessageId(messages);
+            if (latestId !== null) {
+                lastMessageId = latestId;
+            }
+
+            if (isFirstLoad) {
+                isFirstLoad = false;
+            }
+
         } catch (e) {
             console.error("Erreur chargement chat", e);
         } finally {
@@ -224,7 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* ================= MARK AS READ ================= */
+    /* ================= MARK READ ================= */
 
     async function markAsRead() {
         try {
@@ -244,10 +279,21 @@ document.addEventListener("DOMContentLoaded", () => {
     /* ================= SEND ================= */
 
     async function sendMessage() {
+
+        if (isSending) return;
+
         const msg  = input.value.trim();
         const file = fileInput?.files?.[0];
 
         if (!msg && !file) return;
+
+        // sécurité front
+        if (file && !CAN_UPLOAD) {
+            alert("Vous n’êtes pas autorisé à envoyer des fichiers.");
+            return;
+        }
+
+        isSending = true;
 
         const fd = new FormData();
         if (msg) fd.append("message", msg);
@@ -256,8 +302,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const headers = {};
         if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
 
+        const sendBtn = form.querySelector(".chat-send");
         input.disabled = true;
-        form.querySelector(".chat-send").disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
 
         try {
             const res = await fetch("/chat/send", {
@@ -266,6 +313,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 credentials: "same-origin",
                 headers
             });
+
             const data = await res.json();
 
             if (!data.success) {
@@ -281,8 +329,9 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
             console.error("Erreur envoi chat", e);
         } finally {
+            isSending = false;
             input.disabled = false;
-            form.querySelector(".chat-send").disabled = false;
+            if (sendBtn) sendBtn.disabled = false;
             input.focus();
         }
     }
