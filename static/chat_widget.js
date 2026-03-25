@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const audio = document.getElementById("chat-sound");
 
-    /* ================= DEBUG CRITIQUE ================= */
+    /* ================= DEBUG ================= */
 
     if (fileInput) {
         fileInput.addEventListener("change", () => {
@@ -191,6 +191,34 @@ document.addEventListener("DOMContentLoaded", () => {
         return row;
     }
 
+    /* ================= OPEN / CLOSE (FIX CRITIQUE) ================= */
+
+    function openChat() {
+        widget.classList.add("open");
+        widget.setAttribute("aria-hidden", "false");
+        toggleBtn.setAttribute("aria-expanded", "true");
+
+        setBadge(0);
+        loadMessages(true);
+
+        setTimeout(() => input.focus(), 100);
+    }
+
+    function closeChat() {
+        widget.classList.remove("open");
+        widget.setAttribute("aria-hidden", "true");
+        toggleBtn.setAttribute("aria-expanded", "false");
+    }
+
+    toggleBtn.addEventListener("click", () => {
+        if (isOpen()) closeChat();
+        else openChat();
+    });
+
+    if (closeBtn) {
+        closeBtn.addEventListener("click", closeChat);
+    }
+
     /* ================= LOAD ================= */
 
     async function loadMessages(forceScroll = false) {
@@ -241,12 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const msg   = input.value.trim();
         const files = fileInput?.files ? Array.from(fileInput.files) : [];
 
-        console.log("📤 SEND DEBUG:", { msg, files });
-
-        if (!msg && files.length === 0) {
-            console.warn("⛔ Rien à envoyer");
-            return;
-        }
+        if (!msg && files.length === 0) return;
 
         if (files.length > 0 && !CAN_UPLOAD) {
             alert("Vous n’êtes pas autorisé à envoyer des fichiers.");
@@ -257,11 +280,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const fd = new FormData();
         if (msg) fd.append("message", msg);
-
-        files.forEach(f => {
-            console.log("📎 ajout fichier:", f.name);
-            fd.append("file", f);
-        });
+        files.forEach(f => fd.append("file", f));
 
         const headers = {};
         if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
@@ -275,8 +294,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             const data = await res.json();
-
-            console.log("📥 RESPONSE:", data);
 
             if (!data.success) {
                 alert(data.message || "Erreur envoi message");
