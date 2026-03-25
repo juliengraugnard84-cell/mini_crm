@@ -104,7 +104,9 @@
 <!-- ================= SOUND LOGIC (SAFE & NON-INTRUSIVE) ================= -->
 
 <script>
+
 let lastMessageId = null;
+let chatAudioUnlocked = false;
 
 function playNotificationSound() {
     const audio = document.getElementById("chat-sound");
@@ -116,13 +118,22 @@ function playNotificationSound() {
     });
 }
 
-// 🔓 Débloque l'audio après interaction utilisateur
-document.addEventListener("click", () => {
+// 🔓 Déblocage audio robuste (clic + clavier)
+function unlockChatAudio() {
+    if (chatAudioUnlocked) return;
+
     const audio = document.getElementById("chat-sound");
-    if (audio) {
-        audio.play().then(() => audio.pause()).catch(() => {});
-    }
-}, { once: true });
+    if (!audio) return;
+
+    audio.play().then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        chatAudioUnlocked = true;
+    }).catch(() => {});
+}
+
+document.addEventListener("click", unlockChatAudio);
+document.addEventListener("keydown", unlockChatAudio);
 
 // 🔔 Hook NON destructif sur fetch (aucun impact sur ton code existant)
 (function () {
@@ -153,8 +164,8 @@ document.addEventListener("click", () => {
 
                         if (lastMessageId && lastMsg.id !== lastMessageId) {
 
-                            // 🔔 uniquement message reçu
-                            if (!lastMsg.is_mine) {
+                            // 🔔 uniquement message reçu (FIX FIABLE)
+                            if (lastMsg.sender_id !== window.CHAT_CURRENT_USER_ID) {
                                 playNotificationSound();
                             }
                         }
