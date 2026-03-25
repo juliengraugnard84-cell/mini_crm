@@ -101,24 +101,31 @@
     window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else None) | tojson }};
 </script>
 
-<!-- ================= SOUND LOGIC (SAFE & NON-INTRUSIVE) ================= -->
+<!-- ================= SOUND LOGIC FINAL ================= -->
 
 <script>
 
 let lastMessageId = null;
 let chatAudioUnlocked = false;
+let lastSoundTimestamp = 0;
 
+// 🔊 Lecture sécurisée avec anti-spam
 function playNotificationSound() {
     const audio = document.getElementById("chat-sound");
-    if (!audio) return;
+    if (!audio || !chatAudioUnlocked) return;
+
+    const now = Date.now();
+
+    // Anti double déclenchement (important)
+    if (now - lastSoundTimestamp < 1000) return;
+
+    lastSoundTimestamp = now;
 
     audio.currentTime = 0;
-    audio.play().catch(() => {
-        // navigateur bloque → ignoré
-    });
+    audio.play().catch(() => {});
 }
 
-// 🔓 Déblocage audio robuste (clic + clavier)
+// 🔓 Déblocage audio (clic + clavier)
 function unlockChatAudio() {
     if (chatAudioUnlocked) return;
 
@@ -129,13 +136,16 @@ function unlockChatAudio() {
         audio.pause();
         audio.currentTime = 0;
         chatAudioUnlocked = true;
+        console.log("🔓 Audio débloqué");
     }).catch(() => {});
 }
 
 document.addEventListener("click", unlockChatAudio);
 document.addEventListener("keydown", unlockChatAudio);
 
-// 🔔 Hook NON destructif sur fetch (aucun impact sur ton code existant)
+//
+// 🔔 1. HOOK FETCH (API)
+//
 (function () {
 
     const originalFetch = window.fetch;
@@ -148,7 +158,6 @@ document.addEventListener("keydown", unlockChatAudio);
 
             const url = args[0];
 
-            // 🎯 On cible uniquement l'API chat
             if (typeof url === "string" && url.includes("/chat/messages")) {
 
                 const clone = response.clone();
@@ -164,8 +173,8 @@ document.addEventListener("keydown", unlockChatAudio);
 
                         if (lastMessageId && lastMsg.id !== lastMessageId) {
 
-                            // 🔔 uniquement message reçu (FIX FIABLE)
                             if (lastMsg.sender_id !== window.CHAT_CURRENT_USER_ID) {
+                                console.log("🔔 Nouveau message (API)");
                                 playNotificationSound();
                             }
                         }
@@ -183,4 +192,40 @@ document.addEventListener("keydown", unlockChatAudio);
     };
 
 })();
+
+//
+// 🔔 2. FALLBACK DOM (ULTRA FIABLE)
+//
+(function () {
+
+    const chatContainer = document.getElementById("chat-messages");
+    if (!chatContainer) return;
+
+    const observer = new MutationObserver((mutations) => {
+
+        mutations.forEach((mutation) => {
+
+            mutation.addedNodes.forEach((node) => {
+
+                if (
+                    node.classList &&
+                    node.classList.contains("chat-row") &&
+                    node.classList.contains("them")
+                ) {
+                    console.log("🔔 Nouveau message (DOM)");
+                    playNotificationSound();
+                }
+
+            });
+
+        });
+
+    });
+
+    observer.observe(chatContainer, {
+        childList: true
+    });
+
+})();
+
 </script>
