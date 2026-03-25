@@ -29,7 +29,6 @@
 
         <nav class="sidebar-nav">
 
-            <!-- ================= TOUS LES UTILISATEURS ================= -->
             <a href="{{ url_for('dashboard') }}"
                class="{% if request.path.startswith('/dashboard') %}active{% endif %}">
                 Tableau de bord
@@ -45,7 +44,6 @@
                 Chiffre d’affaires
             </a>
 
-            <!-- ================= COTATIONS (COMMERCIAL + ADMIN) ================= -->
             {% if current_user
                   and current_user.role in ["admin", "commercial"]
                   and available_endpoints
@@ -56,7 +54,6 @@
                 </a>
             {% endif %}
 
-            <!-- ================= RESSOURCES (ADMIN + COMMERCIAUX) ================= -->
             {% if current_user and current_user.role in ["admin", "commercial"] %}
                 <a href="{{ url_for('shared_resources') }}"
                    class="{% if request.path.startswith('/ressources') %}active{% endif %}">
@@ -64,7 +61,6 @@
                 </a>
             {% endif %}
 
-            <!-- ================= AGENDA NEGOCIATIONS (ADMIN + COMMERCIAUX) ================= -->
             {% if current_user and current_user.role in ["admin", "commercial"] %}
                 <a href="{{ url_for('admin_planning') }}"
                    class="{% if request.path.startswith('/admin/planning') %}active{% endif %}">
@@ -72,7 +68,6 @@
                 </a>
             {% endif %}
 
-            <!-- ================= ADMIN UNIQUEMENT ================= -->
             {% if current_user and current_user.role == "admin" %}
 
                 <a href="{{ url_for('admin_updates') }}"
@@ -124,7 +119,6 @@
             <span class="role">connecté</span>
         </div>
 
-        <!-- FLASH MESSAGES -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-container">
@@ -148,57 +142,28 @@
 <!-- ================= CHAT ================= -->
 {% if current_user %}
 
-<button
-    id="chat-toggle"
-    class="chat-toggle"
-    type="button"
-    aria-label="Ouvrir le chat"
-    aria-haspopup="dialog"
-    aria-expanded="false">
-    <span class="chat-toggle-icon">💬</span>
-    <span id="chat-badge" class="chat-badge" style="display:none;" aria-hidden="true">0</span>
+<button id="chat-toggle" class="chat-toggle" type="button">
+    💬 <span id="chat-badge" class="chat-badge" style="display:none;">0</span>
 </button>
 
-<div
-    id="chat-widget"
-    class="chat-widget"
-    aria-hidden="true"
-    role="dialog"
-    aria-modal="false"
-    aria-label="Chat interne">
+<div id="chat-widget" class="chat-widget">
 
     <div class="chat-header">
-        <div class="chat-header-left">
+        <div>
             <div class="chat-title">Chat interne</div>
             <div class="chat-subtitle">Support</div>
         </div>
-
-        <button
-            id="chat-close"
-            class="chat-close"
-            type="button"
-            aria-label="Fermer le chat">
-            ✕
-        </button>
+        <button id="chat-close" class="chat-close" type="button">✕</button>
     </div>
 
-    <div
-        id="chat-messages"
-        class="chat-messages"
-        role="log"
-        aria-live="off"
-        aria-relevant="additions">
-    </div>
+    <div id="chat-messages" class="chat-messages"></div>
 
-    <form
-        id="chat-form"
-        class="chat-inputbar"
-        enctype="multipart/form-data"
-        autocomplete="off">
+    <form id="chat-form" class="chat-inputbar" enctype="multipart/form-data">
 
-        <label class="chat-attach" title="Joindre un fichier" aria-label="Joindre un fichier">
+        <!-- ✅ MULTI FILE FIX -->
+        <label class="chat-attach">
             📎
-            <input id="chat-file" type="file" name="file" tabindex="-1">
+            <input id="chat-file" type="file" name="file" multiple tabindex="-1">
         </label>
 
         <textarea
@@ -206,15 +171,9 @@
             name="message"
             class="chat-input"
             rows="1"
-            placeholder="Écrire un message…"
-            autocomplete="off"></textarea>
+            placeholder="Écrire un message…"></textarea>
 
-        <button
-            class="chat-send"
-            type="submit"
-            aria-label="Envoyer le message">
-            ➤
-        </button>
+        <button class="chat-send" type="submit">➤</button>
     </form>
 </div>
 
