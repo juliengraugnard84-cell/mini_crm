@@ -959,4 +959,52 @@ main.content {
 .pipeline-value {
     font-size: 24px;
     margin-top: 10px;
+}/* =========================================================
+   🔥 PATCH CHAT — CENTRALISATION COULEURS (SAFE)
+   AJOUT NON DESTRUCTIF — PRIORITAIRE
+   ========================================================= */
+
+:root {
+    --chat-primary: var(--accent);
+    --chat-primary-dark: #e0a124;
+    --chat-primary-soft: rgba(245,179,53,.12);
+
+    --chat-bg: #f6f8fc;
+    --chat-border: #e2e8f0;
+    --chat-text: #0f172a;
+    --chat-muted: #64748b;
+}
+
+/* Override propre sans casser ton design existant */
+
+.chat-header {
+    background: var(--chat-primary) !important;
+}
+
+.chat-bubble.me {
+    background: var(--chat-primary) !important;
+}
+
+.chat-send {
+    background: var(--chat-primary) !important;
+}
+
+.chat-send:hover {
+    background: var(--chat-primary-dark) !important;
+}
+
+.chat-input:focus {
+    border-color: var(--chat-primary) !important;
+}
+
+.chat-attach:hover {
+    color: var(--chat-primary) !important;
+}
+
+.chat-toggle {
+    background: linear-gradient(
+        180deg,
+        var(--chat-primary),
+        var(--chat-primary-dark)
+    ) !important;
 }

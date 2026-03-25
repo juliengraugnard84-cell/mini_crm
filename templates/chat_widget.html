@@ -87,10 +87,89 @@
     </form>
 </div>
 
+<!-- ================= AUDIO NOTIFICATION ================= -->
+
+<audio id="chat-sound" preload="auto">
+    <source src="{{ url_for('static', filename='sounds/notification.mp3') }}" type="audio/mpeg">
+</audio>
+
 <!-- ================= VARIABLES JS CHAT ================= -->
 
 <script>
     window.CHAT_CURRENT_USER_ID = {{ (current_user.id if current_user else None) | tojson }};
     window.CHAT_CURRENT_USERNAME = {{ (current_user.username if current_user else None) | tojson }};
     window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else None) | tojson }};
+</script>
+
+<!-- ================= SOUND LOGIC (SAFE & NON-INTRUSIVE) ================= -->
+
+<script>
+let lastMessageId = null;
+
+function playNotificationSound() {
+    const audio = document.getElementById("chat-sound");
+    if (!audio) return;
+
+    audio.currentTime = 0;
+    audio.play().catch(() => {
+        // navigateur bloque → ignoré
+    });
+}
+
+// 🔓 Débloque l'audio après interaction utilisateur
+document.addEventListener("click", () => {
+    const audio = document.getElementById("chat-sound");
+    if (audio) {
+        audio.play().then(() => audio.pause()).catch(() => {});
+    }
+}, { once: true });
+
+// 🔔 Hook NON destructif sur fetch (aucun impact sur ton code existant)
+(function () {
+
+    const originalFetch = window.fetch;
+
+    window.fetch = async function (...args) {
+
+        const response = await originalFetch.apply(this, args);
+
+        try {
+
+            const url = args[0];
+
+            // 🎯 On cible uniquement l'API chat
+            if (typeof url === "string" && url.includes("/chat/messages")) {
+
+                const clone = response.clone();
+                const data = await clone.json();
+
+                if (data && data.success && Array.isArray(data.messages)) {
+
+                    const messages = data.messages;
+
+                    if (messages.length > 0) {
+
+                        const lastMsg = messages[messages.length - 1];
+
+                        if (lastMessageId && lastMsg.id !== lastMessageId) {
+
+                            // 🔔 uniquement message reçu
+                            if (!lastMsg.is_mine) {
+                                playNotificationSound();
+                            }
+                        }
+
+                        lastMessageId = lastMsg.id;
+                    }
+                }
+            }
+
+        } catch (e) {
+            console.warn("Chat sound hook error:", e);
+        }
+
+        return response;
+    };
+
+})();
 </script>
