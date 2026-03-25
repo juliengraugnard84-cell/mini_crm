@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ================= AUDIO (FIX NAVIGATEUR) ================= */
 
-    document.addEventListener("click", () => {
+    function unlockAudio() {
         if (!audio || audioUnlocked) return;
 
         audio.play().then(() => {
@@ -46,7 +46,12 @@ document.addEventListener("DOMContentLoaded", () => {
             audioUnlocked = true;
             console.log("🔓 Audio débloqué");
         }).catch(() => {});
-    }, { once: true });
+    }
+
+    // 🔥 IMPORTANT → plusieurs events sinon ça bloque chez certains users
+    document.addEventListener("click", unlockAudio);
+    document.addEventListener("keydown", unlockAudio);
+    window.addEventListener("focus", unlockAudio);
 
     function playSound() {
         if (!audio || !audioUnlocked) return;
@@ -221,6 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
             const messages = Array.isArray(data.messages) ? data.messages : [];
 
+            // 🔥 détection AVANT mise à jour id
             if (!isFirstLoad && hasNewIncomingMessage(messages)) {
                 playSound();
             }
@@ -240,13 +246,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 scrollBottom();
             }
 
-            const latestId = getLatestMessageId(messages);
-            if (latestId !== null) {
-                lastMessageId = latestId;
-            }
-
+            // ✅ FIX CRITIQUE (ne pas écraser trop tôt)
             if (isFirstLoad) {
+                const latestId = getLatestMessageId(messages);
+                if (latestId !== null) {
+                    lastMessageId = latestId;
+                }
                 isFirstLoad = false;
+            } else {
+                const latestId = getLatestMessageId(messages);
+                if (latestId !== null) {
+                    lastMessageId = latestId;
+                }
             }
 
         } catch (e) {
@@ -294,7 +305,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const fd = new FormData();
         if (msg) fd.append("message", msg);
 
-        // 🔥 MULTI UPLOAD
         files.forEach(f => fd.append("file", f));
 
         const headers = {};

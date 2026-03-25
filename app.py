@@ -3231,7 +3231,7 @@ def chat_send():
 
     message = (request.form.get("message") or "").strip()
 
-    # ✅ support multi + legacy
+    # ✅ multi + fallback legacy
     files = request.files.getlist("file")
     if not files:
         single = request.files.get("file")
@@ -3248,13 +3248,14 @@ def chat_send():
     # =========================
     for file_obj in files:
 
+        # 🔥 ignore les faux inputs vides
         if not file_obj or not getattr(file_obj, "filename", None):
             continue
 
         file_key, file_name, file_error = _chat_store_file(file_obj)
 
         if file_error:
-            errors.append(file_name or "fichier")
+            errors.append(file_obj.filename or "fichier")
             continue
 
         uploaded_files.append((file_key, file_name))
@@ -3274,12 +3275,13 @@ def chat_send():
 
         inserted_ids = []
 
-        # =========================
-        # MESSAGE SEUL
-        # =========================
-        if message and not uploaded_files:
+        with conn.cursor() as cur:
 
-            with conn.cursor() as cur:
+            # =========================
+            # MESSAGE SEUL
+            # =========================
+            if message and not uploaded_files:
+
                 cur.execute("""
                     INSERT INTO chat_messages (
                         user_id,
@@ -3298,12 +3300,11 @@ def chat_send():
                 row = cur.fetchone()
                 inserted_ids.append(row["id"])
 
-        # =========================
-        # FICHIERS
-        # =========================
-        for file_key, file_name in uploaded_files:
+            # =========================
+            # FICHIERS
+            # =========================
+            for file_key, file_name in uploaded_files:
 
-            with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO chat_messages (
                         user_id,
