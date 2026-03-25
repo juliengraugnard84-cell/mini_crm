@@ -101,7 +101,7 @@
     window.CHAT_CSRF_TOKEN = {{ (csrf_token if csrf_token else None) | tojson }};
 </script>
 
-<!-- ================= SOUND LOGIC FINAL ================= -->
+<!-- ================= SOUND LOGIC FINAL (STABLE) ================= -->
 
 <script>
 
@@ -109,43 +109,62 @@ let lastMessageId = null;
 let chatAudioUnlocked = false;
 let lastSoundTimestamp = 0;
 
-// 🔊 Lecture sécurisée avec anti-spam
+// 🔊 Lecture du son (ultra safe)
 function playNotificationSound() {
     const audio = document.getElementById("chat-sound");
-    if (!audio || !chatAudioUnlocked) return;
+
+    if (!audio) {
+        console.warn("❌ Audio introuvable");
+        return;
+    }
+
+    if (!chatAudioUnlocked) {
+        console.warn("🔒 Audio non débloqué");
+        return;
+    }
 
     const now = Date.now();
 
-    // Anti double déclenchement (important)
-    if (now - lastSoundTimestamp < 1000) return;
+    // Anti spam / double déclenchement
+    if (now - lastSoundTimestamp < 800) return;
 
     lastSoundTimestamp = now;
 
     audio.currentTime = 0;
-    audio.play().catch(() => {});
+
+    audio.play()
+        .then(() => console.log("🔊 Son joué"))
+        .catch(err => console.warn("❌ Erreur audio:", err));
 }
 
-// 🔓 Déblocage audio (clic + clavier)
+
+// 🔓 Débloque audio navigateur (CRITIQUE)
 function unlockChatAudio() {
     if (chatAudioUnlocked) return;
 
     const audio = document.getElementById("chat-sound");
     if (!audio) return;
 
-    audio.play().then(() => {
-        audio.pause();
-        audio.currentTime = 0;
-        chatAudioUnlocked = true;
-        console.log("🔓 Audio débloqué");
-    }).catch(() => {});
+    audio.play()
+        .then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            chatAudioUnlocked = true;
+            console.log("🔓 Audio débloqué");
+        })
+        .catch(() => {});
 }
 
+// événements user obligatoires
 document.addEventListener("click", unlockChatAudio);
 document.addEventListener("keydown", unlockChatAudio);
 
-//
-// 🔔 1. HOOK FETCH (API)
-//
+
+
+/* =====================================================
+   🔔 1. HOOK FETCH (API)
+   ===================================================== */
+
 (function () {
 
     const originalFetch = window.fetch;
@@ -174,7 +193,7 @@ document.addEventListener("keydown", unlockChatAudio);
                         if (lastMessageId && lastMsg.id !== lastMessageId) {
 
                             if (lastMsg.sender_id !== window.CHAT_CURRENT_USER_ID) {
-                                console.log("🔔 Nouveau message (API)");
+                                console.log("📡 Nouveau message (API)");
                                 playNotificationSound();
                             }
                         }
@@ -185,7 +204,7 @@ document.addEventListener("keydown", unlockChatAudio);
             }
 
         } catch (e) {
-            console.warn("Chat sound hook error:", e);
+            console.warn("Chat fetch hook error:", e);
         }
 
         return response;
@@ -193,13 +212,22 @@ document.addEventListener("keydown", unlockChatAudio);
 
 })();
 
-//
-// 🔔 2. FALLBACK DOM (ULTRA FIABLE)
-//
+
+
+/* =====================================================
+   🔔 2. OBSERVER DOM (FIABLE)
+   ===================================================== */
+
 (function () {
 
     const chatContainer = document.getElementById("chat-messages");
-    if (!chatContainer) return;
+
+    if (!chatContainer) {
+        console.warn("❌ chat-messages introuvable");
+        return;
+    }
+
+    console.log("👀 Observer chat actif");
 
     const observer = new MutationObserver((mutations) => {
 
@@ -207,12 +235,13 @@ document.addEventListener("keydown", unlockChatAudio);
 
             mutation.addedNodes.forEach((node) => {
 
+                if (!node.classList) return;
+
                 if (
-                    node.classList &&
                     node.classList.contains("chat-row") &&
                     node.classList.contains("them")
                 ) {
-                    console.log("🔔 Nouveau message (DOM)");
+                    console.log("💬 Nouveau message (DOM)");
                     playNotificationSound();
                 }
 
