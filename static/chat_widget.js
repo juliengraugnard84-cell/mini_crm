@@ -1,15 +1,23 @@
 document.addEventListener("DOMContentLoaded", () => {
 
-    /* ================= ELEMENTS ================= */
+    /* ================= ROOT WIDGET (FIX CRITIQUE) ================= */
+
+    const widget = document.getElementById("chat-widget");
+
+    if (!widget) {
+        console.warn("Chat widget absent");
+        return;
+    }
+
+    /* ================= ELEMENTS (SCOPED FIX) ================= */
 
     const toggleBtn   = document.getElementById("chat-toggle");
-    const widget      = document.getElementById("chat-widget");
-    const closeBtn    = document.getElementById("chat-close");
+    const closeBtn    = widget.querySelector("#chat-close");
 
-    const form        = document.getElementById("chat-form");
-    const input       = document.getElementById("chat-input");
-    const fileInput   = document.getElementById("chat-file");
-    const messagesBox = document.getElementById("chat-messages");
+    const form        = widget.querySelector("#chat-form");
+    const input       = widget.querySelector("#chat-input");
+    const fileInput   = widget.querySelector("#chat-file");
+    const messagesBox = widget.querySelector("#chat-messages");
     const badge       = document.getElementById("chat-badge");
 
     const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID ?? null;
@@ -20,6 +28,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ================= DEBUG ================= */
 
+    console.log("FORM =", form);
+    console.log("FILE INPUT =", fileInput);
+
     if (fileInput) {
         fileInput.addEventListener("change", () => {
             console.log("📂 fichiers sélectionnés :", fileInput.files);
@@ -28,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ================= SÉCURITÉ ================= */
 
-    if (!toggleBtn || !widget || !form || !input || !messagesBox) {
+    if (!toggleBtn || !form || !input || !messagesBox) {
         console.warn("Chat widget incomplet — initialisation annulée");
         return;
     }
@@ -257,7 +268,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* ================= SEND (FIX MAJEUR) ================= */
+    /* ================= SEND (FIX TOTAL) ================= */
 
     async function sendMessage() {
 
@@ -280,7 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (msg) fd.append("message", msg);
 
         files.forEach(f => {
-            fd.append("file", f); // important pour Flask getlist
+            fd.append("file", f);
         });
 
         const headers = {};
@@ -288,14 +299,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const sendBtn = form.querySelector(".chat-send");
 
-        // 🔒 LOCK UI
         input.disabled = true;
         if (sendBtn) sendBtn.disabled = true;
         if (fileInput) fileInput.disabled = true;
 
         try {
 
-            console.log("📤 Envoi message + fichiers :", files);
+            console.log("📤 Envoi :", files);
 
             const res = await fetch("/chat/send", {
                 method: "POST",
@@ -318,10 +328,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } catch (e) {
             console.error("Erreur envoi chat", e);
-            alert("Erreur lors de l’envoi");
+            alert("Erreur envoi");
         } finally {
 
-            // 🔓 UNLOCK UI
             input.disabled = false;
             if (sendBtn) sendBtn.disabled = false;
             if (fileInput) fileInput.disabled = false;
@@ -332,6 +341,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     form.addEventListener("submit", e => {
+        console.log("🚀 SUBMIT TRIGGERED");
         e.preventDefault();
         sendMessage();
     });
