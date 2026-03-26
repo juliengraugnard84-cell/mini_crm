@@ -52,7 +52,6 @@ document.addEventListener("DOMContentLoaded", () => {
             audio.pause();
             audio.currentTime = 0;
             audioUnlocked = true;
-            console.log("🔓 Audio débloqué");
         }).catch(() => {});
     }
 
@@ -67,10 +66,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (now - lastSoundTime < 800) return;
 
         lastSoundTime = now;
-
         audio.currentTime = 0;
         audio.play().catch(() => {});
-        console.log("🔊 Son joué");
     }
 
     /* ================= HELPERS ================= */
@@ -191,7 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return row;
     }
 
-    /* ================= OPEN / CLOSE (FIX CRITIQUE) ================= */
+    /* ================= OPEN / CLOSE ================= */
 
     function openChat() {
         widget.classList.add("open");
@@ -260,7 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* ================= SEND ================= */
+    /* ================= SEND (FIX MAJEUR) ================= */
 
     async function sendMessage() {
 
@@ -279,13 +276,27 @@ document.addEventListener("DOMContentLoaded", () => {
         isSending = true;
 
         const fd = new FormData();
+
         if (msg) fd.append("message", msg);
-        files.forEach(f => fd.append("file", f));
+
+        files.forEach(f => {
+            fd.append("file", f); // important pour Flask getlist
+        });
 
         const headers = {};
         if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
 
+        const sendBtn = form.querySelector(".chat-send");
+
+        // 🔒 LOCK UI
+        input.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
+        if (fileInput) fileInput.disabled = true;
+
         try {
+
+            console.log("📤 Envoi message + fichiers :", files);
+
             const res = await fetch("/chat/send", {
                 method: "POST",
                 body: fd,
@@ -307,9 +318,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } catch (e) {
             console.error("Erreur envoi chat", e);
+            alert("Erreur lors de l’envoi");
         } finally {
-            isSending = false;
+
+            // 🔓 UNLOCK UI
             input.disabled = false;
+            if (sendBtn) sendBtn.disabled = false;
+            if (fileInput) fileInput.disabled = false;
+
+            isSending = false;
             input.focus();
         }
     }
