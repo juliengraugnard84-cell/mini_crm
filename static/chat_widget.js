@@ -95,8 +95,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function formatTime(ts) {
         if (!ts) return "";
-        const m = String(ts).match(/(\d{2}):(\d{2})/);
-        return m ? `${m[1]}:${m[2]}` : "";
+
+        const date = new Date(ts);
+
+        return date.toLocaleTimeString("fr-FR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Europe/Paris"
+        });
     }
 
     function scrollBottom() {
@@ -199,6 +205,26 @@ document.addEventListener("DOMContentLoaded", () => {
         return row;
     }
 
+    /* ================= MARK AS READ ================= */
+
+    async function markAsRead() {
+        try {
+            const headers = {};
+            if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
+
+            await fetch("/chat/mark_read", {
+                method: "POST",
+                credentials: "same-origin",
+                headers
+            });
+
+            console.log("✔ messages marqués comme lus");
+
+        } catch (e) {
+            console.error("Erreur mark_read", e);
+        }
+    }
+
     /* ================= OPEN / CLOSE ================= */
 
     function openChat() {
@@ -207,7 +233,9 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleBtn.setAttribute("aria-expanded", "true");
 
         setBadge(0);
+
         loadMessages(true);
+        markAsRead(); // ✅ FIX BADGE
 
         setTimeout(() => input.focus(), 100);
     }
@@ -350,6 +378,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setInterval(() => {
         loadMessages(false);
+
+        if (isOpen()) {
+            markAsRead(); // ✅ sync temps réel
+        }
+
     }, 5000);
 
     loadMessages(false);
