@@ -3094,8 +3094,12 @@ def delete_update(update_id):
     return redirect(url_for("admin_updates"))
 
 ############################################################
-# 14. CHAT (BACKEND) — VERSION SAFE + MULTI UPLOAD (FIX)
+# 14. CHAT (BACKEND) — VERSION SAFE + MULTI UPLOAD + HEURE PARIS
 ############################################################
+
+from datetime import timezone
+from zoneinfo import ZoneInfo
+
 
 def _chat_store_file(file_storage):
     """
@@ -3138,10 +3142,23 @@ def _chat_store_file(file_storage):
 
 
 def _serialize_chat_datetime(value):
+    """
+    Sérialise created_at en heure Europe/Paris.
+    Compatible timestamps naïfs / timezone-aware.
+    Si naïf, on suppose UTC (Render/Postgres fréquent).
+    """
     if not value:
         return ""
+
     try:
+        paris_tz = ZoneInfo("Europe/Paris")
+
+        if getattr(value, "tzinfo", None) is None:
+            value = value.replace(tzinfo=timezone.utc)
+
+        value = value.astimezone(paris_tz)
         return value.strftime("%Y-%m-%d %H:%M:%S")
+
     except Exception:
         try:
             return str(value)
