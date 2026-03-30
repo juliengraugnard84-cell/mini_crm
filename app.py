@@ -2174,14 +2174,6 @@ def api_calendar():
 
 ###########################################################
 # 11. DOCUMENTS (GLOBAL + PAR DOSSIER + RESSOURCES PARTAGÉES)
-# - ADMIN : vue globale + upload + delete
-# - COMMERCIAL :
-#     - accès à SES dossiers clients
-#     - accès + upload aux ressources partagées
-# - RESSOURCES CLASSÉES : Mandats / Résiliations
-# - S3 privé + URL signée
-# - MULTI DOWNLOAD ZIP
-# - COMPATIBLE templates existants
 ############################################################
 
 import io
@@ -2192,7 +2184,7 @@ GLOBAL_PREFIX = "clients/global/"
 SHARED_PREFIX = "clients/shared/"
 SHARED_CATEGORIES = ("mandats", "resiliations")
 
-MAX_MULTI_DOWNLOAD = 20  # sécurité mémoire
+MAX_MULTI_DOWNLOAD = 20
 
 
 # =========================================================
@@ -2263,7 +2255,7 @@ def upload_document():
 
 
 # =========================================================
-# UPLOAD DOCUMENT PAR DOSSIER CLIENT
+# UPLOAD DOCUMENT PAR DOSSIER CLIENT (MODIFIÉ ✔)
 # =========================================================
 @app.route(
     "/clients/<int:client_id>/documents/upload",
@@ -2281,6 +2273,11 @@ def upload_client_document(client_id):
         return redirect(url_for("client_detail", client_id=client_id))
 
     files = request.files.getlist("files")
+
+    # ✅ NOUVEAU
+    doc_name = (request.form.get("doc_name") or "").strip()
+    pdl = (request.form.get("pdl") or "").strip()
+    pdl = re.sub(r"[^0-9]", "", pdl)  # nettoyage
 
     if not files:
         legacy = request.files.get("file")
@@ -2303,7 +2300,15 @@ def upload_client_document(client_id):
             continue
 
         try:
-            filename = clean_filename(secure_filename(fichier.filename))
+            original_ext = os.path.splitext(fichier.filename)[1].lower()
+
+            base_name = clean_filename(doc_name) if doc_name else clean_filename(fichier.filename)
+
+            if pdl:
+                base_name = f"{base_name}_{pdl}"
+
+            filename = f"{base_name}{original_ext}"
+
             prefix = client_s3_prefix(client_id)
 
             key = _s3_make_non_overwriting_key(
