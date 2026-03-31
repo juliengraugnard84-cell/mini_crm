@@ -2574,7 +2574,7 @@ def delete_document():
 app.view_functions.setdefault("documents_admin", documents)
 
 
-############################################################
+ ############################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS
 # ⚠️ VERSION UNIQUE — AUCUN DOUBLON
@@ -2959,7 +2959,7 @@ def create_cotation(client_id):
                 f.get("commentaire"),
                 user.get("id"),
 
-                f.get("pdl"),
+                f.get("pdl_pce"),
                 parse_date_safe(f.get("elec_debut_fourniture")),
                 parse_date_safe(f.get("elec_fin_fourniture")),
                 f.get("elec_nb_mois"),
@@ -2991,7 +2991,7 @@ def create_cotation(client_id):
         logger.exception("Erreur cotation : %r", e)
         flash("Erreur lors de la création.", "danger")
 
-    return redirect(url_for("client_detail", client_id=client_id))    
+    return redirect(url_for("client_detail", client_id=client_id))
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
