@@ -2574,7 +2574,7 @@ def delete_document():
 app.view_functions.setdefault("documents_admin", documents)
 
 
- ############################################################
+############################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS
 # ⚠️ VERSION UNIQUE — AUCUN DOUBLON
@@ -2594,6 +2594,12 @@ def parse_date_safe(val):
 def parse_time_safe(val):
     try:
         return datetime.strptime(val, "%H:%M").time()
+    except:
+        return None
+
+def parse_int_safe(val):
+    try:
+        return int(val)
     except:
         return None
 
@@ -2745,7 +2751,7 @@ def new_client():
 
 
 # =========================
-# CLIENT — UPDATE STATUS (FIX 🔥)
+# CLIENT — UPDATE STATUS
 # =========================
 @app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
 @login_required
@@ -2779,7 +2785,7 @@ def update_client_status(client_id):
 
 
 # =========================
-# CLIENT — SUPPRESSION (ADMIN 🔥)
+# CLIENT — SUPPRESSION
 # =========================
 @app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
 @admin_required
@@ -2848,7 +2854,7 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — AJOUT COTATION (VERSION COMPLÈTE 🔥)
+# CLIENT — AJOUT COTATION
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
@@ -2870,30 +2876,23 @@ def create_cotation(client_id):
                     date_negociation,
                     heure_negociation,
                     energie_type,
-
                     entreprise_nom,
                     site_nom,
                     siret,
                     code_naf,
-
                     adresse_facturation,
                     adresse_consommation,
-
                     signataire_nom,
                     fonction_signataire,
                     signataire_tel,
                     signataire_mobile,
                     signataire_email,
-
                     date_remise_offre,
-
                     fournisseur_actuel,
                     type_compteur,
                     date_echeance,
-
                     commentaire,
                     created_by,
-
                     pdl_pce,
                     elec_debut_fourniture,
                     elec_fin_fourniture,
@@ -2902,13 +2901,11 @@ def create_cotation(client_id):
                     formule_acheminement,
                     elec_car,
                     puissance_souscrite,
-
                     pointe,
                     hph,
                     hch,
                     hpr,
                     hce,
-
                     gaz_debut_fourniture,
                     gaz_fin_fourniture,
                     gaz_nb_mois,
@@ -2962,7 +2959,7 @@ def create_cotation(client_id):
                 f.get("pdl_pce"),
                 parse_date_safe(f.get("elec_debut_fourniture")),
                 parse_date_safe(f.get("elec_fin_fourniture")),
-                f.get("elec_nb_mois"),
+                parse_int_safe(f.get("elec_nb_mois")),  # ✅ FIX
                 f.get("elec_segment"),
                 f.get("formule_acheminement"),
                 f.get("elec_car"),
@@ -2976,7 +2973,7 @@ def create_cotation(client_id):
 
                 parse_date_safe(f.get("gaz_debut_fourniture")),
                 parse_date_safe(f.get("gaz_fin_fourniture")),
-                f.get("gaz_nb_mois"),
+                parse_int_safe(f.get("gaz_nb_mois")),   # ✅ FIX
                 f.get("pce"),
                 f.get("gaz_segment"),
                 f.get("profil"),
