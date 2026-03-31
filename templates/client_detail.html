@@ -42,18 +42,10 @@
             <select name="status"
                     class="form-select"
                     onchange="this.form.submit()">
-                <option value="en_cours" {% if (client.status or '')|lower == "en_cours" %}selected{% endif %}>
-                    🟡 En cours
-                </option>
-                <option value="en_attente" {% if (client.status or '')|lower == "en_attente" %}selected{% endif %}>
-                    ⏳ En attente
-                </option>
-                <option value="gagne" {% if (client.status or '')|lower == "gagne" %}selected{% endif %}>
-                    🟢 Gagné
-                </option>
-                <option value="perdu" {% if (client.status or '')|lower == "perdu" %}selected{% endif %}>
-                    🔴 Perdu
-                </option>
+                <option value="en_cours" {% if (client.status or '')|lower == "en_cours" %}selected{% endif %}>🟡 En cours</option>
+                <option value="en_attente" {% if (client.status or '')|lower == "en_attente" %}selected{% endif %}>⏳ En attente</option>
+                <option value="gagne" {% if (client.status or '')|lower == "gagne" %}selected{% endif %}>🟢 Gagné</option>
+                <option value="perdu" {% if (client.status or '')|lower == "perdu" %}selected{% endif %}>🔴 Perdu</option>
             </select>
         </form>
     </div>
@@ -62,83 +54,10 @@
 
 <!-- ================= FICHE ENTREPRISE ================= -->
 <div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card-header">
         <strong>Fiche entreprise</strong>
-
-        {% if current_user
-              and (current_user.role == "admin" or current_user.id == client.owner_id)
-              and available_endpoints
-              and 'edit_client' in available_endpoints %}
-            <span class="text-muted" style="font-size: 0.9rem;">Modifiable</span>
-        {% endif %}
     </div>
     <div class="card-body">
-
-        {% if current_user
-              and (current_user.role == "admin" or current_user.id == client.owner_id)
-              and available_endpoints
-              and 'edit_client' in available_endpoints %}
-
-        <form method="post"
-              action="{{ url_for('edit_client', client_id=client.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-            <div class="row">
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><strong>Entreprise *</strong></label>
-                    <input type="text" name="name" class="form-control"
-                           value="{{ client.name }}" required>
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><strong>Nom du gérant</strong></label>
-                    <input type="text" name="gerant_nom" class="form-control"
-                           value="{{ client.gerant_nom or '' }}">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><strong>Email</strong></label>
-                    <input type="email" name="email" class="form-control"
-                           value="{{ client.email or '' }}">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><strong>Téléphone</strong></label>
-                    <input type="text" name="phone" class="form-control"
-                           value="{{ client.phone or '' }}">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><strong>SIRET</strong></label>
-                    <input type="text" name="siret" class="form-control"
-                           value="{{ client.siret or '' }}">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><strong>Adresse</strong></label>
-                    <input type="text" name="address" class="form-control"
-                           value="{{ client.address or '' }}">
-                </div>
-
-                {% if current_user and current_user.role == "admin" %}
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><strong>Commercial assigné</strong></label>
-                    <input type="text" name="commercial_name" class="form-control"
-                           value="{{ client.commercial or '' }}">
-                </div>
-                {% endif %}
-
-            </div>
-
-            <div class="text-end">
-                <button type="submit" class="btn btn-primary">
-                    Enregistrer les modifications
-                </button>
-            </div>
-        </form>
-
-        {% else %}
         <div class="row">
             <div class="col-md-6 mb-2"><strong>Entreprise :</strong><br>{{ client.name }}</div>
             <div class="col-md-6 mb-2"><strong>Nom du gérant :</strong><br>{{ client.gerant_nom or "—" }}</div>
@@ -147,13 +66,11 @@
             <div class="col-md-6 mb-2"><strong>SIRET :</strong><br>{{ client.siret or "—" }}</div>
             <div class="col-md-6 mb-2"><strong>Adresse :</strong><br>{{ client.address or "—" }}</div>
         </div>
-        {% endif %}
-
     </div>
 </div>
 
 <!-- ================= TABS ================= -->
-<ul class="nav nav-tabs mb-4" role="tablist">
+<ul class="nav nav-tabs mb-4">
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cotations">Cotations</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#documents">Documents</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#updates">Mise à jour</button></li>
@@ -161,42 +78,172 @@
 
 <div class="tab-content">
 
-    <!-- ================= ONGLET DOCUMENTS ================= -->
-    <div class="tab-pane fade" id="documents" role="tabpanel">
+<!-- ================= ONGLET COTATIONS ================= -->
+<div class="tab-pane fade show active" id="cotations">
 
-        <!-- 🔥 NOUVEAU BLOC -->
-        <div class="card mb-4">
-            <div class="card-header"><strong>Ressources partagées</strong></div>
-            <div class="card-body">
+    <!-- FORMULAIRE -->
+    <div class="card mb-4">
+        <div class="card-header"><strong>Nouvelle demande de cotation</strong></div>
+        <div class="card-body">
 
-                {% if shared_mandats %}
-                <h6>Mandats</h6>
-                <ul>
-                    {% for d in shared_mandats %}
-                    <li>
-                        {{ d.nom }}
-                        <a href="{{ url_for('download_document') }}?key={{ d.key | urlencode }}">Télécharger</a>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
+            <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-                {% if shared_resiliations %}
-                <h6>Résiliations</h6>
-                <ul>
-                    {% for d in shared_resiliations %}
-                    <li>
-                        {{ d.nom }}
-                        <a href="{{ url_for('download_document') }}?key={{ d.key | urlencode }}">Télécharger</a>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
+                <div class="row">
 
-            </div>
+                    <div class="col-md-6">
+                        <h6>Données client</h6>
+
+                        <input class="form-control mb-2" name="entreprise_nom" placeholder="Raison sociale">
+                        <input class="form-control mb-2" name="siret" placeholder="SIRET">
+                        <input class="form-control mb-2" name="adresse_consommation" placeholder="Adresse compteur">
+                        <input class="form-control mb-2" name="adresse_facturation" placeholder="Adresse facturation">
+                        <input class="form-control mb-2" name="signataire_nom" placeholder="Nom">
+                        <input class="form-control mb-2" name="signataire_tel" placeholder="Téléphone">
+                        <input class="form-control mb-2" name="signataire_email" placeholder="Email">
+                    </div>
+
+                    <div class="col-md-6">
+                        <h6>Gaz</h6>
+                        <input class="form-control mb-2" name="pdl_pce" placeholder="PCE">
+                        <input class="form-control mb-2" name="gaz_car" placeholder="CAR">
+                    </div>
+
+                    <div class="col-md-6 mt-3">
+                        <h6>Électricité</h6>
+                        <input class="form-control mb-2" name="rae" placeholder="RAE">
+                        <input class="form-control mb-2" name="pointe" placeholder="Pointe">
+                        <input class="form-control mb-2" name="hph" placeholder="HPH">
+                        <input class="form-control mb-2" name="hch" placeholder="HCH">
+                        <input class="form-control mb-2" name="hpe" placeholder="HPE">
+                        <input class="form-control mb-2" name="hce" placeholder="HCE">
+                    </div>
+
+                </div>
+
+                <button class="btn btn-primary mt-3">Envoyer</button>
+            </form>
+
         </div>
-
     </div>
+
+    <!-- HISTORIQUE -->
+    <div class="card">
+        <div class="card-header"><strong>Historique des cotations</strong></div>
+        <div class="card-body">
+            {% if cotations %}
+            <table class="table table-sm">
+                {% for c in cotations %}
+                <tr>
+                    <td>#{{ c.id }}</td>
+                    <td>{{ c.energie_type or "—" }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <p class="text-muted">Aucune cotation.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= ONGLET DOCUMENTS ================= -->
+<div class="tab-pane fade" id="documents">
+
+    <div class="card mb-4">
+        <div class="card-header"><strong>Documents du client</strong></div>
+        <div class="card-body">
+
+            <!-- UPLOAD -->
+            <form method="post"
+                  action="{{ url_for('upload_client_document', client_id=client.id) }}"
+                  enctype="multipart/form-data">
+
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                <input type="file" name="files" multiple class="form-control mb-2">
+                <input type="text" name="doc_name" class="form-control mb-2" placeholder="Nom du document">
+                <input type="text" name="pdl" class="form-control mb-2" placeholder="PDL / PCE">
+
+                <button class="btn btn-success">Uploader</button>
+            </form>
+
+            <hr>
+
+            {% if documents %}
+            <table class="table table-sm">
+                {% for d in documents %}
+                <tr>
+                    <td>{{ d.nom }}</td>
+                    <td><a href="{{ url_for('download_document') }}?key={{ d.key }}">Télécharger</a></td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <p class="text-muted">Aucun document.</p>
+            {% endif %}
+
+            <hr>
+
+            <h5>Ressources partagées</h5>
+
+            {% for d in shared_mandats %}
+                <div>{{ d.nom }} <a href="{{ url_for('download_document') }}?key={{ d.key }}">Télécharger</a></div>
+            {% endfor %}
+
+            {% for d in shared_resiliations %}
+                <div>{{ d.nom }} <a href="{{ url_for('download_document') }}?key={{ d.key }}">Télécharger</a></div>
+            {% endfor %}
+
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= ONGLET MISE À JOUR ================= -->
+<div class="tab-pane fade" id="updates">
+
+    <div class="card mb-4">
+        <div class="card-header"><strong>Demande de mise à jour</strong></div>
+        <div class="card-body">
+
+            <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                <input type="date" name="update_date" class="form-control mb-2" required>
+
+                <textarea name="update_commentaire"
+                          class="form-control mb-2"
+                          placeholder="Commentaire"></textarea>
+
+                <button class="btn btn-warning">Envoyer</button>
+            </form>
+
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><strong>Historique</strong></div>
+        <div class="card-body">
+
+            {% if updates %}
+            <table class="table table-sm">
+                {% for u in updates %}
+                <tr>
+                    <td>{{ u.update_date }}</td>
+                    <td>{{ u.commentaire }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <p class="text-muted">Aucune mise à jour.</p>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
 
 </div>
 
