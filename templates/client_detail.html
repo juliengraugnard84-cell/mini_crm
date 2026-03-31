@@ -203,7 +203,7 @@
 
                                 <div class="mb-2">
                                     <label class="form-label">PDL</label>
-                                    <input class="form-control" name="pdl" placeholder="PDL">
+                                    <input class="form-control" name="pdl_pce" placeholder="PDL">
                                 </div>
 
                                 <div class="mb-2">
@@ -365,7 +365,7 @@
                         <tr>
                             <td>#{{ c.id }}</td>
                             <td>{{ c.energie_type or "—" }}</td>
-                            <td>{{ c.pdl_pce or "—" }}</td>
+                            <td>{{ c.pdl_pce or c.pce or "—" }}</td>
                             <td>{{ c.date_negociation or "—" }}</td>
                             <td>{{ c.fournisseur_actuel or "—" }}</td>
                             <td>{{ c.commentaire or "—" }}</td>

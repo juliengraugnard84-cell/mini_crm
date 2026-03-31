@@ -2573,6 +2573,7 @@ def delete_document():
 # =========================================================
 app.view_functions.setdefault("documents_admin", documents)
 
+
 ############################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS
@@ -2744,18 +2745,21 @@ def new_client():
 
 
 # =========================
-# CLIENT — UPDATE STATUS
+# CLIENT — UPDATE STATUS (FIX 🔥)
 # =========================
 @app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
-@admin_required
+@login_required
 def update_client_status(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
 
     conn = get_db()
     new_status = (request.form.get("status") or "").lower()
 
     if new_status not in ("en_cours", "en_attente", "gagne", "perdu"):
         flash("Statut invalide.", "danger")
-        return redirect(url_for("clients"))
+        return redirect(url_for("client_detail", client_id=client_id))
 
     try:
         with conn.cursor() as cur:
@@ -2763,12 +2767,37 @@ def update_client_status(client_id):
                 "UPDATE crm_clients SET status=%s WHERE id=%s",
                 (new_status, client_id)
             )
+
         conn.commit()
         flash("Statut mis à jour.", "success")
 
     except Exception:
         conn.rollback()
         flash("Erreur mise à jour.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# CLIENT — SUPPRESSION (ADMIN 🔥)
+# =========================
+@app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
+@admin_required
+def delete_client(client_id):
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
+
+        conn.commit()
+        flash("Client supprimé.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur suppression client : %r", e)
+        flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("clients"))
 
@@ -2865,7 +2894,6 @@ def create_cotation(client_id):
                     commentaire,
                     created_by,
 
-                    -- ELECTRICITE
                     pdl_pce,
                     elec_debut_fourniture,
                     elec_fin_fourniture,
@@ -2881,7 +2909,6 @@ def create_cotation(client_id):
                     hpr,
                     hce,
 
-                    -- GAZ
                     gaz_debut_fourniture,
                     gaz_fin_fourniture,
                     gaz_nb_mois,
@@ -2898,7 +2925,6 @@ def create_cotation(client_id):
                     %s,
                     %s,%s,%s,
                     %s,%s,
-
                     %s,%s,%s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,%s,%s
@@ -2933,7 +2959,6 @@ def create_cotation(client_id):
                 f.get("commentaire"),
                 user.get("id"),
 
-                # ELEC
                 f.get("pdl"),
                 parse_date_safe(f.get("elec_debut_fourniture")),
                 parse_date_safe(f.get("elec_fin_fourniture")),
@@ -2949,7 +2974,6 @@ def create_cotation(client_id):
                 f.get("hpr"),
                 f.get("hce"),
 
-                # GAZ
                 parse_date_safe(f.get("gaz_debut_fourniture")),
                 parse_date_safe(f.get("gaz_fin_fourniture")),
                 f.get("gaz_nb_mois"),
@@ -2967,7 +2991,7 @@ def create_cotation(client_id):
         logger.exception("Erreur cotation : %r", e)
         flash("Erreur lors de la création.", "danger")
 
-    return redirect(url_for("client_detail", client_id=client_id))
+    return redirect(url_for("client_detail", client_id=client_id))    
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
