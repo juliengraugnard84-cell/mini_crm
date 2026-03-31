@@ -299,7 +299,7 @@ def init_db():
                 )
             """)
 
-            # ================= LOG SUPPRESSION UPDATES =================
+            # ================= LOG SUPPRESSION =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS update_deletions_log (
                     id SERIAL PRIMARY KEY,
@@ -314,33 +314,56 @@ def init_db():
             # ================= ADMIN BOOTSTRAP =================
             cur.execute("SELECT id FROM users WHERE username = 'admin'")
             if not cur.fetchone():
-                cur.execute(
-                    """
+                cur.execute("""
                     INSERT INTO users (username, password_hash, role)
                     VALUES (%s, %s, %s)
-                    """,
-                    (
-                        "admin",
-                        generate_password_hash(ADMIN_DEFAULT_PASSWORD),
-                        "admin",
-                    ),
-                )
+                """, (
+                    "admin",
+                    generate_password_hash(ADMIN_DEFAULT_PASSWORD),
+                    "admin",
+                ))
 
             # ================= MIGRATIONS SAFE =================
-            # Alignement strict avec les routes existantes
 
-            # crm_clients
+            # CLIENTS
             _try_add_column(conn, "crm_clients", "siret TEXT")
             _try_add_column(conn, "crm_clients", "gerant_nom TEXT")
 
-            # cotations
+            # BASE COTATION
             _try_add_column(conn, "cotations", "type_compteur TEXT")
             _try_add_column(conn, "cotations", "heure_negociation TIME")
             _try_add_column(conn, "cotations", "signataire_mobile TEXT")
 
-            # ✅ NOUVEAU : adresses facturation / consommation
-            _try_add_column(conn, "cotations", "adresse_facturation TEXT")
-            _try_add_column(conn, "cotations", "adresse_consommation TEXT")
+            # NOUVEAUX CHAMPS CLIENT
+            _try_add_column(conn, "cotations", "site_nom TEXT")
+            _try_add_column(conn, "cotations", "fonction_signataire TEXT")
+            _try_add_column(conn, "cotations", "code_naf TEXT")
+            _try_add_column(conn, "cotations", "date_remise_offre DATE")
+
+            # ELECTRICITE
+            _try_add_column(conn, "cotations", "elec_debut_fourniture DATE")
+            _try_add_column(conn, "cotations", "elec_fin_fourniture DATE")
+            _try_add_column(conn, "cotations", "elec_nb_mois INTEGER")
+            _try_add_column(conn, "cotations", "elec_segment TEXT")
+            _try_add_column(conn, "cotations", "formule_acheminement TEXT")
+            _try_add_column(conn, "cotations", "elec_car TEXT")
+            _try_add_column(conn, "cotations", "puissance_souscrite TEXT")
+
+            # PUISSANCES
+            _try_add_column(conn, "cotations", "pointe TEXT")
+            _try_add_column(conn, "cotations", "hph TEXT")
+            _try_add_column(conn, "cotations", "hch TEXT")
+            _try_add_column(conn, "cotations", "hpr TEXT")
+            _try_add_column(conn, "cotations", "hce TEXT")
+
+            # GAZ
+            _try_add_column(conn, "cotations", "gaz_debut_fourniture DATE")
+            _try_add_column(conn, "cotations", "gaz_fin_fourniture DATE")
+            _try_add_column(conn, "cotations", "gaz_nb_mois INTEGER")
+            _try_add_column(conn, "cotations", "pce TEXT")
+            _try_add_column(conn, "cotations", "gaz_segment TEXT")
+            _try_add_column(conn, "cotations", "profil TEXT")
+            _try_add_column(conn, "cotations", "gaz_car TEXT")
 
         conn.commit()
 
@@ -354,7 +377,7 @@ def init_db():
 
 # 🚨 IMPORTANT
 # ❌ NE PAS APPELER init_db() AUTOMATIQUEMENT
-# ✅ À exécuter UNE SEULE FOIS manuellement si nécessaire
+# ✅ À exécuter UNE SEULE FOIS manuellement
 ############################################################
 # 4. S3 — STOCKAGE DOCUMENTS (PROD SAFE)
 ############################################################
@@ -2558,7 +2581,9 @@ app.view_functions.setdefault("documents_admin", documents)
 
 from datetime import datetime
 
-# ✅ SAFE PARSE (CORRECTION BUG COTATION)
+# =========================
+# SAFE PARSE
+# =========================
 def parse_date_safe(val):
     try:
         return datetime.strptime(val, "%Y-%m-%d").date()
@@ -2628,13 +2653,9 @@ def clients():
 
         rows = cur.fetchall()
 
-    en_cours = []
-    en_attente = []
-    gagnes = []
-    perdus = []
+    en_cours, en_attente, gagnes, perdus = [], [], [], []
 
     for r in rows:
-
         st = (r["status"] or "en_cours").lower()
 
         if st == "gagne":
@@ -2657,7 +2678,7 @@ def clients():
 
 
 # =========================
-# CLIENT — CRÉATION (DEBUG ACTIF)
+# CLIENT — CRÉATION
 # =========================
 @app.route("/clients/new", methods=["POST"], endpoint="new_client")
 @login_required
@@ -2696,26 +2717,20 @@ def new_client():
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO crm_clients (
-                    name,
-                    email,
-                    phone,
-                    address,
-                    commercial,
-                    owner_id,
-                    status,
-                    siret,
-                    gerant_nom
+                    name, email, phone, address,
+                    commercial, owner_id, status,
+                    siret, gerant_nom
                 )
                 VALUES (%s,%s,%s,%s,%s,%s,'en_cours',%s,%s)
             """, (
                 name,
-                email if email else None,
-                phone if phone else None,
-                address if address else None,
+                email or None,
+                phone or None,
+                address or None,
                 commercial,
                 owner_id,
-                siret if siret else None,
-                gerant_nom if gerant_nom else None,
+                siret or None,
+                gerant_nom or None,
             ))
 
         conn.commit()
@@ -2723,8 +2738,7 @@ def new_client():
 
     except Exception as e:
         conn.rollback()
-        print("🔥 ERREUR SQL CLIENT :", e)
-        raise  # 🔥 IMPORTANT → affiche l'erreur réelle
+        raise
 
     return redirect(url_for("clients"))
 
@@ -2737,8 +2751,7 @@ def new_client():
 def update_client_status(client_id):
 
     conn = get_db()
-
-    new_status = (request.form.get("status") or "").strip().lower()
+    new_status = (request.form.get("status") or "").lower()
 
     if new_status not in ("en_cours", "en_attente", "gagne", "perdu"):
         flash("Statut invalide.", "danger")
@@ -2746,25 +2759,22 @@ def update_client_status(client_id):
 
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE crm_clients
-                SET status = %s
-                WHERE id = %s
-            """, (new_status, client_id))
-
+            cur.execute(
+                "UPDATE crm_clients SET status=%s WHERE id=%s",
+                (new_status, client_id)
+            )
         conn.commit()
         flash("Statut mis à jour.", "success")
 
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        logger.exception("Erreur update status : %r", e)
-        flash("Erreur lors de la mise à jour.", "danger")
+        flash("Erreur mise à jour.", "danger")
 
     return redirect(url_for("clients"))
 
 
 # =========================
-# CLIENT — DÉTAIL DOSSIER
+# CLIENT — DÉTAIL
 # =========================
 @app.route("/clients/<int:client_id>")
 @login_required
@@ -2789,25 +2799,14 @@ def client_detail(client_id):
         return redirect(url_for("clients"))
 
     client = row_to_obj(row)
-
     documents = list_client_documents(client_id)
 
     with conn.cursor() as cur:
-        cur.execute("""
-            SELECT *
-            FROM cotations
-            WHERE client_id=%s
-            ORDER BY date_creation DESC
-        """, (client_id,))
+        cur.execute("SELECT * FROM cotations WHERE client_id=%s ORDER BY date_creation DESC", (client_id,))
         cotations = [row_to_obj(r) for r in cur.fetchall()]
 
     with conn.cursor() as cur:
-        cur.execute("""
-            SELECT *
-            FROM client_updates
-            WHERE client_id=%s
-            ORDER BY created_at DESC
-        """, (client_id,))
+        cur.execute("SELECT * FROM client_updates WHERE client_id=%s ORDER BY created_at DESC", (client_id,))
         updates = [row_to_obj(r) for r in cur.fetchall()]
 
     return render_template(
@@ -2820,7 +2819,7 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — AJOUT COTATION (FIX 🔥)
+# CLIENT — AJOUT COTATION (VERSION COMPLÈTE 🔥)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
@@ -2831,92 +2830,144 @@ def create_cotation(client_id):
 
     conn = get_db()
     user = session.get("user") or {}
-
-    date_negociation = (request.form.get("date_negociation") or "").strip()
-    heure_negociation = (request.form.get("heure_negociation") or "").strip()
-    energie_type = (request.form.get("energie_type") or "").strip()
-    type_compteur = (request.form.get("type_compteur") or "").strip()
-    pdl_pce = (request.form.get("pdl_pce") or "").strip()
-    date_echeance = (request.form.get("date_echeance") or "").strip()
-    fournisseur_actuel = (request.form.get("fournisseur_actuel") or "").strip()
-    entreprise_nom = (request.form.get("entreprise_nom") or "").strip()
-    siret = (request.form.get("siret") or "").strip()
-    adresse_facturation = (request.form.get("adresse_facturation") or "").strip()
-    adresse_consommation = (request.form.get("adresse_consommation") or "").strip()
-    signataire_nom = (request.form.get("signataire_nom") or "").strip()
-    signataire_tel = (request.form.get("signataire_tel") or "").strip()
-    signataire_mobile = (request.form.get("signataire_mobile") or "").strip()
-    signataire_email = (request.form.get("signataire_email") or "").strip()
-    commentaire = (request.form.get("commentaire") or "").strip()
+    f = request.form
 
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id FROM crm_clients WHERE id = %s",
-                (client_id,)
-            )
-            row = cur.fetchone()
 
-        if not row:
-            flash("Client introuvable.", "danger")
-            return redirect(url_for("clients"))
-
-        with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO cotations (
                     client_id,
                     date_negociation,
+                    heure_negociation,
                     energie_type,
-                    pdl_pce,
-                    date_echeance,
-                    fournisseur_actuel,
+
                     entreprise_nom,
+                    site_nom,
                     siret,
+                    code_naf,
+
                     adresse_facturation,
                     adresse_consommation,
+
                     signataire_nom,
+                    fonction_signataire,
                     signataire_tel,
+                    signataire_mobile,
                     signataire_email,
+
+                    date_remise_offre,
+
+                    fournisseur_actuel,
+                    type_compteur,
+                    date_echeance,
+
                     commentaire,
                     created_by,
-                    type_compteur,
-                    heure_negociation,
-                    signataire_mobile
+
+                    -- ELECTRICITE
+                    pdl_pce,
+                    elec_debut_fourniture,
+                    elec_fin_fourniture,
+                    elec_nb_mois,
+                    elec_segment,
+                    formule_acheminement,
+                    elec_car,
+                    puissance_souscrite,
+
+                    pointe,
+                    hph,
+                    hch,
+                    hpr,
+                    hce,
+
+                    -- GAZ
+                    gaz_debut_fourniture,
+                    gaz_fin_fourniture,
+                    gaz_nb_mois,
+                    pce,
+                    gaz_segment,
+                    profil,
+                    gaz_car
                 )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (
+                    %s,%s,%s,%s,
+                    %s,%s,%s,%s,
+                    %s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,
+                    %s,%s,%s,
+                    %s,%s,
+
+                    %s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,%s
+                )
             """, (
+
                 client_id,
-                parse_date_safe(date_negociation),
-                energie_type if energie_type else None,
-                pdl_pce if pdl_pce else None,
-                parse_date_safe(date_echeance),
-                fournisseur_actuel if fournisseur_actuel else None,
-                entreprise_nom if entreprise_nom else None,
-                siret if siret else None,
-                adresse_facturation if adresse_facturation else None,
-                adresse_consommation if adresse_consommation else None,
-                signataire_nom if signataire_nom else None,
-                signataire_tel if signataire_tel else None,
-                signataire_email if signataire_email else None,
-                commentaire if commentaire else None,
+                parse_date_safe(f.get("date_negociation")),
+                parse_time_safe(f.get("heure_negociation")),
+                f.get("energie_type"),
+
+                f.get("entreprise_nom"),
+                f.get("site_nom"),
+                f.get("siret"),
+                f.get("code_naf"),
+
+                f.get("adresse_facturation"),
+                f.get("adresse_consommation"),
+
+                f.get("signataire_nom"),
+                f.get("fonction_signataire"),
+                f.get("signataire_tel"),
+                f.get("signataire_mobile"),
+                f.get("signataire_email"),
+
+                parse_date_safe(f.get("date_remise_offre")),
+
+                f.get("fournisseur_actuel"),
+                f.get("type_compteur"),
+                parse_date_safe(f.get("date_echeance")),
+
+                f.get("commentaire"),
                 user.get("id"),
-                type_compteur if type_compteur else None,
-                parse_time_safe(heure_negociation),
-                signataire_mobile if signataire_mobile else None,
+
+                # ELEC
+                f.get("pdl"),
+                parse_date_safe(f.get("elec_debut_fourniture")),
+                parse_date_safe(f.get("elec_fin_fourniture")),
+                f.get("elec_nb_mois"),
+                f.get("elec_segment"),
+                f.get("formule_acheminement"),
+                f.get("elec_car"),
+                f.get("puissance_souscrite"),
+
+                f.get("pointe"),
+                f.get("hph"),
+                f.get("hch"),
+                f.get("hpr"),
+                f.get("hce"),
+
+                # GAZ
+                parse_date_safe(f.get("gaz_debut_fourniture")),
+                parse_date_safe(f.get("gaz_fin_fourniture")),
+                f.get("gaz_nb_mois"),
+                f.get("pce"),
+                f.get("gaz_segment"),
+                f.get("profil"),
+                f.get("gaz_car"),
             ))
 
         conn.commit()
-        print("✅ COTATION ENREGISTRÉE")
         flash("Demande de cotation envoyée.", "success")
 
     except Exception as e:
         conn.rollback()
-        print("🔥 ERREUR SQL COTATION :", e)
-        logger.exception("Erreur création cotation : %r", e)
+        logger.exception("Erreur cotation : %r", e)
         flash("Erreur lors de la création.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
-
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################

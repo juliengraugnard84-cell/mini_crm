@@ -71,179 +71,502 @@
 
 <!-- ================= TABS ================= -->
 <ul class="nav nav-tabs mb-4">
-    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cotations">Cotations</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#documents">Documents</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#updates">Mise à jour</button></li>
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cotations" type="button">
+            Cotations
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#documents" type="button">
+            Documents
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#updates" type="button">
+            Mise à jour
+        </button>
+    </li>
 </ul>
 
 <div class="tab-content">
 
-<!-- ================= ONGLET COTATIONS ================= -->
-<div class="tab-pane fade show active" id="cotations">
+    <!-- ================= ONGLET COTATIONS ================= -->
+    <div class="tab-pane fade show active" id="cotations">
 
-    <!-- FORMULAIRE -->
-    <div class="card mb-4">
-        <div class="card-header"><strong>Nouvelle demande de cotation</strong></div>
-        <div class="card-body">
+        <!-- FORMULAIRE -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Nouvelle demande de cotation</strong>
+            </div>
+            <div class="card-body">
 
-            <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-                <div class="row">
+                    <div class="row">
 
-                    <div class="col-md-6">
-                        <h6>Données client</h6>
+                        <!-- ================= DONNÉES CLIENT ================= -->
+                        <div class="col-lg-6 mb-4">
+                            <div class="border rounded p-3 h-100">
+                                <h5 class="mb-3">Données client</h5>
 
-                        <input class="form-control mb-2" name="entreprise_nom" placeholder="Raison sociale">
-                        <input class="form-control mb-2" name="siret" placeholder="SIRET">
-                        <input class="form-control mb-2" name="adresse_consommation" placeholder="Adresse compteur">
-                        <input class="form-control mb-2" name="adresse_facturation" placeholder="Adresse facturation">
-                        <input class="form-control mb-2" name="signataire_nom" placeholder="Nom">
-                        <input class="form-control mb-2" name="signataire_tel" placeholder="Téléphone">
-                        <input class="form-control mb-2" name="signataire_email" placeholder="Email">
+                                <div class="mb-2">
+                                    <label class="form-label">Type d’énergie</label>
+                                    <select name="energie_type" class="form-select">
+                                        <option value="">Sélectionner</option>
+                                        <option value="electricite">Électricité</option>
+                                        <option value="gaz">Gaz</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Raison sociale</label>
+                                    <input class="form-control" name="entreprise_nom" value="{{ client.name or '' }}">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Nom commercial du site</label>
+                                    <input class="form-control" name="site_nom" placeholder="Nom commercial du site">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">SIRET</label>
+                                    <input class="form-control" name="siret" value="{{ client.siret or '' }}">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Nom du signataire</label>
+                                    <input class="form-control" name="signataire_nom" placeholder="Nom du signataire">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Fonction du signataire</label>
+                                    <input class="form-control" name="fonction_signataire" placeholder="Fonction du signataire">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Téléphone</label>
+                                    <input class="form-control" name="signataire_tel" value="{{ client.phone or '' }}" placeholder="Téléphone">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Portable</label>
+                                    <input class="form-control" name="signataire_mobile" placeholder="Numéro de portable">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Email</label>
+                                    <input class="form-control" name="signataire_email" value="{{ client.email or '' }}" placeholder="Email">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Code NAF</label>
+                                    <input class="form-control" name="code_naf" placeholder="Code NAF">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Adresse du compteur</label>
+                                    <input class="form-control" name="adresse_consommation" placeholder="Adresse du compteur" value="{{ client.address or '' }}">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Adresse facturation</label>
+                                    <input class="form-control" name="adresse_facturation" placeholder="Adresse facturation">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Date de remise de l’offre</label>
+                                    <input type="date" class="form-control" name="date_remise_offre">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ================= DONNÉES CONSOMMATION ÉLECTRICITÉ ================= -->
+                        <div class="col-lg-6 mb-4">
+                            <div class="border rounded p-3 h-100">
+                                <h5 class="mb-3">Données consommation électricité</h5>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Début de fourniture souhaitée</label>
+                                    <input type="date" class="form-control" name="elec_debut_fourniture">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Fin de fourniture souhaitée</label>
+                                    <input type="date" class="form-control" name="elec_fin_fourniture">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Nombre de mois à fournir</label>
+                                    <input class="form-control" name="elec_nb_mois" placeholder="Nombre de mois de fourniture">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">PDL</label>
+                                    <input class="form-control" name="pdl" placeholder="PDL">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Segment</label>
+                                    <input class="form-control" name="elec_segment" placeholder="Segment">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Formule d’acheminement</label>
+                                    <input class="form-control" name="formule_acheminement" placeholder="Formule d’acheminement">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">CAR</label>
+                                    <input class="form-control" name="elec_car" placeholder="CAR">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Puissance souscrite</label>
+                                    <input class="form-control" name="puissance_souscrite" placeholder="Puissance souscrite">
+                                </div>
+
+                                <hr>
+
+                                <h6 class="mb-3">Puissance par poste</h6>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Pointe</label>
+                                    <input class="form-control" name="pointe" placeholder="Pointe">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">HPH</label>
+                                    <input class="form-control" name="hph" placeholder="HPH">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">HCH</label>
+                                    <input class="form-control" name="hch" placeholder="HCH">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">HPR</label>
+                                    <input class="form-control" name="hpr" placeholder="HPR">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">HCE</label>
+                                    <input class="form-control" name="hce" placeholder="HCE">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ================= DONNÉES CONSOMMATION GAZ ================= -->
+                        <div class="col-lg-6 mb-4">
+                            <div class="border rounded p-3 h-100">
+                                <h5 class="mb-3">Données consommation gaz</h5>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Début de fourniture souhaitée</label>
+                                    <input type="date" class="form-control" name="gaz_debut_fourniture">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Fin de fourniture souhaitée</label>
+                                    <input type="date" class="form-control" name="gaz_fin_fourniture">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Nombre de mois à fournir</label>
+                                    <input class="form-control" name="gaz_nb_mois" placeholder="Nombre de mois de fourniture">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">PCE</label>
+                                    <input class="form-control" name="pce" placeholder="PCE">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Segment</label>
+                                    <input class="form-control" name="gaz_segment" placeholder="Segment">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Profil</label>
+                                    <input class="form-control" name="profil" placeholder="Profil">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">CAR</label>
+                                    <input class="form-control" name="gaz_car" placeholder="CAR">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ================= INFOS MÉTIER EXISTANTES / COMPAT ================= -->
+                        <div class="col-lg-6 mb-4">
+                            <div class="border rounded p-3 h-100">
+                                <h5 class="mb-3">Informations complémentaires</h5>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Date de négociation</label>
+                                    <input type="date" class="form-control" name="date_negociation">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Heure de négociation</label>
+                                    <input type="time" class="form-control" name="heure_negociation">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Type de compteur</label>
+                                    <input class="form-control" name="type_compteur" placeholder="Type de compteur">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Date d’échéance</label>
+                                    <input type="date" class="form-control" name="date_echeance">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Fournisseur actuel</label>
+                                    <input class="form-control" name="fournisseur_actuel" placeholder="Fournisseur actuel">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Commentaire</label>
+                                    <textarea class="form-control" name="commentaire" rows="5" placeholder="Commentaire"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
 
-                    <div class="col-md-6">
-                        <h6>Gaz</h6>
-                        <input class="form-control mb-2" name="pdl_pce" placeholder="PCE">
-                        <input class="form-control mb-2" name="gaz_car" placeholder="CAR">
+                    <button class="btn btn-primary mt-2">Envoyer</button>
+                </form>
+
+            </div>
+        </div>
+
+        <!-- HISTORIQUE -->
+        <div class="card">
+            <div class="card-header"><strong>Historique des cotations</strong></div>
+            <div class="card-body">
+                {% if cotations %}
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Type d’énergie</th>
+                            <th>PDL / PCE</th>
+                            <th>Date négociation</th>
+                            <th>Fournisseur actuel</th>
+                            <th>Commentaire</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for c in cotations %}
+                        <tr>
+                            <td>#{{ c.id }}</td>
+                            <td>{{ c.energie_type or "—" }}</td>
+                            <td>{{ c.pdl_pce or "—" }}</td>
+                            <td>{{ c.date_negociation or "—" }}</td>
+                            <td>{{ c.fournisseur_actuel or "—" }}</td>
+                            <td>{{ c.commentaire or "—" }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">Aucune cotation.</p>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================= ONGLET DOCUMENTS ================= -->
+    <div class="tab-pane fade" id="documents">
+
+        <div class="card mb-4">
+            <div class="card-header"><strong>Documents du client</strong></div>
+            <div class="card-body">
+
+                <!-- UPLOAD -->
+                <form method="post"
+                      action="{{ url_for('upload_client_document', client_id=client.id) }}"
+                      enctype="multipart/form-data">
+
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                    <div class="row">
+                        <div class="col-md-5 mb-2">
+                            <input type="file" name="files" multiple class="form-control">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <input type="text" name="doc_name" class="form-control" placeholder="Nom du document">
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <input type="text" name="pdl" class="form-control" placeholder="PDL / PCE">
+                        </div>
                     </div>
 
-                    <div class="col-md-6 mt-3">
-                        <h6>Électricité</h6>
-                        <input class="form-control mb-2" name="rae" placeholder="RAE">
-                        <input class="form-control mb-2" name="pointe" placeholder="Pointe">
-                        <input class="form-control mb-2" name="hph" placeholder="HPH">
-                        <input class="form-control mb-2" name="hch" placeholder="HCH">
-                        <input class="form-control mb-2" name="hpe" placeholder="HPE">
-                        <input class="form-control mb-2" name="hce" placeholder="HCE">
-                    </div>
+                    <button class="btn btn-success">Uploader</button>
+                </form>
 
+                <hr>
+
+                {% if documents %}
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for d in documents %}
+                    <tr>
+                        <td>{{ d.nom }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('download_document') }}?key={{ d.key }}"
+                               class="btn btn-sm btn-outline-primary">
+                                Télécharger
+                            </a>
+
+                            <form method="post"
+                                  action="{{ url_for('delete_document') }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Supprimer ce document ?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="key" value="{{ d.key }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    Supprimer
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">Aucun document.</p>
+                {% endif %}
+
+                <hr>
+
+                <h5>Ressources partagées</h5>
+
+                {% if shared_mandats %}
+                <div class="mb-3">
+                    <strong>Mandats</strong>
+                    <ul class="mt-2 mb-0">
+                        {% for d in shared_mandats %}
+                        <li class="mb-1">
+                            {{ d.nom }}
+                            <a href="{{ url_for('download_document') }}?key={{ d.key }}" class="ms-2">
+                                Télécharger
+                            </a>
+
+                            <form method="post"
+                                  action="{{ url_for('delete_document') }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Supprimer ce document partagé ?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="key" value="{{ d.key }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger ms-2">
+                                    Supprimer
+                                </button>
+                            </form>
+                        </li>
+                        {% endfor %}
+                    </ul>
                 </div>
+                {% endif %}
 
-                <button class="btn btn-primary mt-3">Envoyer</button>
-            </form>
+                {% if shared_resiliations %}
+                <div class="mb-3">
+                    <strong>Résiliations</strong>
+                    <ul class="mt-2 mb-0">
+                        {% for d in shared_resiliations %}
+                        <li class="mb-1">
+                            {{ d.nom }}
+                            <a href="{{ url_for('download_document') }}?key={{ d.key }}" class="ms-2">
+                                Télécharger
+                            </a>
 
+                            <form method="post"
+                                  action="{{ url_for('delete_document') }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Supprimer ce document partagé ?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="key" value="{{ d.key }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger ms-2">
+                                    Supprimer
+                                </button>
+                            </form>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if not shared_mandats and not shared_resiliations %}
+                <p class="text-muted mb-0">Aucune ressource partagée.</p>
+                {% endif %}
+
+            </div>
         </div>
+
     </div>
 
-    <!-- HISTORIQUE -->
-    <div class="card">
-        <div class="card-header"><strong>Historique des cotations</strong></div>
-        <div class="card-body">
-            {% if cotations %}
-            <table class="table table-sm">
-                {% for c in cotations %}
-                <tr>
-                    <td>#{{ c.id }}</td>
-                    <td>{{ c.energie_type or "—" }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-            {% else %}
-            <p class="text-muted">Aucune cotation.</p>
-            {% endif %}
+    <!-- ================= ONGLET MISE À JOUR ================= -->
+    <div class="tab-pane fade" id="updates">
+
+        <div class="card mb-4">
+            <div class="card-header"><strong>Demande de mise à jour</strong></div>
+            <div class="card-body">
+
+                <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                    <input type="date" name="update_date" class="form-control mb-2" required>
+
+                    <textarea name="update_commentaire"
+                              class="form-control mb-2"
+                              placeholder="Commentaire"></textarea>
+
+                    <button class="btn btn-warning">Envoyer</button>
+                </form>
+
+            </div>
         </div>
-    </div>
 
-</div>
+        <div class="card">
+            <div class="card-header"><strong>Historique</strong></div>
+            <div class="card-body">
 
-<!-- ================= ONGLET DOCUMENTS ================= -->
-<div class="tab-pane fade" id="documents">
+                {% if updates %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Commentaire</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for u in updates %}
+                    <tr>
+                        <td>{{ u.update_date }}</td>
+                        <td>{{ u.commentaire }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">Aucune mise à jour.</p>
+                {% endif %}
 
-    <div class="card mb-4">
-        <div class="card-header"><strong>Documents du client</strong></div>
-        <div class="card-body">
-
-            <!-- UPLOAD -->
-            <form method="post"
-                  action="{{ url_for('upload_client_document', client_id=client.id) }}"
-                  enctype="multipart/form-data">
-
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-                <input type="file" name="files" multiple class="form-control mb-2">
-                <input type="text" name="doc_name" class="form-control mb-2" placeholder="Nom du document">
-                <input type="text" name="pdl" class="form-control mb-2" placeholder="PDL / PCE">
-
-                <button class="btn btn-success">Uploader</button>
-            </form>
-
-            <hr>
-
-            {% if documents %}
-            <table class="table table-sm">
-                {% for d in documents %}
-                <tr>
-                    <td>{{ d.nom }}</td>
-                    <td><a href="{{ url_for('download_document') }}?key={{ d.key }}">Télécharger</a></td>
-                </tr>
-                {% endfor %}
-            </table>
-            {% else %}
-            <p class="text-muted">Aucun document.</p>
-            {% endif %}
-
-            <hr>
-
-            <h5>Ressources partagées</h5>
-
-            {% for d in shared_mandats %}
-                <div>{{ d.nom }} <a href="{{ url_for('download_document') }}?key={{ d.key }}">Télécharger</a></div>
-            {% endfor %}
-
-            {% for d in shared_resiliations %}
-                <div>{{ d.nom }} <a href="{{ url_for('download_document') }}?key={{ d.key }}">Télécharger</a></div>
-            {% endfor %}
-
+            </div>
         </div>
+
     </div>
-
-</div>
-
-<!-- ================= ONGLET MISE À JOUR ================= -->
-<div class="tab-pane fade" id="updates">
-
-    <div class="card mb-4">
-        <div class="card-header"><strong>Demande de mise à jour</strong></div>
-        <div class="card-body">
-
-            <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-                <input type="date" name="update_date" class="form-control mb-2" required>
-
-                <textarea name="update_commentaire"
-                          class="form-control mb-2"
-                          placeholder="Commentaire"></textarea>
-
-                <button class="btn btn-warning">Envoyer</button>
-            </form>
-
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header"><strong>Historique</strong></div>
-        <div class="card-body">
-
-            {% if updates %}
-            <table class="table table-sm">
-                {% for u in updates %}
-                <tr>
-                    <td>{{ u.update_date }}</td>
-                    <td>{{ u.commentaire }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-            {% else %}
-            <p class="text-muted">Aucune mise à jour.</p>
-            {% endif %}
-
-        </div>
-    </div>
-
-</div>
 
 </div>
 
