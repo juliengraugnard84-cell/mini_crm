@@ -2574,13 +2574,14 @@ def delete_document():
 app.view_functions.setdefault("documents_admin", documents)
 
 
-############################################################
+###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS
 # ⚠️ VERSION UNIQUE — AUCUN DOUBLON
 ############################################################
 
 from datetime import datetime
+import re
 
 # =========================
 # SAFE PARSE
@@ -2685,176 +2686,7 @@ def clients():
 
 
 # =========================
-# CLIENT — CRÉATION
-# =========================
-@app.route("/clients/new", methods=["POST"], endpoint="new_client")
-@login_required
-def new_client():
-
-    conn = get_db()
-    user = session.get("user") or {}
-
-    name = (request.form.get("name") or "").strip()
-    gerant_nom = (request.form.get("gerant_nom") or "").strip()
-    email = (request.form.get("email") or "").strip()
-    phone = (request.form.get("phone") or "").strip()
-    address = (request.form.get("address") or "").strip()
-    siret = (request.form.get("siret") or "").strip()
-    commercial_name = (request.form.get("commercial_name") or "").strip()
-
-    if not name:
-        flash("Nom obligatoire.", "danger")
-        return redirect(url_for("clients"))
-
-    owner_id = user.get("id")
-    commercial = user.get("username")
-
-    if user.get("role") == "admin" and commercial_name:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, username FROM users WHERE LOWER(username)=LOWER(%s)",
-                (commercial_name,),
-            )
-            row = cur.fetchone()
-            if row:
-                owner_id = row["id"]
-                commercial = row["username"]
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO crm_clients (
-                    name, email, phone, address,
-                    commercial, owner_id, status,
-                    siret, gerant_nom
-                )
-                VALUES (%s,%s,%s,%s,%s,%s,'en_cours',%s,%s)
-            """, (
-                name,
-                email or None,
-                phone or None,
-                address or None,
-                commercial,
-                owner_id,
-                siret or None,
-                gerant_nom or None,
-            ))
-
-        conn.commit()
-        flash("Client créé avec succès.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        raise
-
-    return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — UPDATE STATUS
-# =========================
-@app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
-@login_required
-def update_client_status(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-    new_status = (request.form.get("status") or "").lower()
-
-    if new_status not in ("en_cours", "en_attente", "gagne", "perdu"):
-        flash("Statut invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE crm_clients SET status=%s WHERE id=%s",
-                (new_status, client_id)
-            )
-
-        conn.commit()
-        flash("Statut mis à jour.", "success")
-
-    except Exception:
-        conn.rollback()
-        flash("Erreur mise à jour.", "danger")
-
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# CLIENT — SUPPRESSION
-# =========================
-@app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
-@admin_required
-def delete_client(client_id):
-
-    conn = get_db()
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
-
-        conn.commit()
-        flash("Client supprimé.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur suppression client : %r", e)
-        flash("Erreur lors de la suppression.", "danger")
-
-    return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — DÉTAIL
-# =========================
-@app.route("/clients/<int:client_id>")
-@login_required
-def client_detail(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT crm_clients.*, users.username AS commercial
-            FROM crm_clients
-            LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.id=%s
-        """, (client_id,))
-        row = cur.fetchone()
-
-    if not row:
-        flash("Client introuvable.", "danger")
-        return redirect(url_for("clients"))
-
-    client = row_to_obj(row)
-    documents = list_client_documents(client_id)
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM cotations WHERE client_id=%s ORDER BY date_creation DESC", (client_id,))
-        cotations = [row_to_obj(r) for r in cur.fetchall()]
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM client_updates WHERE client_id=%s ORDER BY created_at DESC", (client_id,))
-        updates = [row_to_obj(r) for r in cur.fetchall()]
-
-    return render_template(
-        "client_detail.html",
-        client=client,
-        documents=documents,
-        cotations=cotations,
-        updates=updates,
-    )
-
-
-# =========================
-# CLIENT — AJOUT COTATION
+# CLIENT — AJOUT COTATION (FIX PDL/PCE 🔥)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
@@ -2866,6 +2698,21 @@ def create_cotation(client_id):
     conn = get_db()
     user = session.get("user") or {}
     f = request.form
+
+    # 🔥 FIX CRITIQUE PDL / PCE
+    pdl_pce = (f.get("pdl_pce") or "").strip()
+
+    # gaz peut venir sous plusieurs noms
+    pce = (
+        f.get("pce")
+        or f.get("pdl")           # fallback classique
+        or f.get("pdl_pce")       # fallback sécurité
+        or ""
+    ).strip()
+
+    # nettoyage chiffres uniquement (sécurise saisie)
+    pce = re.sub(r"\D", "", pce) if pce else None
+    pdl_pce = re.sub(r"\D", "", pdl_pce) if pdl_pce else None
 
     try:
         with conn.cursor() as cur:
@@ -2956,10 +2803,10 @@ def create_cotation(client_id):
                 f.get("commentaire"),
                 user.get("id"),
 
-                f.get("pdl_pce"),
+                pdl_pce,  # ⚡ électricité
                 parse_date_safe(f.get("elec_debut_fourniture")),
                 parse_date_safe(f.get("elec_fin_fourniture")),
-                parse_int_safe(f.get("elec_nb_mois")),  # ✅ FIX
+                parse_int_safe(f.get("elec_nb_mois")),
                 f.get("elec_segment"),
                 f.get("formule_acheminement"),
                 f.get("elec_car"),
@@ -2973,8 +2820,8 @@ def create_cotation(client_id):
 
                 parse_date_safe(f.get("gaz_debut_fourniture")),
                 parse_date_safe(f.get("gaz_fin_fourniture")),
-                parse_int_safe(f.get("gaz_nb_mois")),   # ✅ FIX
-                f.get("pce"),
+                parse_int_safe(f.get("gaz_nb_mois")),
+                pce,  # 🔥 GAZ FIX
                 f.get("gaz_segment"),
                 f.get("profil"),
                 f.get("gaz_car"),

@@ -26,19 +26,15 @@
             <strong>{{ cotation.commercial_name or "—" }}</strong>
         </div>
 
-        <!-- ================= ENERGIE (CORRIGÉ) ================= -->
+        <!-- ================= ENERGIE (ROBUSTE 🔥) ================= -->
         <div class="info-item">
             <span>Énergie</span>
             <strong>
                 {% set energie = (cotation.energie_type or "").lower() %}
-                {% if energie in ["gaz"] %}
-                    <span class="badge bg-warning text-dark">
-                        🔥 Gaz
-                    </span>
-                {% elif energie in ["electricite", "électricité"] %}
-                    <span class="badge bg-info text-dark">
-                        ⚡ Électricité
-                    </span>
+                {% if "gaz" in energie %}
+                    <span class="badge bg-warning text-dark">🔥 Gaz</span>
+                {% elif "elec" in energie %}
+                    <span class="badge bg-info text-dark">⚡ Électricité</span>
                 {% else %}
                     —
                 {% endif %}
@@ -79,10 +75,20 @@
 <div class="card mb-4">
     <h5>Données techniques</h5>
 
+    {% set energie = (cotation.energie_type or "").lower() %}
+
     <div class="info-grid">
+
+        <!-- ================= FIX PDL / PCE 🔥 ================= -->
         <div class="info-item">
             <span>PDL / PCE</span>
-            <strong>{{ cotation.pdl_pce or "—" }}</strong>
+            <strong>
+                {% if "gaz" in energie %}
+                    {{ cotation.pce or cotation.pdl_pce or "—" }}
+                {% else %}
+                    {{ cotation.pdl_pce or cotation.pce or "—" }}
+                {% endif %}
+            </strong>
         </div>
 
         <div class="info-item">
@@ -138,7 +144,6 @@
             </strong>
         </div>
 
-        <!-- ================= ADRESSES ================= -->
         <div class="info-item">
             <span>Adresse de facturation</span>
             <strong>{{ cotation.adresse_facturation or "—" }}</strong>
