@@ -2686,6 +2686,53 @@ def clients():
 
 
 # =========================
+# CLIENT — DETAIL (FIX CRITIQUE 🔥)
+# =========================
+@app.route("/clients/<int:client_id>")
+@login_required
+def client_detail(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    # CLIENT
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT crm_clients.*, users.username AS commercial
+            FROM crm_clients
+            LEFT JOIN users ON users.id = crm_clients.owner_id
+            WHERE crm_clients.id = %s
+        """, (client_id,))
+        client = cur.fetchone()
+
+    if not client:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    # DOCUMENTS
+    documents = list_client_documents(client_id)
+
+    # COTATIONS
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT *
+            FROM cotations
+            WHERE client_id = %s
+            ORDER BY date_creation DESC
+        """, (client_id,))
+        cotations = cur.fetchall()
+
+    return render_template(
+        "client_detail.html",
+        client=row_to_obj(client),
+        documents=documents,
+        cotations=[row_to_obj(c) for c in cotations],
+    )
+
+
+# =========================
 # CLIENT — AJOUT COTATION (FIX PDL/PCE 🔥)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
@@ -2699,18 +2746,15 @@ def create_cotation(client_id):
     user = session.get("user") or {}
     f = request.form
 
-    # 🔥 FIX CRITIQUE PDL / PCE
     pdl_pce = (f.get("pdl_pce") or "").strip()
 
-    # gaz peut venir sous plusieurs noms
     pce = (
         f.get("pce")
-        or f.get("pdl")           # fallback classique
-        or f.get("pdl_pce")       # fallback sécurité
+        or f.get("pdl")
+        or f.get("pdl_pce")
         or ""
     ).strip()
 
-    # nettoyage chiffres uniquement (sécurise saisie)
     pce = re.sub(r"\D", "", pce) if pce else None
     pdl_pce = re.sub(r"\D", "", pdl_pce) if pdl_pce else None
 
@@ -2803,7 +2847,7 @@ def create_cotation(client_id):
                 f.get("commentaire"),
                 user.get("id"),
 
-                pdl_pce,  # ⚡ électricité
+                pdl_pce,
                 parse_date_safe(f.get("elec_debut_fourniture")),
                 parse_date_safe(f.get("elec_fin_fourniture")),
                 parse_int_safe(f.get("elec_nb_mois")),
@@ -2821,7 +2865,7 @@ def create_cotation(client_id):
                 parse_date_safe(f.get("gaz_debut_fourniture")),
                 parse_date_safe(f.get("gaz_fin_fourniture")),
                 parse_int_safe(f.get("gaz_nb_mois")),
-                pce,  # 🔥 GAZ FIX
+                pce,
                 f.get("gaz_segment"),
                 f.get("profil"),
                 f.get("gaz_car"),
