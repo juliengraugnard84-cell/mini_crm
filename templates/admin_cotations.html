@@ -69,17 +69,20 @@
                         {{ c.commercial_name or "—" }}
                     </td>
 
-                    <!-- ================= ENERGIE (CORRIGÉ) ================= -->
+                    <!-- ================= ENERGIE (FIX ROBUSTE 🔥) ================= -->
                     <td>
                         {% set energie = (c.energie_type or "").lower() %}
-                        {% if energie in ["gaz"] %}
+
+                        {% if "gaz" in energie %}
                             <span class="badge bg-warning text-dark">
                                 🔥 Gaz
                             </span>
-                        {% elif energie in ["electricite", "électricité"] %}
+
+                        {% elif "elec" in energie %}
                             <span class="badge bg-info text-dark">
                                 ⚡ Électricité
                             </span>
+
                         {% else %}
                             <span class="text-muted">—</span>
                         {% endif %}
