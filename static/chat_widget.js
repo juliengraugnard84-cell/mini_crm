@@ -20,6 +20,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const messagesBox = widget.querySelector("#chat-messages");
     const badge       = document.getElementById("chat-badge");
 
+    const sendBtn     = form.querySelector(".chat-send"); // ✅ FIX
+
     const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID ?? null;
     const CSRF_TOKEN      = window.CHAT_CSRF_TOKEN ?? null;
     const CAN_UPLOAD      = window.CHAT_CAN_UPLOAD ?? false;
@@ -293,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* ================= SEND (FIX UPLOAD FINAL) ================= */
+    /* ================= SEND ================= */
 
     async function sendMessage() {
 
@@ -315,16 +317,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (msg) fd.append("message", msg);
 
-        // ✅ FIX COMPAT FLASK MULTI
         files.forEach(f => {
-            fd.append("file[]", f);   // <-- FIX PRINCIPAL
-            fd.append("file", f);     // <-- compat fallback
+            fd.append("file[]", f);
+            fd.append("file", f);
         });
 
         const headers = {};
         if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
-
-        const sendBtn = form.querySelector(".chat-send");
 
         input.disabled = true;
         if (sendBtn) sendBtn.disabled = true;
@@ -367,9 +366,20 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    form.addEventListener("submit", e => {
-        e.preventDefault();
+    /* ================= FIX CLICK (CRITIQUE) ================= */
+
+    sendBtn.addEventListener("click", () => {
+        console.log("🖱 CLICK SEND");
         sendMessage();
+    });
+
+    /* ================= ENTER ================= */
+
+    input.addEventListener("keydown", e => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
     });
 
     /* ================= INIT ================= */
