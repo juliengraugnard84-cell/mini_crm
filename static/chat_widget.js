@@ -218,8 +218,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers
             });
 
-            console.log("✔ messages marqués comme lus");
-
         } catch (e) {
             console.error("Erreur mark_read", e);
         }
@@ -233,9 +231,8 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleBtn.setAttribute("aria-expanded", "true");
 
         setBadge(0);
-
         loadMessages(true);
-        markAsRead(); // ✅ FIX BADGE
+        markAsRead();
 
         setTimeout(() => input.focus(), 100);
     }
@@ -296,7 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* ================= SEND (FIX TOTAL) ================= */
+    /* ================= SEND (FIX UPLOAD FINAL) ================= */
 
     async function sendMessage() {
 
@@ -318,8 +315,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (msg) fd.append("message", msg);
 
+        // ✅ FIX COMPAT FLASK MULTI
         files.forEach(f => {
-            fd.append("file", f);
+            fd.append("file[]", f);   // <-- FIX PRINCIPAL
+            fd.append("file", f);     // <-- compat fallback
         });
 
         const headers = {};
@@ -369,7 +368,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     form.addEventListener("submit", e => {
-        console.log("🚀 SUBMIT TRIGGERED");
         e.preventDefault();
         sendMessage();
     });
@@ -380,7 +378,7 @@ document.addEventListener("DOMContentLoaded", () => {
         loadMessages(false);
 
         if (isOpen()) {
-            markAsRead(); // ✅ sync temps réel
+            markAsRead();
         }
 
     }, 5000);

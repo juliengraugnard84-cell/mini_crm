@@ -3152,7 +3152,6 @@ def _serialize_chat_datetime(value):
     """
     Sérialise created_at en heure Europe/Paris.
     Compatible timestamps naïfs / timezone-aware.
-    Si naïf, on suppose UTC (Render/Postgres fréquent).
     """
     if not value:
         return ""
@@ -3247,35 +3246,41 @@ def chat_messages():
 
 
 # =========================================================
-# SEND MESSAGE (MULTI FILES FIX)
+# SEND MESSAGE (MULTI FILES FIX FINAL)
 # =========================================================
 @app.route("/chat/send", methods=["POST"])
 @login_required
 def chat_send():
 
     message = (request.form.get("message") or "").strip()
-
-    # 🔥 FIX CRITIQUE FLASK (fichiers vides)
-    raw_files = request.files.getlist("file")
-
-    files = [
-        f for f in raw_files
-        if f and getattr(f, "filename", None)
-    ]
-
-    # fallback si Flask renvoie mal
-    if not files:
-        single = request.files.get("file")
-        if single and getattr(single, "filename", None):
-            files = [single]
-
     user = session.get("user") or {}
+
+    # =========================
+    # 🔥 FIX CRITIQUE FICHIERS
+    # =========================
+    files = []
+
+    if "file" in request.files:
+        raw = request.files.getlist("file")
+
+        for f in raw:
+            if f and getattr(f, "filename", ""):
+                files.append(f)
+
+    # fallback ultra safe
+    if not files:
+        for key in request.files:
+            f = request.files.get(key)
+            if f and getattr(f, "filename", ""):
+                files.append(f)
+
+    print("FILES REÇUS =", [f.filename for f in files])
 
     uploaded_files = []
     errors = []
 
     # =========================
-    # TRAITEMENT DES FICHIERS
+    # TRAITEMENT
     # =========================
     for file_obj in files:
 
@@ -3304,9 +3309,7 @@ def chat_send():
 
         with conn.cursor() as cur:
 
-            # =========================
             # MESSAGE SEUL
-            # =========================
             if message and not uploaded_files:
 
                 cur.execute("""
@@ -3317,19 +3320,16 @@ def chat_send():
                         is_read
                     )
                     VALUES (%s, %s, %s, 0)
-                    RETURNING id, created_at
+                    RETURNING id
                 """, (
                     user.get("id"),
                     user.get("username"),
                     message,
                 ))
 
-                row = cur.fetchone()
-                inserted_ids.append(row["id"])
+                inserted_ids.append(cur.fetchone()["id"])
 
-            # =========================
             # FICHIERS
-            # =========================
             for file_key, file_name in uploaded_files:
 
                 cur.execute("""
@@ -3342,7 +3342,7 @@ def chat_send():
                         is_read
                     )
                     VALUES (%s, %s, %s, %s, %s, 0)
-                    RETURNING id, created_at
+                    RETURNING id
                 """, (
                     user.get("id"),
                     user.get("username"),
@@ -3351,8 +3351,7 @@ def chat_send():
                     file_name,
                 ))
 
-                row = cur.fetchone()
-                inserted_ids.append(row["id"])
+                inserted_ids.append(cur.fetchone()["id"])
 
         conn.commit()
 
@@ -3459,3 +3458,4 @@ def debug_routes():
 # ============================
 # FIN PARTIE 4/4
 # ============================
+
