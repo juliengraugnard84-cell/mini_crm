@@ -2686,7 +2686,7 @@ def clients():
 
 
 # =========================
-# CLIENT — DETAIL (FIX CRITIQUE 🔥)
+# CLIENT — DETAIL
 # =========================
 @app.route("/clients/<int:client_id>")
 @login_required
@@ -2697,7 +2697,6 @@ def client_detail(client_id):
 
     conn = get_db()
 
-    # CLIENT
     with conn.cursor() as cur:
         cur.execute("""
             SELECT crm_clients.*, users.username AS commercial
@@ -2711,10 +2710,8 @@ def client_detail(client_id):
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    # DOCUMENTS
     documents = list_client_documents(client_id)
 
-    # COTATIONS
     with conn.cursor() as cur:
         cur.execute("""
             SELECT *
@@ -2733,7 +2730,49 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — AJOUT COTATION (FIX PDL/PCE 🔥)
+# 🔥 FIX CRITIQUE — UPDATE STATUT CLIENT
+# =========================
+@app.route(
+    "/clients/<int:client_id>/status",
+    methods=["POST"],
+    endpoint="update_client_status"
+)
+@login_required
+def update_client_status(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    status = (request.form.get("status") or "").strip().lower()
+
+    allowed_status = {"en_cours", "en_attente", "gagne", "perdu"}
+
+    if status not in allowed_status:
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE crm_clients
+                SET status = %s
+                WHERE id = %s
+            """, (status, client_id))
+
+        conn.commit()
+        flash("Statut mis à jour.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur update status : %r", e)
+        flash("Erreur lors de la mise à jour.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# CLIENT — AJOUT COTATION
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
