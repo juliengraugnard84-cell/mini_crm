@@ -143,9 +143,9 @@
 </div>
 {% endif %}
 
-<!-- ================= DEBUG (À SUPPRIMER APRÈS) ================= -->
+<!-- ================= DEBUG (CORRIGÉ) ================= -->
 <div class="card mt-4" style="background:#111;color:#0f0;font-size:12px;">
-    <pre>{{ cotation.__dict__ | tojson(indent=2) }}</pre>
+    <pre>{{ cotation.__dict__ | tojson(indent=2, default=str) }}</pre>
 </div>
 
 <!-- ================= ACTIONS ================= -->
