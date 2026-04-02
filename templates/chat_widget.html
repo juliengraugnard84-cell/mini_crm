@@ -54,6 +54,9 @@
         aria-relevant="additions">
     </div>
 
+    <!-- ✅ PREVIEW FICHIERS -->
+    <div id="chat-preview" class="chat-preview"></div>
+
     <!-- FORMULAIRE -->
     <form
         id="chat-form"
@@ -117,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileInput   = document.getElementById("chat-file");
     const messagesBox = document.getElementById("chat-messages");
     const badge       = document.getElementById("chat-badge");
+    const previewBox  = document.getElementById("chat-preview"); // ✅ AJOUT
 
     const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID ?? null;
     const CSRF_TOKEN      = window.CHAT_CSRF_TOKEN ?? null;
@@ -130,13 +134,31 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
+    /* ================= PREVIEW FICHIERS ================= */
+
+    if (fileInput && previewBox) {
+        fileInput.addEventListener("change", () => {
+
+            previewBox.innerHTML = "";
+
+            const files = Array.from(fileInput.files || []);
+
+            files.forEach(file => {
+                const item = document.createElement("div");
+                item.className = "chat-preview-item";
+                item.textContent = "📎 " + file.name;
+                previewBox.appendChild(item);
+            });
+
+        });
+    }
+
     /* ================= STATE ================= */
 
     let isLoading = false;
     let audioUnlocked = false;
     let lastSoundTime = 0;
 
-    // mémorise le dernier message connu pour détecter les nouveaux
     let lastMessageId = null;
     let isFirstLoad = true;
 
@@ -162,8 +184,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!audio || !audioUnlocked) return;
 
         const now = Date.now();
-
-        // anti double déclenchement
         if (now - lastSoundTime < 800) return;
 
         lastSoundTime = now;
@@ -243,8 +263,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (messageId === null) return false;
             if (messageId <= lastMessageId) return false;
 
-            // si on ne connaît pas l'utilisateur courant,
-            // on considère prudemment qu'on ne joue pas de son
             if (currentUserId === null) return false;
 
             return senderId !== currentUserId;
@@ -322,11 +340,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     toggleBtn.addEventListener("click", () => {
-        if (isOpen()) {
-            closeChat();
-        } else {
-            openChat();
-        }
+        if (isOpen()) closeChat();
+        else openChat();
     });
 
     if (closeBtn) {
@@ -344,16 +359,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 credentials: "same-origin"
             });
 
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}`);
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const data = await res.json();
             const messages = Array.isArray(data.messages) ? data.messages : [];
 
-            // joue le son uniquement si de nouveaux messages d'un autre utilisateur sont arrivés
             if (!isFirstLoad && hasNewIncomingMessage(messages)) {
-                console.log("🔔 Nouveau message reçu");
                 playSound();
             }
 
@@ -363,27 +374,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 return !m.is_read && senderId !== null && currentUserId !== null && senderId !== currentUserId;
             }).length;
 
-            if (!isOpen()) {
-                setBadge(unread);
-            }
+            if (!isOpen()) setBadge(unread);
 
             messagesBox.innerHTML = "";
-            messages.forEach(m => {
-                messagesBox.appendChild(renderMessage(m));
-            });
+            messages.forEach(m => messagesBox.appendChild(renderMessage(m)));
 
-            if (forceScroll || isOpen()) {
-                scrollBottom();
-            }
+            if (forceScroll || isOpen()) scrollBottom();
 
             const latestId = getLatestMessageId(messages);
-            if (latestId !== null) {
-                lastMessageId = latestId;
-            }
+            if (latestId !== null) lastMessageId = latestId;
 
-            if (isFirstLoad) {
-                isFirstLoad = false;
-            }
+            if (isFirstLoad) isFirstLoad = false;
 
         } catch (e) {
             console.error("Erreur chargement chat", e);
@@ -397,10 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function markAsRead() {
         try {
             const headers = {};
-
-            if (CSRF_TOKEN) {
-                headers["X-CSRF-Token"] = CSRF_TOKEN;
-            }
+            if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
 
             await fetch("/chat/mark_read", {
                 method: "POST",
@@ -426,9 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (file) fd.append("file", file);
 
         const headers = {};
-        if (CSRF_TOKEN) {
-            headers["X-CSRF-Token"] = CSRF_TOKEN;
-        }
+        if (CSRF_TOKEN) headers["X-CSRF-Token"] = CSRF_TOKEN;
 
         const sendBtn = form.querySelector(".chat-send");
 
@@ -444,9 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers
             });
 
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}`);
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const data = await res.json();
 
@@ -457,6 +451,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             input.value = "";
             if (fileInput) fileInput.value = "";
+            if (previewBox) previewBox.innerHTML = "";
 
             await loadMessages(true);
 
@@ -487,10 +482,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setInterval(() => {
         loadMessages(false);
-
-        if (isOpen()) {
-            markAsRead();
-        }
+        if (isOpen()) markAsRead();
     }, 5000);
 
     /* ================= INIT ================= */

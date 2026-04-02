@@ -782,3 +782,19 @@ main.content {
     font-size: 24px;
     margin-top: 10px;
 }
+.chat-preview {
+    padding: 6px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-top: 1px solid #eee;
+}
+
+.chat-preview-item {
+    font-size: 12px;
+    background: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 20px;
+    color: #333;
+    max-width: 160px;
+}
