@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const messagesBox = widget.querySelector("#chat-messages");
     const badge       = document.getElementById("chat-badge");
 
-    const sendBtn     = form.querySelector(".chat-send"); // ✅ FIX
+    const sendBtn     = form.querySelector(".chat-send");
 
     const CURRENT_USER_ID = window.CHAT_CURRENT_USER_ID ?? null;
     const CSRF_TOKEN      = window.CHAT_CSRF_TOKEN ?? null;
@@ -317,8 +317,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (msg) fd.append("message", msg);
 
+        // ✅ FIX ICI (IMPORTANT)
         files.forEach(f => {
-            fd.append("file[]", f);
             fd.append("file", f);
         });
 
@@ -366,7 +366,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* ================= FIX CLICK (CRITIQUE) ================= */
+    /* ================= FIX CLICK ================= */
 
     sendBtn.addEventListener("click", () => {
         console.log("🖱 CLICK SEND");
