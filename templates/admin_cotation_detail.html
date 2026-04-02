@@ -46,6 +46,18 @@
             <span>Heure</span>
             <strong>{{ cotation.heure_negociation or "—" }}</strong>
         </div>
+
+        <div class="info-item">
+            <span>Statut</span>
+            <strong>{{ cotation.status or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Date remise offre</span>
+            <strong>
+                {{ format_date(cotation.date_remise_offre) if cotation.date_remise_offre else "—" }}
+            </strong>
+        </div>
     </div>
 </div>
 
@@ -92,8 +104,18 @@
         </div>
 
         <div class="info-item">
+            <span>Site</span>
+            <strong>{{ cotation.site_nom or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
             <span>SIRET</span>
             <strong>{{ cotation.siret or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Code NAF</span>
+            <strong>{{ cotation.code_naf or "—" }}</strong>
         </div>
 
         <div class="info-item">
@@ -121,13 +143,153 @@
         </div>
 
         <div class="info-item">
+            <span>Fonction</span>
+            <strong>{{ cotation.fonction_signataire or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
             <span>Email</span>
             <strong>{{ cotation.signataire_email or "—" }}</strong>
         </div>
 
         <div class="info-item">
             <span>Téléphone</span>
-            <strong>{{ cotation.signataire_tel or cotation.signataire_mobile or "—" }}</strong>
+            <strong>{{ cotation.signataire_tel or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Mobile</span>
+            <strong>{{ cotation.signataire_mobile or "—" }}</strong>
+        </div>
+
+    </div>
+</div>
+
+<!-- ================= ÉLECTRICITÉ ================= -->
+<div class="card mb-4">
+    <h5>Données consommation électricité</h5>
+
+    <div class="info-grid">
+
+        <div class="info-item">
+            <span>Début de fourniture souhaitée</span>
+            <strong>
+                {{ format_date(cotation.elec_debut_fourniture) if cotation.elec_debut_fourniture else "—" }}
+            </strong>
+        </div>
+
+        <div class="info-item">
+            <span>Fin de fourniture souhaitée</span>
+            <strong>
+                {{ format_date(cotation.elec_fin_fourniture) if cotation.elec_fin_fourniture else "—" }}
+            </strong>
+        </div>
+
+        <div class="info-item">
+            <span>Nombre de mois à fournir</span>
+            <strong>{{ cotation.elec_nb_mois or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Segment</span>
+            <strong>{{ cotation.elec_segment or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Formule d’acheminement</span>
+            <strong>{{ cotation.formule_acheminement or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>CAR</span>
+            <strong>{{ cotation.elec_car or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Puissance souscrite</span>
+            <strong>{{ cotation.puissance_souscrite or "—" }}</strong>
+        </div>
+
+    </div>
+</div>
+
+<!-- ================= PUISSANCE PAR POSTE ================= -->
+<div class="card mb-4">
+    <h5>Puissance par poste</h5>
+
+    <div class="info-grid">
+
+        <div class="info-item">
+            <span>Pointe</span>
+            <strong>{{ cotation.pointe or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>HPH</span>
+            <strong>{{ cotation.hph or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>HCH</span>
+            <strong>{{ cotation.hch or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>HPR</span>
+            <strong>{{ cotation.hpr or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>HCE</span>
+            <strong>{{ cotation.hce or "—" }}</strong>
+        </div>
+
+    </div>
+</div>
+
+<!-- ================= GAZ ================= -->
+<div class="card mb-4">
+    <h5>Données consommation gaz</h5>
+
+    <div class="info-grid">
+
+        <div class="info-item">
+            <span>Début de fourniture souhaitée</span>
+            <strong>
+                {{ format_date(cotation.gaz_debut_fourniture) if cotation.gaz_debut_fourniture else "—" }}
+            </strong>
+        </div>
+
+        <div class="info-item">
+            <span>Fin de fourniture souhaitée</span>
+            <strong>
+                {{ format_date(cotation.gaz_fin_fourniture) if cotation.gaz_fin_fourniture else "—" }}
+            </strong>
+        </div>
+
+        <div class="info-item">
+            <span>Nombre de mois à fournir</span>
+            <strong>{{ cotation.gaz_nb_mois or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>PCE gaz</span>
+            <strong>{{ cotation.pce or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Segment gaz</span>
+            <strong>{{ cotation.gaz_segment or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Profil</span>
+            <strong>{{ cotation.profil or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>CAR gaz</span>
+            <strong>{{ cotation.gaz_car or "—" }}</strong>
         </div>
 
     </div>
