@@ -30,12 +30,16 @@
 
         <div class="info-item">
             <span>Date création</span>
-            <strong>{{ format_date(cotation.date_creation) }}</strong>
+            <strong>
+                {{ format_date(cotation.date_creation) if cotation.date_creation else "—" }}
+            </strong>
         </div>
 
         <div class="info-item">
             <span>Date négociation</span>
-            <strong>{{ format_date(cotation.date_negociation) }}</strong>
+            <strong>
+                {{ format_date(cotation.date_negociation) if cotation.date_negociation else "—" }}
+            </strong>
         </div>
 
         <div class="info-item">
@@ -68,7 +72,9 @@
 
         <div class="info-item">
             <span>Date échéance</span>
-            <strong>{{ format_date(cotation.date_echeance) }}</strong>
+            <strong>
+                {{ format_date(cotation.date_echeance) if cotation.date_echeance else "—" }}
+            </strong>
         </div>
 
     </div>
@@ -131,7 +137,7 @@
 {% if cotation.commentaire %}
 <div class="card mb-4">
     <h5>Commentaire</h5>
-    <div class="alert alert-light">
+    <div class="alert alert-light" style="white-space:pre-line;">
         {{ cotation.commentaire }}
     </div>
 </div>
@@ -139,7 +145,7 @@
 
 <!-- ================= DEBUG (À SUPPRIMER APRÈS) ================= -->
 <div class="card mt-4" style="background:#111;color:#0f0;font-size:12px;">
-    <pre>{{ cotation | tojson(indent=2) }}</pre>
+    <pre>{{ cotation.__dict__ | tojson(indent=2) }}</pre>
 </div>
 
 <!-- ================= ACTIONS ================= -->
