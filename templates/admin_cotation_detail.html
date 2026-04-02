@@ -3,15 +3,12 @@
 
 {% block content %}
 
-<!-- ================= PAGE HEADER ================= -->
 <div class="page-header mb-4">
     <h1>Demande de cotation</h1>
-    <p class="text-muted">
-        Consultation détaillée de la demande
-    </p>
+    <p class="text-muted">Consultation détaillée de la demande</p>
 </div>
 
-<!-- ================= INFORMATIONS GÉNÉRALES ================= -->
+<!-- ================= INFOS GÉNÉRALES ================= -->
 <div class="card mb-4">
     <h5>Informations générales</h5>
 
@@ -26,98 +23,66 @@
             <strong>{{ cotation.commercial_name or "—" }}</strong>
         </div>
 
-        <!-- ================= ENERGIE (ROBUSTE 🔥) ================= -->
         <div class="info-item">
             <span>Énergie</span>
-            <strong>
-                {% set energie = (cotation.energie_type or "").lower() %}
-                {% if "gaz" in energie %}
-                    <span class="badge bg-warning text-dark">🔥 Gaz</span>
-                {% elif "elec" in energie %}
-                    <span class="badge bg-info text-dark">⚡ Électricité</span>
-                {% else %}
-                    —
-                {% endif %}
-            </strong>
+            <strong>{{ cotation.energie_type or "—" }}</strong>
         </div>
 
         <div class="info-item">
-            <span>Date de création</span>
-            <strong>
-                {{ format_date(cotation.date_creation) if cotation.date_creation else "—" }}
-            </strong>
+            <span>Date création</span>
+            <strong>{{ format_date(cotation.date_creation) }}</strong>
         </div>
 
         <div class="info-item">
-            <span>Date de négociation</span>
-            <strong>
-                {{ format_date(cotation.date_negociation) if cotation.date_negociation else "—" }}
-            </strong>
+            <span>Date négociation</span>
+            <strong>{{ format_date(cotation.date_negociation) }}</strong>
         </div>
 
         <div class="info-item">
-            <span>Heure de négociation</span>
+            <span>Heure</span>
             <strong>{{ cotation.heure_negociation or "—" }}</strong>
-        </div>
-
-        <div class="info-item">
-            <span>Statut</span>
-            <strong>
-                <span class="badge bg-primary">
-                    {{ cotation.status or "—" }}
-                </span>
-            </strong>
         </div>
     </div>
 </div>
 
-<!-- ================= DONNÉES TECHNIQUES ================= -->
+<!-- ================= TECHNIQUE ================= -->
 <div class="card mb-4">
     <h5>Données techniques</h5>
 
-    {% set energie = (cotation.energie_type or "").lower() %}
-
     <div class="info-grid">
 
-        <!-- ================= FIX PDL / PCE 🔥 ================= -->
         <div class="info-item">
             <span>PDL / PCE</span>
-            <strong>
-                {% if "gaz" in energie %}
-                    {{ cotation.pce or cotation.pdl_pce or "—" }}
-                {% else %}
-                    {{ cotation.pdl_pce or cotation.pce or "—" }}
-                {% endif %}
-            </strong>
+            <strong>{{ cotation.pdl_pce or cotation.pce or "—" }}</strong>
         </div>
 
         <div class="info-item">
-            <span>Type de compteur</span>
+            <span>Type compteur</span>
             <strong>{{ cotation.type_compteur or "—" }}</strong>
         </div>
 
         <div class="info-item">
-            <span>Fournisseur actuel</span>
+            <span>Fournisseur</span>
             <strong>{{ cotation.fournisseur_actuel or "—" }}</strong>
         </div>
 
         <div class="info-item">
-            <span>Date d’échéance</span>
-            <strong>
-                {{ format_date(cotation.date_echeance) if cotation.date_echeance else "—" }}
-            </strong>
+            <span>Date échéance</span>
+            <strong>{{ format_date(cotation.date_echeance) }}</strong>
         </div>
+
     </div>
 </div>
 
-<!-- ================= ENTREPRISE / SIGNATAIRE ================= -->
+<!-- ================= ENTREPRISE ================= -->
 <div class="card mb-4">
-    <h5>Entreprise & signataire</h5>
+    <h5>Entreprise</h5>
 
     <div class="info-grid">
+
         <div class="info-item">
             <span>Entreprise</span>
-            <strong>{{ cotation.entreprise_nom or cotation.client_name or "—" }}</strong>
+            <strong>{{ cotation.entreprise_nom or "—" }}</strong>
         </div>
 
         <div class="info-item">
@@ -126,7 +91,26 @@
         </div>
 
         <div class="info-item">
-            <span>Signataire</span>
+            <span>Adresse facturation</span>
+            <strong>{{ cotation.adresse_facturation or "—" }}</strong>
+        </div>
+
+        <div class="info-item">
+            <span>Adresse consommation</span>
+            <strong>{{ cotation.adresse_consommation or "—" }}</strong>
+        </div>
+
+    </div>
+</div>
+
+<!-- ================= SIGNATAIRE ================= -->
+<div class="card mb-4">
+    <h5>Signataire</h5>
+
+    <div class="info-grid">
+
+        <div class="info-item">
+            <span>Nom</span>
             <strong>{{ cotation.signataire_nom or "—" }}</strong>
         </div>
 
@@ -137,21 +121,7 @@
 
         <div class="info-item">
             <span>Téléphone</span>
-            <strong>
-                {{ cotation.signataire_tel
-                   or cotation.signataire_mobile
-                   or "—" }}
-            </strong>
-        </div>
-
-        <div class="info-item">
-            <span>Adresse de facturation</span>
-            <strong>{{ cotation.adresse_facturation or "—" }}</strong>
-        </div>
-
-        <div class="info-item">
-            <span>Adresse de consommation</span>
-            <strong>{{ cotation.adresse_consommation or "—" }}</strong>
+            <strong>{{ cotation.signataire_tel or cotation.signataire_mobile or "—" }}</strong>
         </div>
 
     </div>
@@ -160,28 +130,36 @@
 <!-- ================= COMMENTAIRE ================= -->
 {% if cotation.commentaire %}
 <div class="card mb-4">
-    <h5>Commentaire du commercial</h5>
-    <div class="alert alert-light" style="white-space:pre-line;">
+    <h5>Commentaire</h5>
+    <div class="alert alert-light">
         {{ cotation.commentaire }}
     </div>
 </div>
 {% endif %}
 
+<!-- ================= DEBUG (À SUPPRIMER APRÈS) ================= -->
+<div class="card mt-4" style="background:#111;color:#0f0;font-size:12px;">
+    <pre>{{ cotation | tojson(indent=2) }}</pre>
+</div>
+
 <!-- ================= ACTIONS ================= -->
 <div class="d-flex justify-content-between mt-4">
-    <a href="{{ url_for('admin_cotations') }}"
-       class="btn btn-secondary">
-        ← Retour aux demandes
+
+    <a href="{{ url_for('admin_cotations') }}" class="btn btn-secondary">
+        ← Retour
     </a>
 
     <form method="POST"
           action="{{ url_for('delete_cotation_admin', cotation_id=cotation.id) }}"
-          onsubmit="return confirm('Supprimer définitivement cette demande ?');">
+          onsubmit="return confirm('Supprimer ?');">
+
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
         <button class="btn btn-danger">
-            Supprimer la demande
+            Supprimer
         </button>
     </form>
+
 </div>
 
 {% endblock %}
