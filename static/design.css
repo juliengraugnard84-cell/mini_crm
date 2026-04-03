@@ -798,3 +798,28 @@ main.content {
     color: #333;
     max-width: 160px;
 }
+/* ================= DEBUG BLOCK ================= */
+
+.debug-item {
+    background: #ffffff;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.debug-item small {
+    color: #888;
+    font-size: 12px;
+}
+
+.debug-item strong {
+    font-size: 14px;
+    color: #222;
+}
+
+.card-header.bg-dark {
+    border-radius: 8px 8px 0 0;
+}
