@@ -209,11 +209,11 @@
 
         </div>
 
-        <!-- JSON brut (dev only) -->
+        <!-- JSON brut (FIX CRITIQUE ICI) -->
         <details class="mt-4">
             <summary style="cursor:pointer;">Voir JSON complet</summary>
             <pre class="mt-2 p-3 bg-dark text-success rounded">
-{{ cotation | tojson(indent=2) }}
+{{ cotation.__dict__ | tojson(indent=2) }}
             </pre>
         </details>
 
