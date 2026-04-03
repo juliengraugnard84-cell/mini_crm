@@ -54,7 +54,6 @@
     <h5>Données techniques</h5>
 
     <div class="info-grid">
-
         <div class="info-item">
             <span>PDL / PCE</span>
             <strong>{{ cotation.pdl_pce or cotation.pce or "—" }}</strong>
@@ -76,7 +75,6 @@
                 {{ format_date(cotation.date_echeance) if cotation.date_echeance else "—" }}
             </strong>
         </div>
-
     </div>
 </div>
 
@@ -85,7 +83,6 @@
     <h5>Entreprise</h5>
 
     <div class="info-grid">
-
         <div class="info-item">
             <span>Entreprise</span>
             <strong>{{ cotation.entreprise_nom or "—" }}</strong>
@@ -105,7 +102,6 @@
             <span>Adresse consommation</span>
             <strong>{{ cotation.adresse_consommation or "—" }}</strong>
         </div>
-
     </div>
 </div>
 
@@ -114,7 +110,6 @@
     <h5>Signataire</h5>
 
     <div class="info-grid">
-
         <div class="info-item">
             <span>Nom</span>
             <strong>{{ cotation.signataire_nom or "—" }}</strong>
@@ -129,7 +124,6 @@
             <span>Téléphone</span>
             <strong>{{ cotation.signataire_tel or cotation.signataire_mobile or "—" }}</strong>
         </div>
-
     </div>
 </div>
 
@@ -143,7 +137,7 @@
 </div>
 {% endif %}
 
-<!-- ================= DEBUG PROPRE (AMÉLIORÉ) ================= -->
+<!-- ================= DEBUG PROPRE FINAL ================= -->
 {% if current_user and current_user.role == "admin" %}
 <div class="card mt-4 shadow-sm">
 
@@ -156,6 +150,7 @@
 
     <div id="debug-content" class="card-body" style="display:none;">
 
+        <!-- ✅ VRAIE GRID (SANS BOOTSTRAP) -->
         <div class="debug-grid">
 
             <div class="debug-item">
@@ -195,6 +190,7 @@
 
         </div>
 
+        <!-- JSON -->
         <details class="debug-json mt-4">
             <summary>Voir JSON complet</summary>
             <pre>{{ cotation.__dict__ }}</pre>
