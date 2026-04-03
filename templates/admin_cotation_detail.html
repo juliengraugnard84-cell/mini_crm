@@ -143,78 +143,61 @@
 </div>
 {% endif %}
 
-<!-- ================= DEBUG PROPRE ================= -->
+<!-- ================= DEBUG PROPRE (AMÉLIORÉ) ================= -->
 {% if current_user and current_user.role == "admin" %}
 <div class="card mt-4 shadow-sm">
-    
-    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-        <span>🔧 Données techniques (debug)</span>
+
+    <div class="card-header debug-header d-flex justify-content-between align-items-center">
+        <span>🔧 Données techniques</span>
         <button class="btn btn-sm btn-outline-light" onclick="toggleDebug()">
             Afficher / Masquer
         </button>
     </div>
 
-    <div id="debug-content" class="card-body bg-light" style="display:none;">
+    <div id="debug-content" class="card-body" style="display:none;">
 
-        <div class="row g-3">
+        <div class="debug-grid">
 
-            <div class="col-md-3">
-                <div class="debug-item">
-                    <small>ID</small>
-                    <strong>{{ cotation.id }}</strong>
-                </div>
+            <div class="debug-item">
+                <span>ID</span>
+                <strong>{{ cotation.id }}</strong>
             </div>
 
-            <div class="col-md-3">
-                <div class="debug-item">
-                    <small>Client ID</small>
-                    <strong>{{ cotation.client_id }}</strong>
-                </div>
+            <div class="debug-item">
+                <span>Client ID</span>
+                <strong>{{ cotation.client_id }}</strong>
             </div>
 
-            <div class="col-md-3">
-                <div class="debug-item">
-                    <small>Énergie</small>
-                    <strong>{{ cotation.energie_type }}</strong>
-                </div>
+            <div class="debug-item">
+                <span>PDL / PCE</span>
+                <strong>{{ cotation.pdl_pce }}</strong>
             </div>
 
-            <div class="col-md-3">
-                <div class="debug-item">
-                    <small>Fournisseur</small>
-                    <strong>{{ cotation.fournisseur_actuel }}</strong>
-                </div>
+            <div class="debug-item">
+                <span>Énergie</span>
+                <strong>{{ cotation.energie_type }}</strong>
             </div>
 
-            <div class="col-md-3">
-                <div class="debug-item">
-                    <small>PDL / PCE</small>
-                    <strong>{{ cotation.pdl_pce }}</strong>
-                </div>
+            <div class="debug-item">
+                <span>Fournisseur</span>
+                <strong>{{ cotation.fournisseur_actuel }}</strong>
             </div>
 
-            <div class="col-md-3">
-                <div class="debug-item">
-                    <small>Date négo</small>
-                    <strong>{{ cotation.date_negociation }}</strong>
-                </div>
+            <div class="debug-item">
+                <span>Date négociation</span>
+                <strong>{{ cotation.date_negociation }}</strong>
             </div>
 
-            <div class="col-md-3">
-                <div class="debug-item">
-                    <small>Échéance</small>
-                    <strong>{{ cotation.date_echeance }}</strong>
-                </div>
+            <div class="debug-item">
+                <span>Date échéance</span>
+                <strong>{{ cotation.date_echeance }}</strong>
             </div>
 
         </div>
 
-        <!-- 🔥 VERSION SAFE (AUCUN CRASH POSSIBLE) -->
-        <details class="mt-4">
-            <summary style="cursor:pointer;">Voir JSON complet</summary>
-            <pre class="mt-2 p-3 bg-dark text-success rounded">
-{{ cotation.__dict__ }}
-            </pre>
+        <details class="debug-json mt-4">
+            <summary>Voir JSON complet</summary>
+            <pre>{{ cotation.__dict__ }}</pre>
         </details>
 
     </div>
