@@ -2576,7 +2576,7 @@ app.view_functions.setdefault("documents_admin", documents)
 
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
-# + STATUT + COTATIONS
+# + STATUT + COTATIONS + DELETE CLIENT
 # ⚠️ VERSION UNIQUE — AUCUN DOUBLON
 ############################################################
 
@@ -2730,7 +2730,7 @@ def client_detail(client_id):
 
 
 # =========================
-# 🔥 FIX CRITIQUE — UPDATE STATUT CLIENT
+# UPDATE STATUT CLIENT
 # =========================
 @app.route(
     "/clients/<int:client_id>/status",
@@ -2769,6 +2769,33 @@ def update_client_status(client_id):
         flash("Erreur lors de la mise à jour.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# 🔥 DELETE CLIENT (FIX ERREUR 405)
+# =========================
+@app.route("/clients/<int:client_id>/delete", methods=["POST"])
+@admin_required
+def delete_client(client_id):
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM crm_clients WHERE id = %s",
+                (client_id,)
+            )
+
+        conn.commit()
+        flash("Client supprimé.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur suppression client : %r", e)
+        flash("Erreur lors de la suppression.", "danger")
+
+    return redirect(url_for("clients"))
 
 
 # =========================
@@ -3458,4 +3485,3 @@ def debug_routes():
 # ============================
 # FIN PARTIE 4/4
 # ============================
-

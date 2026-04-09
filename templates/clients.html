@@ -24,8 +24,9 @@
         <div class="card-body">
             <h5 class="mb-3">Créer un nouveau dossier client</h5>
 
+            {% if 'new_client' in available_endpoints %}
             <form method="post"
-                  action="{% if 'new_client' in available_endpoints %}{{ url_for('new_client') }}{% else %}{{ url_for('clients') }}{% endif %}">
+                  action="{{ url_for('new_client') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
                 <div class="row g-3">
@@ -92,6 +93,12 @@
                     </button>
                 </div>
             </form>
+            {% else %}
+            <div class="alert alert-warning mb-0">
+                ⚠️ La fonctionnalité de création client n’est pas encore activée (route manquante).
+            </div>
+            {% endif %}
+
         </div>
     </div>
 </div>
