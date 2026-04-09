@@ -2686,6 +2686,108 @@ def clients():
 
 
 # =========================
+# CLIENT — CREATION
+# =========================
+@app.route("/clients/new", methods=["POST"], endpoint="create_client")
+@login_required
+def create_client():
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    role = user.get("role")
+    current_user_id = user.get("id")
+
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    address = (request.form.get("address") or "").strip()
+    commercial = (request.form.get("commercial") or "").strip()
+    status = (request.form.get("status") or "").strip().lower()
+    notes = (request.form.get("notes") or "").strip()
+    siret = (request.form.get("siret") or "").strip()
+    gerant_nom = (request.form.get("gerant_nom") or "").strip()
+
+    if not name:
+        flash("Le nom du client est obligatoire.", "danger")
+        return redirect(url_for("clients"))
+
+    allowed_status = {"en_cours", "en_attente", "gagne", "perdu", ""}
+    if status not in allowed_status:
+        status = "en_cours"
+
+    owner_id = current_user_id
+
+    try:
+        with conn.cursor() as cur:
+
+            # Admin : peut affecter un commercial si fourni
+            if role == "admin" and commercial:
+                cur.execute("""
+                    SELECT id
+                    FROM users
+                    WHERE role = 'commercial'
+                      AND LOWER(username) = LOWER(%s)
+                    LIMIT 1
+                """, (commercial,))
+                owner_row = cur.fetchone()
+
+                if owner_row:
+                    owner_id = owner_row["id"]
+                else:
+                    owner_id = None
+
+            # Commercial : propriétaire forcé = lui-même
+            elif role == "commercial":
+                owner_id = current_user_id
+
+            cur.execute("""
+                INSERT INTO crm_clients (
+                    name,
+                    email,
+                    phone,
+                    address,
+                    commercial,
+                    status,
+                    notes,
+                    owner_id,
+                    siret,
+                    gerant_nom
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                name,
+                email or None,
+                phone or None,
+                address or None,
+                commercial or None,
+                status or "en_cours",
+                notes or None,
+                owner_id,
+                siret or None,
+                gerant_nom or None,
+            ))
+
+            new_client = cur.fetchone()
+
+        conn.commit()
+
+        flash("Client créé avec succès.", "success")
+
+        if new_client and new_client.get("id"):
+            return redirect(url_for("client_detail", client_id=new_client["id"]))
+
+        return redirect(url_for("clients"))
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur création client : %r", e)
+        flash("Erreur lors de la création du client.", "danger")
+        return redirect(url_for("clients"))
+
+
+# =========================
 # CLIENT — DETAIL
 # =========================
 @app.route("/clients/<int:client_id>")
