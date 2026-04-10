@@ -2686,6 +2686,52 @@ def clients():
 
 
 # =========================
+# CLIENT — DETAIL (FIX CRITIQUE)
+# =========================
+@app.route("/clients/<int:client_id>", endpoint="client_detail")
+@login_required
+def client_detail(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT crm_clients.*, users.username AS commercial
+            FROM crm_clients
+            LEFT JOIN users ON users.id = crm_clients.owner_id
+            WHERE crm_clients.id = %s
+        """, (client_id,))
+        client = cur.fetchone()
+
+    if not client:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    # 📂 Documents
+    documents = list_client_documents(client_id)
+
+    # 📊 Cotations
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT *
+            FROM cotations
+            WHERE client_id = %s
+            ORDER BY date_creation DESC
+        """, (client_id,))
+        cotations = cur.fetchall()
+
+    return render_template(
+        "client_detail.html",
+        client=row_to_obj(client),
+        documents=documents,
+        cotations=[row_to_obj(c) for c in cotations],
+    )
+
+
+# =========================
 # CLIENT — CREATION
 # =========================
 @app.route("/clients/new", methods=["POST"], endpoint="create_client")
@@ -2730,7 +2776,6 @@ def create_client():
                     LIMIT 1
                 """, (commercial,))
                 owner_row = cur.fetchone()
-
                 owner_id = owner_row["id"] if owner_row else None
 
             elif role == "commercial":
@@ -2760,7 +2805,6 @@ def create_client():
             new_client = cur.fetchone()
 
         conn.commit()
-
         flash("Client créé avec succès.", "success")
 
         if new_client and new_client.get("id"):
@@ -2776,7 +2820,7 @@ def create_client():
 
 
 # =========================
-# CLIENT — AJOUT COTATION (FIX FINAL)
+# CLIENT — AJOUT COTATION
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
@@ -2804,30 +2848,27 @@ def create_cotation(client_id):
     try:
         with conn.cursor() as cur:
 
-            cur.execute("""
-                INSERT INTO cotations (
-                    client_id, date_negociation, heure_negociation, energie_type,
-                    entreprise_nom, site_nom, siret, code_naf,
-                    adresse_facturation, adresse_consommation,
-                    signataire_nom, fonction_signataire, signataire_tel,
-                    signataire_mobile, signataire_email,
-                    date_remise_offre, fournisseur_actuel, type_compteur,
-                    date_echeance, commentaire, created_by,
-                    pdl_pce, elec_debut_fourniture, elec_fin_fourniture,
-                    elec_nb_mois, elec_segment, formule_acheminement,
-                    elec_car, puissance_souscrite,
-                    pointe, hph, hch, hpr, hce,
-                    gaz_debut_fourniture, gaz_fin_fourniture,
-                    gaz_nb_mois, pce, gaz_segment, profil, gaz_car
-                )
-                VALUES (
-                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s,%s,%s
-                )
-            """, (
+            cur.execute(""" INSERT INTO cotations (
+                client_id, date_negociation, heure_negociation, energie_type,
+                entreprise_nom, site_nom, siret, code_naf,
+                adresse_facturation, adresse_consommation,
+                signataire_nom, fonction_signataire, signataire_tel,
+                signataire_mobile, signataire_email,
+                date_remise_offre, fournisseur_actuel, type_compteur,
+                date_echeance, commentaire, created_by,
+                pdl_pce, elec_debut_fourniture, elec_fin_fourniture,
+                elec_nb_mois, elec_segment, formule_acheminement,
+                elec_car, puissance_souscrite,
+                pointe, hph, hch, hpr, hce,
+                gaz_debut_fourniture, gaz_fin_fourniture,
+                gaz_nb_mois, pce, gaz_segment, profil, gaz_car
+            ) VALUES (
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s
+            )""", (
                 client_id,
                 parse_date_safe(f.get("date_negociation")),
                 parse_time_safe(f.get("heure_negociation")),
