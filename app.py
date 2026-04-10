@@ -2863,7 +2863,7 @@ def create_client():
 
 
 # =========================
-# CLIENT — AJOUT COTATION (FIX FINAL)
+# CLIENT — AJOUT COTATION
 # =========================
 @app.route(
     "/clients/<int:client_id>/cotations/new",
@@ -2895,30 +2895,27 @@ def create_cotation(client_id):
     try:
         with conn.cursor() as cur:
 
-            cur.execute("""
-                INSERT INTO cotations (
-                    client_id, date_negociation, heure_negociation, energie_type,
-                    entreprise_nom, site_nom, siret, code_naf,
-                    adresse_facturation, adresse_consommation,
-                    signataire_nom, fonction_signataire, signataire_tel,
-                    signataire_mobile, signataire_email,
-                    date_remise_offre, fournisseur_actuel, type_compteur,
-                    date_echeance, commentaire, created_by,
-                    pdl_pce, elec_debut_fourniture, elec_fin_fourniture,
-                    elec_nb_mois, elec_segment, formule_acheminement,
-                    elec_car, puissance_souscrite,
-                    pointe, hph, hch, hpr, hce,
-                    gaz_debut_fourniture, gaz_fin_fourniture,
-                    gaz_nb_mois, pce, gaz_segment, profil, gaz_car
-                )
-                VALUES (
-                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s,%s,%s
-                )
-            """, (
+            cur.execute(""" INSERT INTO cotations (
+                client_id, date_negociation, heure_negociation, energie_type,
+                entreprise_nom, site_nom, siret, code_naf,
+                adresse_facturation, adresse_consommation,
+                signataire_nom, fonction_signataire, signataire_tel,
+                signataire_mobile, signataire_email,
+                date_remise_offre, fournisseur_actuel, type_compteur,
+                date_echeance, commentaire, created_by,
+                pdl_pce, elec_debut_fourniture, elec_fin_fourniture,
+                elec_nb_mois, elec_segment, formule_acheminement,
+                elec_car, puissance_souscrite,
+                pointe, hph, hch, hpr, hce,
+                gaz_debut_fourniture, gaz_fin_fourniture,
+                gaz_nb_mois, pce, gaz_segment, profil, gaz_car
+            ) VALUES (
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s
+            )""", (
                 client_id,
                 parse_date_safe(f.get("date_negociation")),
                 parse_time_safe(f.get("heure_negociation")),
@@ -2971,6 +2968,35 @@ def create_cotation(client_id):
         flash("Erreur lors de la création.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# 🔥 DELETE CLIENT
+# =========================
+@app.route(
+    "/clients/<int:client_id>/delete",
+    methods=["POST"],
+    endpoint="delete_client"
+)
+@admin_required
+def delete_client(client_id):
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM cotations WHERE client_id = %s", (client_id,))
+            cur.execute("DELETE FROM crm_clients WHERE id = %s", (client_id,))
+
+        conn.commit()
+        flash("Client supprimé.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur suppression client : %r", e)
+        flash("Erreur lors de la suppression.", "danger")
+
+    return redirect(url_for("clients"))
     
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
