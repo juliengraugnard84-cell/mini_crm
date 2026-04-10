@@ -69,6 +69,67 @@
     </div>
 </div>
 
+<!-- ================= TIMELINE ================= -->
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Timeline du dossier</strong>
+    </div>
+
+    <div class="card-body">
+
+        {% if timeline %}
+        <div style="position:relative;padding-left:30px;">
+
+            <!-- ligne verticale -->
+            <div style="position:absolute;left:10px;top:0;bottom:0;width:2px;background:#dee2e6;"></div>
+
+            {% for t in timeline %}
+            <div style="position:relative;margin-bottom:20px;">
+
+                <!-- point -->
+                <div style="
+                    position:absolute;
+                    left:-2px;
+                    top:5px;
+                    width:12px;
+                    height:12px;
+                    border-radius:50%;
+                    background:
+                        {% if t.type == 'client' %}#0d6efd
+                        {% elif t.type == 'cotation' %}#198754
+                        {% else %}#6c757d
+                        {% endif %};
+                "></div>
+
+                <div class="ms-3">
+
+                    <div class="fw-bold">
+                        {{ t.title }}
+                    </div>
+
+                    <div class="text-muted small">
+                        {{ format_datetime_fr(t.date) }}
+                    </div>
+
+                    {% if t.description %}
+                    <div class="mt-1">
+                        {{ t.description }}
+                    </div>
+                    {% endif %}
+
+                </div>
+
+            </div>
+            {% endfor %}
+
+        </div>
+        {% else %}
+            <p class="text-muted mb-0">Aucune activité.</p>
+        {% endif %}
+
+    </div>
+</div>
+
 <!-- ================= TABS ================= -->
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">

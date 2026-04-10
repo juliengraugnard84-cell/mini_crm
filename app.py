@@ -947,6 +947,10 @@ def inject_globals():
         current_user=current_user,
         csrf_token=session.get("csrf_token"),
         format_date=format_date_safe,
+
+        # ✅ AJOUT CRITIQUE (timeline FR)
+        format_datetime_fr=format_datetime_fr,
+
         unread_cotations=unread_cotations,
         unread_updates=unread_updates,
 
@@ -956,7 +960,6 @@ def inject_globals():
         # ✅ Utilisé par les templates pour éviter url_for sur une route absente
         available_endpoints=available_endpoints,
     )
-
 
 ############################################################
 # 7. LOGIN / LOGOUT — VERSION ROBUSTE & ALIGNÉE DB
@@ -2576,7 +2579,7 @@ app.view_functions.setdefault("documents_admin", documents)
 
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
-# + STATUT + COTATIONS + DELETE CLIENT
+# + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
 # ⚠️ VERSION UNIQUE — AUCUN DOUBLON
 ############################################################
 
@@ -2603,6 +2606,19 @@ def parse_int_safe(val):
         return int(val)
     except:
         return None
+
+# =========================
+# FORMAT DATE FR (TIMELINE)
+# =========================
+def format_datetime_fr(value, with_time=True):
+    if not value:
+        return "—"
+    try:
+        if with_time:
+            return value.strftime("%d/%m/%Y à %H:%M")
+        return value.strftime("%d/%m/%Y")
+    except:
+        return "—"
 
 
 # =========================
@@ -2688,7 +2704,7 @@ def clients():
 
 
 # =========================
-# CLIENT — DETAIL
+# CLIENT — DETAIL + TIMELINE
 # =========================
 @app.route("/clients/<int:client_id>", endpoint="client_detail")
 @login_required
@@ -2723,22 +2739,46 @@ def client_detail(client_id):
         """, (client_id,))
         cotations = cur.fetchall()
 
+    # ================= TIMELINE =================
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT * FROM (
+                SELECT
+                    'client' AS type,
+                    created_at AS date,
+                    'Création du client' AS title,
+                    COALESCE(notes, '') AS description
+                FROM crm_clients
+                WHERE id = %s
+
+                UNION ALL
+
+                SELECT
+                    'cotation',
+                    date_creation,
+                    'Nouvelle cotation #' || id,
+                    COALESCE(commentaire, '')
+                FROM cotations
+                WHERE client_id = %s
+            ) t
+            ORDER BY COALESCE(date, CURRENT_TIMESTAMP) DESC
+        """, (client_id, client_id))
+
+        timeline = cur.fetchall()
+
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
         documents=documents,
         cotations=[row_to_obj(c) for c in cotations],
+        timeline=[row_to_obj(t) for t in timeline],
     )
 
 
 # =========================
 # CLIENT — UPDATE STATUS
 # =========================
-@app.route(
-    "/clients/<int:client_id>/status",
-    methods=["POST"],
-    endpoint="update_client_status"
-)
+@app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
 @login_required
 def update_client_status(client_id):
 
@@ -2811,14 +2851,12 @@ def create_client():
 
             if role == "admin" and commercial:
                 cur.execute("""
-                    SELECT id
-                    FROM users
-                    WHERE role = 'commercial'
-                      AND LOWER(username) = LOWER(%s)
+                    SELECT id FROM users
+                    WHERE role='commercial' AND LOWER(username)=LOWER(%s)
                     LIMIT 1
                 """, (commercial,))
-                owner_row = cur.fetchone()
-                owner_id = owner_row["id"] if owner_row else None
+                row = cur.fetchone()
+                owner_id = row["id"] if row else None
 
             elif role == "commercial":
                 owner_id = current_user_id
@@ -2829,19 +2867,12 @@ def create_client():
                     commercial, status, notes,
                     owner_id, siret, gerant_nom
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id
             """, (
-                name,
-                email or None,
-                phone or None,
-                address or None,
-                commercial or None,
-                status or "en_cours",
-                notes or None,
-                owner_id,
-                siret or None,
-                gerant_nom or None,
+                name, email or None, phone or None, address or None,
+                commercial or None, status or "en_cours", notes or None,
+                owner_id, siret or None, gerant_nom or None
             ))
 
             new_client = cur.fetchone()
@@ -2863,121 +2894,9 @@ def create_client():
 
 
 # =========================
-# CLIENT — AJOUT COTATION
+# CLIENT — DELETE (FIX FINAL + S3 CLEAN)
 # =========================
-@app.route(
-    "/clients/<int:client_id>/cotations/new",
-    methods=["POST"],
-    endpoint="create_cotation"
-)
-@login_required
-def create_cotation(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-    user = session.get("user") or {}
-    f = request.form
-
-    pdl_pce = (f.get("pdl_pce") or "").strip()
-
-    pce = (
-        f.get("pce")
-        or f.get("pdl")
-        or f.get("pdl_pce")
-        or ""
-    ).strip()
-
-    pce = re.sub(r"\D", "", pce) if pce else None
-    pdl_pce = re.sub(r"\D", "", pdl_pce) if pdl_pce else None
-
-    try:
-        with conn.cursor() as cur:
-
-            cur.execute(""" INSERT INTO cotations (
-                client_id, date_negociation, heure_negociation, energie_type,
-                entreprise_nom, site_nom, siret, code_naf,
-                adresse_facturation, adresse_consommation,
-                signataire_nom, fonction_signataire, signataire_tel,
-                signataire_mobile, signataire_email,
-                date_remise_offre, fournisseur_actuel, type_compteur,
-                date_echeance, commentaire, created_by,
-                pdl_pce, elec_debut_fourniture, elec_fin_fourniture,
-                elec_nb_mois, elec_segment, formule_acheminement,
-                elec_car, puissance_souscrite,
-                pointe, hph, hch, hpr, hce,
-                gaz_debut_fourniture, gaz_fin_fourniture,
-                gaz_nb_mois, pce, gaz_segment, profil, gaz_car
-            ) VALUES (
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s
-            )""", (
-                client_id,
-                parse_date_safe(f.get("date_negociation")),
-                parse_time_safe(f.get("heure_negociation")),
-                f.get("energie_type"),
-                f.get("entreprise_nom"),
-                f.get("site_nom"),
-                f.get("siret"),
-                f.get("code_naf"),
-                f.get("adresse_facturation"),
-                f.get("adresse_consommation"),
-                f.get("signataire_nom"),
-                f.get("fonction_signataire"),
-                f.get("signataire_tel"),
-                f.get("signataire_mobile"),
-                f.get("signataire_email"),
-                parse_date_safe(f.get("date_remise_offre")),
-                f.get("fournisseur_actuel"),
-                f.get("type_compteur"),
-                parse_date_safe(f.get("date_echeance")),
-                f.get("commentaire"),
-                user.get("id"),
-                pdl_pce,
-                parse_date_safe(f.get("elec_debut_fourniture")),
-                parse_date_safe(f.get("elec_fin_fourniture")),
-                parse_int_safe(f.get("elec_nb_mois")),
-                f.get("elec_segment"),
-                f.get("formule_acheminement"),
-                f.get("elec_car"),
-                f.get("puissance_souscrite"),
-                f.get("pointe"),
-                f.get("hph"),
-                f.get("hch"),
-                f.get("hpr"),
-                f.get("hce"),
-                parse_date_safe(f.get("gaz_debut_fourniture")),
-                parse_date_safe(f.get("gaz_fin_fourniture")),
-                parse_int_safe(f.get("gaz_nb_mois")),
-                pce,
-                f.get("gaz_segment"),
-                f.get("profil"),
-                f.get("gaz_car"),
-            ))
-
-        conn.commit()
-        flash("Demande de cotation envoyée.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur cotation : %r", e)
-        flash("Erreur lors de la création.", "danger")
-
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# 🔥 DELETE CLIENT
-# =========================
-@app.route(
-    "/clients/<int:client_id>/delete",
-    methods=["POST"],
-    endpoint="delete_client"
-)
+@app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
 @admin_required
 def delete_client(client_id):
 
@@ -2985,8 +2904,22 @@ def delete_client(client_id):
 
     try:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM cotations WHERE client_id = %s", (client_id,))
-            cur.execute("DELETE FROM crm_clients WHERE id = %s", (client_id,))
+            cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
+            cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
+
+        # 🔥 SUPPRESSION S3
+        try:
+            if not LOCAL_MODE and s3:
+                prefix = client_s3_prefix(client_id)
+                objects = s3_list_all_objects(AWS_BUCKET, prefix=prefix)
+
+                for obj in objects:
+                    key = obj.get("Key")
+                    if key:
+                        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+
+        except Exception as e:
+            logger.exception("Erreur suppression S3 client : %r", e)
 
         conn.commit()
         flash("Client supprimé.", "success")
@@ -2997,7 +2930,7 @@ def delete_client(client_id):
         flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("clients"))
-    
+
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
