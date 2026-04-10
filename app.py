@@ -2721,7 +2721,6 @@ def create_client():
     try:
         with conn.cursor() as cur:
 
-            # Admin : peut affecter un commercial si fourni
             if role == "admin" and commercial:
                 cur.execute("""
                     SELECT id
@@ -2732,27 +2731,16 @@ def create_client():
                 """, (commercial,))
                 owner_row = cur.fetchone()
 
-                if owner_row:
-                    owner_id = owner_row["id"]
-                else:
-                    owner_id = None
+                owner_id = owner_row["id"] if owner_row else None
 
-            # Commercial : propriétaire forcé = lui-même
             elif role == "commercial":
                 owner_id = current_user_id
 
             cur.execute("""
                 INSERT INTO crm_clients (
-                    name,
-                    email,
-                    phone,
-                    address,
-                    commercial,
-                    status,
-                    notes,
-                    owner_id,
-                    siret,
-                    gerant_nom
+                    name, email, phone, address,
+                    commercial, status, notes,
+                    owner_id, siret, gerant_nom
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
@@ -2788,120 +2776,7 @@ def create_client():
 
 
 # =========================
-# CLIENT — DETAIL
-# =========================
-@app.route("/clients/<int:client_id>")
-@login_required
-def client_detail(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT crm_clients.*, users.username AS commercial
-            FROM crm_clients
-            LEFT JOIN users ON users.id = crm_clients.owner_id
-            WHERE crm_clients.id = %s
-        """, (client_id,))
-        client = cur.fetchone()
-
-    if not client:
-        flash("Client introuvable.", "danger")
-        return redirect(url_for("clients"))
-
-    documents = list_client_documents(client_id)
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT *
-            FROM cotations
-            WHERE client_id = %s
-            ORDER BY date_creation DESC
-        """, (client_id,))
-        cotations = cur.fetchall()
-
-    return render_template(
-        "client_detail.html",
-        client=row_to_obj(client),
-        documents=documents,
-        cotations=[row_to_obj(c) for c in cotations],
-    )
-
-
-# =========================
-# UPDATE STATUT CLIENT
-# =========================
-@app.route(
-    "/clients/<int:client_id>/status",
-    methods=["POST"],
-    endpoint="update_client_status"
-)
-@login_required
-def update_client_status(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-    status = (request.form.get("status") or "").strip().lower()
-
-    allowed_status = {"en_cours", "en_attente", "gagne", "perdu"}
-
-    if status not in allowed_status:
-        flash("Statut invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE crm_clients
-                SET status = %s
-                WHERE id = %s
-            """, (status, client_id))
-
-        conn.commit()
-        flash("Statut mis à jour.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur update status : %r", e)
-        flash("Erreur lors de la mise à jour.", "danger")
-
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# 🔥 DELETE CLIENT (FIX ERREUR 405)
-# =========================
-@app.route("/clients/<int:client_id>/delete", methods=["POST"])
-@admin_required
-def delete_client(client_id):
-
-    conn = get_db()
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM crm_clients WHERE id = %s",
-                (client_id,)
-            )
-
-        conn.commit()
-        flash("Client supprimé.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur suppression client : %r", e)
-        flash("Erreur lors de la suppression.", "danger")
-
-    return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — AJOUT COTATION
+# CLIENT — AJOUT COTATION (FIX FINAL)
 # =========================
 @app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
 @login_required
@@ -2931,90 +2806,49 @@ def create_cotation(client_id):
 
             cur.execute("""
                 INSERT INTO cotations (
-                    client_id,
-                    date_negociation,
-                    heure_negociation,
-                    energie_type,
-                    entreprise_nom,
-                    site_nom,
-                    siret,
-                    code_naf,
-                    adresse_facturation,
-                    adresse_consommation,
-                    signataire_nom,
-                    fonction_signataire,
-                    signataire_tel,
-                    signataire_mobile,
-                    signataire_email,
-                    date_remise_offre,
-                    fournisseur_actuel,
-                    type_compteur,
-                    date_echeance,
-                    commentaire,
-                    created_by,
-                    pdl_pce,
-                    elec_debut_fourniture,
-                    elec_fin_fourniture,
-                    elec_nb_mois,
-                    elec_segment,
-                    formule_acheminement,
-                    elec_car,
-                    puissance_souscrite,
-                    pointe,
-                    hph,
-                    hch,
-                    hpr,
-                    hce,
-                    gaz_debut_fourniture,
-                    gaz_fin_fourniture,
-                    gaz_nb_mois,
-                    pce,
-                    gaz_segment,
-                    profil,
-                    gaz_car
+                    client_id, date_negociation, heure_negociation, energie_type,
+                    entreprise_nom, site_nom, siret, code_naf,
+                    adresse_facturation, adresse_consommation,
+                    signataire_nom, fonction_signataire, signataire_tel,
+                    signataire_mobile, signataire_email,
+                    date_remise_offre, fournisseur_actuel, type_compteur,
+                    date_echeance, commentaire, created_by,
+                    pdl_pce, elec_debut_fourniture, elec_fin_fourniture,
+                    elec_nb_mois, elec_segment, formule_acheminement,
+                    elec_car, puissance_souscrite,
+                    pointe, hph, hch, hpr, hce,
+                    gaz_debut_fourniture, gaz_fin_fourniture,
+                    gaz_nb_mois, pce, gaz_segment, profil, gaz_car
                 )
                 VALUES (
-                    %s,%s,%s,%s,
-                    %s,%s,%s,%s,
-                    %s,%s,
-                    %s,%s,%s,%s,%s,
-                    %s,
-                    %s,%s,%s,
-                    %s,%s,
+                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,%s,%s
                 )
             """, (
-
                 client_id,
                 parse_date_safe(f.get("date_negociation")),
                 parse_time_safe(f.get("heure_negociation")),
                 f.get("energie_type"),
-
                 f.get("entreprise_nom"),
                 f.get("site_nom"),
                 f.get("siret"),
                 f.get("code_naf"),
-
                 f.get("adresse_facturation"),
                 f.get("adresse_consommation"),
-
                 f.get("signataire_nom"),
                 f.get("fonction_signataire"),
                 f.get("signataire_tel"),
                 f.get("signataire_mobile"),
                 f.get("signataire_email"),
-
                 parse_date_safe(f.get("date_remise_offre")),
-
                 f.get("fournisseur_actuel"),
                 f.get("type_compteur"),
                 parse_date_safe(f.get("date_echeance")),
-
                 f.get("commentaire"),
                 user.get("id"),
-
                 pdl_pce,
                 parse_date_safe(f.get("elec_debut_fourniture")),
                 parse_date_safe(f.get("elec_fin_fourniture")),
@@ -3023,13 +2857,11 @@ def create_cotation(client_id):
                 f.get("formule_acheminement"),
                 f.get("elec_car"),
                 f.get("puissance_souscrite"),
-
                 f.get("pointe"),
                 f.get("hph"),
                 f.get("hch"),
                 f.get("hpr"),
                 f.get("hce"),
-
                 parse_date_safe(f.get("gaz_debut_fourniture")),
                 parse_date_safe(f.get("gaz_fin_fourniture")),
                 parse_int_safe(f.get("gaz_nb_mois")),
