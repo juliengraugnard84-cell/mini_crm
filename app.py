@@ -2686,7 +2686,7 @@ def clients():
 
 
 # =========================
-# CLIENT — DETAIL (FIX CRITIQUE)
+# CLIENT — DETAIL (FIX)
 # =========================
 @app.route("/clients/<int:client_id>", endpoint="client_detail")
 @login_required
@@ -2710,10 +2710,8 @@ def client_detail(client_id):
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    # 📂 Documents
     documents = list_client_documents(client_id)
 
-    # 📊 Cotations
     with conn.cursor() as cur:
         cur.execute("""
             SELECT *
@@ -2729,6 +2727,44 @@ def client_detail(client_id):
         documents=documents,
         cotations=[row_to_obj(c) for c in cotations],
     )
+
+
+# =========================
+# CLIENT — UPDATE STATUS (FIX CRITIQUE)
+# =========================
+@app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
+@login_required
+def update_client_status(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    new_status = (request.form.get("status") or "").strip().lower()
+
+    allowed_status = {"en_cours", "en_attente", "gagne", "perdu"}
+
+    if new_status not in allowed_status:
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("clients"))
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE crm_clients
+                SET status = %s
+                WHERE id = %s
+            """, (new_status, client_id))
+
+        conn.commit()
+        flash("Statut mis à jour.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur update status : %r", e)
+        flash("Erreur lors de la mise à jour.", "danger")
+
+    return redirect(url_for("clients"))
 
 
 # =========================
@@ -2805,6 +2841,7 @@ def create_client():
             new_client = cur.fetchone()
 
         conn.commit()
+
         flash("Client créé avec succès.", "success")
 
         if new_client and new_client.get("id"):
@@ -2817,110 +2854,7 @@ def create_client():
         logger.exception("Erreur création client : %r", e)
         flash("Erreur lors de la création du client.", "danger")
         return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — AJOUT COTATION
-# =========================
-@app.route("/clients/<int:client_id>/cotations/new", methods=["POST"])
-@login_required
-def create_cotation(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-    user = session.get("user") or {}
-    f = request.form
-
-    pdl_pce = (f.get("pdl_pce") or "").strip()
-
-    pce = (
-        f.get("pce")
-        or f.get("pdl")
-        or f.get("pdl_pce")
-        or ""
-    ).strip()
-
-    pce = re.sub(r"\D", "", pce) if pce else None
-    pdl_pce = re.sub(r"\D", "", pdl_pce) if pdl_pce else None
-
-    try:
-        with conn.cursor() as cur:
-
-            cur.execute(""" INSERT INTO cotations (
-                client_id, date_negociation, heure_negociation, energie_type,
-                entreprise_nom, site_nom, siret, code_naf,
-                adresse_facturation, adresse_consommation,
-                signataire_nom, fonction_signataire, signataire_tel,
-                signataire_mobile, signataire_email,
-                date_remise_offre, fournisseur_actuel, type_compteur,
-                date_echeance, commentaire, created_by,
-                pdl_pce, elec_debut_fourniture, elec_fin_fourniture,
-                elec_nb_mois, elec_segment, formule_acheminement,
-                elec_car, puissance_souscrite,
-                pointe, hph, hch, hpr, hce,
-                gaz_debut_fourniture, gaz_fin_fourniture,
-                gaz_nb_mois, pce, gaz_segment, profil, gaz_car
-            ) VALUES (
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s
-            )""", (
-                client_id,
-                parse_date_safe(f.get("date_negociation")),
-                parse_time_safe(f.get("heure_negociation")),
-                f.get("energie_type"),
-                f.get("entreprise_nom"),
-                f.get("site_nom"),
-                f.get("siret"),
-                f.get("code_naf"),
-                f.get("adresse_facturation"),
-                f.get("adresse_consommation"),
-                f.get("signataire_nom"),
-                f.get("fonction_signataire"),
-                f.get("signataire_tel"),
-                f.get("signataire_mobile"),
-                f.get("signataire_email"),
-                parse_date_safe(f.get("date_remise_offre")),
-                f.get("fournisseur_actuel"),
-                f.get("type_compteur"),
-                parse_date_safe(f.get("date_echeance")),
-                f.get("commentaire"),
-                user.get("id"),
-                pdl_pce,
-                parse_date_safe(f.get("elec_debut_fourniture")),
-                parse_date_safe(f.get("elec_fin_fourniture")),
-                parse_int_safe(f.get("elec_nb_mois")),
-                f.get("elec_segment"),
-                f.get("formule_acheminement"),
-                f.get("elec_car"),
-                f.get("puissance_souscrite"),
-                f.get("pointe"),
-                f.get("hph"),
-                f.get("hch"),
-                f.get("hpr"),
-                f.get("hce"),
-                parse_date_safe(f.get("gaz_debut_fourniture")),
-                parse_date_safe(f.get("gaz_fin_fourniture")),
-                parse_int_safe(f.get("gaz_nb_mois")),
-                pce,
-                f.get("gaz_segment"),
-                f.get("profil"),
-                f.get("gaz_car"),
-            ))
-
-        conn.commit()
-        flash("Demande de cotation envoyée.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur cotation : %r", e)
-        flash("Erreur lors de la création.", "danger")
-
-    return redirect(url_for("client_detail", client_id=client_id))
+    
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
