@@ -2580,7 +2580,7 @@ app.view_functions.setdefault("documents_admin", documents)
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
-# ✅ VERSION FIXED — AVEC CREATE_COTATION
+# ✅ VERSION FINALE STABLE (CREATE_CLIENT + CREATE_COTATION)
 ############################################################
 
 from datetime import datetime
@@ -2741,7 +2741,6 @@ def client_detail(client_id):
         """, (client_id,))
         cotations = cur.fetchall()
 
-    # TIMELINE
     with conn.cursor() as cur:
         cur.execute("""
             SELECT * FROM (
@@ -2778,7 +2777,75 @@ def client_detail(client_id):
 
 
 # =========================
-# ✅ COTATION — CREATION (FIX MAJEUR)
+# ✅ CLIENT — CREATION (FIX CRITIQUE)
+# =========================
+@app.route("/clients/new", methods=["POST"])
+@login_required
+def create_client():
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    role = user.get("role")
+    user_id = user.get("id")
+
+    name = (request.form.get("name") or "").strip()
+
+    if not name:
+        flash("Nom du client obligatoire.", "danger")
+        return redirect(url_for("clients"))
+
+    email = request.form.get("email")
+    phone = request.form.get("phone")
+    address = request.form.get("address")
+    siret = request.form.get("siret")
+    gerant_nom = request.form.get("gerant_nom")
+    commercial = request.form.get("commercial")
+
+    try:
+        with conn.cursor() as cur:
+
+            owner_id = user_id
+
+            if role == "admin" and commercial:
+                cur.execute("""
+                    SELECT id FROM users
+                    WHERE LOWER(username)=LOWER(%s)
+                    LIMIT 1
+                """, (commercial,))
+                row = cur.fetchone()
+                if row:
+                    owner_id = row["id"]
+
+            cur.execute("""
+                INSERT INTO crm_clients (
+                    name, email, phone, address,
+                    owner_id, siret, gerant_nom
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                name,
+                email,
+                phone,
+                address,
+                owner_id,
+                siret,
+                gerant_nom
+            ))
+
+        conn.commit()
+        flash("Client créé avec succès.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur création client : %r", e)
+        flash("Erreur lors de la création.", "danger")
+
+    return redirect(url_for("clients"))
+
+
+# =========================
+# ✅ COTATION — CREATION
 # =========================
 @app.route("/clients/<int:client_id>/cotation", methods=["POST"], endpoint="create_cotation")
 @login_required
@@ -2815,7 +2882,7 @@ def create_cotation(client_id):
     except Exception as e:
         conn.rollback()
         logger.exception("Erreur création cotation : %r", e)
-        flash("Erreur lors de la création de la cotation.", "danger")
+        flash("Erreur lors de la création.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
 
@@ -2872,7 +2939,6 @@ def delete_client(client_id):
             cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
             cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
 
-        # S3 CLEAN
         try:
             if not LOCAL_MODE and s3:
                 prefix = client_s3_prefix(client_id)
