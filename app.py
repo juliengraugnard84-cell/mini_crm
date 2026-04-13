@@ -2580,11 +2580,12 @@ app.view_functions.setdefault("documents_admin", documents)
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
-# ⚠️ VERSION UNIQUE — AUCUN DOUBLON
+# ✅ VERSION FIXED — AVEC CREATE_COTATION
 ############################################################
 
 from datetime import datetime
 import re
+
 
 # =========================
 # SAFE PARSE
@@ -2606,6 +2607,7 @@ def parse_int_safe(val):
         return int(val)
     except:
         return None
+
 
 # =========================
 # FORMAT DATE FR (TIMELINE)
@@ -2739,7 +2741,7 @@ def client_detail(client_id):
         """, (client_id,))
         cotations = cur.fetchall()
 
-    # ================= TIMELINE =================
+    # TIMELINE
     with conn.cursor() as cur:
         cur.execute("""
             SELECT * FROM (
@@ -2773,6 +2775,49 @@ def client_detail(client_id):
         cotations=[row_to_obj(c) for c in cotations],
         timeline=[row_to_obj(t) for t in timeline],
     )
+
+
+# =========================
+# ✅ COTATION — CREATION (FIX MAJEUR)
+# =========================
+@app.route("/clients/<int:client_id>/cotation", methods=["POST"], endpoint="create_cotation")
+@login_required
+def create_cotation(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO cotations (
+                    client_id,
+                    date_negociation,
+                    heure_negociation,
+                    commentaire,
+                    created_by
+                )
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                client_id,
+                parse_date_safe(request.form.get("date_negociation")),
+                parse_time_safe(request.form.get("heure_negociation")),
+                (request.form.get("commentaire") or "").strip(),
+                user.get("id"),
+            ))
+
+        conn.commit()
+        flash("Cotation créée avec succès.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur création cotation : %r", e)
+        flash("Erreur lors de la création de la cotation.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
 
 
 # =========================
@@ -2814,87 +2859,7 @@ def update_client_status(client_id):
 
 
 # =========================
-# CLIENT — CREATION
-# =========================
-@app.route("/clients/new", methods=["POST"], endpoint="create_client")
-@login_required
-def create_client():
-
-    conn = get_db()
-    user = session.get("user") or {}
-
-    role = user.get("role")
-    current_user_id = user.get("id")
-
-    name = (request.form.get("name") or "").strip()
-    email = (request.form.get("email") or "").strip()
-    phone = (request.form.get("phone") or "").strip()
-    address = (request.form.get("address") or "").strip()
-    commercial = (request.form.get("commercial") or "").strip()
-    status = (request.form.get("status") or "").strip().lower()
-    notes = (request.form.get("notes") or "").strip()
-    siret = (request.form.get("siret") or "").strip()
-    gerant_nom = (request.form.get("gerant_nom") or "").strip()
-
-    if not name:
-        flash("Le nom du client est obligatoire.", "danger")
-        return redirect(url_for("clients"))
-
-    allowed_status = {"en_cours", "en_attente", "gagne", "perdu", ""}
-    if status not in allowed_status:
-        status = "en_cours"
-
-    owner_id = current_user_id
-
-    try:
-        with conn.cursor() as cur:
-
-            if role == "admin" and commercial:
-                cur.execute("""
-                    SELECT id FROM users
-                    WHERE role='commercial' AND LOWER(username)=LOWER(%s)
-                    LIMIT 1
-                """, (commercial,))
-                row = cur.fetchone()
-                owner_id = row["id"] if row else None
-
-            elif role == "commercial":
-                owner_id = current_user_id
-
-            cur.execute("""
-                INSERT INTO crm_clients (
-                    name, email, phone, address,
-                    commercial, status, notes,
-                    owner_id, siret, gerant_nom
-                )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                RETURNING id
-            """, (
-                name, email or None, phone or None, address or None,
-                commercial or None, status or "en_cours", notes or None,
-                owner_id, siret or None, gerant_nom or None
-            ))
-
-            new_client = cur.fetchone()
-
-        conn.commit()
-
-        flash("Client créé avec succès.", "success")
-
-        if new_client and new_client.get("id"):
-            return redirect(url_for("client_detail", client_id=new_client["id"]))
-
-        return redirect(url_for("clients"))
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur création client : %r", e)
-        flash("Erreur lors de la création du client.", "danger")
-        return redirect(url_for("clients"))
-
-
-# =========================
-# CLIENT — DELETE (FIX FINAL + S3 CLEAN)
+# CLIENT — DELETE
 # =========================
 @app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
 @admin_required
@@ -2907,7 +2872,7 @@ def delete_client(client_id):
             cur.execute("DELETE FROM cotations WHERE client_id=%s", (client_id,))
             cur.execute("DELETE FROM crm_clients WHERE id=%s", (client_id,))
 
-        # 🔥 SUPPRESSION S3
+        # S3 CLEAN
         try:
             if not LOCAL_MODE and s3:
                 prefix = client_s3_prefix(client_id)
