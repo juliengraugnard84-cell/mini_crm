@@ -1,3 +1,4 @@
+```html
 {% extends "base.html" %}
 {% block title %}Clients{% endblock %}
 
@@ -24,7 +25,12 @@
         <div class="card-body">
             <h5 class="mb-3">Créer un nouveau dossier client</h5>
 
-            {% if 'create_client' in available_endpoints %}
+            {% if available_endpoints is defined and 'create_client' not in available_endpoints %}
+            <div class="alert alert-warning mb-3">
+                ⚠️ Route <code>create_client</code> non détectée côté template. Le formulaire reste affiché pour éviter de bloquer les commerciaux.
+            </div>
+            {% endif %}
+
             <form method="POST"
                   action="{{ url_for('create_client') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -93,11 +99,6 @@
                     </button>
                 </div>
             </form>
-            {% else %}
-            <div class="alert alert-warning mb-0">
-                ⚠️ La fonctionnalité de création client n’est pas encore activée (route manquante).
-            </div>
-            {% endif %}
 
         </div>
     </div>
@@ -369,3 +370,4 @@
 </div>
 
 {% endblock %}
+```
