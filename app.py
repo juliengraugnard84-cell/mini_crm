@@ -2708,7 +2708,7 @@ def clients():
 
 
 # =========================
-# CLIENT — DETAIL + TIMELINE (CORRIGÉ)
+# CLIENT — DETAIL + TIMELINE
 # =========================
 @app.route("/clients/<int:client_id>", endpoint="client_detail")
 @login_required
@@ -2773,7 +2773,7 @@ def client_detail(client_id):
 
         timeline = cur.fetchall()
 
-    # ✅ AJOUT CRITIQUE — MISES À JOUR
+    # UPDATES
     with conn.cursor() as cur:
         cur.execute("""
             SELECT *
@@ -2783,7 +2783,7 @@ def client_detail(client_id):
         """, (client_id,))
         updates = cur.fetchall()
 
-    # ✅ AJOUT CRITIQUE — RESSOURCES PARTAGÉES
+    # RESSOURCES PARTAGÉES
     shared_mandats = []
     shared_resiliations = []
 
@@ -2888,6 +2888,41 @@ def create_client():
         flash("Erreur lors de la création.", "danger")
 
     return redirect(url_for("clients"))
+
+
+# =========================
+# 🔥 COTATION — CREATION (FIX CRITIQUE)
+# =========================
+@app.route(
+    "/clients/<int:client_id>/cotation",
+    methods=["POST"],
+    endpoint="create_cotation"  # ✅ FIX ICI
+)
+@login_required
+def create_cotation(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    f = request.form
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(""" INSERT INTO cotations (client_id) VALUES (%s) """, (client_id,))
+
+        conn.commit()
+        flash("Cotation créée avec succès.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur création cotation : %r", e)
+        flash("Erreur lors de la création.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
