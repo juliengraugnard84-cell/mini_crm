@@ -2777,7 +2777,7 @@ def client_detail(client_id):
 
 
 # =========================
-# ✅ CLIENT — CREATION (FIX CRITIQUE)
+# CLIENT — CREATION
 # =========================
 @app.route("/clients/new", methods=["POST"])
 @login_required
@@ -2845,7 +2845,7 @@ def create_client():
 
 
 # =========================
-# ✅ COTATION — CREATION
+# ✅ COTATION — CREATION (COMPLET FIX)
 # =========================
 @app.route("/clients/<int:client_id>/cotation", methods=["POST"], endpoint="create_cotation")
 @login_required
@@ -2857,22 +2857,111 @@ def create_cotation(client_id):
     conn = get_db()
     user = session.get("user") or {}
 
+    f = request.form
+
     try:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO cotations (
+
                     client_id,
+                    energie_type,
+
+                    entreprise_nom,
+                    site_nom,
+                    siret,
+                    signataire_nom,
+                    fonction_signataire,
+                    signataire_tel,
+                    signataire_mobile,
+                    signataire_email,
+                    code_naf,
+                    adresse_consommation,
+                    adresse_facturation,
+                    date_remise_offre,
+
+                    elec_debut_fourniture,
+                    elec_fin_fourniture,
+                    elec_nb_mois,
+                    pdl_pce,
+                    elec_segment,
+                    formule_acheminement,
+                    elec_car,
+                    puissance_souscrite,
+                    elec_fournisseur_actuel,
+                    pointe, hph, hch, hpr, hce,
+
+                    gaz_debut_fourniture,
+                    gaz_fin_fourniture,
+                    gaz_nb_mois,
+                    pce,
+                    gaz_segment,
+                    profil,
+                    gaz_car,
+                    gaz_fournisseur_actuel,
+
                     date_negociation,
                     heure_negociation,
+                    type_compteur,
+                    date_echeance,
                     commentaire,
                     created_by
+
                 )
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES (
+                    %s,%s,
+                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s
+                )
             """, (
+
                 client_id,
-                parse_date_safe(request.form.get("date_negociation")),
-                parse_time_safe(request.form.get("heure_negociation")),
-                (request.form.get("commentaire") or "").strip(),
+                f.get("energie_type"),
+
+                f.get("entreprise_nom"),
+                f.get("site_nom"),
+                f.get("siret"),
+                f.get("signataire_nom"),
+                f.get("fonction_signataire"),
+                f.get("signataire_tel"),
+                f.get("signataire_mobile"),
+                f.get("signataire_email"),
+                f.get("code_naf"),
+                f.get("adresse_consommation"),
+                f.get("adresse_facturation"),
+                parse_date_safe(f.get("date_remise_offre")),
+
+                parse_date_safe(f.get("elec_debut_fourniture")),
+                parse_date_safe(f.get("elec_fin_fourniture")),
+                parse_int_safe(f.get("elec_nb_mois")),
+                f.get("pdl_pce"),
+                f.get("elec_segment"),
+                f.get("formule_acheminement"),
+                f.get("elec_car"),
+                f.get("puissance_souscrite"),
+                f.get("elec_fournisseur_actuel"),
+                f.get("pointe"),
+                f.get("hph"),
+                f.get("hch"),
+                f.get("hpr"),
+                f.get("hce"),
+
+                parse_date_safe(f.get("gaz_debut_fourniture")),
+                parse_date_safe(f.get("gaz_fin_fourniture")),
+                parse_int_safe(f.get("gaz_nb_mois")),
+                f.get("pce"),
+                f.get("gaz_segment"),
+                f.get("profil"),
+                f.get("gaz_car"),
+                f.get("gaz_fournisseur_actuel"),
+
+                parse_date_safe(f.get("date_negociation")),
+                parse_time_safe(f.get("heure_negociation")),
+                f.get("type_compteur"),
+                parse_date_safe(f.get("date_echeance")),
+                (f.get("commentaire") or "").strip(),
                 user.get("id"),
             ))
 
@@ -2961,7 +3050,6 @@ def delete_client(client_id):
         flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("clients"))
-
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################

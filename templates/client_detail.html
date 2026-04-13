@@ -287,6 +287,11 @@
                                     <input class="form-control" name="puissance_souscrite" placeholder="Puissance souscrite">
                                 </div>
 
+                                <div class="mb-2">
+                                    <label class="form-label">Fournisseur actuel</label>
+                                    <input class="form-control" name="elec_fournisseur_actuel" placeholder="Fournisseur actuel électricité">
+                                </div>
+
                                 <hr>
 
                                 <h6 class="mb-3">Puissance par poste</h6>
@@ -357,6 +362,11 @@
                                     <label class="form-label">CAR</label>
                                     <input class="form-control" name="gaz_car" placeholder="CAR">
                                 </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Fournisseur actuel</label>
+                                    <input class="form-control" name="gaz_fournisseur_actuel" placeholder="Fournisseur actuel gaz">
+                                </div>
                             </div>
                         </div>
 
@@ -386,11 +396,6 @@
                                 </div>
 
                                 <div class="mb-2">
-                                    <label class="form-label">Fournisseur actuel</label>
-                                    <input class="form-control" name="fournisseur_actuel" placeholder="Fournisseur actuel">
-                                </div>
-
-                                <div class="mb-2">
                                     <label class="form-label">Commentaire</label>
                                     <textarea class="form-control" name="commentaire" rows="5" placeholder="Commentaire"></textarea>
                                 </div>
@@ -417,7 +422,8 @@
                             <th>Type d’énergie</th>
                             <th>PDL / PCE</th>
                             <th>Date négociation</th>
-                            <th>Fournisseur actuel</th>
+                            <th>Fournisseur électricité</th>
+                            <th>Fournisseur gaz</th>
                             <th>Commentaire</th>
                         </tr>
                     </thead>
@@ -428,7 +434,8 @@
                             <td>{{ c.energie_type or "—" }}</td>
                             <td>{{ c.pdl_pce or c.pce or "—" }}</td>
                             <td>{{ c.date_negociation or "—" }}</td>
-                            <td>{{ c.fournisseur_actuel or "—" }}</td>
+                            <td>{{ c.elec_fournisseur_actuel or "—" }}</td>
+                            <td>{{ c.gaz_fournisseur_actuel or "—" }}</td>
                             <td>{{ c.commentaire or "—" }}</td>
                         </tr>
                     {% endfor %}
