@@ -10,14 +10,11 @@
         <p class="text-muted">Gestion des dossiers clients</p>
     </div>
 
-```
-<button class="btn btn-primary"
-        data-bs-toggle="collapse"
-        data-bs-target="#newClientForm">
-    ➕ Nouveau dossier
-</button>
-```
-
+    <button class="btn btn-primary"
+            data-bs-toggle="collapse"
+            data-bs-target="#newClientForm">
+        ➕ Nouveau dossier
+    </button>
 </div>
 
 <!-- ================= CRÉATION CLIENT ================= -->
@@ -27,89 +24,78 @@
         <div class="card-body">
             <h5 class="mb-3">Créer un nouveau dossier client</h5>
 
-```
-        <form method="POST" action="{{ url_for('create_client') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <form method="POST" action="{{ url_for('create_client') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-            <div class="row g-3">
+                <div class="row g-3">
 
-                <div class="col-md-6">
-                    <label class="form-label">Nom du client *</label>
-                    <input type="text" name="name" class="form-control" required>
-                </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nom du client *</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Nom du gérant</label>
-                    <input type="text" name="gerant_nom" class="form-control">
-                </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nom du gérant</label>
+                        <input type="text" name="gerant_nom" class="form-control">
+                    </div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control">
-                </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control">
+                    </div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Téléphone</label>
-                    <input type="text" name="phone" class="form-control">
-                </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Téléphone</label>
+                        <input type="text" name="phone" class="form-control">
+                    </div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Adresse</label>
-                    <input type="text" name="address" class="form-control">
-                </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Adresse</label>
+                        <input type="text" name="address" class="form-control">
+                    </div>
 
-                <div class="col-md-6">
-                    <label class="form-label">SIRET</label>
-                    <input type="text" name="siret" class="form-control">
-                </div>
+                    <div class="col-md-6">
+                        <label class="form-label">SIRET</label>
+                        <input type="text" name="siret" class="form-control">
+                    </div>
 
-                <!-- 🔥 FIX COMMERCIAL -->
-                {% if current_user and current_user.role == "admin" %}
-                <div class="col-md-6">
-                    <label class="form-label">Commercial *</label>
-
-                    {% if users is defined and users %}
-                    <select name="owner_id" class="form-select" required>
-                        {% for u in users if u.role == 'commercial' %}
-                            <option value="{{ u.id }}">{{ u.username }}</option>
-                        {% endfor %}
-                    </select>
-                    {% else %}
-                    <input type="text" class="form-control" placeholder="Liste utilisateurs indisponible" disabled>
+                    {% if current_user and current_user.role == "admin" %}
+                    <div class="col-md-6">
+                        <label class="form-label">Commercial *</label>
+                        <select name="owner_id" class="form-select" required>
+                            {% for u in users if u.role == 'commercial' %}
+                                <option value="{{ u.id }}">{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     {% endif %}
-                </div>
-                {% endif %}
 
-                <!-- 🔥 AJOUT STATUS -->
-                <div class="col-md-6">
-                    <label class="form-label">Statut</label>
-                    <select name="status" class="form-select">
-                        <option value="en_cours">En cours</option>
-                        <option value="en_attente">En attente</option>
-                        <option value="gagne">Gagné</option>
-                        <option value="perdu">Perdu</option>
-                    </select>
-                </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="en_cours">En cours</option>
+                            <option value="en_attente">En attente</option>
+                            <option value="gagne">Gagné</option>
+                            <option value="perdu">Perdu</option>
+                        </select>
+                    </div>
 
-                <!-- 🔥 AJOUT NOTES -->
-                <div class="col-12">
-                    <label class="form-label">Notes</label>
-                    <textarea name="notes" class="form-control"></textarea>
+                    <div class="col-12">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control"></textarea>
+                    </div>
+
                 </div>
 
-            </div>
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-success">
+                        ✔ Créer le dossier
+                    </button>
+                </div>
+            </form>
 
-            <div class="mt-4">
-                <button type="submit" class="btn btn-success">
-                    ✔ Créer le dossier
-                </button>
-            </div>
-        </form>
-
+        </div>
     </div>
-</div>
-```
-
 </div>
 
 <!-- ================= SEARCH ================= -->
@@ -139,8 +125,59 @@
     {% endif %}
 </h2>
 
-<!-- 🔥 TOUT LE RESTE EST STRICTEMENT IDENTIQUE À TON CODE -->
+<!-- ================= PIPELINE ================= -->
 
-{{ super() }}
+<div class="row">
+
+    <div class="col-md-3">
+        <h5>En cours</h5>
+        {% for c in clients_en_cours %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <strong>{{ c.name }}</strong><br>
+                <small>{{ c.commercial or '' }}</small><br>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}" class="btn btn-sm btn-primary mt-2">Ouvrir</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="col-md-3">
+        <h5>En attente</h5>
+        {% for c in clients_en_attente %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <strong>{{ c.name }}</strong><br>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}" class="btn btn-sm btn-warning mt-2">Ouvrir</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="col-md-3">
+        <h5>Gagnés</h5>
+        {% for c in clients_gagnes %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <strong>{{ c.name }}</strong><br>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}" class="btn btn-sm btn-success mt-2">Ouvrir</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="col-md-3">
+        <h5>Perdus</h5>
+        {% for c in clients_perdus %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <strong>{{ c.name }}</strong><br>
+                <a href="{{ url_for('client_detail', client_id=c.id) }}" class="btn btn-sm btn-danger mt-2">Ouvrir</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
 
 {% endblock %}
