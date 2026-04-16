@@ -2726,17 +2726,9 @@ def create_client():
         flash("Nom du client obligatoire.", "danger")
         return redirect(url_for("clients"))
 
-    allowed_status = {"en_cours", "en_attente", "gagne", "perdu", "nouveau"}
-    if status not in allowed_status:
-        status = "en_cours"
-
     owner_id = user_id
-
     if role == "admin":
-        raw_owner_id = request.form.get("owner_id")
-        parsed_owner_id = parse_int_safe(raw_owner_id)
-        if parsed_owner_id:
-            owner_id = parsed_owner_id
+        owner_id = parse_int_safe(request.form.get("owner_id")) or user_id
 
     try:
         with conn.cursor() as cur:
@@ -2748,15 +2740,9 @@ def create_client():
                 )
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
-                name,
-                email or None,
-                phone or None,
-                address or None,
-                status,
-                notes or None,
-                owner_id,
-                siret or None,
-                gerant_nom or None,
+                name, email or None, phone or None, address or None,
+                status, notes or None, owner_id,
+                siret or None, gerant_nom or None
             ))
 
         conn.commit()
@@ -2771,13 +2757,9 @@ def create_client():
 
 
 # =========================
-# STATUS (FIX FINAL)
+# STATUS
 # =========================
-@app.route(
-    "/clients/<int:client_id>/status",
-    methods=["POST"],
-    endpoint="update_client_status"
-)
+@app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
 @login_required
 def update_client_status(client_id):
 
@@ -2787,27 +2769,43 @@ def update_client_status(client_id):
     conn = get_db()
     new_status = (request.form.get("status") or "").strip().lower()
 
-    allowed_status = {"en_cours", "en_attente", "gagne", "perdu"}
-
-    if new_status not in allowed_status:
-        flash("Statut invalide.", "danger")
-        return redirect(url_for("client_detail", client_id=client_id))
-
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE crm_clients
-                SET status = %s
-                WHERE id = %s
-            """, (new_status, client_id))
-
+            cur.execute("UPDATE crm_clients SET status=%s WHERE id=%s", (new_status, client_id))
         conn.commit()
         flash("Statut mis à jour.", "success")
 
     except Exception as e:
         conn.rollback()
-        logger.exception("Erreur update status : %r", e)
-        flash("Erreur lors de la mise à jour.", "danger")
+        logger.exception("Erreur status : %r", e)
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# COTATION (🔥 FIX FINAL)
+# =========================
+@app.route("/clients/<int:client_id>/cotation", methods=["POST"], endpoint="create_cotation")
+@login_required
+def create_cotation(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO cotations (client_id, date_creation)
+                VALUES (%s, NOW())
+            """, (client_id,))
+        conn.commit()
+        flash("Cotation créée.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur cotation : %r", e)
 
     return redirect(url_for("client_detail", client_id=client_id))
 ############################################################
