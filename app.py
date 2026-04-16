@@ -2492,7 +2492,11 @@ def clients():
     users = []
     if role == "admin":
         with conn.cursor() as cur:
-            cur.execute("SELECT id, username, role FROM users ORDER BY username ASC")
+            cur.execute("""
+                SELECT id, username, role
+                FROM users
+                ORDER BY username ASC
+            """)
             users = cur.fetchall()
 
     with conn.cursor() as cur:
@@ -2503,15 +2507,19 @@ def clients():
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                """, (f"%{q}%",))
+                    WHERE
+                        crm_clients.name ILIKE %s
+                        OR COALESCE(crm_clients.email, '') ILIKE %s
+                        OR COALESCE(crm_clients.phone, '') ILIKE %s
+                        OR COALESCE(crm_clients.siret, '') ILIKE %s
+                    ORDER BY crm_clients.created_at DESC, crm_clients.id DESC
+                """, (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
             else:
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    ORDER BY crm_clients.created_at DESC
+                    ORDER BY crm_clients.created_at DESC, crm_clients.id DESC
                 """)
         else:
             if q:
@@ -2519,16 +2527,22 @@ def clients():
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id = %s AND crm_clients.name ILIKE %s
-                    ORDER BY crm_clients.created_at DESC
-                """, (user_id, f"%{q}%"))
+                    WHERE crm_clients.owner_id = %s
+                      AND (
+                          crm_clients.name ILIKE %s
+                          OR COALESCE(crm_clients.email, '') ILIKE %s
+                          OR COALESCE(crm_clients.phone, '') ILIKE %s
+                          OR COALESCE(crm_clients.siret, '') ILIKE %s
+                      )
+                    ORDER BY crm_clients.created_at DESC, crm_clients.id DESC
+                """, (user_id, f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
             else:
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.owner_id = %s
-                    ORDER BY crm_clients.created_at DESC
+                    ORDER BY crm_clients.created_at DESC, crm_clients.id DESC
                 """, (user_id,))
 
         rows = cur.fetchall()
@@ -2563,6 +2577,111 @@ def clients():
 
 
 # =========================
+# CLIENT — CREATION
+# =========================
+@app.route("/clients/create", methods=["POST"], endpoint="create_client")
+@login_required
+def create_client():
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    role = user.get("role")
+    current_user_id = user.get("id")
+    current_username = user.get("username")
+
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    address = (request.form.get("address") or "").strip()
+    commercial = (request.form.get("commercial") or "").strip()
+    status = (request.form.get("status") or "en_cours").strip().lower()
+    notes = (request.form.get("notes") or "").strip()
+    siret = (request.form.get("siret") or "").strip()
+    gerant_nom = (request.form.get("gerant_nom") or "").strip()
+
+    if not name:
+        flash("Le nom du client est obligatoire.", "danger")
+        return redirect(url_for("clients"))
+
+    if status not in ("en_cours", "en_attente", "gagne", "perdu", "nouveau"):
+        status = "en_cours"
+
+    owner_id = None
+
+    try:
+        if role == "admin":
+            owner_raw = (request.form.get("owner_id") or "").strip()
+
+            if owner_raw:
+                try:
+                    owner_id = int(owner_raw)
+                except Exception:
+                    flash("Commercial invalide.", "danger")
+                    return redirect(url_for("clients"))
+
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT id, username
+                        FROM users
+                        WHERE id = %s
+                          AND role = 'commercial'
+                    """, (owner_id,))
+                    owner_row = cur.fetchone()
+
+                if not owner_row:
+                    flash("Commercial introuvable.", "danger")
+                    return redirect(url_for("clients"))
+
+                if not commercial:
+                    commercial = owner_row["username"]
+
+        else:
+            owner_id = current_user_id
+            commercial = current_username
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO crm_clients (
+                    name,
+                    email,
+                    phone,
+                    address,
+                    commercial,
+                    status,
+                    notes,
+                    owner_id,
+                    siret,
+                    gerant_nom
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                name,
+                email or None,
+                phone or None,
+                address or None,
+                commercial or None,
+                status,
+                notes or None,
+                owner_id,
+                siret or None,
+                gerant_nom or None,
+            ))
+            new_client_id = cur.fetchone()["id"]
+
+        conn.commit()
+        flash("Client créé avec succès.", "success")
+        return redirect(url_for("client_detail", client_id=new_client_id))
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur création client : %r", e)
+        flash("Erreur lors de la création du client.", "danger")
+        return redirect(url_for("clients"))
+
+
+# =========================
 # CLIENT — DETAIL
 # =========================
 @app.route("/clients/<int:client_id>", endpoint="client_detail")
@@ -2591,29 +2710,47 @@ def client_detail(client_id):
 
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT * FROM cotations
+            SELECT *
+            FROM cotations
             WHERE client_id = %s
-            ORDER BY date_creation DESC
+            ORDER BY date_creation DESC, id DESC
         """, (client_id,))
         cotations = cur.fetchall()
 
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT * FROM (
-                SELECT 'client' AS type, created_at AS date,
-                       'Création du client' AS title,
-                       COALESCE(notes,'') AS description
-                FROM crm_clients WHERE id = %s
+            SELECT *
+            FROM (
+                SELECT
+                    'client' AS type,
+                    created_at AS date,
+                    'Création du client' AS title,
+                    COALESCE(notes,'') AS description
+                FROM crm_clients
+                WHERE id = %s
 
                 UNION ALL
 
-                SELECT 'cotation', date_creation,
-                       'Nouvelle cotation #' || id,
-                       COALESCE(commentaire,'')
-                FROM cotations WHERE client_id = %s
+                SELECT
+                    'cotation' AS type,
+                    date_creation AS date,
+                    'Nouvelle cotation #' || id AS title,
+                    COALESCE(commentaire,'') AS description
+                FROM cotations
+                WHERE client_id = %s
+
+                UNION ALL
+
+                SELECT
+                    'update' AS type,
+                    created_at AS date,
+                    'Demande de mise à jour' AS title,
+                    COALESCE(commentaire,'') AS description
+                FROM client_updates
+                WHERE client_id = %s
             ) t
             ORDER BY COALESCE(date, CURRENT_TIMESTAMP) DESC
-        """, (client_id, client_id))
+        """, (client_id, client_id, client_id))
         timeline = cur.fetchall()
 
     with conn.cursor() as cur:
@@ -2621,7 +2758,7 @@ def client_detail(client_id):
             SELECT *
             FROM client_updates
             WHERE client_id = %s
-            ORDER BY update_date DESC
+            ORDER BY update_date DESC, id DESC
         """, (client_id,))
         updates = cur.fetchall()
 
@@ -2638,6 +2775,210 @@ def client_detail(client_id):
 
 
 # =========================
+# CLIENT — MODIFICATION
+# =========================
+@app.route("/clients/<int:client_id>/edit", methods=["POST"], endpoint="edit_client")
+@login_required
+def edit_client(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    address = (request.form.get("address") or "").strip()
+    commercial = (request.form.get("commercial") or "").strip()
+    status = (request.form.get("status") or "en_cours").strip().lower()
+    notes = (request.form.get("notes") or "").strip()
+    siret = (request.form.get("siret") or "").strip()
+    gerant_nom = (request.form.get("gerant_nom") or "").strip()
+
+    if not name:
+        flash("Le nom du client est obligatoire.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    if status not in ("en_cours", "en_attente", "gagne", "perdu", "nouveau"):
+        status = "en_cours"
+
+    try:
+        owner_id = None
+
+        if role == "admin":
+            owner_raw = (request.form.get("owner_id") or "").strip()
+
+            if owner_raw:
+                try:
+                    owner_id = int(owner_raw)
+                except Exception:
+                    flash("Commercial invalide.", "danger")
+                    return redirect(url_for("client_detail", client_id=client_id))
+
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT id, username
+                        FROM users
+                        WHERE id = %s
+                          AND role = 'commercial'
+                    """, (owner_id,))
+                    owner_row = cur.fetchone()
+
+                if not owner_row:
+                    flash("Commercial introuvable.", "danger")
+                    return redirect(url_for("client_detail", client_id=client_id))
+
+                if not commercial:
+                    commercial = owner_row["username"]
+
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE crm_clients
+                    SET
+                        name = %s,
+                        email = %s,
+                        phone = %s,
+                        address = %s,
+                        commercial = %s,
+                        status = %s,
+                        notes = %s,
+                        owner_id = %s,
+                        siret = %s,
+                        gerant_nom = %s
+                    WHERE id = %s
+                """, (
+                    name,
+                    email or None,
+                    phone or None,
+                    address or None,
+                    commercial or None,
+                    status,
+                    notes or None,
+                    owner_id,
+                    siret or None,
+                    gerant_nom or None,
+                    client_id,
+                ))
+
+        else:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE crm_clients
+                    SET
+                        name = %s,
+                        email = %s,
+                        phone = %s,
+                        address = %s,
+                        status = %s,
+                        notes = %s,
+                        siret = %s,
+                        gerant_nom = %s
+                    WHERE id = %s
+                """, (
+                    name,
+                    email or None,
+                    phone or None,
+                    address or None,
+                    status,
+                    notes or None,
+                    siret or None,
+                    gerant_nom or None,
+                    client_id,
+                ))
+
+        conn.commit()
+        flash("Client mis à jour avec succès.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur modification client : %r", e)
+        flash("Erreur lors de la modification du client.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
+# CLIENT — UPDATE STATUS
+# =========================
+@app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
+@login_required
+def update_client_status(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    status = (request.form.get("status") or "").strip().lower()
+
+    if status not in ("en_cours", "en_attente", "gagne", "perdu"):
+        flash("Statut invalide.", "danger")
+        return redirect(request.referrer or url_for("clients"))
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE crm_clients
+                SET status = %s
+                WHERE id = %s
+            """, (status, client_id))
+
+        conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur update status : %r", e)
+        flash("Erreur lors de la mise à jour.", "danger")
+
+    return redirect(request.referrer or url_for("clients"))
+
+
+# =========================
+# CLIENT — SUPPRESSION
+# =========================
+@app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
+@login_required
+def delete_client(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    if role not in ("admin", "commercial"):
+        abort(403)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM crm_clients WHERE id = %s", (client_id,))
+            row = cur.fetchone()
+
+        if not row:
+            flash("Client introuvable.", "danger")
+            return redirect(url_for("clients"))
+
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM cotations WHERE client_id = %s", (client_id,))
+            cur.execute("DELETE FROM client_updates WHERE client_id = %s", (client_id,))
+            cur.execute("DELETE FROM revenus WHERE client_id = %s", (client_id,))
+            cur.execute("DELETE FROM crm_clients WHERE id = %s", (client_id,))
+
+        conn.commit()
+        flash("Client supprimé avec succès.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur suppression client : %r", e)
+        flash("Erreur lors de la suppression du client.", "danger")
+
+    return redirect(url_for("clients"))
+
+
+# =========================
 # COTATION
 # =========================
 @app.route("/clients/<int:client_id>/cotation", methods=["POST"], endpoint="create_cotation")
@@ -2648,19 +2989,166 @@ def create_cotation(client_id):
         abort(403)
 
     conn = get_db()
+    user = session.get("user") or {}
+
+    date_negociation = parse_date_safe((request.form.get("date_negociation") or "").strip())
+    heure_negociation = parse_time_safe((request.form.get("heure_negociation") or "").strip())
+    energie_type = (request.form.get("energie_type") or "").strip()
+    pdl_pce = (request.form.get("pdl_pce") or "").strip()
+    date_echeance = parse_date_safe((request.form.get("date_echeance") or "").strip())
+    fournisseur_actuel = (request.form.get("fournisseur_actuel") or "").strip()
+    entreprise_nom = (request.form.get("entreprise_nom") or "").strip()
+    siret = (request.form.get("siret") or "").strip()
+    adresse_facturation = (request.form.get("adresse_facturation") or "").strip()
+    adresse_consommation = (request.form.get("adresse_consommation") or "").strip()
+    signataire_nom = (request.form.get("signataire_nom") or "").strip()
+    signataire_tel = (request.form.get("signataire_tel") or "").strip()
+    signataire_email = (request.form.get("signataire_email") or "").strip()
+    commentaire = (request.form.get("commentaire") or "").strip()
+
+    # Champs étendus
+    type_compteur = (request.form.get("type_compteur") or "").strip()
+    signataire_mobile = (request.form.get("signataire_mobile") or "").strip()
+    site_nom = (request.form.get("site_nom") or "").strip()
+    fonction_signataire = (request.form.get("fonction_signataire") or "").strip()
+    code_naf = (request.form.get("code_naf") or "").strip()
+    date_remise_offre = parse_date_safe((request.form.get("date_remise_offre") or "").strip())
+
+    elec_debut_fourniture = parse_date_safe((request.form.get("elec_debut_fourniture") or "").strip())
+    elec_fin_fourniture = parse_date_safe((request.form.get("elec_fin_fourniture") or "").strip())
+    elec_nb_mois = parse_int_safe((request.form.get("elec_nb_mois") or "").strip())
+    elec_segment = (request.form.get("elec_segment") or "").strip()
+    formule_acheminement = (request.form.get("formule_acheminement") or "").strip()
+    elec_car = (request.form.get("elec_car") or "").strip()
+    puissance_souscrite = (request.form.get("puissance_souscrite") or "").strip()
+    elec_fournisseur_actuel = (request.form.get("elec_fournisseur_actuel") or "").strip()
+
+    pointe = (request.form.get("pointe") or "").strip()
+    hph = (request.form.get("hph") or "").strip()
+    hch = (request.form.get("hch") or "").strip()
+    hpr = (request.form.get("hpr") or "").strip()
+    hce = (request.form.get("hce") or "").strip()
+
+    gaz_debut_fourniture = parse_date_safe((request.form.get("gaz_debut_fourniture") or "").strip())
+    gaz_fin_fourniture = parse_date_safe((request.form.get("gaz_fin_fourniture") or "").strip())
+    gaz_nb_mois = parse_int_safe((request.form.get("gaz_nb_mois") or "").strip())
+    pce = (request.form.get("pce") or "").strip()
+    gaz_segment = (request.form.get("gaz_segment") or "").strip()
+    profil = (request.form.get("profil") or "").strip()
+    gaz_car = (request.form.get("gaz_car") or "").strip()
+    gaz_fournisseur_actuel = (request.form.get("gaz_fournisseur_actuel") or "").strip()
 
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO cotations (client_id, date_creation)
-                VALUES (%s, NOW())
-            """, (client_id,))
+                INSERT INTO cotations (
+                    client_id,
+                    date_negociation,
+                    energie_type,
+                    pdl_pce,
+                    date_echeance,
+                    fournisseur_actuel,
+                    entreprise_nom,
+                    siret,
+                    adresse_facturation,
+                    adresse_consommation,
+                    signataire_nom,
+                    signataire_tel,
+                    signataire_email,
+                    commentaire,
+                    created_by,
+                    is_read,
+                    status,
+                    date_creation,
+                    type_compteur,
+                    heure_negociation,
+                    signataire_mobile,
+                    site_nom,
+                    fonction_signataire,
+                    code_naf,
+                    date_remise_offre,
+                    elec_debut_fourniture,
+                    elec_fin_fourniture,
+                    elec_nb_mois,
+                    elec_segment,
+                    formule_acheminement,
+                    elec_car,
+                    puissance_souscrite,
+                    elec_fournisseur_actuel,
+                    pointe,
+                    hph,
+                    hch,
+                    hpr,
+                    hce,
+                    gaz_debut_fourniture,
+                    gaz_fin_fourniture,
+                    gaz_nb_mois,
+                    pce,
+                    gaz_segment,
+                    profil,
+                    gaz_car,
+                    gaz_fournisseur_actuel
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, 0, 'nouvelle', NOW(), %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s
+                )
+            """, (
+                client_id,
+                date_negociation,
+                energie_type or None,
+                pdl_pce or None,
+                date_echeance,
+                fournisseur_actuel or None,
+                entreprise_nom or None,
+                siret or None,
+                adresse_facturation or None,
+                adresse_consommation or None,
+                signataire_nom or None,
+                signataire_tel or None,
+                signataire_email or None,
+                commentaire or None,
+                user.get("id"),
+                type_compteur or None,
+                heure_negociation,
+                signataire_mobile or None,
+                site_nom or None,
+                fonction_signataire or None,
+                code_naf or None,
+                date_remise_offre,
+                elec_debut_fourniture,
+                elec_fin_fourniture,
+                elec_nb_mois,
+                elec_segment or None,
+                formule_acheminement or None,
+                elec_car or None,
+                puissance_souscrite or None,
+                elec_fournisseur_actuel or None,
+                pointe or None,
+                hph or None,
+                hch or None,
+                hpr or None,
+                hce or None,
+                gaz_debut_fourniture,
+                gaz_fin_fourniture,
+                gaz_nb_mois,
+                pce or None,
+                gaz_segment or None,
+                profil or None,
+                gaz_car or None,
+                gaz_fournisseur_actuel or None,
+            ))
+
         conn.commit()
         flash("Cotation créée.", "success")
 
     except Exception as e:
         conn.rollback()
         logger.exception("Erreur cotation : %r", e)
+        flash("Erreur lors de la création de la cotation.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
 
@@ -2681,12 +3169,21 @@ def download_document():
         abort(403)
 
     try:
+        if LOCAL_MODE or not s3:
+            flash("Téléchargement indisponible en mode local.", "warning")
+            return redirect(request.referrer or url_for("clients"))
+
         url = s3_presigned_url(key)
+        if not url:
+            flash("Impossible de générer le lien de téléchargement.", "danger")
+            return redirect(request.referrer or url_for("clients"))
+
         return redirect(url)
 
     except Exception as e:
         logger.exception("Erreur download : %r", e)
-        return redirect(url_for("clients"))
+        flash("Erreur lors du téléchargement.", "danger")
+        return redirect(request.referrer or url_for("clients"))
 
 
 # =========================
@@ -2696,49 +3193,93 @@ def download_document():
 @login_required
 def delete_document():
 
-    key = request.form.get("key")
+    key = (request.form.get("key") or "").strip()
 
-    if key:
-        try:
-            if not can_access_document_key(key):
-                abort(403)
+    if not key:
+        flash("Document invalide.", "danger")
+        return redirect(request.referrer or url_for("clients"))
 
-            if s3:
-                s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+    try:
+        if not can_access_document_key(key):
+            abort(403)
 
-            flash("Document supprimé.", "success")
+        if LOCAL_MODE or not s3:
+            flash("Suppression indisponible en mode local.", "warning")
+            return redirect(request.referrer or url_for("clients"))
 
-        except Exception as e:
-            logger.exception("Erreur delete : %r", e)
+        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+        flash("Document supprimé.", "success")
+
+    except Exception as e:
+        logger.exception("Erreur delete : %r", e)
+        flash("Erreur lors de la suppression du document.", "danger")
 
     return redirect(request.referrer or url_for("clients"))
 
 
 # =========================
-# DOCUMENT UPLOAD (FIX DOUBLON)
+# DOCUMENT UPLOAD LEGACY
 # =========================
+# ⚠️ Conserve l’ancienne route /clients/<id>/upload
+# sans écraser la vraie fonction upload_client_document du bloc 11
 @app.route("/clients/<int:client_id>/upload", methods=["POST"], endpoint="upload_client_document_legacy")
 @login_required
-def upload_client_document(client_id):
+def upload_client_document_legacy(client_id):
 
     if not can_access_client(client_id):
         abort(403)
 
-    if not s3:
+    if LOCAL_MODE or not s3:
         flash("Upload indisponible.", "warning")
         return redirect(url_for("client_detail", client_id=client_id))
 
     files = request.files.getlist("files")
 
-    for f in files:
-        if f and getattr(f, "filename", ""):
-            try:
-                key = f"clients/{client_id}/{secure_filename(f.filename)}"
-                s3_upload_fileobj(f, AWS_BUCKET, key)
-            except Exception as e:
-                logger.exception("Erreur upload : %r", e)
+    # fallback legacy
+    if not files:
+        legacy_file = request.files.get("file")
+        if legacy_file and getattr(legacy_file, "filename", ""):
+            files = [legacy_file]
 
-    flash("Documents uploadés.", "success")
+    files = [f for f in files if f and getattr(f, "filename", "")]
+
+    if not files:
+        flash("Aucun fichier sélectionné.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    success_count = 0
+    failed = []
+
+    prefix = client_s3_prefix(client_id)
+
+    for f in files:
+        try:
+            if not allowed_file(f.filename):
+                failed.append(f.filename or "fichier_invalide")
+                continue
+
+            original_name = secure_filename(f.filename) or "document"
+            filename = clean_filename(original_name)
+
+            key = _s3_make_non_overwriting_key(
+                AWS_BUCKET,
+                f"{prefix}{filename}"
+            )
+
+            s3_upload_fileobj(f, AWS_BUCKET, key)
+            success_count += 1
+
+        except Exception as e:
+            logger.exception("Erreur upload legacy : %r", e)
+            failed.append(getattr(f, "filename", None) or "fichier_erreur")
+
+    if success_count > 0 and not failed:
+        flash(f"{success_count} document(s) uploadé(s).", "success")
+    elif success_count > 0:
+        flash(f"{success_count} upload(s) réussi(s), {len(failed)} échec(s).", "warning")
+    else:
+        flash("Aucun upload réussi.", "danger")
+
     return redirect(url_for("client_detail", client_id=client_id))
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
