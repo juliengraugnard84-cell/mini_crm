@@ -2452,7 +2452,7 @@ def shared_resources():
         resiliations=resiliations,
     )
 
-    ###########################################################
+###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
 # ✅ VERSION FINALE STABLE (FIX PIPELINE + ENDPOINTS + SYNTAX)
@@ -2695,11 +2695,13 @@ def client_detail(client_id):
         updates=[row_to_obj(u) for u in updates],
         shared_mandats=shared_mandats,
         shared_resiliations=shared_resiliations,
+        current_user=session.get("user"),
+        available_endpoints=[rule.endpoint for rule in app.url_map.iter_rules()],
     )
 
 
 # =========================
-# CLIENT — CREATION (FIX ENDPOINT)
+# CLIENT — CREATION
 # =========================
 @app.route("/clients/new", methods=["POST"], endpoint="create_client")
 @login_required
@@ -2712,17 +2714,50 @@ def create_client():
     user_id = user.get("id")
 
     name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    address = (request.form.get("address") or "").strip()
+    notes = (request.form.get("notes") or "").strip()
+    status = (request.form.get("status") or "en_cours").strip().lower()
+    siret = (request.form.get("siret") or "").strip()
+    gerant_nom = (request.form.get("gerant_nom") or "").strip()
 
     if not name:
         flash("Nom du client obligatoire.", "danger")
         return redirect(url_for("clients"))
 
+    allowed_status = {"en_cours", "en_attente", "gagne", "perdu", "nouveau"}
+    if status not in allowed_status:
+        status = "en_cours"
+
+    owner_id = user_id
+
+    if role == "admin":
+        raw_owner_id = request.form.get("owner_id")
+        parsed_owner_id = parse_int_safe(raw_owner_id)
+        if parsed_owner_id:
+            owner_id = parsed_owner_id
+
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO crm_clients (name, owner_id, status)
-                VALUES (%s,%s,'en_cours')
-            """, (name, user_id))
+                INSERT INTO crm_clients (
+                    name, email, phone, address,
+                    status, notes, owner_id,
+                    siret, gerant_nom
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                name,
+                email or None,
+                phone or None,
+                address or None,
+                status,
+                notes or None,
+                owner_id,
+                siret or None,
+                gerant_nom or None,
+            ))
 
         conn.commit()
         flash("Client créé avec succès.", "success")
@@ -2733,6 +2768,48 @@ def create_client():
         flash("Erreur lors de la création.", "danger")
 
     return redirect(url_for("clients"))
+
+
+# =========================
+# STATUS (FIX FINAL)
+# =========================
+@app.route(
+    "/clients/<int:client_id>/status",
+    methods=["POST"],
+    endpoint="update_client_status"
+)
+@login_required
+def update_client_status(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    new_status = (request.form.get("status") or "").strip().lower()
+
+    allowed_status = {"en_cours", "en_attente", "gagne", "perdu"}
+
+    if new_status not in allowed_status:
+        flash("Statut invalide.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE crm_clients
+                SET status = %s
+                WHERE id = %s
+            """, (new_status, client_id))
+
+        conn.commit()
+        flash("Statut mis à jour.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur update status : %r", e)
+        flash("Erreur lors de la mise à jour.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
