@@ -2454,7 +2454,7 @@ def shared_resources():
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
-# ✅ VERSION FINALE STABLE (100% routes OK + cotation complète)
+# ✅ VERSION FINALE STABLE (FIX PIPELINE + NOUVEAU)
 ############################################################
 
 from datetime import datetime
@@ -2500,7 +2500,7 @@ def format_datetime_fr(value, with_time=True):
 
 
 # =========================
-# CLIENT — LISTE
+# CLIENT — LISTE (🔥 FIX ICI)
 # =========================
 @app.route("/clients", endpoint="clients")
 @login_required
@@ -2565,18 +2565,28 @@ def clients():
 
         rows = cur.fetchall()
 
+    # 🔥 FIX CRITIQUE PIPELINE
     en_cours, en_attente, gagnes, perdus = [], [], [], []
 
     for r in rows:
-        st = (r["status"] or "en_cours").lower()
 
-        if st == "gagne":
-            gagnes.append(r)
-        elif st == "perdu":
-            perdus.append(r)
+        st = (r.get("status") or "").strip().lower()
+
+        # 🔥 NORMALISATION MÉTIER
+        if st in ("", "nouveau", "en_cours"):
+            en_cours.append(r)
+
         elif st == "en_attente":
             en_attente.append(r)
+
+        elif st == "gagne":
+            gagnes.append(r)
+
+        elif st == "perdu":
+            perdus.append(r)
+
         else:
+            # sécurité absolue → jamais perdu
             en_cours.append(r)
 
     return render_template(
@@ -2619,7 +2629,6 @@ def client_detail(client_id):
 
     documents = list_client_documents(client_id)
 
-    # Ressources partagées affichées dans le template
     shared_mandats = []
     shared_resiliations = []
 
@@ -2645,7 +2654,7 @@ def client_detail(client_id):
                     shared_resiliations.append(doc)
 
         except Exception as e:
-            logger.exception("Erreur chargement ressources partagées client_detail : %r", e)
+            logger.exception("Erreur ressources partagées : %r", e)
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -2700,331 +2709,6 @@ def client_detail(client_id):
         shared_mandats=shared_mandats,
         shared_resiliations=shared_resiliations,
     )
-
-
-# =========================
-# CLIENT — CREATION
-# =========================
-@app.route("/clients/new", methods=["POST"])
-@login_required
-def create_client():
-
-    conn = get_db()
-    user = session.get("user") or {}
-
-    role = user.get("role")
-    user_id = user.get("id")
-
-    name = (request.form.get("name") or "").strip()
-    email = (request.form.get("email") or "").strip()
-    phone = (request.form.get("phone") or "").strip()
-    address = (request.form.get("address") or "").strip()
-    notes = (request.form.get("notes") or "").strip()
-    status = (request.form.get("status") or "en_cours").strip().lower()
-    siret = (request.form.get("siret") or "").strip()
-    gerant_nom = (request.form.get("gerant_nom") or "").strip()
-
-    if not name:
-        flash("Nom du client obligatoire.", "danger")
-        return redirect(url_for("clients"))
-
-    allowed_status = {"en_cours", "en_attente", "gagne", "perdu", "nouveau"}
-    if status not in allowed_status:
-        status = "en_cours"
-
-    owner_id = user_id
-
-    if role == "admin":
-        raw_owner_id = request.form.get("owner_id")
-        parsed_owner_id = parse_int_safe(raw_owner_id)
-        if parsed_owner_id:
-            owner_id = parsed_owner_id
-
-    commercial = (request.form.get("commercial") or "").strip()
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO crm_clients (
-                    name,
-                    email,
-                    phone,
-                    address,
-                    commercial,
-                    status,
-                    notes,
-                    owner_id,
-                    siret,
-                    gerant_nom
-                )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (
-                name,
-                email or None,
-                phone or None,
-                address or None,
-                commercial or None,
-                status,
-                notes or None,
-                owner_id,
-                siret or None,
-                gerant_nom or None,
-            ))
-
-        conn.commit()
-        flash("Client créé avec succès.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur création client : %r", e)
-        flash("Erreur lors de la création.", "danger")
-
-    return redirect(url_for("clients"))
-
-
-# =========================
-# 🔥 COTATION — CREATION COMPLETE
-# =========================
-@app.route(
-    "/clients/<int:client_id>/cotation",
-    methods=["POST"],
-    endpoint="create_cotation"
-)
-@login_required
-def create_cotation(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-    user = session.get("user") or {}
-    f = request.form
-
-    try:
-        with conn.cursor() as cur:
-
-            cur.execute("""
-                INSERT INTO cotations (
-                    client_id,
-                    date_negociation,
-                    heure_negociation,
-                    energie_type,
-                    pdl_pce,
-                    date_echeance,
-                    fournisseur_actuel,
-                    entreprise_nom,
-                    siret,
-                    adresse_facturation,
-                    adresse_consommation,
-                    signataire_nom,
-                    signataire_tel,
-                    signataire_email,
-                    commentaire,
-                    created_by,
-                    type_compteur,
-                    signataire_mobile,
-                    site_nom,
-                    fonction_signataire,
-                    code_naf,
-                    date_remise_offre,
-                    elec_debut_fourniture,
-                    elec_fin_fourniture,
-                    elec_nb_mois,
-                    elec_segment,
-                    formule_acheminement,
-                    elec_car,
-                    puissance_souscrite,
-                    elec_fournisseur_actuel,
-                    pointe,
-                    hph,
-                    hch,
-                    hpr,
-                    hce,
-                    gaz_debut_fourniture,
-                    gaz_fin_fourniture,
-                    gaz_nb_mois,
-                    pce,
-                    gaz_segment,
-                    profil,
-                    gaz_car,
-                    gaz_fournisseur_actuel
-                )
-                VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s
-                )
-            """, (
-                client_id,
-                parse_date_safe(f.get("date_negociation")),
-                parse_time_safe(f.get("heure_negociation")),
-                f.get("energie_type") or None,
-                f.get("pdl_pce") or None,
-                parse_date_safe(f.get("date_echeance")),
-                f.get("fournisseur_actuel") or None,
-                f.get("entreprise_nom") or None,
-                f.get("siret") or None,
-                f.get("adresse_facturation") or None,
-                f.get("adresse_consommation") or None,
-                f.get("signataire_nom") or None,
-                f.get("signataire_tel") or None,
-                f.get("signataire_email") or None,
-                f.get("commentaire") or None,
-                user.get("id"),
-                f.get("type_compteur") or None,
-                f.get("signataire_mobile") or None,
-                f.get("site_nom") or None,
-                f.get("fonction_signataire") or None,
-                f.get("code_naf") or None,
-                parse_date_safe(f.get("date_remise_offre")),
-                parse_date_safe(f.get("elec_debut_fourniture")),
-                parse_date_safe(f.get("elec_fin_fourniture")),
-                parse_int_safe(f.get("elec_nb_mois")),
-                f.get("elec_segment") or None,
-                f.get("formule_acheminement") or None,
-                f.get("elec_car") or None,
-                f.get("puissance_souscrite") or None,
-                f.get("elec_fournisseur_actuel") or None,
-                f.get("pointe") or None,
-                f.get("hph") or None,
-                f.get("hch") or None,
-                f.get("hpr") or None,
-                f.get("hce") or None,
-                parse_date_safe(f.get("gaz_debut_fourniture")),
-                parse_date_safe(f.get("gaz_fin_fourniture")),
-                parse_int_safe(f.get("gaz_nb_mois")),
-                f.get("pce") or None,
-                f.get("gaz_segment") or None,
-                f.get("profil") or None,
-                f.get("gaz_car") or None,
-                f.get("gaz_fournisseur_actuel") or None,
-            ))
-
-        conn.commit()
-        flash("Cotation créée avec succès.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur création cotation : %r", e)
-        flash("Erreur lors de la création.", "danger")
-
-    return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================
-# 🔥 DELETE CLIENT
-# =========================
-@app.route(
-    "/clients/<int:client_id>/delete",
-    methods=["POST"],
-    endpoint="delete_client"
-)
-@login_required
-def delete_client(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT id, name FROM crm_clients WHERE id = %s",
-            (client_id,)
-        )
-        client = cur.fetchone()
-
-    if not client:
-        flash("Client introuvable.", "danger")
-        return redirect(url_for("clients"))
-
-    try:
-        if not LOCAL_MODE and s3:
-            try:
-                prefix = client_s3_prefix(client_id)
-                items = s3_list_all_objects(AWS_BUCKET, prefix=prefix)
-
-                for item in items:
-                    key = item.get("Key")
-                    if key and not key.endswith("/"):
-                        try:
-                            s3.delete_object(Bucket=AWS_BUCKET, Key=key)
-                        except Exception as e:
-                            logger.exception("Erreur suppression document S3 client : %r", e)
-
-                legacy_prefix = f"clients/{client_id}/"
-                legacy_items = s3_list_all_objects(AWS_BUCKET, prefix=legacy_prefix)
-
-                for item in legacy_items:
-                    key = item.get("Key")
-                    if key and not key.endswith("/"):
-                        try:
-                            s3.delete_object(Bucket=AWS_BUCKET, Key=key)
-                        except Exception as e:
-                            logger.exception("Erreur suppression document S3 legacy : %r", e)
-
-            except Exception as e:
-                logger.exception("Erreur nettoyage S3 client : %r", e)
-
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM cotations WHERE client_id = %s", (client_id,))
-            cur.execute("DELETE FROM client_updates WHERE client_id = %s", (client_id,))
-            cur.execute("DELETE FROM revenus WHERE client_id = %s", (client_id,))
-            cur.execute("DELETE FROM crm_clients WHERE id = %s", (client_id,))
-
-        conn.commit()
-        flash("Dossier client supprimé avec succès.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur suppression client : %r", e)
-        flash("Erreur lors de la suppression du dossier.", "danger")
-
-    return redirect(url_for("clients"))
-
-
-# =========================
-# STATUS
-# =========================
-@app.route(
-    "/clients/<int:client_id>/status",
-    methods=["POST"],
-    endpoint="update_client_status"
-)
-@login_required
-def update_client_status(client_id):
-
-    if not can_access_client(client_id):
-        abort(403)
-
-    conn = get_db()
-    new_status = (request.form.get("status") or "").strip().lower()
-
-    allowed_status = {"en_cours", "en_attente", "gagne", "perdu"}
-
-    if new_status not in allowed_status:
-        flash("Statut invalide.", "danger")
-        return redirect(url_for("clients"))
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE crm_clients
-                SET status = %s
-                WHERE id = %s
-            """, (new_status, client_id))
-
-        conn.commit()
-        flash("Statut mis à jour.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur update status : %r", e)
-        flash("Erreur lors de la mise à jour.", "danger")
-
-    return redirect(url_for("clients"))
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
