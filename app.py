@@ -2666,7 +2666,7 @@ def create_cotation(client_id):
 
 
 # =========================
-# DOCUMENT DOWNLOAD (FIX SAFE)
+# DOCUMENT DOWNLOAD
 # =========================
 @app.route("/document/download", endpoint="download_document")
 @login_required
@@ -2690,7 +2690,7 @@ def download_document():
 
 
 # =========================
-# DOCUMENT DELETE (FIX SAFE)
+# DOCUMENT DELETE
 # =========================
 @app.route("/document/delete", methods=["POST"], endpoint="delete_document")
 @login_required
@@ -2715,9 +2715,9 @@ def delete_document():
 
 
 # =========================
-# DOCUMENT UPLOAD (FIX SAFE)
+# DOCUMENT UPLOAD (FIX DOUBLON)
 # =========================
-@app.route("/clients/<int:client_id>/upload", methods=["POST"], endpoint="upload_client_document")
+@app.route("/clients/<int:client_id>/upload", methods=["POST"], endpoint="upload_client_document_legacy")
 @login_required
 def upload_client_document(client_id):
 
