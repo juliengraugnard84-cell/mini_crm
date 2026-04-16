@@ -2615,48 +2615,89 @@ def client_detail(client_id):
 
     documents = list_client_documents(client_id)
 
-    shared_mandats, shared_resiliations = [], []
+    # cotations
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT * FROM cotations
+            WHERE client_id = %s
+            ORDER BY date_creation DESC
+        """, (client_id,))
+        cotations = cur.fetchall()
 
-    if not LOCAL_MODE and s3:
-        try:
-            items = s3_list_all_objects(AWS_BUCKET, prefix=SHARED_PREFIX)
+    # timeline
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT * FROM (
+                SELECT 'client' AS type, created_at AS date,
+                       'Création du client' AS title,
+                       COALESCE(notes,'') AS description
+                FROM crm_clients WHERE id = %s
 
-            for item in items:
-                key = item.get("Key")
-                if not key or key.endswith("/"):
-                    continue
+                UNION ALL
 
-                doc = {
-                    "nom": key.replace(SHARED_PREFIX, "", 1),
-                    "key": key,
-                    "taille": item.get("Size", 0),
-                    "date": item.get("LastModified"),
-                }
+                SELECT 'cotation', date_creation,
+                       'Nouvelle cotation #' || id,
+                       COALESCE(commentaire,'')
+                FROM cotations WHERE client_id = %s
+            ) t
+            ORDER BY COALESCE(date, CURRENT_TIMESTAMP) DESC
+        """, (client_id, client_id))
+        timeline = cur.fetchall()
 
-                if key.startswith(f"{SHARED_PREFIX}mandats/"):
-                    shared_mandats.append(doc)
-                elif key.startswith(f"{SHARED_PREFIX}resiliations/"):
-                    shared_resiliations.append(doc)
-
-        except Exception as e:
-            logger.exception("Erreur ressources partagées : %r", e)
+    # updates
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT *
+            FROM client_updates
+            WHERE client_id = %s
+            ORDER BY update_date DESC
+        """, (client_id,))
+        updates = cur.fetchall()
 
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
         documents=documents,
-        shared_mandats=shared_mandats,
-        shared_resiliations=shared_resiliations,
+        cotations=[row_to_obj(c) for c in cotations],
+        timeline=[row_to_obj(t) for t in timeline],
+        updates=[row_to_obj(u) for u in updates],
         current_user=session.get("user"),
         available_endpoints=[rule.endpoint for rule in app.url_map.iter_rules()],
     )
 
 
 # =========================
+# COTATION
+# =========================
+@app.route("/clients/<int:client_id>/cotation", methods=["POST"], endpoint="create_cotation")
+@login_required
+def create_cotation(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO cotations (client_id, date_creation)
+                VALUES (%s, NOW())
+            """, (client_id,))
+        conn.commit()
+        flash("Cotation créée.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur cotation : %r", e)
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
+# =========================
 # DOCUMENTS
 # =========================
-
-@app.route("/document/download")
+@app.route("/document/download", endpoint="download_document")
 @login_required
 def download_document():
 
@@ -2665,25 +2706,31 @@ def download_document():
     if not key:
         return redirect(url_for("clients"))
 
-    url = s3.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": AWS_BUCKET, "Key": key},
-        ExpiresIn=3600
-    )
+    try:
+        url = s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": AWS_BUCKET, "Key": key},
+            ExpiresIn=3600
+        )
+        return redirect(url)
+    except Exception as e:
+        logger.exception("Erreur download : %r", e)
+        return redirect(url_for("clients"))
 
-    return redirect(url)
 
-
-@app.route("/document/delete", methods=["POST"])
+@app.route("/document/delete", methods=["POST"], endpoint="delete_document")
 @login_required
 def delete_document():
 
     key = request.form.get("key")
 
     if key:
-        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+        try:
+            s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+            flash("Document supprimé.", "success")
+        except Exception as e:
+            logger.exception("Erreur delete : %r", e)
 
-    flash("Document supprimé.", "success")
     return redirect(request.referrer or url_for("clients"))
 
 
