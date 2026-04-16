@@ -2128,7 +2128,7 @@ def api_calendar():
                 LEFT JOIN users
                     ON users.id = cotations.created_by
                 WHERE cotations.date_negociation IS NOT NULL
-                AND cotations.created_by = %s
+                  AND cotations.created_by = %s
             """, (user_id,))
 
         rows = cur.fetchall()
@@ -2140,15 +2140,21 @@ def api_calendar():
     # =====================================================
     for r in rows:
 
-        if r["heure_negociation"]:
-            start = f"{r['date_negociation']}T{r['heure_negociation']}"
+        date_negociation = r.get("date_negociation")
+        heure_negociation = r.get("heure_negociation")
+
+        if not date_negociation:
+            continue
+
+        if heure_negociation:
+            start = f"{date_negociation}T{heure_negociation}"
         else:
-            start = f"{r['date_negociation']}"
+            start = str(date_negociation)
 
         events.append({
             "id": f"cotation_{r['id']}",
-            "title": f"{r['client_name']} - {r['commercial_name']}",
-            "start": start
+            "title": f"{r.get('client_name') or ''} - {r.get('commercial_name') or ''}",
+            "start": start,
         })
 
     # =====================================================
@@ -2171,34 +2177,41 @@ def api_calendar():
 
         for r in rows:
 
+            event_date = r.get("event_date")
+
+            if not event_date:
+                continue
+
             # Journée entière
             if r.get("all_day"):
 
                 events.append({
                     "id": f"event_{r['id']}",
-                    "title": r["title"],
-                    "start": str(r["event_date"]),
-                    "allDay": True
+                    "title": r.get("title") or "",
+                    "start": str(event_date),
+                    "allDay": True,
                 })
 
             else:
 
-                if r["event_time"]:
-                    start = f"{r['event_date']}T{r['event_time']}"
-                else:
-                    start = str(r["event_date"])
+                event_time = r.get("event_time")
+                end_time = r.get("end_time")
 
-                if r.get("end_time"):
-                    end = f"{r['event_date']}T{r['end_time']}"
+                if event_time:
+                    start = f"{event_date}T{event_time}"
                 else:
-                    end = None
+                    start = str(event_date)
+
+                end = None
+                if end_time:
+                    end = f"{event_date}T{end_time}"
 
                 events.append({
                     "id": f"event_{r['id']}",
-                    "title": r["title"],
+                    "title": r.get("title") or "",
                     "start": start,
                     "end": end,
-                    "allDay": False
+                    "allDay": False,
                 })
 
     except Exception as e:
