@@ -2402,6 +2402,55 @@ def upload_client_document(client_id):
         flash(f"Aucun upload réussi. Échecs: {', '.join(failed)}", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
+############################################################
+# 11 BIS. RESSOURCES PARTAGÉES (FIX CRITIQUE)
+############################################################
+
+@app.route("/ressources")
+@login_required
+def shared_resources():
+
+    mandats = []
+    resiliations = []
+
+    if LOCAL_MODE or not s3:
+        return render_template(
+            "ressources.html",
+            mandats=mandats,
+            resiliations=resiliations,
+        )
+
+    try:
+        items = s3_list_all_objects(AWS_BUCKET, prefix=SHARED_PREFIX)
+
+        for item in items:
+            key = item.get("Key")
+
+            if not key or key.endswith("/"):
+                continue
+
+            doc = {
+                "nom": key.replace(SHARED_PREFIX, "", 1),
+                "key": key,
+                "taille": item.get("Size", 0),
+                "date": item.get("LastModified"),
+            }
+
+            if key.startswith(f"{SHARED_PREFIX}mandats/"):
+                mandats.append(doc)
+
+            elif key.startswith(f"{SHARED_PREFIX}resiliations/"):
+                resiliations.append(doc)
+
+    except Exception as e:
+        logger.exception("Erreur chargement ressources : %r", e)
+        flash("Impossible de charger les ressources.", "danger")
+
+    return render_template(
+        "ressources.html",
+        mandats=mandats,
+        resiliations=resiliations,
+    )
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
