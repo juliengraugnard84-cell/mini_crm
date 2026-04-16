@@ -2297,13 +2297,7 @@ def upload_document():
             f"{GLOBAL_PREFIX}{filename}"
         )
 
-        stream = getattr(fichier, "stream", fichier)
-        try:
-            stream.seek(0)
-        except Exception:
-            pass
-
-        s3_upload_fileobj(stream, AWS_BUCKET, key)
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
 
         flash("Document global uploadé.", "success")
 
@@ -2315,7 +2309,7 @@ def upload_document():
 
 
 # =========================================================
-# UPLOAD DOCUMENT PAR DOSSIER CLIENT (MODIFIÉ ✔)
+# UPLOAD DOCUMENT PAR DOSSIER CLIENT
 # =========================================================
 @app.route(
     "/clients/<int:client_id>/documents/upload",
@@ -2334,10 +2328,8 @@ def upload_client_document(client_id):
 
     files = request.files.getlist("files")
 
-    # ✅ NOUVEAU
     doc_name = (request.form.get("doc_name") or "").strip()
-    pdl = (request.form.get("pdl") or "").strip()
-    pdl = re.sub(r"[^0-9]", "", pdl)
+    pdl = re.sub(r"[^0-9]", "", (request.form.get("pdl") or ""))
 
     if not files:
         legacy = request.files.get("file")
@@ -2361,15 +2353,14 @@ def upload_client_document(client_id):
 
         try:
             original_name = secure_filename(fichier.filename) or "document"
-            original_ext = os.path.splitext(original_name)[1].lower()
+            ext = os.path.splitext(original_name)[1].lower()
 
             base_name = clean_filename(doc_name) if doc_name else clean_filename(original_name)
 
             if pdl:
                 base_name = f"{base_name}_{pdl}"
 
-            filename = f"{base_name}{original_ext}"
-
+            filename = f"{base_name}{ext}"
             prefix = client_s3_prefix(client_id)
 
             key = _s3_make_non_overwriting_key(
@@ -2377,13 +2368,7 @@ def upload_client_document(client_id):
                 f"{prefix}{filename}"
             )
 
-            stream = getattr(fichier, "stream", fichier)
-            try:
-                stream.seek(0)
-            except Exception:
-                pass
-
-            s3_upload_fileobj(stream, AWS_BUCKET, key)
+            s3_upload_fileobj(fichier, AWS_BUCKET, key)
 
             success_count += 1
 
@@ -2392,18 +2377,17 @@ def upload_client_document(client_id):
             failed.append(fichier.filename or "fichier_erreur")
 
     if success_count > 0 and not failed:
-        flash(f"{success_count} document(s) ajouté(s) au dossier client.", "success")
-    elif success_count > 0 and failed:
-        flash(
-            f"{success_count} upload(s) OK, {len(failed)} échec(s): {', '.join(failed)}",
-            "warning"
-        )
+        flash(f"{success_count} document(s) ajouté(s).", "success")
+    elif success_count > 0:
+        flash(f"{success_count} OK, {len(failed)} échecs.", "warning")
     else:
-        flash(f"Aucun upload réussi. Échecs: {', '.join(failed)}", "danger")
+        flash("Aucun upload réussi.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
+
+
 ############################################################
-# 11 BIS. RESSOURCES PARTAGÉES (FIX CRITIQUE)
+# 11 BIS. RESSOURCES PARTAGÉES
 ############################################################
 
 @app.route("/ressources")
@@ -2414,18 +2398,13 @@ def shared_resources():
     resiliations = []
 
     if LOCAL_MODE or not s3:
-        return render_template(
-            "ressources.html",
-            mandats=mandats,
-            resiliations=resiliations,
-        )
+        return render_template("ressources.html", mandats=mandats, resiliations=resiliations)
 
     try:
         items = s3_list_all_objects(AWS_BUCKET, prefix=SHARED_PREFIX)
 
         for item in items:
             key = item.get("Key")
-
             if not key or key.endswith("/"):
                 continue
 
@@ -2438,25 +2417,20 @@ def shared_resources():
 
             if key.startswith(f"{SHARED_PREFIX}mandats/"):
                 mandats.append(doc)
-
             elif key.startswith(f"{SHARED_PREFIX}resiliations/"):
                 resiliations.append(doc)
 
     except Exception as e:
-        logger.exception("Erreur chargement ressources : %r", e)
-        flash("Impossible de charger les ressources.", "danger")
+        logger.exception("Erreur ressources : %r", e)
 
-    return render_template(
-        "ressources.html",
-        mandats=mandats,
-        resiliations=resiliations,
-    )
+    return render_template("ressources.html", mandats=mandats, resiliations=resiliations)
+
 
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
 # + DOCUMENTS (UPLOAD / DOWNLOAD / DELETE)
-# ✅ VERSION FINALE STABLE
+# ✅ VERSION FINALE STABLE (CORRIGÉE)
 ############################################################
 
 from datetime import datetime
@@ -2615,7 +2589,6 @@ def client_detail(client_id):
 
     documents = list_client_documents(client_id)
 
-    # cotations
     with conn.cursor() as cur:
         cur.execute("""
             SELECT * FROM cotations
@@ -2624,7 +2597,6 @@ def client_detail(client_id):
         """, (client_id,))
         cotations = cur.fetchall()
 
-    # timeline
     with conn.cursor() as cur:
         cur.execute("""
             SELECT * FROM (
@@ -2644,7 +2616,6 @@ def client_detail(client_id):
         """, (client_id, client_id))
         timeline = cur.fetchall()
 
-    # updates
     with conn.cursor() as cur:
         cur.execute("""
             SELECT *
@@ -2695,7 +2666,7 @@ def create_cotation(client_id):
 
 
 # =========================
-# DOCUMENTS
+# DOCUMENT DOWNLOAD (FIX SAFE)
 # =========================
 @app.route("/document/download", endpoint="download_document")
 @login_required
@@ -2706,18 +2677,21 @@ def download_document():
     if not key:
         return redirect(url_for("clients"))
 
+    if not can_access_document_key(key):
+        abort(403)
+
     try:
-        url = s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": AWS_BUCKET, "Key": key},
-            ExpiresIn=3600
-        )
+        url = s3_presigned_url(key)
         return redirect(url)
+
     except Exception as e:
         logger.exception("Erreur download : %r", e)
         return redirect(url_for("clients"))
 
 
+# =========================
+# DOCUMENT DELETE (FIX SAFE)
+# =========================
 @app.route("/document/delete", methods=["POST"], endpoint="delete_document")
 @login_required
 def delete_document():
@@ -2726,27 +2700,43 @@ def delete_document():
 
     if key:
         try:
-            s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+            if not can_access_document_key(key):
+                abort(403)
+
+            if s3:
+                s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+
             flash("Document supprimé.", "success")
+
         except Exception as e:
             logger.exception("Erreur delete : %r", e)
 
     return redirect(request.referrer or url_for("clients"))
 
 
+# =========================
+# DOCUMENT UPLOAD (FIX SAFE)
+# =========================
 @app.route("/clients/<int:client_id>/upload", methods=["POST"], endpoint="upload_client_document")
 @login_required
 def upload_client_document(client_id):
 
+    if not can_access_client(client_id):
+        abort(403)
+
+    if not s3:
+        flash("Upload indisponible.", "warning")
+        return redirect(url_for("client_detail", client_id=client_id))
+
     files = request.files.getlist("files")
 
     for f in files:
-        if f:
-            s3.upload_fileobj(
-                f,
-                AWS_BUCKET,
-                f"clients/{client_id}/{f.filename}"
-            )
+        if f and getattr(f, "filename", ""):
+            try:
+                key = f"clients/{client_id}/{secure_filename(f.filename)}"
+                s3_upload_fileobj(f, AWS_BUCKET, key)
+            except Exception as e:
+                logger.exception("Erreur upload : %r", e)
 
     flash("Documents uploadés.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
