@@ -2455,7 +2455,8 @@ def shared_resources():
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
-# ✅ VERSION FINALE STABLE (FIX PIPELINE + ENDPOINTS + SYNTAX)
+# + DOCUMENTS (UPLOAD / DOWNLOAD / DELETE)
+# ✅ VERSION FINALE STABLE
 ############################################################
 
 from datetime import datetime
@@ -2487,7 +2488,7 @@ def parse_int_safe(val):
 
 
 # =========================
-# FORMAT DATE FR (TIMELINE)
+# FORMAT DATE FR
 # =========================
 def format_datetime_fr(value, with_time=True):
     if not value:
@@ -2517,17 +2518,12 @@ def clients():
     users = []
     if role == "admin":
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, username, role
-                FROM users
-                ORDER BY username ASC
-            """)
+            cur.execute("SELECT id, username, role FROM users ORDER BY username ASC")
             users = cur.fetchall()
 
     with conn.cursor() as cur:
 
         if role == "admin":
-
             if q:
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
@@ -2543,16 +2539,13 @@ def clients():
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     ORDER BY crm_clients.created_at DESC
                 """)
-
         else:
-
             if q:
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id = %s
-                      AND crm_clients.name ILIKE %s
+                    WHERE crm_clients.owner_id = %s AND crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
                 """, (user_id, f"%{q}%"))
             else:
@@ -2622,8 +2615,7 @@ def client_detail(client_id):
 
     documents = list_client_documents(client_id)
 
-    shared_mandats = []
-    shared_resiliations = []
+    shared_mandats, shared_resiliations = [], []
 
     if not LOCAL_MODE and s3:
         try:
@@ -2649,50 +2641,10 @@ def client_detail(client_id):
         except Exception as e:
             logger.exception("Erreur ressources partagées : %r", e)
 
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT *
-            FROM cotations
-            WHERE client_id = %s
-            ORDER BY date_creation DESC
-        """, (client_id,))
-        cotations = cur.fetchall()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT * FROM (
-                SELECT 'client' AS type, created_at AS date,
-                       'Création du client' AS title,
-                       COALESCE(notes,'') AS description
-                FROM crm_clients WHERE id = %s
-
-                UNION ALL
-
-                SELECT 'cotation', date_creation,
-                       'Nouvelle cotation #' || id,
-                       COALESCE(commentaire,'')
-                FROM cotations WHERE client_id = %s
-            ) t
-            ORDER BY COALESCE(date, CURRENT_TIMESTAMP) DESC
-        """, (client_id, client_id))
-        timeline = cur.fetchall()
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT *
-            FROM client_updates
-            WHERE client_id = %s
-            ORDER BY update_date DESC
-        """, (client_id,))
-        updates = cur.fetchall()
-
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
         documents=documents,
-        cotations=[row_to_obj(c) for c in cotations],
-        timeline=[row_to_obj(t) for t in timeline],
-        updates=[row_to_obj(u) for u in updates],
         shared_mandats=shared_mandats,
         shared_resiliations=shared_resiliations,
         current_user=session.get("user"),
@@ -2701,112 +2653,55 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — CREATION
+# DOCUMENTS
 # =========================
-@app.route("/clients/new", methods=["POST"], endpoint="create_client")
+
+@app.route("/document/download")
 @login_required
-def create_client():
+def download_document():
 
-    conn = get_db()
-    user = session.get("user") or {}
+    key = request.args.get("key")
 
-    role = user.get("role")
-    user_id = user.get("id")
-
-    name = (request.form.get("name") or "").strip()
-    email = (request.form.get("email") or "").strip()
-    phone = (request.form.get("phone") or "").strip()
-    address = (request.form.get("address") or "").strip()
-    notes = (request.form.get("notes") or "").strip()
-    status = (request.form.get("status") or "en_cours").strip().lower()
-    siret = (request.form.get("siret") or "").strip()
-    gerant_nom = (request.form.get("gerant_nom") or "").strip()
-
-    if not name:
-        flash("Nom du client obligatoire.", "danger")
+    if not key:
         return redirect(url_for("clients"))
 
-    owner_id = user_id
-    if role == "admin":
-        owner_id = parse_int_safe(request.form.get("owner_id")) or user_id
+    url = s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": AWS_BUCKET, "Key": key},
+        ExpiresIn=3600
+    )
 
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO crm_clients (
-                    name, email, phone, address,
-                    status, notes, owner_id,
-                    siret, gerant_nom
-                )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (
-                name, email or None, phone or None, address or None,
-                status, notes or None, owner_id,
-                siret or None, gerant_nom or None
-            ))
-
-        conn.commit()
-        flash("Client créé avec succès.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur création client : %r", e)
-        flash("Erreur lors de la création.", "danger")
-
-    return redirect(url_for("clients"))
+    return redirect(url)
 
 
-# =========================
-# STATUS
-# =========================
-@app.route("/clients/<int:client_id>/status", methods=["POST"], endpoint="update_client_status")
+@app.route("/document/delete", methods=["POST"])
 @login_required
-def update_client_status(client_id):
+def delete_document():
 
-    if not can_access_client(client_id):
-        abort(403)
+    key = request.form.get("key")
 
-    conn = get_db()
-    new_status = (request.form.get("status") or "").strip().lower()
+    if key:
+        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
 
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE crm_clients SET status=%s WHERE id=%s", (new_status, client_id))
-        conn.commit()
-        flash("Statut mis à jour.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur status : %r", e)
-
-    return redirect(url_for("client_detail", client_id=client_id))
+    flash("Document supprimé.", "success")
+    return redirect(request.referrer or url_for("clients"))
 
 
-# =========================
-# COTATION (🔥 FIX FINAL)
-# =========================
-@app.route("/clients/<int:client_id>/cotation", methods=["POST"], endpoint="create_cotation")
+@app.route("/clients/<int:client_id>/upload", methods=["POST"], endpoint="upload_client_document")
 @login_required
-def create_cotation(client_id):
+def upload_client_document(client_id):
 
-    if not can_access_client(client_id):
-        abort(403)
+    files = request.files.getlist("files")
 
-    conn = get_db()
+    for f in files:
+        if f:
+            s3.upload_fileobj(
+                f,
+                AWS_BUCKET,
+                f"clients/{client_id}/{f.filename}"
+            )
 
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO cotations (client_id, date_creation)
-                VALUES (%s, NOW())
-            """, (client_id,))
-        conn.commit()
-        flash("Cotation créée.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur cotation : %r", e)
-
+    flash("Documents uploadés.", "success")
     return redirect(url_for("client_detail", client_id=client_id))
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
