@@ -367,6 +367,10 @@ def init_db():
             _try_add_column(conn, "cotations", "gaz_car TEXT")
             _try_add_column(conn, "cotations", "gaz_fournisseur_actuel TEXT")
 
+            # 🔥 FIX CRITIQUE — CALENDAR EVENTS
+            _try_add_column(conn, "calendar_events", "end_time TIME")
+            _try_add_column(conn, "calendar_events", "all_day BOOLEAN DEFAULT FALSE")
+
         conn.commit()
 
     except Exception:
@@ -393,6 +397,11 @@ if not LOCAL_MODE:
             region_name=AWS_REGION,
             aws_access_key_id=AWS_ACCESS_KEY,
             aws_secret_access_key=AWS_SECRET_KEY,
+            config=boto3.session.Config(
+                retries={"max_attempts": 3, "mode": "standard"},
+                connect_timeout=5,
+                read_timeout=30,
+            ),
         )
         logger.info(
             "S3 connecté | bucket=%s | region=%s",
@@ -462,7 +471,7 @@ def slugify(text: str) -> str:
 
 def client_s3_prefix(client_id: int) -> str:
     """
-    Préfixe S3 UNIQUE par client (OBLIGATOIRE partout) :
+    Préfixe S3 UNIQUE par client :
     clients/<slug_nom>_<client_id>/
     """
     conn = get_db()
@@ -493,20 +502,21 @@ def s3_upload_fileobj(fileobj, bucket: str, key: str):
         raise RuntimeError("Client S3 non initialisé.")
 
     stream = getattr(fileobj, "stream", fileobj)
+
     try:
         stream.seek(0)
     except Exception:
         pass
 
+    content_type = getattr(fileobj, "mimetype", None)
+    if not content_type:
+        content_type = "application/octet-stream"
+
     s3.upload_fileobj(
         stream,
         bucket,
         key,
-        ExtraArgs={
-            "ContentType": getattr(
-                fileobj, "mimetype", None
-            ) or "application/octet-stream"
-        },
+        ExtraArgs={"ContentType": content_type},
     )
 
 
@@ -557,15 +567,19 @@ def s3_list_all_objects(bucket: str, prefix: str | None = None):
 
     while True:
         params = {"Bucket": bucket}
+
         if prefix:
             params["Prefix"] = prefix
+
         if token:
             params["ContinuationToken"] = token
 
         resp = s3.list_objects_v2(**params)
-        items.extend(resp.get("Contents") or [])
 
-        if resp.get("IsTruncated"):
+        contents = resp.get("Contents") or []
+        items.extend(contents)
+
+        if resp.get("IsTruncated") and resp.get("NextContinuationToken"):
             token = resp.get("NextContinuationToken")
         else:
             break
@@ -583,9 +597,11 @@ def _s3_object_exists(bucket: str, key: str) -> bool:
     try:
         s3.head_object(Bucket=bucket, Key=key)
         return True
+
     except ClientError as e:
         code = (e.response or {}).get("Error", {}).get("Code", "")
         return code not in ("404", "NoSuchKey", "NotFound")
+
     except Exception:
         return False
 
@@ -598,6 +614,7 @@ def _s3_make_non_overwriting_key(bucket: str, key: str) -> str:
         return key
 
     base, ext = os.path.splitext(key)
+
     for _ in range(20):
         candidate = f"{base}_{secrets.token_hex(3)}{ext}"
         if not _s3_object_exists(bucket, candidate):
@@ -613,14 +630,14 @@ def _s3_make_non_overwriting_key(bucket: str, key: str) -> str:
 def list_client_documents(client_id: int):
     """
     Liste tous les documents d’un client.
-    
+
     ✔ Compatible :
     - nouveau format : clients/<slug>_<id>/
     - ancien format : clients/<id>/
     - anciens slugs après renommage
 
     ✔ Optimisé :
-    - évite scan global S3 inutile
+    - scan ciblé
     """
 
     if not s3:
@@ -629,15 +646,6 @@ def list_client_documents(client_id: int):
     docs = []
 
     try:
-        prefixes = []
-
-        # 🔹 Nouveau format (actuel)
-        prefixes.append(client_s3_prefix(client_id))
-
-        # 🔹 Ancien format (legacy)
-        prefixes.append(f"clients/{client_id}/")
-
-        # 🔹 Scan intelligent des anciens slugs
         base_prefix = "clients/"
 
         items = s3_list_all_objects(AWS_BUCKET, prefix=base_prefix)
@@ -648,7 +656,6 @@ def list_client_documents(client_id: int):
             if not key or key.endswith("/"):
                 continue
 
-            # 🔎 On identifie le client depuis la clé
             extracted_client_id = extract_client_id_from_s3_key(key)
 
             if extracted_client_id != client_id:
@@ -669,7 +676,6 @@ def list_client_documents(client_id: int):
         logger.exception("Erreur list_client_documents : %r", e)
 
     return docs
-
 
 ############################################################
 # 5. UTILITAIRES & CONTRÔLES D’ACCÈS
@@ -1909,7 +1915,7 @@ def admin_dossiers_detail(commercial):
 ############################################################
 
 @app.route("/admin/planning")
-@login_required
+@admin_required
 def admin_planning():
     conn = get_db()
 
@@ -1926,7 +1932,8 @@ def admin_planning():
             FROM cotations
             JOIN crm_clients ON crm_clients.id = cotations.client_id
             LEFT JOIN users ON users.id = cotations.created_by
-            WHERE cotations.date_negociation >= CURRENT_DATE
+            WHERE cotations.date_negociation IS NOT NULL
+              AND cotations.date_negociation >= CURRENT_DATE
             ORDER BY cotations.date_negociation ASC
         """)
         cotations = cur.fetchall()
@@ -1943,7 +1950,8 @@ def admin_planning():
                 client_updates.client_name,
                 client_updates.commercial_name
             FROM client_updates
-            WHERE client_updates.update_date >= CURRENT_DATE
+            WHERE client_updates.update_date IS NOT NULL
+              AND client_updates.update_date >= CURRENT_DATE
             ORDER BY client_updates.update_date ASC
         """)
         updates = cur.fetchall()
@@ -1954,7 +1962,6 @@ def admin_planning():
     events = []
 
     try:
-
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
@@ -1966,14 +1973,16 @@ def admin_planning():
                     end_time,
                     all_day
                 FROM calendar_events
-                WHERE event_date >= CURRENT_DATE
+                WHERE event_date IS NOT NULL
+                  AND event_date >= CURRENT_DATE
                 ORDER BY event_date ASC
             """)
             rows = cur.fetchall()
 
         events = [row_to_obj(r) for r in rows]
 
-    except Exception:
+    except Exception as e:
+        logger.exception("Erreur chargement events planning : %r", e)
         events = []
 
     return render_template(
@@ -2008,7 +2017,6 @@ def add_calendar_event():
         return redirect(url_for("admin_planning"))
 
     try:
-
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO calendar_events (
@@ -2023,7 +2031,7 @@ def add_calendar_event():
                 VALUES (%s,%s,%s,%s,%s,%s,%s)
             """, (
                 title,
-                description,
+                description or None,
                 event_date,
                 start_time if start_time else None,
                 end_time if end_time else None,
@@ -2036,7 +2044,6 @@ def add_calendar_event():
         flash("Événement ajouté au planning.", "success")
 
     except Exception as e:
-
         conn.rollback()
         logger.exception("Erreur ajout evenement calendrier : %r", e)
         flash("Erreur lors de l'ajout.", "danger")
@@ -2054,7 +2061,6 @@ def delete_calendar_event(event_id):
     conn = get_db()
 
     try:
-
         with conn.cursor() as cur:
             cur.execute(
                 "DELETE FROM calendar_events WHERE id = %s",
@@ -2066,7 +2072,6 @@ def delete_calendar_event(event_id):
         flash("Événement supprimé.", "success")
 
     except Exception as e:
-
         conn.rollback()
         logger.exception("Erreur suppression evenement calendrier : %r", e)
         flash("Erreur lors de la suppression.", "danger")
@@ -2192,11 +2197,12 @@ def api_calendar():
                     "id": f"event_{r['id']}",
                     "title": r["title"],
                     "start": start,
-                    "end": end
+                    "end": end,
+                    "allDay": False
                 })
 
-    except Exception:
-        pass
+    except Exception as e:
+        logger.exception("Erreur chargement events API calendar : %r", e)
 
     return jsonify(events)
 
@@ -2257,7 +2263,11 @@ def documents():
 def upload_document():
     fichier = request.files.get("file")
 
-    if not fichier or not allowed_file(fichier.filename):
+    if not fichier or not getattr(fichier, "filename", ""):
+        flash("Fichier invalide.", "danger")
+        return redirect(url_for("documents"))
+
+    if not allowed_file(fichier.filename):
         flash("Fichier invalide.", "danger")
         return redirect(url_for("documents"))
 
@@ -2266,13 +2276,22 @@ def upload_document():
         return redirect(url_for("documents"))
 
     try:
-        filename = clean_filename(secure_filename(fichier.filename))
+        original_name = secure_filename(fichier.filename) or "document"
+        filename = clean_filename(original_name)
+
         key = _s3_make_non_overwriting_key(
             AWS_BUCKET,
             f"{GLOBAL_PREFIX}{filename}"
         )
 
-        s3_upload_fileobj(fichier, AWS_BUCKET, key)
+        stream = getattr(fichier, "stream", fichier)
+        try:
+            stream.seek(0)
+        except Exception:
+            pass
+
+        s3_upload_fileobj(stream, AWS_BUCKET, key)
+
         flash("Document global uploadé.", "success")
 
     except Exception as e:
@@ -2305,7 +2324,7 @@ def upload_client_document(client_id):
     # ✅ NOUVEAU
     doc_name = (request.form.get("doc_name") or "").strip()
     pdl = (request.form.get("pdl") or "").strip()
-    pdl = re.sub(r"[^0-9]", "", pdl)  # nettoyage
+    pdl = re.sub(r"[^0-9]", "", pdl)
 
     if not files:
         legacy = request.files.get("file")
@@ -2328,9 +2347,10 @@ def upload_client_document(client_id):
             continue
 
         try:
-            original_ext = os.path.splitext(fichier.filename)[1].lower()
+            original_name = secure_filename(fichier.filename) or "document"
+            original_ext = os.path.splitext(original_name)[1].lower()
 
-            base_name = clean_filename(doc_name) if doc_name else clean_filename(fichier.filename)
+            base_name = clean_filename(doc_name) if doc_name else clean_filename(original_name)
 
             if pdl:
                 base_name = f"{base_name}_{pdl}"
@@ -2344,7 +2364,14 @@ def upload_client_document(client_id):
                 f"{prefix}{filename}"
             )
 
-            s3_upload_fileobj(fichier, AWS_BUCKET, key)
+            stream = getattr(fichier, "stream", fichier)
+            try:
+                stream.seek(0)
+            except Exception:
+                pass
+
+            s3_upload_fileobj(stream, AWS_BUCKET, key)
+
             success_count += 1
 
         except Exception as e:
@@ -2362,227 +2389,10 @@ def upload_client_document(client_id):
         flash(f"Aucun upload réussi. Échecs: {', '.join(failed)}", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
-
-
-# =========================================================
-# RESSOURCES PARTAGÉES — LISTE
-# =========================================================
-@app.route("/ressources")
-@login_required
-def shared_resources():
-    mandats = []
-    resiliations = []
-
-    if LOCAL_MODE or not s3:
-        return render_template(
-            "ressources.html",
-            mandats=mandats,
-            resiliations=resiliations,
-        )
-
-    try:
-        items = s3_list_all_objects(AWS_BUCKET, prefix=SHARED_PREFIX)
-
-        for item in items:
-            key = item.get("Key")
-            if not key or key.endswith("/"):
-                continue
-
-            doc = {
-                "nom": key.replace(SHARED_PREFIX, "", 1),
-                "key": key,
-                "taille": item.get("Size", 0),
-                "date": item.get("LastModified"),
-            }
-
-            if key.startswith(f"{SHARED_PREFIX}mandats/"):
-                mandats.append(doc)
-            elif key.startswith(f"{SHARED_PREFIX}resiliations/"):
-                resiliations.append(doc)
-
-    except Exception as e:
-        logger.exception("❌ Erreur chargement ressources partagées : %r", e)
-        flash("Impossible de charger les ressources.", "danger")
-
-    return render_template(
-        "ressources.html",
-        mandats=mandats,
-        resiliations=resiliations,
-    )
-
-
-# =========================================================
-# RESSOURCES PARTAGÉES — UPLOAD
-# =========================================================
-@app.route("/ressources/upload", methods=["POST"])
-@login_required
-def shared_resources_upload():
-    user = session.get("user") or {}
-    role = user.get("role")
-
-    if role not in ("admin", "commercial"):
-        abort(403)
-
-    fichier = request.files.get("file")
-    category = (request.form.get("category") or "").strip()
-
-    if category not in SHARED_CATEGORIES:
-        flash("Catégorie invalide.", "danger")
-        return redirect(url_for("shared_resources"))
-
-    if not fichier or not allowed_file(fichier.filename):
-        flash("Fichier invalide.", "danger")
-        return redirect(url_for("shared_resources"))
-
-    if LOCAL_MODE or not s3:
-        flash("Upload indisponible en mode local.", "warning")
-        return redirect(url_for("shared_resources"))
-
-    try:
-        filename = clean_filename(secure_filename(fichier.filename))
-        key = _s3_make_non_overwriting_key(
-            AWS_BUCKET,
-            f"{SHARED_PREFIX}{category}/{filename}"
-        )
-
-        s3_upload_fileobj(fichier, AWS_BUCKET, key)
-        flash("Ressource partagée ajoutée.", "success")
-
-    except Exception as e:
-        logger.exception("❌ Erreur upload ressource partagée : %r", e)
-        flash("Erreur lors de l’upload.", "danger")
-
-    return redirect(url_for("shared_resources"))
-
-
-# =========================================================
-# DOWNLOAD SIMPLE
-# =========================================================
-@app.route("/documents/download")
-@login_required
-def download_document():
-    key = (request.args.get("key") or "").strip()
-
-    if not key:
-        flash("Document introuvable.", "danger")
-        return redirect(request.referrer or url_for("dashboard"))
-
-    if LOCAL_MODE or not s3:
-        flash("Téléchargement indisponible en mode local.", "warning")
-        return redirect(request.referrer or url_for("dashboard"))
-
-    if not can_access_document_key(key):
-        abort(403)
-
-    url = s3_presigned_url(key)
-    if not url:
-        flash("Accès impossible au document.", "danger")
-        return redirect(request.referrer or url_for("dashboard"))
-
-    return redirect(url)
-
-
-# =========================================================
-# DOWNLOAD MULTIPLE (ZIP)
-# =========================================================
-@app.route("/documents/download-multiple", methods=["POST"])
-@login_required
-def download_multiple_documents():
-
-    keys = request.form.getlist("keys")
-
-    if not keys:
-        flash("Aucun document sélectionné.", "danger")
-        return redirect(request.referrer or url_for("dashboard"))
-
-    if len(keys) > MAX_MULTI_DOWNLOAD:
-        flash(f"Maximum {MAX_MULTI_DOWNLOAD} fichiers par téléchargement.", "danger")
-        return redirect(request.referrer or url_for("dashboard"))
-
-    if LOCAL_MODE or not s3:
-        flash("Téléchargement multiple indisponible en mode local.", "warning")
-        return redirect(request.referrer or url_for("dashboard"))
-
-    valid_keys = [k for k in keys if can_access_document_key(k)]
-
-    if not valid_keys:
-        abort(403)
-
-    memory_file = io.BytesIO()
-
-    try:
-        with zipfile.ZipFile(memory_file, "w", zipfile.ZIP_DEFLATED) as zf:
-            for key in valid_keys:
-                try:
-                    obj = s3.get_object(Bucket=AWS_BUCKET, Key=key)
-                    filename = key.split("/")[-1]
-
-                    if filename in zf.namelist():
-                        base, dot, ext = filename.rpartition(".")
-                        suffix = key.split("/")[-2].replace("/", "_")
-                        if dot:
-                            filename = f"{base}_{suffix}.{ext}"
-                        else:
-                            filename = f"{filename}_{suffix}"
-
-                    zf.writestr(filename, obj["Body"].read())
-                except Exception as e:
-                    logger.exception("Erreur ajout ZIP : %r", e)
-
-        memory_file.seek(0)
-
-        return send_file(
-            memory_file,
-            as_attachment=True,
-            download_name="documents.zip",
-            mimetype="application/zip",
-        )
-
-    except Exception as e:
-        logger.exception("Erreur génération ZIP : %r", e)
-        flash("Erreur lors de la création du fichier ZIP.", "danger")
-        return redirect(request.referrer or url_for("dashboard"))
-
-
-# =========================================================
-# DELETE DOCUMENT
-# =========================================================
-@app.route("/documents/delete", methods=["POST"])
-@login_required
-def delete_document():
-    key = (request.form.get("key") or "").strip()
-
-    if not key:
-        flash("Document introuvable.", "danger")
-        return redirect(request.referrer or url_for("dashboard"))
-
-    if LOCAL_MODE or not s3:
-        flash("Suppression indisponible en mode local.", "warning")
-        return redirect(request.referrer or url_for("dashboard"))
-
-    if not can_access_document_key(key):
-        abort(403)
-
-    try:
-        s3.delete_object(Bucket=AWS_BUCKET, Key=key)
-        flash("Document supprimé.", "success")
-    except Exception as e:
-        logger.exception("❌ Erreur suppression document : %r", e)
-        flash("Erreur lors de la suppression.", "danger")
-
-    return redirect(request.referrer or url_for("dashboard"))
-
-
-# =========================================================
-# ALIAS COMPAT LEGACY
-# =========================================================
-app.view_functions.setdefault("documents_admin", documents)
-
-
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
-# ✅ VERSION FINALE STABLE (100% routes OK)
+# ✅ VERSION FINALE STABLE (100% routes OK + cotation complète)
 ############################################################
 
 from datetime import datetime
@@ -2595,19 +2405,21 @@ import re
 def parse_date_safe(val):
     try:
         return datetime.strptime(val, "%Y-%m-%d").date()
-    except:
+    except Exception:
         return None
+
 
 def parse_time_safe(val):
     try:
         return datetime.strptime(val, "%H:%M").time()
-    except:
+    except Exception:
         return None
+
 
 def parse_int_safe(val):
     try:
         return int(val)
-    except:
+    except Exception:
         return None
 
 
@@ -2621,7 +2433,7 @@ def format_datetime_fr(value, with_time=True):
         if with_time:
             return value.strftime("%d/%m/%Y à %H:%M")
         return value.strftime("%d/%m/%Y")
-    except:
+    except Exception:
         return "—"
 
 
@@ -2638,6 +2450,16 @@ def clients():
     user = session.get("user") or {}
     role = user.get("role")
     user_id = user.get("id")
+
+    users = []
+    if role == "admin":
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, username, role
+                FROM users
+                ORDER BY username ASC
+            """)
+            users = cur.fetchall()
 
     with conn.cursor() as cur:
 
@@ -2666,7 +2488,7 @@ def clients():
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
+                    WHERE crm_clients.owner_id = %s
                       AND crm_clients.name ILIKE %s
                     ORDER BY crm_clients.created_at DESC
                 """, (user_id, f"%{q}%"))
@@ -2675,7 +2497,7 @@ def clients():
                     SELECT crm_clients.*, users.username AS commercial
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
-                    WHERE crm_clients.owner_id=%s
+                    WHERE crm_clients.owner_id = %s
                     ORDER BY crm_clients.created_at DESC
                 """, (user_id,))
 
@@ -2702,8 +2524,9 @@ def clients():
         clients_gagnes=[row_to_obj(r) for r in gagnes],
         clients_perdus=[row_to_obj(r) for r in perdus],
         q=q,
+        users=[row_to_obj(u) for u in users],
         current_user=session.get("user"),
-        available_endpoints=[rule.endpoint for rule in app.url_map.iter_rules()]
+        available_endpoints=[rule.endpoint for rule in app.url_map.iter_rules()],
     )
 
 
@@ -2734,6 +2557,34 @@ def client_detail(client_id):
 
     documents = list_client_documents(client_id)
 
+    # Ressources partagées affichées dans le template
+    shared_mandats = []
+    shared_resiliations = []
+
+    if not LOCAL_MODE and s3:
+        try:
+            items = s3_list_all_objects(AWS_BUCKET, prefix=SHARED_PREFIX)
+
+            for item in items:
+                key = item.get("Key")
+                if not key or key.endswith("/"):
+                    continue
+
+                doc = {
+                    "nom": key.replace(SHARED_PREFIX, "", 1),
+                    "key": key,
+                    "taille": item.get("Size", 0),
+                    "date": item.get("LastModified"),
+                }
+
+                if key.startswith(f"{SHARED_PREFIX}mandats/"):
+                    shared_mandats.append(doc)
+                elif key.startswith(f"{SHARED_PREFIX}resiliations/"):
+                    shared_resiliations.append(doc)
+
+        except Exception as e:
+            logger.exception("Erreur chargement ressources partagées client_detail : %r", e)
+
     with conn.cursor() as cur:
         cur.execute("""
             SELECT *
@@ -2757,16 +2608,15 @@ def client_detail(client_id):
                 UNION ALL
 
                 SELECT
-                    'cotation',
-                    date_creation,
-                    'Nouvelle cotation #' || id,
-                    COALESCE(commentaire, '')
+                    'cotation' AS type,
+                    date_creation AS date,
+                    'Nouvelle cotation #' || id AS title,
+                    COALESCE(commentaire, '') AS description
                 FROM cotations
                 WHERE client_id = %s
             ) t
             ORDER BY COALESCE(date, CURRENT_TIMESTAMP) DESC
         """, (client_id, client_id))
-
         timeline = cur.fetchall()
 
     with conn.cursor() as cur:
@@ -2785,6 +2635,8 @@ def client_detail(client_id):
         cotations=[row_to_obj(c) for c in cotations],
         timeline=[row_to_obj(t) for t in timeline],
         updates=[row_to_obj(u) for u in updates],
+        shared_mandats=shared_mandats,
+        shared_resiliations=shared_resiliations,
     )
 
 
@@ -2802,20 +2654,60 @@ def create_client():
     user_id = user.get("id")
 
     name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    address = (request.form.get("address") or "").strip()
+    notes = (request.form.get("notes") or "").strip()
+    status = (request.form.get("status") or "en_cours").strip().lower()
+    siret = (request.form.get("siret") or "").strip()
+    gerant_nom = (request.form.get("gerant_nom") or "").strip()
 
     if not name:
         flash("Nom du client obligatoire.", "danger")
         return redirect(url_for("clients"))
 
+    allowed_status = {"en_cours", "en_attente", "gagne", "perdu", "nouveau"}
+    if status not in allowed_status:
+        status = "en_cours"
+
+    owner_id = user_id
+
+    if role == "admin":
+        raw_owner_id = request.form.get("owner_id")
+        parsed_owner_id = parse_int_safe(raw_owner_id)
+        if parsed_owner_id:
+            owner_id = parsed_owner_id
+
+    commercial = (request.form.get("commercial") or "").strip()
+
     try:
         with conn.cursor() as cur:
-
-            owner_id = user_id
-
             cur.execute("""
-                INSERT INTO crm_clients (name, owner_id)
-                VALUES (%s,%s)
-            """, (name, owner_id))
+                INSERT INTO crm_clients (
+                    name,
+                    email,
+                    phone,
+                    address,
+                    commercial,
+                    status,
+                    notes,
+                    owner_id,
+                    siret,
+                    gerant_nom
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                name,
+                email or None,
+                phone or None,
+                address or None,
+                commercial or None,
+                status,
+                notes or None,
+                owner_id,
+                siret or None,
+                gerant_nom or None,
+            ))
 
         conn.commit()
         flash("Client créé avec succès.", "success")
@@ -2829,7 +2721,7 @@ def create_client():
 
 
 # =========================
-# 🔥 COTATION — CREATION
+# 🔥 COTATION — CREATION COMPLETE
 # =========================
 @app.route(
     "/clients/<int:client_id>/cotation",
@@ -2843,13 +2735,110 @@ def create_cotation(client_id):
         abort(403)
 
     conn = get_db()
+    user = session.get("user") or {}
+    f = request.form
 
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO cotations (client_id) VALUES (%s)",
-                (client_id,)
-            )
+
+            cur.execute("""
+                INSERT INTO cotations (
+                    client_id,
+                    date_negociation,
+                    heure_negociation,
+                    energie_type,
+                    pdl_pce,
+                    date_echeance,
+                    fournisseur_actuel,
+                    entreprise_nom,
+                    siret,
+                    adresse_facturation,
+                    adresse_consommation,
+                    signataire_nom,
+                    signataire_tel,
+                    signataire_email,
+                    commentaire,
+                    created_by,
+                    type_compteur,
+                    signataire_mobile,
+                    site_nom,
+                    fonction_signataire,
+                    code_naf,
+                    date_remise_offre,
+                    elec_debut_fourniture,
+                    elec_fin_fourniture,
+                    elec_nb_mois,
+                    elec_segment,
+                    formule_acheminement,
+                    elec_car,
+                    puissance_souscrite,
+                    elec_fournisseur_actuel,
+                    pointe,
+                    hph,
+                    hch,
+                    hpr,
+                    hce,
+                    gaz_debut_fourniture,
+                    gaz_fin_fourniture,
+                    gaz_nb_mois,
+                    pce,
+                    gaz_segment,
+                    profil,
+                    gaz_car,
+                    gaz_fournisseur_actuel
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s
+                )
+            """, (
+                client_id,
+                parse_date_safe(f.get("date_negociation")),
+                parse_time_safe(f.get("heure_negociation")),
+                f.get("energie_type") or None,
+                f.get("pdl_pce") or None,
+                parse_date_safe(f.get("date_echeance")),
+                f.get("fournisseur_actuel") or None,
+                f.get("entreprise_nom") or None,
+                f.get("siret") or None,
+                f.get("adresse_facturation") or None,
+                f.get("adresse_consommation") or None,
+                f.get("signataire_nom") or None,
+                f.get("signataire_tel") or None,
+                f.get("signataire_email") or None,
+                f.get("commentaire") or None,
+                user.get("id"),
+                f.get("type_compteur") or None,
+                f.get("signataire_mobile") or None,
+                f.get("site_nom") or None,
+                f.get("fonction_signataire") or None,
+                f.get("code_naf") or None,
+                parse_date_safe(f.get("date_remise_offre")),
+                parse_date_safe(f.get("elec_debut_fourniture")),
+                parse_date_safe(f.get("elec_fin_fourniture")),
+                parse_int_safe(f.get("elec_nb_mois")),
+                f.get("elec_segment") or None,
+                f.get("formule_acheminement") or None,
+                f.get("elec_car") or None,
+                f.get("puissance_souscrite") or None,
+                f.get("elec_fournisseur_actuel") or None,
+                f.get("pointe") or None,
+                f.get("hph") or None,
+                f.get("hch") or None,
+                f.get("hpr") or None,
+                f.get("hce") or None,
+                parse_date_safe(f.get("gaz_debut_fourniture")),
+                parse_date_safe(f.get("gaz_fin_fourniture")),
+                parse_int_safe(f.get("gaz_nb_mois")),
+                f.get("pce") or None,
+                f.get("gaz_segment") or None,
+                f.get("profil") or None,
+                f.get("gaz_car") or None,
+                f.get("gaz_fournisseur_actuel") or None,
+            ))
 
         conn.commit()
         flash("Cotation créée avec succès.", "success")
@@ -2863,7 +2852,79 @@ def create_cotation(client_id):
 
 
 # =========================
-# 🔥 STATUS — FIX CRITIQUE
+# 🔥 DELETE CLIENT
+# =========================
+@app.route(
+    "/clients/<int:client_id>/delete",
+    methods=["POST"],
+    endpoint="delete_client"
+)
+@login_required
+def delete_client(client_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, name FROM crm_clients WHERE id = %s",
+            (client_id,)
+        )
+        client = cur.fetchone()
+
+    if not client:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    try:
+        if not LOCAL_MODE and s3:
+            try:
+                prefix = client_s3_prefix(client_id)
+                items = s3_list_all_objects(AWS_BUCKET, prefix=prefix)
+
+                for item in items:
+                    key = item.get("Key")
+                    if key and not key.endswith("/"):
+                        try:
+                            s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+                        except Exception as e:
+                            logger.exception("Erreur suppression document S3 client : %r", e)
+
+                legacy_prefix = f"clients/{client_id}/"
+                legacy_items = s3_list_all_objects(AWS_BUCKET, prefix=legacy_prefix)
+
+                for item in legacy_items:
+                    key = item.get("Key")
+                    if key and not key.endswith("/"):
+                        try:
+                            s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+                        except Exception as e:
+                            logger.exception("Erreur suppression document S3 legacy : %r", e)
+
+            except Exception as e:
+                logger.exception("Erreur nettoyage S3 client : %r", e)
+
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM cotations WHERE client_id = %s", (client_id,))
+            cur.execute("DELETE FROM client_updates WHERE client_id = %s", (client_id,))
+            cur.execute("DELETE FROM revenus WHERE client_id = %s", (client_id,))
+            cur.execute("DELETE FROM crm_clients WHERE id = %s", (client_id,))
+
+        conn.commit()
+        flash("Dossier client supprimé avec succès.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur suppression client : %r", e)
+        flash("Erreur lors de la suppression du dossier.", "danger")
+
+    return redirect(url_for("clients"))
+
+
+# =========================
+# STATUS
 # =========================
 @app.route(
     "/clients/<int:client_id>/status",
@@ -3116,7 +3177,14 @@ def _chat_store_file(file_storage):
     key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
 
     try:
-        s3_upload_fileobj(file_storage, AWS_BUCKET, key)
+        stream = getattr(file_storage, "stream", file_storage)
+        try:
+            stream.seek(0)
+        except Exception:
+            pass
+
+        s3_upload_fileobj(stream, AWS_BUCKET, key)
+
         return (key, file_name_original, None)
 
     except ClientError as e:
@@ -3238,9 +3306,6 @@ def chat_send():
     message = (request.form.get("message") or "").strip()
     user = session.get("user") or {}
 
-    # =========================
-    # 🔥 FIX CRITIQUE FICHIERS
-    # =========================
     files = []
 
     if "file" in request.files:
@@ -3257,14 +3322,9 @@ def chat_send():
             if f and getattr(f, "filename", ""):
                 files.append(f)
 
-    print("FILES REÇUS =", [f.filename for f in files])
-
     uploaded_files = []
     errors = []
 
-    # =========================
-    # TRAITEMENT
-    # =========================
     for file_obj in files:
 
         file_key, file_name, file_error = _chat_store_file(file_obj)
@@ -3275,9 +3335,6 @@ def chat_send():
 
         uploaded_files.append((file_key, file_name))
 
-    # =========================
-    # VALIDATION
-    # =========================
     if not message and not uploaded_files:
         return jsonify({
             "success": False,
