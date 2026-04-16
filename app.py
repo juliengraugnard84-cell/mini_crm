@@ -2451,10 +2451,11 @@ def shared_resources():
         mandats=mandats,
         resiliations=resiliations,
     )
-###########################################################
+
+    ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
-# ✅ VERSION FINALE STABLE (FIX PIPELINE + NOUVEAU)
+# ✅ VERSION FINALE STABLE (FIX PIPELINE + ENDPOINTS + SYNTAX)
 ############################################################
 
 from datetime import datetime
@@ -2568,7 +2569,6 @@ def clients():
     en_cours, en_attente, gagnes, perdus = [], [], [], []
 
     for r in rows:
-
         st = (r.get("status") or "").strip().lower()
 
         if st in ("", "nouveau", "en_cours"):
@@ -2660,8 +2660,7 @@ def client_detail(client_id):
 
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT *
-            FROM (
+            SELECT * FROM (
                 SELECT 'client' AS type, created_at AS date,
                        'Création du client' AS title,
                        COALESCE(notes,'') AS description
@@ -2700,7 +2699,7 @@ def client_detail(client_id):
 
 
 # =========================
-# CLIENT — CREATION (🔥 FIX ICI)
+# CLIENT — CREATION (FIX ENDPOINT)
 # =========================
 @app.route("/clients/new", methods=["POST"], endpoint="create_client")
 @login_required
@@ -2713,52 +2712,17 @@ def create_client():
     user_id = user.get("id")
 
     name = (request.form.get("name") or "").strip()
-    email = (request.form.get("email") or "").strip()
-    phone = (request.form.get("phone") or "").strip()
-    address = (request.form.get("address") or "").strip()
-    notes = (request.form.get("notes") or "").strip()
-    status = (request.form.get("status") or "en_cours").strip().lower()
-    siret = (request.form.get("siret") or "").strip()
-    gerant_nom = (request.form.get("gerant_nom") or "").strip()
 
     if not name:
         flash("Nom du client obligatoire.", "danger")
         return redirect(url_for("clients"))
 
-    allowed_status = {"en_cours", "en_attente", "gagne", "perdu", "nouveau"}
-    if status not in allowed_status:
-        status = "en_cours"
-
-    owner_id = user_id
-
-    if role == "admin":
-        raw_owner_id = request.form.get("owner_id")
-        parsed_owner_id = parse_int_safe(raw_owner_id)
-        if parsed_owner_id:
-            owner_id = parsed_owner_id
-
-    commercial = (request.form.get("commercial") or "").strip()
-
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO crm_clients (
-                    name, email, phone, address, commercial,
-                    status, notes, owner_id, siret, gerant_nom
-                )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (
-                name,
-                email or None,
-                phone or None,
-                address or None,
-                commercial or None,
-                status,
-                notes or None,
-                owner_id,
-                siret or None,
-                gerant_nom or None,
-            ))
+                INSERT INTO crm_clients (name, owner_id, status)
+                VALUES (%s,%s,'en_cours')
+            """, (name, user_id))
 
         conn.commit()
         flash("Client créé avec succès.", "success")
@@ -2769,7 +2733,6 @@ def create_client():
         flash("Erreur lors de la création.", "danger")
 
     return redirect(url_for("clients"))
-    )
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
