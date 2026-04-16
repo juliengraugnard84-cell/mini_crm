@@ -2500,7 +2500,7 @@ def format_datetime_fr(value, with_time=True):
 
 
 # =========================
-# CLIENT — LISTE (🔥 FIX ICI)
+# CLIENT — LISTE
 # =========================
 @app.route("/clients", endpoint="clients")
 @login_required
@@ -2565,28 +2565,21 @@ def clients():
 
         rows = cur.fetchall()
 
-    # 🔥 FIX CRITIQUE PIPELINE
     en_cours, en_attente, gagnes, perdus = [], [], [], []
 
     for r in rows:
 
         st = (r.get("status") or "").strip().lower()
 
-        # 🔥 NORMALISATION MÉTIER
         if st in ("", "nouveau", "en_cours"):
             en_cours.append(r)
-
         elif st == "en_attente":
             en_attente.append(r)
-
         elif st == "gagne":
             gagnes.append(r)
-
         elif st == "perdu":
             perdus.append(r)
-
         else:
-            # sécurité absolue → jamais perdu
             en_cours.append(r)
 
     return render_template(
@@ -2667,24 +2660,19 @@ def client_detail(client_id):
 
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT * FROM (
-                SELECT
-                    'client' AS type,
-                    created_at AS date,
-                    'Création du client' AS title,
-                    COALESCE(notes, '') AS description
-                FROM crm_clients
-                WHERE id = %s
+            SELECT *
+            FROM (
+                SELECT 'client' AS type, created_at AS date,
+                       'Création du client' AS title,
+                       COALESCE(notes,'') AS description
+                FROM crm_clients WHERE id = %s
 
                 UNION ALL
 
-                SELECT
-                    'cotation' AS type,
-                    date_creation AS date,
-                    'Nouvelle cotation #' || id AS title,
-                    COALESCE(commentaire, '') AS description
-                FROM cotations
-                WHERE client_id = %s
+                SELECT 'cotation', date_creation,
+                       'Nouvelle cotation #' || id,
+                       COALESCE(commentaire,'')
+                FROM cotations WHERE client_id = %s
             ) t
             ORDER BY COALESCE(date, CURRENT_TIMESTAMP) DESC
         """, (client_id, client_id))
@@ -2708,6 +2696,79 @@ def client_detail(client_id):
         updates=[row_to_obj(u) for u in updates],
         shared_mandats=shared_mandats,
         shared_resiliations=shared_resiliations,
+    )
+
+
+# =========================
+# CLIENT — CREATION (🔥 FIX ICI)
+# =========================
+@app.route("/clients/new", methods=["POST"], endpoint="create_client")
+@login_required
+def create_client():
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    role = user.get("role")
+    user_id = user.get("id")
+
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    address = (request.form.get("address") or "").strip()
+    notes = (request.form.get("notes") or "").strip()
+    status = (request.form.get("status") or "en_cours").strip().lower()
+    siret = (request.form.get("siret") or "").strip()
+    gerant_nom = (request.form.get("gerant_nom") or "").strip()
+
+    if not name:
+        flash("Nom du client obligatoire.", "danger")
+        return redirect(url_for("clients"))
+
+    allowed_status = {"en_cours", "en_attente", "gagne", "perdu", "nouveau"}
+    if status not in allowed_status:
+        status = "en_cours"
+
+    owner_id = user_id
+
+    if role == "admin":
+        raw_owner_id = request.form.get("owner_id")
+        parsed_owner_id = parse_int_safe(raw_owner_id)
+        if parsed_owner_id:
+            owner_id = parsed_owner_id
+
+    commercial = (request.form.get("commercial") or "").strip()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO crm_clients (
+                    name, email, phone, address, commercial,
+                    status, notes, owner_id, siret, gerant_nom
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                name,
+                email or None,
+                phone or None,
+                address or None,
+                commercial or None,
+                status,
+                notes or None,
+                owner_id,
+                siret or None,
+                gerant_nom or None,
+            ))
+
+        conn.commit()
+        flash("Client créé avec succès.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur création client : %r", e)
+        flash("Erreur lors de la création.", "danger")
+
+    return redirect(url_for("clients"))
     )
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
