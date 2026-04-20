@@ -8,6 +8,9 @@
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
+    <!-- ✅ FULLCALENDAR CSS (FIX CRITIQUE) -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+
     <!-- STYLE GLOBAL CRM -->
     <link rel="stylesheet" href="{{ url_for('static', filename='design.css') }}">
 
@@ -88,7 +91,6 @@
                 </a>
             {% endif %}
 
-            <!-- ✅ CORRECTION ICI -->
             {% if current_user and current_user.role == "admin" %}
                 <a href="{{ url_for('admin_planning') }}"
                    class="{% if request.path.startswith('/admin/planning') %}active{% endif %}">
@@ -228,6 +230,9 @@
 {% if current_user %}
 <script src="{{ url_for('static', filename='chat_widget.js') }}?v=2"></script>
 {% endif %}
+
+<!-- 🔥 FIX CRITIQUE POUR TON AGENDA -->
+{% block scripts %}{% endblock %}
 
 </body>
 </html>

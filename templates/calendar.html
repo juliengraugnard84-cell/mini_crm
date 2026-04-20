@@ -11,19 +11,6 @@
     </div>
 </div>
 
-{% endblock %}
-
-{% block scripts %}
-
-<!-- FullCalendar CSS -->
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
-
-<!-- FullCalendar JS -->
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-
-<!-- Script Agenda -->
-<script src="{{ url_for('static', filename='calendar.js') }}?v=FINAL"></script>
-
 <!-- ================= MODALE RDV ================= -->
 <div class="modal fade" id="rdvModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -74,5 +61,15 @@
         </div>
     </div>
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<!-- FullCalendar JS -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+<!-- Script Agenda -->
+<script src="{{ url_for('static', filename='calendar.js') }}?v=FINAL"></script>
 
 {% endblock %}
