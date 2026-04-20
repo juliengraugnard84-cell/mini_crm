@@ -15,8 +15,31 @@ document.addEventListener("DOMContentLoaded", function () {
             right: "dayGridMonth,timeGridWeek,timeGridDay"
         },
 
-        // ✅ CORRECTION ICI (ancienne route supprimée)
-        events: "/api/calendar",
+        // ✅ FIX COMPLET : parsing propre des events
+        events: function(fetchInfo, successCallback, failureCallback) {
+
+            fetch("/api/calendar")
+                .then(response => response.json())
+                .then(data => {
+
+                    console.log("EVENTS:", data);
+
+                    const formattedEvents = data.map(e => ({
+                        id: e.id,
+                        title: e.title,
+                        start: e.start,
+                        end: e.end || undefined,
+                        allDay: e.allDay || false,
+                        color: e.color || "#3788d8"
+                    }));
+
+                    successCallback(formattedEvents);
+                })
+                .catch(error => {
+                    console.error("Erreur chargement calendrier:", error);
+                    failureCallback(error);
+                });
+        },
 
         dateClick(info) {
             openModal({
@@ -89,4 +112,5 @@ document.addEventListener("DOMContentLoaded", function () {
             body: JSON.stringify({ id })
         }).then(() => location.reload());
     });
+
 });
