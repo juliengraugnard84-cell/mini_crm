@@ -2109,7 +2109,7 @@ def planning():
         events = []
 
     return render_template(
-        "planning.html",
+        "calendar.html",  # ✅ FIX ICI
         cotations=[row_to_obj(c) for c in cotations],
         updates=[row_to_obj(u) for u in updates],
         events=events
