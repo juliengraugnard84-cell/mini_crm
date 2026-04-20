@@ -1107,7 +1107,7 @@ def dashboard():
                     cotations.status,
                     crm_clients.name AS client_name
                 FROM cotations
-                JOIN crm_clients
+                LEFT JOIN crm_clients
                 ON crm_clients.id = cotations.client_id
                 WHERE COALESCE(cotations.is_read,0)=0
                 ORDER BY cotations.date_creation DESC
@@ -1696,7 +1696,7 @@ def admin_cotations():
                 crm_clients.name AS client_name,
                 users.username AS commercial_name
             FROM cotations
-            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
             LEFT JOIN users ON users.id = cotations.created_by
             ORDER BY cotations.date_creation DESC
         """)
@@ -1720,7 +1720,7 @@ def admin_cotation_detail(cotation_id):
                 crm_clients.name AS client_name,
                 users.username AS commercial_name
             FROM cotations
-            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
             LEFT JOIN users ON users.id = cotations.created_by
             WHERE cotations.id = %s
         """, (cotation_id,))
@@ -1930,7 +1930,7 @@ def admin_planning():
                 crm_clients.name AS client_name,
                 users.username AS commercial_name
             FROM cotations
-            JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
             LEFT JOIN users ON users.id = cotations.created_by
             WHERE cotations.date_negociation IS NOT NULL
               AND cotations.date_negociation >= CURRENT_DATE
@@ -2105,7 +2105,7 @@ def api_calendar():
                     crm_clients.name AS client_name,
                     users.username AS commercial_name
                 FROM cotations
-                JOIN crm_clients
+                LEFT JOIN crm_clients
                     ON crm_clients.id = cotations.client_id
                 LEFT JOIN users
                     ON users.id = cotations.created_by
@@ -2123,7 +2123,7 @@ def api_calendar():
                     crm_clients.name AS client_name,
                     users.username AS commercial_name
                 FROM cotations
-                JOIN crm_clients
+                LEFT JOIN crm_clients
                     ON crm_clients.id = cotations.client_id
                 LEFT JOIN users
                     ON users.id = cotations.created_by
@@ -3091,7 +3091,7 @@ def create_cotation(client_id):
                 )
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, 0, 'nouvelle', NOW(), %s, %s,
+                    %s, %s, %s, %s, %s, 0, 'en_cours', NOW(), %s, %s,
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s
@@ -3281,6 +3281,7 @@ def upload_client_document_legacy(client_id):
         flash("Aucun upload réussi.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
+
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
 ############################################################
