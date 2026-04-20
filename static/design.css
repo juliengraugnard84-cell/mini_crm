@@ -877,3 +877,18 @@ main.content {
     font-size: 12px;
     overflow-x: auto;
 }
+/* ================= FIX FULLCALENDAR ================= */
+
+#calendar {
+    width: 100%;
+    min-height: 700px;
+}
+
+/* force l'affichage interne fullcalendar */
+.fc {
+    height: 100% !important;
+}
+
+.fc-view-harness {
+    min-height: 600px !important;
+}
