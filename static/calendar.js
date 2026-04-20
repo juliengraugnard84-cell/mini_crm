@@ -2,6 +2,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const calendarEl = document.getElementById("calendar");
 
+    if (!calendarEl) {
+        console.error("Element #calendar introuvable");
+        return;
+    }
+
     const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: "dayGridMonth",
         locale: "fr",
@@ -15,7 +20,7 @@ document.addEventListener("DOMContentLoaded", function () {
             right: "dayGridMonth,timeGridWeek,timeGridDay"
         },
 
-        // ✅ FIX COMPLET : parsing propre des events
+        // ✅ FETCH API OK
         events: function(fetchInfo, successCallback, failureCallback) {
 
             fetch("/api/calendar")
@@ -52,8 +57,8 @@ document.addEventListener("DOMContentLoaded", function () {
             openModal({
                 id: e.id,
                 title: e.title,
-                date: e.startStr.slice(0, 10),
-                start_time: e.startStr.slice(11, 16),
+                date: e.startStr ? e.startStr.slice(0, 10) : "",
+                start_time: e.startStr ? e.startStr.slice(11, 16) : "",
                 end_time: e.endStr ? e.endStr.slice(11, 16) : "10:00"
             });
         }
@@ -62,55 +67,91 @@ document.addEventListener("DOMContentLoaded", function () {
     calendar.render();
 
     /* ==========================
-       MODALE
+       MODALE (SAFE)
     ========================== */
 
     function openModal(data) {
-        document.getElementById("rdv-id").value = data.id || "";
-        document.getElementById("rdv-title").value = data.title || "";
-        document.getElementById("rdv-date").value = data.date || "";
-        document.getElementById("rdv-start").value = data.start_time || "09:00";
-        document.getElementById("rdv-end").value = data.end_time || "10:00";
 
-        document.getElementById("btn-delete").style.display = data.id ? "inline-block" : "none";
+        const idField = document.getElementById("rdv-id");
+        const titleField = document.getElementById("rdv-title");
+        const dateField = document.getElementById("rdv-date");
+        const startField = document.getElementById("rdv-start");
+        const endField = document.getElementById("rdv-end");
+        const deleteBtn = document.getElementById("btn-delete");
+        const modalEl = document.getElementById("rdvModal");
 
-        new bootstrap.Modal(document.getElementById("rdvModal")).show();
+        if (idField) idField.value = data.id || "";
+        if (titleField) titleField.value = data.title || "";
+        if (dateField) dateField.value = data.date || "";
+        if (startField) startField.value = data.start_time || "09:00";
+        if (endField) endField.value = data.end_time || "10:00";
+
+        if (deleteBtn) {
+            deleteBtn.style.display = data.id ? "inline-block" : "none";
+        }
+
+        if (modalEl) {
+            new bootstrap.Modal(modalEl).show();
+        }
     }
 
     /* ==========================
-       SAVE
+       SAVE (SAFE)
     ========================== */
-    document.getElementById("btn-save").addEventListener("click", () => {
-        const id = document.getElementById("rdv-id").value;
-        const payload = {
-            title: document.getElementById("rdv-title").value,
-            date: document.getElementById("rdv-date").value,
-            start_time: document.getElementById("rdv-start").value,
-            end_time: document.getElementById("rdv-end").value
-        };
 
-        const url = id ? "/appointments/update" : "/appointments/create";
-        if (id) payload.id = id;
+    const btnSave = document.getElementById("btn-save");
 
-        fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        }).then(() => location.reload());
-    });
+    if (btnSave) {
+        btnSave.addEventListener("click", () => {
+
+            const idField = document.getElementById("rdv-id");
+            const titleField = document.getElementById("rdv-title");
+            const dateField = document.getElementById("rdv-date");
+            const startField = document.getElementById("rdv-start");
+            const endField = document.getElementById("rdv-end");
+
+            const id = idField ? idField.value : null;
+
+            const payload = {
+                title: titleField ? titleField.value : "",
+                date: dateField ? dateField.value : "",
+                start_time: startField ? startField.value : "",
+                end_time: endField ? endField.value : ""
+            };
+
+            const url = id ? "/appointments/update" : "/appointments/create";
+            if (id) payload.id = id;
+
+            fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }).then(() => location.reload());
+        });
+    }
 
     /* ==========================
-       DELETE
+       DELETE (SAFE)
     ========================== */
-    document.getElementById("btn-delete").addEventListener("click", () => {
-        const id = document.getElementById("rdv-id").value;
-        if (!confirm("Supprimer ce rendez-vous ?")) return;
 
-        fetch("/appointments/delete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id })
-        }).then(() => location.reload());
-    });
+    const btnDelete = document.getElementById("btn-delete");
+
+    if (btnDelete) {
+        btnDelete.addEventListener("click", () => {
+
+            const idField = document.getElementById("rdv-id");
+            const id = idField ? idField.value : null;
+
+            if (!id) return;
+
+            if (!confirm("Supprimer ce rendez-vous ?")) return;
+
+            fetch("/appointments/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id })
+            }).then(() => location.reload());
+        });
+    }
 
 });
