@@ -88,9 +88,15 @@
                 </a>
             {% endif %}
 
-            {% if current_user and current_user.role in ["admin", "commercial"] %}
+            <!-- ✅ CORRECTION ICI -->
+            {% if current_user and current_user.role == "admin" %}
                 <a href="{{ url_for('admin_planning') }}"
                    class="{% if request.path.startswith('/admin/planning') %}active{% endif %}">
+                    📅 Agenda des négociations
+                </a>
+            {% elif current_user and current_user.role == "commercial" %}
+                <a href="{{ url_for('planning') }}"
+                   class="{% if request.path.startswith('/planning') %}active{% endif %}">
                     📅 Agenda des négociations
                 </a>
             {% endif %}
