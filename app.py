@@ -1993,6 +1993,129 @@ def admin_planning():
     )
 
 
+############################################################
+# 10 TER BIS. PLANNING COMMERCIAL (AGENDA)
+############################################################
+
+@app.route("/planning")
+@login_required
+def planning():
+
+    conn = get_db()
+    user = session.get("user") or {}
+
+    role = user.get("role")
+    user_id = user.get("id")
+
+    # =========================
+    # NEGOCIATIONS (COTATIONS)
+    # =========================
+    with conn.cursor() as cur:
+
+        if role == "admin":
+            cur.execute("""
+                SELECT
+                    cotations.id,
+                    cotations.date_negociation,
+                    crm_clients.name AS client_name,
+                    users.username AS commercial_name
+                FROM cotations
+                LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
+                LEFT JOIN users ON users.id = cotations.created_by
+                WHERE cotations.date_negociation IS NOT NULL
+                  AND cotations.date_negociation >= CURRENT_DATE
+                ORDER BY cotations.date_negociation ASC
+            """)
+        else:
+            cur.execute("""
+                SELECT
+                    cotations.id,
+                    cotations.date_negociation,
+                    crm_clients.name AS client_name,
+                    users.username AS commercial_name
+                FROM cotations
+                LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
+                LEFT JOIN users ON users.id = cotations.created_by
+                WHERE cotations.date_negociation IS NOT NULL
+                  AND cotations.date_negociation >= CURRENT_DATE
+                  AND cotations.created_by = %s
+                ORDER BY cotations.date_negociation ASC
+            """, (user_id,))
+
+        cotations = cur.fetchall()
+
+    # =========================
+    # DEMANDES DE MISE A JOUR
+    # =========================
+    with conn.cursor() as cur:
+
+        if role == "admin":
+            cur.execute("""
+                SELECT
+                    client_updates.id,
+                    client_updates.update_date,
+                    client_updates.commentaire,
+                    client_updates.client_name,
+                    client_updates.commercial_name
+                FROM client_updates
+                WHERE client_updates.update_date IS NOT NULL
+                  AND client_updates.update_date >= CURRENT_DATE
+                ORDER BY client_updates.update_date ASC
+            """)
+        else:
+            cur.execute("""
+                SELECT
+                    client_updates.id,
+                    client_updates.update_date,
+                    client_updates.commentaire,
+                    client_updates.client_name,
+                    client_updates.commercial_name
+                FROM client_updates
+                WHERE client_updates.update_date IS NOT NULL
+                  AND client_updates.update_date >= CURRENT_DATE
+                  AND LOWER(client_updates.commercial_name) = LOWER(%s)
+                ORDER BY client_updates.update_date ASC
+            """, (user.get("username"),))
+
+        updates = cur.fetchall()
+
+    # =========================
+    # EVENEMENTS (optionnel visibles)
+    # =========================
+    events = []
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    id,
+                    title,
+                    description,
+                    event_date,
+                    event_time,
+                    end_time,
+                    all_day
+                FROM calendar_events
+                WHERE event_date IS NOT NULL
+                  AND event_date >= CURRENT_DATE
+                ORDER BY event_date ASC
+            """)
+            rows = cur.fetchall()
+
+        events = [row_to_obj(r) for r in rows]
+
+    except Exception as e:
+        logger.exception("Erreur chargement events planning commercial : %r", e)
+        events = []
+
+    return render_template(
+        "planning.html",
+        cotations=[row_to_obj(c) for c in cotations],
+        updates=[row_to_obj(u) for u in updates],
+        events=events
+    )
+
+
 # ===============================
 # AJOUT EVENEMENT CALENDRIER
 # ===============================
