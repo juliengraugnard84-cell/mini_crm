@@ -2078,8 +2078,7 @@ def delete_calendar_event(event_id):
 
     return redirect(url_for("admin_planning"))
 ############################################################
-# 10 TER BIS. API CALENDRIER — NEGOCIATIONS
-# (utilisé par FullCalendar dans le planning)
+# 10 TER BIS. API CALENDRIER — NEGOCIATIONS + UPDATES
 ############################################################
 
 @app.route("/api/calendar")
@@ -2091,10 +2090,13 @@ def api_calendar():
 
     role = user.get("role")
     user_id = user.get("id")
+    username = user.get("username")
 
     with conn.cursor() as cur:
 
-        # ADMIN → voit toutes les négociations
+        # =========================
+        # ADMIN → voit tout
+        # =========================
         if role == "admin":
 
             cur.execute("""
@@ -2112,7 +2114,9 @@ def api_calendar():
                 WHERE cotations.date_negociation IS NOT NULL
             """)
 
-        # COMMERCIAL → voit seulement ses négociations
+        # =========================
+        # COMMERCIAL → voit SES dossiers (FIX)
+        # =========================
         else:
 
             cur.execute("""
@@ -2123,22 +2127,22 @@ def api_calendar():
                     crm_clients.name AS client_name,
                     users.username AS commercial_name
                 FROM cotations
-                LEFT JOIN crm_clients
+                JOIN crm_clients
                     ON crm_clients.id = cotations.client_id
                 LEFT JOIN users
                     ON users.id = cotations.created_by
                 WHERE cotations.date_negociation IS NOT NULL
-                  AND cotations.created_by = %s
+                  AND crm_clients.owner_id = %s
             """, (user_id,))
 
-        rows = cur.fetchall()
+        cotations = cur.fetchall()
 
     events = []
 
     # =====================================================
     # NEGOCIATIONS
     # =====================================================
-    for r in rows:
+    for r in cotations:
 
         date_negociation = r.get("date_negociation")
         heure_negociation = r.get("heure_negociation")
@@ -2155,7 +2159,48 @@ def api_calendar():
             "id": f"cotation_{r['id']}",
             "title": f"{r.get('client_name') or ''} - {r.get('commercial_name') or ''}",
             "start": start,
+            "color": "#3b82f6"
         })
+
+    # =====================================================
+    # MISES À JOUR CLIENT
+    # =====================================================
+    try:
+
+        with conn.cursor() as cur:
+
+            if role == "admin":
+                cur.execute("""
+                    SELECT id, update_date, commentaire, client_name
+                    FROM client_updates
+                    WHERE update_date IS NOT NULL
+                """)
+            else:
+                cur.execute("""
+                    SELECT id, update_date, commentaire, client_name
+                    FROM client_updates
+                    WHERE update_date IS NOT NULL
+                      AND commercial_name = %s
+                """, (username,))
+
+            updates = cur.fetchall()
+
+        for r in updates:
+
+            update_date = r.get("update_date")
+
+            if not update_date:
+                continue
+
+            events.append({
+                "id": f"update_{r['id']}",
+                "title": f"MAJ - {r.get('client_name') or ''}",
+                "start": str(update_date),
+                "color": "#f59e0b"
+            })
+
+    except Exception as e:
+        logger.exception("Erreur updates calendrier : %r", e)
 
     # =====================================================
     # EVENEMENTS ADMIN
@@ -2182,7 +2227,6 @@ def api_calendar():
             if not event_date:
                 continue
 
-            # Journée entière
             if r.get("all_day"):
 
                 events.append({
@@ -2218,7 +2262,6 @@ def api_calendar():
         logger.exception("Erreur chargement events API calendar : %r", e)
 
     return jsonify(events)
-
 ###########################################################
 # 11. DOCUMENTS (GLOBAL + PAR DOSSIER + RESSOURCES PARTAGÉES)
 ############################################################
