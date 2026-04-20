@@ -15,7 +15,8 @@ document.addEventListener("DOMContentLoaded", function () {
             right: "dayGridMonth,timeGridWeek,timeGridDay"
         },
 
-        events: "/appointments/events_json",
+        // ✅ CORRECTION ICI (ancienne route supprimée)
+        events: "/api/calendar",
 
         dateClick(info) {
             openModal({
