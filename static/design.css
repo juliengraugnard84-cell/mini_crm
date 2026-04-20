@@ -892,3 +892,6 @@ main.content {
 .fc-view-harness {
     min-height: 600px !important;
 }
+#calendar {
+    height: 75vh;
+}
