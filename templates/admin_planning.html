@@ -138,6 +138,63 @@
 
 
 <!-- ========================================================= -->
+<!-- LISTE DES RENDEZ-VOUS ADMIN -->
+<!-- ========================================================= -->
+
+<hr class="my-5">
+
+<h3 class="mb-3">📌 Rendez-vous admin</h3>
+
+{% if events %}
+    <ul class="list-group mb-4">
+        {% for event in events %}
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+                <div>
+                    <strong>{{ event.title }}</strong><br>
+
+                    <small class="text-muted">
+                        {{ format_date(event.event_date) }}
+
+                        {% if event.all_day %}
+                            — Journée entière
+                        {% else %}
+                            {% if event.event_time %}
+                                — {{ event.event_time }}
+                            {% endif %}
+
+                            {% if event.end_time %}
+                                - {{ event.end_time }}
+                            {% endif %}
+                        {% endif %}
+                    </small>
+
+                    {% if event.description %}
+                        <div class="mt-1">
+                            <small>{{ event.description }}</small>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <form method="POST"
+                      action="{{ url_for('delete_calendar_event', event_id=event.id) }}"
+                      class="ms-3"
+                      onsubmit="return confirm('Supprimer ce rendez-vous ?');">
+
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                    <button type="submit" class="btn btn-sm btn-danger">
+                        🗑 Supprimer
+                    </button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="text-muted">Aucun rendez-vous admin prévu.</p>
+{% endif %}
+
+
+<!-- ========================================================= -->
 <!-- CALENDRIER DES NEGOCIATIONS -->
 <!-- ========================================================= -->
 

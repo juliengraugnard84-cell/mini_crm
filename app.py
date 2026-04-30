@@ -1957,7 +1957,7 @@ def admin_planning():
         updates = cur.fetchall()
 
     # =========================
-    # EVENEMENTS ADMIN
+    # EVENEMENTS ADMIN / COMMERCIAUX
     # =========================
     events = []
 
@@ -1965,17 +1965,20 @@ def admin_planning():
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
-                    id,
-                    title,
-                    description,
-                    event_date,
-                    event_time,
-                    end_time,
-                    all_day
+                    calendar_events.id,
+                    calendar_events.title,
+                    calendar_events.description,
+                    calendar_events.event_date,
+                    calendar_events.event_time,
+                    calendar_events.end_time,
+                    calendar_events.all_day,
+                    calendar_events.created_by,
+                    users.username AS created_by_username
                 FROM calendar_events
-                WHERE event_date IS NOT NULL
-                  AND event_date >= CURRENT_DATE
-                ORDER BY event_date ASC
+                LEFT JOIN users ON users.id = calendar_events.created_by
+                WHERE calendar_events.event_date IS NOT NULL
+                  AND calendar_events.event_date >= CURRENT_DATE
+                ORDER BY calendar_events.event_date ASC
             """)
             rows = cur.fetchall()
 
@@ -1992,6 +1995,81 @@ def admin_planning():
         events=events
     )
 
+
+# ===============================
+# AJOUT EVENEMENT CALENDRIER
+# Admin + commerciaux
+# ===============================
+@app.route("/calendar/add", methods=["POST"], endpoint="add_calendar_event")
+@login_required
+def add_calendar_event():
+
+    conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    title = (request.form.get("title") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    event_date = (request.form.get("event_date") or "").strip()
+
+    start_time = (request.form.get("start_time") or "").strip()
+    end_time = (request.form.get("end_time") or "").strip()
+
+    all_day = request.form.get("all_day") in ("on", "1", "true")
+
+    if not title or not event_date:
+        flash("Titre et date obligatoires.", "danger")
+
+        if role == "admin":
+            return redirect(url_for("admin_planning"))
+
+        return redirect(url_for("planning"))
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO calendar_events (
+                    title,
+                    description,
+                    event_date,
+                    event_time,
+                    end_time,
+                    all_day,
+                    created_by
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                title,
+                description or None,
+                event_date,
+                start_time if start_time else None,
+                end_time if end_time else None,
+                all_day,
+                user.get("id")
+            ))
+
+        conn.commit()
+
+        flash("Rendez-vous ajouté au planning.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur ajout rendez-vous calendrier : %r", e)
+        flash("Erreur lors de l'ajout du rendez-vous.", "danger")
+
+    if role == "admin":
+        return redirect(url_for("admin_planning"))
+
+    return redirect(url_for("planning"))
+
+
+# ===============================
+# COMPATIBILITÉ ANCIENNE URL ADMIN
+# ===============================
+@app.route("/admin/calendar/add", methods=["POST"], endpoint="add_calendar_event_admin_legacy")
+@admin_required
+def add_calendar_event_admin_legacy():
+    return add_calendar_event()
 
 ############################################################
 # 10 TER BIS. PLANNING COMMERCIAL (AGENDA)
