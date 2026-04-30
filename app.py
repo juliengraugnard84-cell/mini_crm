@@ -2612,6 +2612,62 @@ def shared_resources():
     return render_template("ressources.html", mandats=mandats, resiliations=resiliations)
 
 
+# ===============================
+# UPLOAD RESSOURCES PARTAGÉES
+# ===============================
+@app.route("/ressources/upload", methods=["POST"], endpoint="shared_resources_upload")
+@login_required
+def shared_resources_upload():
+
+    if LOCAL_MODE or not s3:
+        flash("Upload indisponible en mode local.", "warning")
+        return redirect(url_for("shared_resources"))
+
+    category = (request.form.get("category") or "").strip()
+
+    if category not in SHARED_CATEGORIES:
+        flash("Catégorie invalide.", "danger")
+        return redirect(url_for("shared_resources"))
+
+    fichier = request.files.get("file")
+
+    if not fichier or not getattr(fichier, "filename", ""):
+        flash("Fichier invalide.", "danger")
+        return redirect(url_for("shared_resources"))
+
+    if not allowed_file(fichier.filename):
+        flash("Type de fichier non autorisé.", "danger")
+        return redirect(url_for("shared_resources"))
+
+    try:
+        original_name = secure_filename(fichier.filename) or "document"
+        filename = clean_filename(original_name)
+
+        key = _s3_make_non_overwriting_key(
+            AWS_BUCKET,
+            f"{SHARED_PREFIX}{category}/{filename}"
+        )
+
+        s3_upload_fileobj(fichier, AWS_BUCKET, key)
+
+        flash("Document ajouté aux ressources partagées.", "success")
+
+    except Exception as e:
+        logger.exception("Erreur upload ressource partagée : %r", e)
+        flash("Erreur lors de l’upload.", "danger")
+
+    return redirect(url_for("shared_resources"))
+
+
+# ===============================
+# COMPAT URL /resources (OPTIONNEL MAIS CONSEILLÉ)
+# ===============================
+@app.route("/resources")
+@login_required
+def resources_redirect():
+    return redirect(url_for("shared_resources"))
+
+
 ###########################################################
 # 12. CLIENTS (LISTE / CRÉATION / DÉTAIL / MODIFICATION)
 # + STATUT + COTATIONS + DELETE CLIENT + TIMELINE FR
