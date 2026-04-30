@@ -7,7 +7,7 @@
   <div class="mb-4">
     <h2 class="mb-1">Ressources partagées</h2>
     <p class="text-muted mb-0">
-      Mandats et lettres de résiliation accessibles aux administrateurs et commerciaux.
+      Documents partagés accessibles aux administrateurs et commerciaux.
     </p>
   </div>
 
@@ -50,10 +50,10 @@
   </div>
   {% endif %}
 
-  <!-- ================= MANDATS ================= -->
+  <!-- ================= DOCUMENTS PARTAGÉS ================= -->
   <div class="card mb-4 shadow-sm">
     <div class="card-header bg-light">
-      <strong>📂 Mandats</strong>
+      <strong>📂 Documents partagés</strong>
     </div>
     <div class="card-body p-0">
 
@@ -68,8 +68,8 @@
         </thead>
         <tbody>
 
-        {% if mandats %}
-          {% for f in mandats %}
+        {% if fichiers %}
+          {% for f in fichiers %}
           <tr>
             <td>{{ f.nom }}</td>
             <td>{{ format_date(f.date) }}</td>
@@ -88,7 +88,7 @@
                 <input type="hidden" name="key" value="{{ f.key }}">
                 <button type="submit"
                         class="btn btn-sm btn-outline-danger"
-                        onclick="return confirm('Supprimer ce mandat ?')">
+                        onclick="return confirm('Supprimer ce document ?')">
                   Supprimer
                 </button>
               </form>
@@ -99,67 +99,7 @@
         {% else %}
           <tr>
             <td colspan="4" class="text-center text-muted py-4">
-              Aucun mandat disponible
-            </td>
-          </tr>
-        {% endif %}
-
-        </tbody>
-      </table>
-
-    </div>
-  </div>
-
-  <!-- ================= RÉSILIATIONS ================= -->
-  <div class="card mb-4 shadow-sm">
-    <div class="card-header bg-light">
-      <strong>📂 Résiliations</strong>
-    </div>
-    <div class="card-body p-0">
-
-      <table class="table table-striped table-hover mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Nom</th>
-            <th style="width: 160px;">Date</th>
-            <th style="width: 120px;">Taille</th>
-            <th style="width: 160px;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-
-        {% if resiliations %}
-          {% for f in resiliations %}
-          <tr>
-            <td>{{ f.nom }}</td>
-            <td>{{ format_date(f.date) }}</td>
-            <td>{{ f.taille }}</td>
-            <td>
-              <a class="btn btn-sm btn-outline-primary"
-                 href="{{ url_for('download_document', key=f.key) }}">
-                Télécharger
-              </a>
-
-              {% if current_user.role == "admin" %}
-              <form method="POST"
-                    action="{{ url_for('delete_document') }}"
-                    class="d-inline">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="key" value="{{ f.key }}">
-                <button type="submit"
-                        class="btn btn-sm btn-outline-danger"
-                        onclick="return confirm('Supprimer cette résiliation ?')">
-                  Supprimer
-                </button>
-              </form>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="4" class="text-center text-muted py-4">
-              Aucune résiliation disponible
+              Aucun document disponible
             </td>
           </tr>
         {% endif %}

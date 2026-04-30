@@ -2580,40 +2580,36 @@ def upload_client_document(client_id):
 @login_required
 def shared_resources():
 
-    mandats = []
-    resiliations = []
+    fichiers = []
 
     if LOCAL_MODE or not s3:
-        return render_template("ressources.html", mandats=mandats, resiliations=resiliations)
+        return render_template("ressources.html", fichiers=fichiers)
 
     try:
         items = s3_list_all_objects(AWS_BUCKET, prefix=SHARED_PREFIX)
 
         for item in items:
             key = item.get("Key")
+
             if not key or key.endswith("/"):
                 continue
 
-            doc = {
+            fichiers.append({
                 "nom": key.replace(SHARED_PREFIX, "", 1),
                 "key": key,
                 "taille": item.get("Size", 0),
                 "date": item.get("LastModified"),
-            }
-
-            if key.startswith(f"{SHARED_PREFIX}mandats/"):
-                mandats.append(doc)
-            elif key.startswith(f"{SHARED_PREFIX}resiliations/"):
-                resiliations.append(doc)
+            })
 
     except Exception as e:
         logger.exception("Erreur ressources : %r", e)
 
-    return render_template("ressources.html", mandats=mandats, resiliations=resiliations)
+    return render_template("ressources.html", fichiers=fichiers)
 
 
 # ===============================
 # UPLOAD RESSOURCES PARTAGÉES
+# Stockage simple sans catégorie
 # ===============================
 @app.route("/ressources/upload", methods=["POST"], endpoint="shared_resources_upload")
 @login_required
@@ -2621,12 +2617,6 @@ def shared_resources_upload():
 
     if LOCAL_MODE or not s3:
         flash("Upload indisponible en mode local.", "warning")
-        return redirect(url_for("shared_resources"))
-
-    category = (request.form.get("category") or "").strip()
-
-    if category not in SHARED_CATEGORIES:
-        flash("Catégorie invalide.", "danger")
         return redirect(url_for("shared_resources"))
 
     fichier = request.files.get("file")
@@ -2645,7 +2635,7 @@ def shared_resources_upload():
 
         key = _s3_make_non_overwriting_key(
             AWS_BUCKET,
-            f"{SHARED_PREFIX}{category}/{filename}"
+            f"{SHARED_PREFIX}{filename}"
         )
 
         s3_upload_fileobj(fichier, AWS_BUCKET, key)
@@ -2660,7 +2650,7 @@ def shared_resources_upload():
 
 
 # ===============================
-# COMPAT URL /resources (OPTIONNEL MAIS CONSEILLÉ)
+# COMPAT URL /resources
 # ===============================
 @app.route("/resources")
 @login_required
