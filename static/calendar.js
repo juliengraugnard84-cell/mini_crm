@@ -7,12 +7,18 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
     }
 
+    function getCsrfToken() {
+        const input = document.querySelector('input[name="csrf_token"]');
+        return input ? input.value : "";
+    }
+
     const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: "dayGridMonth",
         locale: "fr",
         selectable: true,
-        editable: true,
+        editable: false,
         firstDay: 1,
+        height: 750,
 
         headerToolbar: {
             left: "prev,next today",
@@ -20,7 +26,6 @@ document.addEventListener("DOMContentLoaded", function () {
             right: "dayGridMonth,timeGridWeek,timeGridDay"
         },
 
-        // ✅ FETCH API OK
         events: function(fetchInfo, successCallback, failureCallback) {
 
             fetch("/api/calendar")
@@ -54,20 +59,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
         eventClick(info) {
             const e = info.event;
+
             openModal({
                 id: e.id,
                 title: e.title,
                 date: e.startStr ? e.startStr.slice(0, 10) : "",
-                start_time: e.startStr ? e.startStr.slice(11, 16) : "",
-                end_time: e.endStr ? e.endStr.slice(11, 16) : "10:00"
+                start_time: e.startStr && e.startStr.length > 10 ? e.startStr.slice(11, 16) : "09:00",
+                end_time: e.endStr && e.endStr.length > 10 ? e.endStr.slice(11, 16) : "10:00"
             });
         }
     });
 
     calendar.render();
 
+
     /* ==========================
-       MODALE (SAFE)
+       MODALE
     ========================== */
 
     function openModal(data) {
@@ -87,16 +94,20 @@ document.addEventListener("DOMContentLoaded", function () {
         if (endField) endField.value = data.end_time || "10:00";
 
         if (deleteBtn) {
-            deleteBtn.style.display = data.id ? "inline-block" : "none";
+            deleteBtn.style.display = data.id && data.id.startsWith("event_")
+                ? "inline-block"
+                : "none";
         }
 
         if (modalEl) {
-            new bootstrap.Modal(modalEl).show();
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
         }
     }
 
+
     /* ==========================
-       SAVE (SAFE)
+       SAVE RDV
     ========================== */
 
     const btnSave = document.getElementById("btn-save");
@@ -104,34 +115,49 @@ document.addEventListener("DOMContentLoaded", function () {
     if (btnSave) {
         btnSave.addEventListener("click", () => {
 
-            const idField = document.getElementById("rdv-id");
             const titleField = document.getElementById("rdv-title");
             const dateField = document.getElementById("rdv-date");
             const startField = document.getElementById("rdv-start");
             const endField = document.getElementById("rdv-end");
 
-            const id = idField ? idField.value : null;
+            const title = titleField ? titleField.value.trim() : "";
+            const eventDate = dateField ? dateField.value : "";
+            const startTime = startField ? startField.value : "";
+            const endTime = endField ? endField.value : "";
 
-            const payload = {
-                title: titleField ? titleField.value : "",
-                date: dateField ? dateField.value : "",
-                start_time: startField ? startField.value : "",
-                end_time: endField ? endField.value : ""
-            };
+            if (!title || !eventDate) {
+                alert("Titre et date obligatoires.");
+                return;
+            }
 
-            const url = id ? "/appointments/update" : "/appointments/create";
-            if (id) payload.id = id;
+            const formData = new FormData();
+            formData.append("csrf_token", getCsrfToken());
+            formData.append("title", title);
+            formData.append("event_date", eventDate);
+            formData.append("start_time", startTime);
+            formData.append("end_time", endTime);
+            formData.append("description", "");
 
-            fetch(url, {
+            fetch("/calendar/add", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }).then(() => location.reload());
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Erreur serveur");
+                }
+                window.location.reload();
+            })
+            .catch(error => {
+                console.error("Erreur création RDV:", error);
+                alert("Erreur lors de l'enregistrement du rendez-vous.");
+            });
         });
     }
 
+
     /* ==========================
-       DELETE (SAFE)
+       DELETE RDV ADMIN
     ========================== */
 
     const btnDelete = document.getElementById("btn-delete");
@@ -140,17 +166,31 @@ document.addEventListener("DOMContentLoaded", function () {
         btnDelete.addEventListener("click", () => {
 
             const idField = document.getElementById("rdv-id");
-            const id = idField ? idField.value : null;
+            const rawId = idField ? idField.value : "";
 
-            if (!id) return;
+            if (!rawId || !rawId.startsWith("event_")) return;
+
+            const eventId = rawId.replace("event_", "");
 
             if (!confirm("Supprimer ce rendez-vous ?")) return;
 
-            fetch("/appointments/delete", {
+            const formData = new FormData();
+            formData.append("csrf_token", getCsrfToken());
+
+            fetch("/admin/calendar/" + eventId + "/delete", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id })
-            }).then(() => location.reload());
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Suppression refusée ou impossible");
+                }
+                window.location.reload();
+            })
+            .catch(error => {
+                console.error("Erreur suppression RDV:", error);
+                alert("Suppression impossible.");
+            });
         });
     }
 
