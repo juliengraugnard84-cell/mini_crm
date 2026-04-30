@@ -5,6 +5,60 @@
 
 <h1 class="page-title mb-4">Agenda</h1>
 
+<!-- ================= FORMULAIRE AJOUT RDV ================= -->
+<h3 class="mb-3">➕ Ajouter un rendez-vous</h3>
+
+<form method="POST" action="{{ url_for('add_calendar_event') }}" class="row g-3 mb-4">
+
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="col-md-3">
+        <input
+            type="text"
+            name="title"
+            class="form-control"
+            placeholder="Titre du rendez-vous"
+            required>
+    </div>
+
+    <div class="col-md-2">
+        <input
+            type="date"
+            name="event_date"
+            class="form-control"
+            required>
+    </div>
+
+    <div class="col-md-2">
+        <input
+            type="time"
+            name="start_time"
+            class="form-control">
+    </div>
+
+    <div class="col-md-2">
+        <input
+            type="time"
+            name="end_time"
+            class="form-control">
+    </div>
+
+    <div class="col-md-3">
+        <input
+            type="text"
+            name="description"
+            class="form-control"
+            placeholder="Description optionnelle">
+    </div>
+
+    <div class="col-12">
+        <button type="submit" class="btn btn-success">
+            Ajouter le rendez-vous
+        </button>
+    </div>
+
+</form>
+
 <div class="card shadow-sm">
     <div class="card-body">
         <div id="calendar" style="min-height: 750px;"></div>
