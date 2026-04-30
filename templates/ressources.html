@@ -24,7 +24,7 @@
 
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <div class="col-md-4">
+        <div class="col-md-5">
           <label class="form-label">Nom du document</label>
           <input
             type="text"
@@ -34,15 +34,7 @@
             required>
         </div>
 
-        <div class="col-md-2">
-          <label class="form-label">Catégorie</label>
-          <select name="category" class="form-select" required>
-            <option value="mandats">Mandat</option>
-            <option value="resiliations">Résiliation</option>
-          </select>
-        </div>
-
-        <div class="col-md-4">
+        <div class="col-md-5">
           <label class="form-label">Fichier</label>
           <input type="file" name="file" class="form-control" required>
         </div>
