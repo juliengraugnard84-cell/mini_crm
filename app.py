@@ -2194,64 +2194,6 @@ def planning():
     )
 
 
-# ===============================
-# AJOUT EVENEMENT CALENDRIER
-# ===============================
-@app.route("/admin/calendar/add", methods=["POST"])
-@admin_required
-def add_calendar_event():
-
-    conn = get_db()
-    user = session.get("user") or {}
-
-    title = (request.form.get("title") or "").strip()
-    description = (request.form.get("description") or "").strip()
-    event_date = (request.form.get("event_date") or "").strip()
-
-    start_time = (request.form.get("start_time") or "").strip()
-    end_time = (request.form.get("end_time") or "").strip()
-
-    all_day = request.form.get("all_day") == "on"
-
-    if not title or not event_date:
-        flash("Titre et date obligatoires.", "danger")
-        return redirect(url_for("admin_planning"))
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO calendar_events (
-                    title,
-                    description,
-                    event_date,
-                    event_time,
-                    end_time,
-                    all_day,
-                    created_by
-                )
-                VALUES (%s,%s,%s,%s,%s,%s,%s)
-            """, (
-                title,
-                description or None,
-                event_date,
-                start_time if start_time else None,
-                end_time if end_time else None,
-                all_day,
-                user.get("id")
-            ))
-
-        conn.commit()
-
-        flash("Événement ajouté au planning.", "success")
-
-    except Exception as e:
-        conn.rollback()
-        logger.exception("Erreur ajout evenement calendrier : %r", e)
-        flash("Erreur lors de l'ajout.", "danger")
-
-    return redirect(url_for("admin_planning"))
-
-
 ############################################################
 # SUPPRESSION EVENEMENT CALENDRIER
 ############################################################
