@@ -25,14 +25,24 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="col-md-4">
-          <label class="form-label">Type de document</label>
+          <label class="form-label">Nom du document</label>
+          <input
+            type="text"
+            name="doc_name"
+            class="form-control"
+            placeholder="Ex : Mandat EDF client X"
+            required>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Catégorie</label>
           <select name="category" class="form-select" required>
             <option value="mandats">Mandat</option>
             <option value="resiliations">Résiliation</option>
           </select>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label class="form-label">Fichier</label>
           <input type="file" name="file" class="form-control" required>
         </div>
