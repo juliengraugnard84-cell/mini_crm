@@ -25,7 +25,17 @@
 
         <div class="info-item">
             <span>Énergie</span>
-            <strong>{{ cotation.energie_type or "—" }}</strong>
+            <strong>
+                {% if cotation.energie_type == "electricite" %}
+                    Électricité
+                {% elif cotation.energie_type == "gaz" %}
+                    Gaz
+                {% elif cotation.energie_type == "elec_gaz" %}
+                    Électricité & gaz
+                {% else %}
+                    {{ cotation.energie_type or "—" }}
+                {% endif %}
+            </strong>
         </div>
 
         <div class="info-item">
@@ -66,7 +76,9 @@
 
         <div class="info-item">
             <span>Fournisseur</span>
-            <strong>{{ cotation.fournisseur_actuel or "—" }}</strong>
+            <strong>
+                {{ cotation.elec_fournisseur_actuel or cotation.gaz_fournisseur_actuel or cotation.fournisseur_actuel or "—" }}
+            </strong>
         </div>
 
         <div class="info-item">
@@ -150,7 +162,6 @@
 
     <div id="debug-content" class="card-body" style="display:none;">
 
-        <!-- ✅ VRAIE GRID (SANS BOOTSTRAP) -->
         <div class="debug-grid">
 
             <div class="debug-item">
@@ -165,36 +176,32 @@
 
             <div class="debug-item">
                 <span>PDL / PCE</span>
-                <strong>{{ cotation.pdl_pce }}</strong>
+                <strong>{{ cotation.pdl_pce or cotation.pce or "—" }}</strong>
             </div>
 
             <div class="debug-item">
                 <span>Énergie</span>
-                <strong>{{ cotation.energie_type }}</strong>
+                <strong>{{ cotation.energie_type or "—" }}</strong>
             </div>
 
             <div class="debug-item">
                 <span>Fournisseur</span>
-                <strong>{{ cotation.fournisseur_actuel }}</strong>
+                <strong>
+                    {{ cotation.elec_fournisseur_actuel or cotation.gaz_fournisseur_actuel or cotation.fournisseur_actuel or "—" }}
+                </strong>
             </div>
 
             <div class="debug-item">
                 <span>Date négociation</span>
-                <strong>{{ cotation.date_negociation }}</strong>
+                <strong>{{ format_date(cotation.date_negociation) if cotation.date_negociation else "—" }}</strong>
             </div>
 
             <div class="debug-item">
                 <span>Date échéance</span>
-                <strong>{{ cotation.date_echeance }}</strong>
+                <strong>{{ format_date(cotation.date_echeance) if cotation.date_echeance else "—" }}</strong>
             </div>
 
         </div>
-
-        <!-- JSON -->
-        <details class="debug-json mt-4">
-            <summary>Voir JSON complet</summary>
-            <pre>{{ cotation.__dict__ }}</pre>
-        </details>
 
     </div>
 </div>
