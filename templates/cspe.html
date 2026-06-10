@@ -3,26 +3,25 @@
 
 {% block content %}
 
-<div class="page-header"
-     style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+<div class="page-header crm-page-header-split">
     <div>
         <h1>CSPE</h1>
-        <p class="text-muted mb-0">Dossiers de récupération de taxes par commercial</p>
+        <p class="text-muted mb-0">Suivi premium des dossiers CSPE et de la performance par commercial.</p>
     </div>
 
-    <button class="btn btn-primary"
-            data-bs-toggle="collapse"
-            data-bs-target="#newCspeForm">
-        ➕ Nouveau dossier CSPE
-    </button>
+    <div class="crm-page-header-actions">
+        <button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#newCspeForm">
+            Nouveau dossier CSPE
+        </button>
+    </div>
 </div>
 
 <div id="newCspeForm" class="collapse mb-4">
     <div class="card">
         <div class="card-body">
-            <h5 class="mb-3">Créer un dossier CSPE</h5>
+            <h5 class="mb-3">Creer un dossier CSPE</h5>
 
-            <form method="POST" action="{{ url_for('create_cspe_dossier') }}">
+            <form method="post" action="{{ url_for('create_cspe_dossier') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
                 <div class="row g-3">
@@ -32,10 +31,8 @@
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">Date de négociation</label>
-                        <input type="date"
-                               name="date_negociation"
-                               class="form-control">
+                        <label class="form-label">Date de negociation</label>
+                        <input type="date" name="date_negociation" class="form-control">
                     </div>
 
                     <div class="col-md-6">
@@ -52,7 +49,7 @@
                     <div class="col-md-6">
                         <label class="form-label">Commercial *</label>
                         <select name="owner_id" class="form-select" required>
-                            <option value="">Sélectionner un commercial</option>
+                            <option value="">Selectionner un commercial</option>
                             {% for u in users %}
                             <option value="{{ u.id }}">{{ u.username }}</option>
                             {% endfor %}
@@ -70,7 +67,7 @@
                 </div>
 
                 <div class="mt-4">
-                    <button type="submit" class="btn btn-success">Créer le dossier</button>
+                    <button type="submit" class="btn btn-success">Creer le dossier</button>
                 </div>
             </form>
         </div>
@@ -79,40 +76,33 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <form method="get"
-              action="{{ url_for('cspe_index') }}"
-              style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <form method="get" action="{{ url_for('cspe_index') }}" class="crm-search-form">
             <input type="text"
                    name="q"
                    value="{{ q or '' }}"
-                   placeholder="Rechercher un dossier CSPE…"
-                   class="form-control"
-                   style="max-width:320px;">
+                   placeholder="Rechercher un dossier CSPE"
+                   class="form-control">
             <button type="submit" class="btn btn-secondary">Rechercher</button>
         </form>
     </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px;">
-    <div class="card">
-        <div class="card-body">
-            <div class="text-muted small">Dossiers CSPE</div>
-            <div style="font-size:2rem;font-weight:700;">{{ total_dossiers }}</div>
-        </div>
-    </div>
+<section class="kpi-grid mb-4">
+    <article class="kpi-tile">
+        <span class="kpi-label">Dossiers CSPE</span>
+        <div class="kpi-value">{{ total_dossiers }}</div>
+    </article>
 
-    <div class="card">
-        <div class="card-body">
-            <div class="text-muted small">Chiffre d'affaires cumulé</div>
-            <div style="font-size:2rem;font-weight:700;">{{ "%.2f"|format(total_chiffre_affaire or 0) }} €</div>
-        </div>
-    </div>
-</div>
+    <article class="kpi-tile">
+        <span class="kpi-label">Chiffre d'affaires cumule</span>
+        <div class="kpi-value">{{ "%.2f"|format(total_chiffre_affaire or 0) }} EUR</div>
+    </article>
+</section>
 
 {% if current_user and current_user.role == "admin" %}
 <div class="card mb-4">
     <div class="card-header">
-        <strong>Répartition par commercial</strong>
+        <strong>Repartition par commercial</strong>
     </div>
     <div class="card-body">
         {% if commercial_stats %}
@@ -130,7 +120,7 @@
                     <tr>
                         <td>{{ stat.commercial }}</td>
                         <td>{{ stat.dossiers }}</td>
-                        <td>{{ "%.2f"|format(stat.chiffre_affaire or 0) }} €</td>
+                        <td>{{ "%.2f"|format(stat.chiffre_affaire or 0) }} EUR</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -144,15 +134,18 @@
 {% endif %}
 
 <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <strong>
-            {% if current_user and current_user.role == "admin" %}
+    <div class="crm-table-top">
+        <div>
+            <h5>
+                {% if current_user and current_user.role == "admin" %}
                 Tous les dossiers CSPE
-            {% else %}
+                {% else %}
                 Mes dossiers CSPE
-            {% endif %}
-        </strong>
-        <span class="text-muted small">{{ dossiers|length }} dossier(s)</span>
+                {% endif %}
+            </h5>
+            <p class="crm-soft-note">Les fiches restent accessibles avec l'historique complet.</p>
+        </div>
+        <span class="crm-soft-note">{{ dossiers|length }} dossier(s)</span>
     </div>
 
     <div class="card-body">
@@ -163,9 +156,9 @@
                     <tr>
                         <th>Dossier</th>
                         <th>Commercial</th>
-                        <th>Date de négociation</th>
+                        <th>Date de negociation</th>
                         <th>Chiffre d'affaires</th>
-                        <th>Créé le</th>
+                        <th>Cree le</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -175,16 +168,17 @@
                         <td>
                             <div class="fw-semibold">{{ dossier.name }}</div>
                             {% if dossier.notes %}
-                            <div class="text-muted small">{{ dossier.notes[:100] }}{% if dossier.notes|length > 100 %}…{% endif %}</div>
+                            <div class="text-muted small">
+                                {{ dossier.notes[:100] }}{% if dossier.notes|length > 100 %}...{% endif %}
+                            </div>
                             {% endif %}
                         </td>
-                        <td>{{ dossier.commercial or "Non assigné" }}</td>
+                        <td>{{ dossier.commercial or "Non assigne" }}</td>
                         <td>{{ format_date(dossier.date_negociation) }}</td>
-                        <td>{{ "%.2f"|format(dossier.chiffre_affaire or 0) }} €</td>
+                        <td>{{ "%.2f"|format(dossier.chiffre_affaire or 0) }} EUR</td>
                         <td>{{ format_datetime_fr(dossier.created_at, False) }}</td>
                         <td class="text-end">
-                            <a href="{{ url_for('cspe_detail', dossier_id=dossier.id) }}"
-                               class="btn btn-sm btn-outline-primary">
+                            <a href="{{ url_for('cspe_detail', dossier_id=dossier.id) }}" class="btn btn-sm btn-outline-primary">
                                 Ouvrir
                             </a>
                         </td>
@@ -194,7 +188,7 @@
             </table>
         </div>
         {% else %}
-        <p class="text-muted mb-0">Aucun dossier CSPE trouvé.</p>
+        <p class="text-muted mb-0">Aucun dossier CSPE trouve.</p>
         {% endif %}
     </div>
 </div>

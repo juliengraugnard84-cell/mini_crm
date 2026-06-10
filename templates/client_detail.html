@@ -3,9 +3,47 @@
 
 {% block content %}
 
+{% set client_status = (client.status or 'en_cours')|lower %}
+{% set client_status_label = {
+    'en_cours': 'En cours',
+    'en_attente': 'En attente',
+    'gagne': 'Gagne',
+    'perdu': 'Perdu'
+}.get(client_status, 'En cours') %}
+
+<section class="crm-page-hero">
+    <div>
+        <span class="crm-page-kicker">Fiche client</span>
+        <h1>{{ client.name }}</h1>
+        <p>Vue complete du dossier, des cotations, des documents et des mises a jour associees.</p>
+    </div>
+
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">Commercial : {{ client.commercial or "Non assigne" }}</span>
+        <span class="crm-hero-pill">Statut : {{ client_status_label }}</span>
+        {% if client.siret %}
+        <span class="crm-hero-pill">SIRET : {{ client.siret }}</span>
+        {% endif %}
+    </div>
+</section>
+
+{% if current_user
+      and current_user.role == 'admin'
+      and available_endpoints
+      and 'delete_client' in available_endpoints %}
+<div class="crm-page-header-actions mb-4">
+    <form method="post"
+          action="{{ url_for('delete_client', client_id=client.id) }}"
+          onsubmit="return confirm('Supprimer definitivement ce dossier client ?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-danger">Supprimer le dossier client</button>
+    </form>
+</div>
+{% endif %}
+
 <!-- ================= PAGE HEADER ================= -->
 
-<div class="page-header mb-4 d-flex justify-content-between align-items-center">
+<div class="page-header mb-4 d-flex justify-content-between align-items-center crm-detail-legacy-header">
     <div>
         <h1>Dossier client</h1>
         <p class="text-muted mb-0">{{ client.name }}</p>
@@ -28,16 +66,18 @@
 
 <!-- ================= STATUT DOSSIER ================= -->
 
+<div class="crm-detail-grid mb-4">
+
 {% if current_user
 and (current_user.role == "admin" or current_user.id == client.owner_id)
 and available_endpoints
 and 'update_client_status' in available_endpoints %}
 
-<div class="card mb-4">
+<div class="card">
     <div class="card-header">
         <strong>Statut du dossier</strong>
     </div>
-    <div class="card-body" style="max-width:300px;">
+    <div class="card-body crm-status-card-body">
         <form method="post"
               action="{{ url_for('update_client_status', client_id=client.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -62,7 +102,34 @@ and 'update_client_status' in available_endpoints %}
         <strong>Fiche entreprise</strong>
     </div>
     <div class="card-body">
-        <div class="row">
+        <div class="crm-info-grid">
+            <div class="crm-info-card">
+                <span class="crm-info-label">Entreprise</span>
+                <div class="crm-info-value">{{ client.name }}</div>
+            </div>
+            <div class="crm-info-card">
+                <span class="crm-info-label">Nom du gerant</span>
+                <div class="crm-info-value">{{ client.gerant_nom or "-" }}</div>
+            </div>
+            <div class="crm-info-card">
+                <span class="crm-info-label">Email</span>
+                <div class="crm-info-value">{{ client.email or "-" }}</div>
+            </div>
+            <div class="crm-info-card">
+                <span class="crm-info-label">Telephone</span>
+                <div class="crm-info-value">{{ client.phone or "-" }}</div>
+            </div>
+            <div class="crm-info-card">
+                <span class="crm-info-label">SIRET</span>
+                <div class="crm-info-value">{{ client.siret or "-" }}</div>
+            </div>
+            <div class="crm-info-card">
+                <span class="crm-info-label">Adresse</span>
+                <div class="crm-info-value">{{ client.address or "-" }}</div>
+            </div>
+        </div>
+
+        <div class="row crm-detail-legacy-grid">
             <div class="col-md-6 mb-2"><strong>Entreprise :</strong><br>{{ client.name }}</div>
             <div class="col-md-6 mb-2"><strong>Nom du gérant :</strong><br>{{ client.gerant_nom or "—" }}</div>
             <div class="col-md-6 mb-2"><strong>Email :</strong><br>{{ client.email or "—" }}</div>
@@ -71,6 +138,8 @@ and 'update_client_status' in available_endpoints %}
             <div class="col-md-6 mb-2"><strong>Adresse :</strong><br>{{ client.address or "—" }}</div>
         </div>
     </div>
+</div>
+
 </div>
 
 <!-- ================= TIMELINE ================= -->
@@ -83,7 +152,24 @@ and 'update_client_status' in available_endpoints %}
     <div class="card-body">
 
         {% if timeline %}
-        <div style="position:relative;padding-left:30px;">
+        <div class="crm-timeline">
+            {% for t in timeline %}
+            <div class="crm-timeline-item">
+                <span class="crm-timeline-dot crm-timeline-dot--{{ t.type if t.type in ['client', 'cotation', 'update'] else 'update' }}"></span>
+
+                <div class="crm-timeline-content">
+                    <strong>{{ t.title }}</strong>
+                    <div class="crm-timeline-meta">{{ format_datetime_fr(t.date) }}</div>
+
+                    {% if t.description %}
+                    <div class="mt-2">{{ t.description }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="crm-timeline-legacy" style="position:relative;padding-left:30px;">
 
             <div style="position:absolute;left:10px;top:0;bottom:0;width:2px;background:#dee2e6;"></div>
 

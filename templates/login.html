@@ -2,146 +2,336 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Connexion — SYNERGYGROUP CRM</title>
+    <title>Connexion - Synergygroup CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- Police -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-
     <style>
+        :root {
+            --login-navy: #08133f;
+            --login-navy-soft: #11354b;
+            --login-gold: #f2b233;
+            --login-gold-soft: #f7ca70;
+            --login-ink: #10212b;
+            --login-muted: #64748b;
+            --login-line: rgba(255, 255, 255, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             min-height: 100vh;
-            background: linear-gradient(135deg, #050A3A, #040833);
-            font-family: Inter, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .login-wrapper {
-            width: 100%;
-            max-width: 420px;
-            padding: 20px;
-        }
-
-        .login-card {
-            background: #fff;
-            border-radius: 16px;
-            padding: 28px;
-            box-shadow: 0 20px 50px rgba(0,0,0,.25);
-        }
-
-        .login-logo {
-            width: 56px;
-            height: 56px;
-            border-radius: 14px;
-            background: #F2B233;
-            color: #050A3A;
+            margin: 0;
             display: grid;
             place-items: center;
-            font-weight: 800;
-            font-size: 26px;
-            margin: 0 auto 14px;
+            padding: 28px;
+            background:
+                radial-gradient(circle at top left, rgba(242, 178, 51, 0.16), transparent 24%),
+                radial-gradient(circle at bottom right, rgba(17, 53, 75, 0.32), transparent 28%),
+                linear-gradient(135deg, var(--login-navy) 0%, #0b1f53 42%, var(--login-navy-soft) 100%);
+            font-family: "Aptos", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
+            color: #fff;
         }
 
-        .login-title {
-            text-align: center;
-            font-weight: 700;
-            margin-bottom: 4px;
+        .login-scene {
+            width: min(1080px, 100%);
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(360px, 460px);
+            gap: 26px;
+            align-items: stretch;
         }
 
-        .login-subtitle {
-            text-align: center;
-            font-size: 13px;
-            color: #6b7280;
+        .login-brand-panel,
+        .login-card {
+            border-radius: 30px;
+            overflow: hidden;
+            border: 1px solid var(--login-line);
+            box-shadow: 0 26px 80px rgba(2, 6, 23, 0.24);
+        }
+
+        .login-brand-panel {
+            position: relative;
+            padding: 38px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 640px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+                linear-gradient(145deg, rgba(8, 19, 63, 0.92), rgba(11, 46, 68, 0.82));
+            backdrop-filter: blur(16px);
+        }
+
+        .login-brand-panel::before {
+            content: "";
+            position: absolute;
+            inset: auto -12% -26% auto;
+            width: 360px;
+            height: 360px;
+            border-radius: 999px;
+            background: rgba(242, 178, 51, 0.12);
+            filter: blur(10px);
+        }
+
+        .login-brand-top,
+        .login-brand-bottom {
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-brand-logo {
+            width: min(380px, 100%);
+            max-width: 100%;
+            display: block;
             margin-bottom: 22px;
         }
 
-        .form-label {
-            font-size: .75rem;
+        .login-brand-kicker {
+            display: inline-flex;
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.86);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
-            color: #6b7280;
+        }
+
+        .login-brand-title {
+            margin: 0 0 14px;
+            max-width: 540px;
+            font-size: clamp(34px, 4.6vw, 58px);
+            line-height: 0.98;
+            letter-spacing: -0.05em;
+            font-family: "Cambria", "Constantia", serif;
+        }
+
+        .login-brand-text {
+            max-width: 520px;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 16px;
+            line-height: 1.7;
+        }
+
+        .login-brand-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .login-brand-stat {
+            padding: 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .login-brand-stat span {
+            display: block;
+            margin-bottom: 6px;
+            color: rgba(255, 255, 255, 0.68);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+        }
+
+        .login-brand-stat strong {
+            font-size: 16px;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.98);
+            color: var(--login-ink);
+            padding: 32px;
+        }
+
+        .login-card h1 {
+            margin: 0 0 8px;
+            font-size: 34px;
+            letter-spacing: -0.04em;
+            font-family: "Cambria", "Constantia", serif;
+        }
+
+        .login-card p {
+            margin: 0 0 24px;
+            color: var(--login-muted);
+        }
+
+        .login-form-card {
+            padding: 22px;
+            border-radius: 24px;
+            background: linear-gradient(180deg, #ffffff, #f8fafc);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+
+        .form-label {
+            margin-bottom: 8px;
+            color: var(--login-ink);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         .form-control {
-            border-radius: 10px;
-            padding: 10px 12px;
+            min-height: 52px;
+            border-radius: 16px;
+            border-color: rgba(15, 23, 42, 0.12);
+            padding: 12px 14px;
+            font-size: 15px;
+            box-shadow: none;
+        }
+
+        .form-control:focus {
+            border-color: rgba(242, 178, 51, 0.8);
+            box-shadow: 0 0 0 4px rgba(242, 178, 51, 0.18);
         }
 
         .btn-login {
-            background: #F2B233;
-            color: #050A3A;
-            font-weight: 700;
-            border-radius: 10px;
-            padding: 10px;
+            width: 100%;
+            min-height: 54px;
+            border: 0;
+            border-radius: 16px;
+            background: linear-gradient(180deg, var(--login-gold), var(--login-gold-soft));
+            color: #10212b;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .btn-login:hover {
-            opacity: .9;
+            transform: translateY(-1px);
+            box-shadow: 0 18px 36px rgba(242, 178, 51, 0.26);
+        }
+
+        .login-form-note {
+            margin-top: 18px;
+            color: var(--login-muted);
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .alert {
+            border-radius: 16px;
+            border: 0;
+        }
+
+        @media (max-width: 980px) {
+            .login-scene {
+                grid-template-columns: 1fr;
+            }
+
+            .login-brand-panel {
+                min-height: auto;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 16px;
+            }
+
+            .login-brand-panel,
+            .login-card {
+                padding: 22px;
+                border-radius: 24px;
+            }
+
+            .login-brand-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 
 <body>
 
-<div class="login-wrapper">
+<div class="login-scene">
+    <section class="login-brand-panel">
+        <div class="login-brand-top">
+            <img
+                src="{{ url_for('static', filename='branding/synergygroup-logo.png') }}"
+                alt="Synergygroup"
+                class="login-brand-logo">
 
-    <div class="login-card">
+            <span class="login-brand-kicker">Espace securise</span>
+            <h2 class="login-brand-title">Le CRM premium pour piloter clients, negociations et execution commerciale.</h2>
+            <p class="login-brand-text">
+                Une interface unifiee pour suivre les dossiers, piloter l'agenda, centraliser les documents
+                et garder toute l'equipe alignee sur la meme dynamique de closing.
+            </p>
+        </div>
 
-        <!-- LOGO -->
-        <div class="login-logo">S</div>
+        <div class="login-brand-bottom">
+            <div class="login-brand-grid">
+                <div class="login-brand-stat">
+                    <span>Vision</span>
+                    <strong>Pipeline clair</strong>
+                </div>
+                <div class="login-brand-stat">
+                    <span>Execution</span>
+                    <strong>Agenda central</strong>
+                </div>
+                <div class="login-brand-stat">
+                    <span>Equipe</span>
+                    <strong>Admin + commerciaux</strong>
+                </div>
+            </div>
+        </div>
+    </section>
 
-        <!-- TITRE -->
-        <h4 class="login-title">SYNERGYGROUP CRM</h4>
-        <div class="login-subtitle">Connexion à l’espace sécurisé</div>
+    <section class="login-card">
+        <h1>Connexion</h1>
+        <p>Accede a ton espace de travail Synergygroup CRM.</p>
 
-        <!-- FLASH -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }} small mb-2">
+                <div class="alert alert-{{ category }} small mb-3">
                     {{ message }}
                 </div>
             {% endfor %}
         {% endwith %}
 
-        <!-- FORM -->
-        <form method="POST" action="{{ url_for('login') }}">
+        <div class="login-form-card">
+            <form method="POST" action="{{ url_for('login') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-            <!-- CSRF TOKEN -->
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="mb-3">
+                    <label class="form-label">Utilisateur</label>
+                    <input
+                        type="text"
+                        name="username"
+                        class="form-control"
+                        required
+                        autofocus>
+                </div>
 
-            <div class="mb-3">
-                <label class="form-label">Utilisateur</label>
-                <input
-                    type="text"
-                    name="username"
-                    class="form-control"
-                    required
-                    autofocus
-                >
-            </div>
+                <div class="mb-4">
+                    <label class="form-label">Mot de passe</label>
+                    <input
+                        type="password"
+                        name="password"
+                        class="form-control"
+                        required>
+                </div>
 
-            <div class="mb-4">
-                <label class="form-label">Mot de passe</label>
-                <input
-                    type="password"
-                    name="password"
-                    class="form-control"
-                    required
-                >
-            </div>
+                <button type="submit" class="btn btn-login">
+                    Se connecter
+                </button>
+            </form>
+        </div>
 
-            <button type="submit" class="btn btn-login w-100">
-                Se connecter
-            </button>
-
-        </form>
-
-    </div>
-
+        <div class="login-form-note">
+            Acces reserve aux equipes Synergygroup autorisees.
+        </div>
+    </section>
 </div>
 
 </body>

@@ -5,55 +5,28 @@
     <title>{% block title %}Mini CRM{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- ✅ FULLCALENDAR CSS (FIX CRITIQUE) -->
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
-
-    <!-- STYLE GLOBAL CRM -->
     <link rel="stylesheet" href="{{ url_for('static', filename='design.css') }}">
-
-    <!-- ================= AJOUT UI DEBUG (SAFE) ================= -->
-    <style>
-        .debug-item {
-            background: #ffffff;
-            padding: 10px 12px;
-            border-radius: 8px;
-            border: 1px solid #eee;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-
-        .debug-item small {
-            color: #888;
-            font-size: 12px;
-        }
-
-        .debug-item strong {
-            font-size: 14px;
-            color: #222;
-        }
-
-        .card-header.bg-dark {
-            border-radius: 8px 8px 0 0;
-        }
-    </style>
 </head>
 
-<body>
+<body class="crm-body role-{{ current_user.role if current_user and current_user.role else 'guest' }}">
 
 <div class="app-layout">
 
-    <!-- ================= SIDEBAR ================= -->
     <aside class="sidebar">
         <div class="sidebar-header">
-            <div class="company">
-                <strong>SYNERGYGROUP</strong><br>
-                <small>
-                    {{ current_user.username if current_user and current_user.username else "" }}
-                </small>
+            <a href="{{ url_for('dashboard') }}" class="brand-lockup" aria-label="Retour au tableau de bord">
+                <img
+                    src="{{ url_for('static', filename='branding/synergygroup-logo.png') }}"
+                    alt="Synergygroup"
+                    class="brand-logo">
+            </a>
+
+            <div class="brand-meta">
+                <span class="brand-kicker">Plateforme CRM</span>
+                <strong>{{ current_user.username if current_user and current_user.username else "Equipe Synergygroup" }}</strong>
+                <small>{{ current_user.role|capitalize if current_user and current_user.role else "Connexion securisee" }}</small>
             </div>
         </div>
 
@@ -78,7 +51,7 @@
 
             <a href="{{ url_for('chiffre_affaire') }}"
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
-                Chiffre d’affaires
+                Chiffre d'affaires
             </a>
 
             {% if current_user
@@ -101,12 +74,12 @@
             {% if current_user and current_user.role == "admin" %}
                 <a href="{{ url_for('admin_planning') }}"
                    class="{% if request.path.startswith('/admin/planning') %}active{% endif %}">
-                    📅 Agenda des négociations
+                    Agenda des negociations
                 </a>
             {% elif current_user and current_user.role == "commercial" %}
                 <a href="{{ url_for('planning') }}"
                    class="{% if request.path.startswith('/planning') %}active{% endif %}">
-                    📅 Agenda des négociations
+                    Agenda des negociations
                 </a>
             {% endif %}
 
@@ -114,7 +87,7 @@
 
                 <a href="{{ url_for('admin_updates') }}"
                    class="{% if request.path.startswith('/admin/updates') %}active{% endif %}">
-                    Demandes de mise à jour
+                    Demandes de mise a jour
                     {% if unread_updates and unread_updates > 0 %}
                         <span class="nav-alert-badge danger">{{ unread_updates }}</span>
                     {% endif %}
@@ -130,7 +103,7 @@
 
                 <a href="{{ url_for('admin_dossiers') }}"
                    class="{% if request.path.startswith('/admin/dossiers') %}active{% endif %}">
-                    📊 Suivi des dossiers commerciaux
+                    Suivi des dossiers commerciaux
                 </a>
 
                 <a href="{{ url_for('documents') }}"
@@ -147,18 +120,22 @@
         </nav>
 
         <div class="sidebar-footer">
-            <a href="{{ url_for('logout') }}">Déconnexion</a>
+            <a href="{{ url_for('logout') }}">Deconnexion</a>
         </div>
     </aside>
 
-    <!-- ================= MAIN ================= -->
     <div class="main-content">
 
         <div class="topbar">
-            <strong>
-                {{ current_user.role|capitalize if current_user and current_user.role else "" }}
-            </strong>
-            <span class="role">connecté</span>
+            <div class="topbar-copy">
+                <span class="topbar-kicker">Synergygroup CRM</span>
+                <strong class="topbar-title">{{ self.title()|striptags|trim or "Mini CRM" }}</strong>
+            </div>
+
+            <div class="topbar-userbox">
+                <span class="topbar-user-role">{{ current_user.role|capitalize if current_user and current_user.role else "Invite" }}</span>
+                <strong>{{ current_user.username if current_user and current_user.username else "Utilisateur" }}</strong>
+            </div>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -176,16 +153,15 @@
         </main>
 
         <div class="footer">
-            © {{ current_year if current_year is defined else "" }} SYNERGYGROUP CRM
+            &copy; {{ current_year if current_year is defined else "" }} Synergygroup CRM
         </div>
     </div>
 </div>
 
-<!-- ================= CHAT ================= -->
 {% if current_user and current_user.role in ["admin", "commercial"] %}
 
 <button id="chat-toggle" class="chat-toggle" type="button" aria-label="Ouvrir la messagerie">
-    <span class="chat-toggle-icon">💬</span>
+    <span class="chat-toggle-icon">ðŸ’¬</span>
     <span id="chat-badge" class="chat-badge" style="display:none;">0</span>
 </button>
 
@@ -201,7 +177,7 @@
                 Canal {{ "Admin" if current_user.role == "admin" else "Commercial" }}
             </div>
         </div>
-        <button id="chat-close" class="chat-close" type="button" aria-label="Fermer la messagerie">✕</button>
+        <button id="chat-close" class="chat-close" type="button" aria-label="Fermer la messagerie">âœ•</button>
     </div>
 
     <div class="chat-toolbar">
@@ -213,7 +189,7 @@
         </div>
 
         <button id="chat-refresh" class="chat-icon-btn" type="button" aria-label="Rafraichir le chat">
-            ↻
+            â†»
         </button>
     </div>
 
@@ -231,7 +207,7 @@
 
         <div class="chat-compose-shell">
             <label class="chat-attach" title="Joindre un ou plusieurs fichiers">
-                📎
+                ðŸ“Ž
                 <input id="chat-file" type="file" name="file" multiple tabindex="-1">
             </label>
 
@@ -242,7 +218,7 @@
                 rows="1"
                 placeholder="Ecrire un message..."></textarea>
 
-            <button class="chat-send" type="submit" aria-label="Envoyer le message">➤</button>
+            <button class="chat-send" type="submit" aria-label="Envoyer le message">âž¤</button>
         </div>
 
         <div class="chat-compose-footer">
@@ -277,7 +253,6 @@
 <script src="{{ url_for('static', filename='chat_widget.js') }}?v=3"></script>
 {% endif %}
 
-<!-- 🔥 FIX CRITIQUE POUR TON AGENDA -->
 {% block scripts %}{% endblock %}
 
 </body>

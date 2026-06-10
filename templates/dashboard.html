@@ -3,235 +3,184 @@
 
 {% block content %}
 
-<style>
+{% if current_user and current_user.role == "admin" %}
 
-/* ============================= */
-/* DASHBOARD MODERNE PREMIUM    */
-/* ============================= */
-
-.page-header h1 {
-    font-weight: 800;
-}
-
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 22px;
-    margin-bottom: 40px;
-}
-
-.kpi-tile {
-    background: linear-gradient(145deg, #ffffff, #f3f5f9);
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 10px 25px rgba(0,0,0,.05);
-    transition: all .25s ease;
-    border-left: 5px solid #e5e7eb;
-}
-
-.kpi-tile:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 14px 35px rgba(0,0,0,.08);
-}
-
-.kpi-label {
-    font-size: .85rem;
-    color: #6b7280;
-    margin-bottom: 8px;
-}
-
-.kpi-value {
-    font-size: 2.1rem;
-    font-weight: 800;
-    color: #111827;
-}
-
-.kpi-danger {
-    border-left-color: #ef4444;
-}
-
-.pipeline-wrapper {
-    margin-top: 20px;
-}
-
-.pipeline-card {
-    background: #f9fafb;
-    border-radius: 12px;
-    padding: 12px 14px;
-    transition: all .2s ease;
-}
-
-.pipeline-card:hover {
-    background: #eef2ff;
-    transform: translateX(4px);
-}
-
-.pipeline-admin-tile {
-    background: linear-gradient(135deg, #f9fafb, #f1f5f9);
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 8px 20px rgba(0,0,0,.04);
-    text-align: center;
-}
-
-.pipeline-admin-value {
-    font-size: 1.8rem;
-    font-weight: 700;
-    margin-top: 6px;
-}
-
-</style>
-
-
-{% if current_user and current_user.role == 'admin' %}
-
-<!-- ================= DASHBOARD ADMIN ================= -->
-
-<div class="page-header mb-4">
-    <div class="text-muted small mb-1">Admin connecté</div>
-    <h1>Tableau de bord</h1>
-    <p class="text-muted">Vue d’ensemble de l’activité</p>
-</div>
-
-<div class="kpi-grid">
-    <div class="kpi-tile">
-        <div class="kpi-label">📁 Dossiers clients</div>
-        <div class="kpi-value">{{ total_clients or 0 }}</div>
+<section class="crm-page-hero">
+    <div>
+        <span class="crm-page-kicker">Vue administration</span>
+        <h1>Le cockpit central du CRM Synergygroup.</h1>
+        <p>Suivi global de l'activite, des cotations entrantes et de la performance commerciale.</p>
     </div>
 
-    <div class="kpi-tile">
-        <div class="kpi-label">💰 Chiffre d’affaires total</div>
-        <div class="kpi-value">{{ "%.2f"|format(total_ca or 0) }} €</div>
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">Clients actifs</span>
+        <span class="crm-hero-pill">Pipeline global</span>
+        <span class="crm-hero-pill">Pilotage admin</span>
+    </div>
+</section>
+
+<section class="crm-metric-grid">
+    <article class="crm-metric-card">
+        <span class="crm-metric-label">Dossiers clients</span>
+        <strong>{{ total_clients or 0 }}</strong>
+        <small>Base clients centralisee</small>
+    </article>
+
+    <article class="crm-metric-card">
+        <span class="crm-metric-label">Chiffre d'affaires total</span>
+        <strong>{{ "%.2f"|format(total_ca or 0) }} €</strong>
+        <small>Volume consolide du portefeuille</small>
+    </article>
+
+    <article class="crm-metric-card">
+        <span class="crm-metric-label">Documents stockes</span>
+        <strong>{{ total_docs or 0 }}</strong>
+        <small>Bibliotheque documentaire disponible</small>
+    </article>
+
+    <article class="crm-metric-card crm-metric-card-alert">
+        <span class="crm-metric-label">Nouvelles cotations</span>
+        <strong>{{ unread_cotations or 0 }}</strong>
+        <small>Demandes a traiter rapidement</small>
+    </article>
+</section>
+
+{% set p = pipeline if pipeline is defined else {'en_cours': 0, 'en_attente': 0, 'gagnes': 0, 'perdus': 0} %}
+
+<section class="crm-panel">
+    <div class="crm-panel-heading">
+        <div>
+            <span class="crm-panel-kicker">Pipeline global</span>
+            <h2>Vision d'ensemble de l'avancement commercial</h2>
+        </div>
     </div>
 
-    <div class="kpi-tile">
-        <div class="kpi-label">📄 Documents stockés</div>
-        <div class="kpi-value">{{ total_docs or 0 }}</div>
+    <div class="crm-pipeline-summary">
+        <article class="crm-pipeline-tile">
+            <span>En cours</span>
+            <strong>{{ p.en_cours or 0 }}</strong>
+        </article>
+
+        <article class="crm-pipeline-tile">
+            <span>En attente</span>
+            <strong>{{ p.en_attente or 0 }}</strong>
+        </article>
+
+        <article class="crm-pipeline-tile">
+            <span>Gagnes</span>
+            <strong>{{ p.gagnes or 0 }}</strong>
+        </article>
+
+        <article class="crm-pipeline-tile">
+            <span>Perdus</span>
+            <strong>{{ p.perdus or 0 }}</strong>
+        </article>
     </div>
-
-    <div class="kpi-tile kpi-danger">
-        <div class="kpi-label">📝 Nouvelles cotations</div>
-        <div class="kpi-value">{{ unread_cotations or 0 }}</div>
-    </div>
-</div>
-
-{% set p = pipeline if pipeline is defined else {'en_cours':0,'en_attente':0,'gagnes':0,'perdus':0} %}
-
-<h3 class="mb-3">Pipeline global</h3>
-
-<div class="kpi-grid">
-
-    <div class="pipeline-admin-tile">
-        🟡 En cours
-        <div class="pipeline-admin-value">{{ p.en_cours or 0 }}</div>
-    </div>
-
-    <div class="pipeline-admin-tile">
-        ⏳ En attente
-        <div class="pipeline-admin-value">{{ p.en_attente or 0 }}</div>
-    </div>
-
-    <div class="pipeline-admin-tile">
-        🟢 Gagnés
-        <div class="pipeline-admin-value">{{ p.gagnes or 0 }}</div>
-    </div>
-
-    <div class="pipeline-admin-tile">
-        🔴 Perdus
-        <div class="pipeline-admin-value">{{ p.perdus or 0 }}</div>
-    </div>
-
-</div>
-
+</section>
 
 {% else %}
 
-<!-- ================= DASHBOARD COMMERCIAL ================= -->
-
-<div class="page-header mb-4">
-    <div class="text-muted small mb-1">Commercial connecté</div>
-    <h1>Mon tableau de bord</h1>
-    <p class="text-muted">Suivi de mon activité</p>
-</div>
-
-<div class="kpi-grid">
-    <div class="kpi-tile">
-        <div class="kpi-label">📁 Mes dossiers</div>
-        <div class="kpi-value">{{ commercial_stats.nb_clients or 0 }}</div>
+<section class="crm-page-hero">
+    <div>
+        <span class="crm-page-kicker">Vue commerciale</span>
+        <h1>Ton tableau de bord pour piloter les opportunites du moment.</h1>
+        <p>Un apercu direct de tes dossiers, de ton chiffre d'affaires et de ton pipeline personnel.</p>
     </div>
 
-    <div class="kpi-tile">
-        <div class="kpi-label">💰 CA total</div>
-        <div class="kpi-value">{{ "%.2f"|format(commercial_stats.ca_total or 0) }} €</div>
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">Mes dossiers</span>
+        <span class="crm-hero-pill">CA du mois</span>
+        <span class="crm-hero-pill">Pipeline personnel</span>
     </div>
+</section>
 
-    <div class="kpi-tile">
-        <div class="kpi-label">📆 CA du mois</div>
-        <div class="kpi-value">{{ "%.2f"|format(commercial_stats.ca_mois or 0) }} €</div>
-    </div>
-</div>
+<section class="crm-metric-grid">
+    <article class="crm-metric-card">
+        <span class="crm-metric-label">Mes dossiers</span>
+        <strong>{{ commercial_stats.nb_clients or 0 }}</strong>
+        <small>Clients actifs dans mon portefeuille</small>
+    </article>
 
-<h3 class="mb-3">Mon pipeline</h3>
+    <article class="crm-metric-card">
+        <span class="crm-metric-label">CA total</span>
+        <strong>{{ "%.2f"|format(commercial_stats.ca_total or 0) }} €</strong>
+        <small>Production cumulee</small>
+    </article>
 
-<div class="kpi-grid">
+    <article class="crm-metric-card">
+        <span class="crm-metric-label">CA du mois</span>
+        <strong>{{ "%.2f"|format(commercial_stats.ca_mois or 0) }} €</strong>
+        <small>Performance en cours</small>
+    </article>
+<article class="crm-metric-card">
+        <span class="crm-metric-label">Focus</span>
+        <strong>{{ pipeline_en_cours|length if pipeline_en_cours is defined else 0 }}</strong>
+        <small>Opportunites actuellement en cours</small>
+    </article>
+</section>
 
-    <div class="card shadow-sm">
-        <div class="card-header fw-bold">🟡 En cours ({{ pipeline_en_cours|length }})</div>
-        <div class="card-body">
-            {% for c in pipeline_en_cours %}
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="pipeline-card d-block mb-2 text-dark text-decoration-none">
-                    {{ c.name }}
-                </a>
-            {% else %}
-                <span class="text-muted">Aucun dossier</span>
-            {% endfor %}
+<section class="crm-panel">
+    <div class="crm-panel-heading">
+        <div>
+            <span class="crm-panel-kicker">Pipeline personnel</span>
+            <h2>Mes dossiers a suivre</h2>
         </div>
     </div>
 
-    <div class="card shadow-sm">
-        <div class="card-header fw-bold">⏳ En attente ({{ pipeline_en_attente|length }})</div>
-        <div class="card-body">
-            {% for c in pipeline_en_attente %}
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="pipeline-card d-block mb-2 text-dark text-decoration-none">
-                    {{ c.name }}
-                </a>
-            {% else %}
-                <span class="text-muted">Aucun dossier</span>
-            {% endfor %}
+    <div class="crm-stage-grid">
+        <div class="crm-stage-card">
+            <div class="crm-stage-title">En cours <span>{{ pipeline_en_cours|length }}</span></div>
+            <div class="crm-stage-list">
+                {% for c in pipeline_en_cours %}
+                    <a href="{{ url_for('client_detail', client_id=c.id) }}" class="crm-stage-item">
+                        {{ c.name }}
+                    </a>
+                {% else %}
+                    <div class="crm-stage-empty">Aucun dossier</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="crm-stage-card">
+            <div class="crm-stage-title">En attente <span>{{ pipeline_en_attente|length }}</span></div>
+            <div class="crm-stage-list">
+                {% for c in pipeline_en_attente %}
+                    <a href="{{ url_for('client_detail', client_id=c.id) }}" class="crm-stage-item">
+                        {{ c.name }}
+                    </a>
+                {% else %}
+                    <div class="crm-stage-empty">Aucun dossier</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="crm-stage-card">
+            <div class="crm-stage-title">Gagnes <span>{{ pipeline_gagnes|length }}</span></div>
+            <div class="crm-stage-list">
+                {% for c in pipeline_gagnes %}
+                    <a href="{{ url_for('client_detail', client_id=c.id) }}" class="crm-stage-item">
+                        {{ c.name }}
+                    </a>
+                {% else %}
+                    <div class="crm-stage-empty">Aucun dossier</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="crm-stage-card">
+            <div class="crm-stage-title">Perdus <span>{{ pipeline_perdus|length }}</span></div>
+            <div class="crm-stage-list">
+                {% for c in pipeline_perdus %}
+                    <a href="{{ url_for('client_detail', client_id=c.id) }}" class="crm-stage-item">
+                        {{ c.name }}
+                    </a>
+                {% else %}
+                    <div class="crm-stage-empty">Aucun dossier</div>
+                {% endfor %}
+            </div>
         </div>
     </div>
-
-    <div class="card shadow-sm">
-        <div class="card-header fw-bold">🟢 Gagnés ({{ pipeline_gagnes|length }})</div>
-        <div class="card-body">
-            {% for c in pipeline_gagnes %}
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="pipeline-card d-block mb-2 text-dark text-decoration-none">
-                    {{ c.name }}
-                </a>
-            {% else %}
-                <span class="text-muted">Aucun dossier</span>
-            {% endfor %}
-        </div>
-    </div>
-
-    <div class="card shadow-sm">
-        <div class="card-header fw-bold">🔴 Perdus ({{ pipeline_perdus|length }})</div>
-        <div class="card-body">
-            {% for c in pipeline_perdus %}
-                <a href="{{ url_for('client_detail', client_id=c.id) }}"
-                   class="pipeline-card d-block mb-2 text-dark text-decoration-none">
-                    {{ c.name }}
-                </a>
-            {% else %}
-                <span class="text-muted">Aucun dossier</span>
-            {% endfor %}
-        </div>
-    </div>
-
-</div>
+</section>
 
 {% endif %}
 

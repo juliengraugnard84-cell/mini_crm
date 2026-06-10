@@ -3,50 +3,45 @@
 
 {% block content %}
 
-<!-- ================= PAGE HEADER ================= -->
 <div class="page-header mb-4">
     <h1>Documents</h1>
-    <p class="text-muted">
-        Gestion des documents stockés sur le serveur (S3)
-    </p>
+    <p class="text-muted">Bibliotheque documentaire centralisee pour toute l'equipe.</p>
 </div>
 
-<!-- ================= UPLOAD DOCUMENT ================= -->
 <div class="card mb-4">
-    <h5>Ajouter un document</h5>
-    <p class="text-muted mb-3">
-        Les documents sont ajoutés depuis la fiche d’un dossier client.
-    </p>
+    <div class="card-body">
+        <h5>Ajouter un document</h5>
+        <p class="text-muted mb-3">Les documents se gerent directement depuis la fiche d'un dossier client.</p>
 
-    <!-- Upload global volontairement désactivé -->
-    <div class="alert alert-info mb-0">
-        Pour des raisons de traçabilité et de sécurité, l’ajout de documents
-        se fait exclusivement depuis un dossier client.
-        <br>
-        <strong>Clients → Ouvrir un dossier → Documents</strong>
+        <div class="alert alert-info mb-0">
+            Pour garder une tracabilite propre, l'ajout de documents se fait uniquement depuis un dossier client.
+            <br>
+            <strong>Clients &rarr; Ouvrir un dossier &rarr; Documents</strong>
+        </div>
     </div>
 </div>
 
-<!-- ================= LISTE DOCUMENTS ================= -->
 <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h5>Documents</h5>
-        <span class="text-muted" style="font-size:.8rem;">
-            {{ fichiers|length if fichiers else 0 }} fichier(s)
-        </span>
+    <div class="crm-table-top">
+        <div>
+            <h5>Documents</h5>
+            <p class="crm-soft-note">Acces rapide aux pieces partagees et archives client.</p>
+        </div>
+        <span class="crm-soft-note">{{ fichiers|length if fichiers else 0 }} fichier(s)</span>
     </div>
 
     {% if not fichiers %}
-        <div class="text-muted">
-            Aucun document pour le moment.
-        </div>
+    <div class="card-body">
+        <div class="text-muted">Aucun document pour le moment.</div>
+    </div>
     {% else %}
+    <div class="card-body">
         <table class="table align-middle">
             <thead>
                 <tr>
                     <th>Nom</th>
                     <th style="width:120px;">Taille</th>
-                    <th style="width:220px;text-align:right;">Actions</th>
+                    <th class="text-end" style="width:220px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -67,23 +62,20 @@
                         {% endif %}
                     </td>
 
-                    <td style="text-align:right;">
-                        <!-- ================= OUVRIR / TÉLÉCHARGER ================= -->
+                    <td class="text-end">
                         <a href="{{ url_for('download_document', key=f.key) }}"
                            class="btn btn-secondary btn-sm">
                             Ouvrir
                         </a>
 
-                        <!-- ================= SUPPRIMER (ADMIN SEULEMENT) ================= -->
                         {% if current_user and current_user.role == 'admin' %}
                         <form method="post"
                               action="{{ url_for('delete_document') }}"
                               style="display:inline;"
-                              onsubmit="return confirm('Supprimer définitivement ce document ?');">
+                              onsubmit="return confirm('Supprimer definitivement ce document ?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <input type="hidden" name="key" value="{{ f.key }}">
-                            <button type="submit"
-                                    class="btn btn-danger btn-sm">
+                            <button type="submit" class="btn btn-danger btn-sm">
                                 Supprimer
                             </button>
                         </form>
@@ -93,6 +85,7 @@
             {% endfor %}
             </tbody>
         </table>
+    </div>
     {% endif %}
 </div>
 
