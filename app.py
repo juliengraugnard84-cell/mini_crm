@@ -1443,9 +1443,32 @@ def planning_event_color(
         return explicit_color
 
     if source_kind != "manual":
-        return PLANNING_SOURCE_STYLES.get(source_kind, {}).get("color", "#2563eb")
+        return PLANNING_SOURCE_STYLES.get(source_kind, {}).get("color", "#2f6cab")
 
-    return PLANNING_EVENT_CATEGORIES.get(category or "meeting", {}).get("color", "#2563eb")
+    return PLANNING_EVENT_CATEGORIES.get(category or "meeting", {}).get("color", "#2f6cab")
+
+
+def planning_event_text_color(color: str | None) -> str:
+    if not color:
+        return "#ffffff"
+
+    raw = color.strip().lstrip("#")
+
+    if len(raw) == 3:
+        raw = "".join(ch * 2 for ch in raw)
+
+    if len(raw) != 6:
+        return "#ffffff"
+
+    try:
+        red = int(raw[0:2], 16)
+        green = int(raw[2:4], 16)
+        blue = int(raw[4:6], 16)
+    except ValueError:
+        return "#ffffff"
+
+    luminance = (0.299 * red) + (0.587 * green) + (0.114 * blue)
+    return "#10212b" if luminance >= 170 else "#f8fafc"
 
 
 def planning_event_can_edit(event_row, user) -> bool:
@@ -1546,6 +1569,7 @@ def serialize_manual_planning_event(row, user):
         explicit_color=row.get("color"),
         status=status,
     )
+    text_color = planning_event_text_color(color)
     start_value, end_value, all_day = serialize_planning_event_datetimes(
         row.get("event_date"),
         row.get("end_date"),
@@ -1565,6 +1589,7 @@ def serialize_manual_planning_event(row, user):
         "allDay": all_day,
         "backgroundColor": color,
         "borderColor": color,
+        "textColor": text_color,
         "editable": can_edit,
         "startEditable": can_edit,
         "durationEditable": can_edit,
@@ -1598,6 +1623,7 @@ def serialize_manual_planning_event(row, user):
             "canEdit": can_edit,
             "canDelete": can_edit,
             "color": color,
+            "textColor": text_color,
         },
     }
 
@@ -3298,6 +3324,7 @@ def serialize_cotation_planning_event(row):
         all_day = False
 
     color = planning_event_color(source_kind="cotation", category="negociation")
+    text_color = planning_event_text_color(color)
 
     return {
         "id": f"cotation_{row['id']}",
@@ -3306,6 +3333,7 @@ def serialize_cotation_planning_event(row):
         "allDay": all_day,
         "backgroundColor": color,
         "borderColor": color,
+        "textColor": text_color,
         "editable": False,
         "classNames": ["planning-event", "planning-source-cotation"],
         "extendedProps": {
@@ -3340,12 +3368,14 @@ def serialize_cotation_planning_event(row):
             "canEdit": False,
             "canDelete": False,
             "color": color,
+            "textColor": text_color,
         },
     }
 
 
 def serialize_update_planning_event(row):
     color = planning_event_color(source_kind="update", category="relance")
+    text_color = planning_event_text_color(color)
 
     return {
         "id": f"update_{row['id']}",
@@ -3354,6 +3384,7 @@ def serialize_update_planning_event(row):
         "allDay": True,
         "backgroundColor": color,
         "borderColor": color,
+        "textColor": text_color,
         "editable": False,
         "classNames": ["planning-event", "planning-source-update"],
         "extendedProps": {
@@ -3389,6 +3420,7 @@ def serialize_update_planning_event(row):
             "canEdit": False,
             "canDelete": False,
             "color": color,
+            "textColor": text_color,
         },
     }
 

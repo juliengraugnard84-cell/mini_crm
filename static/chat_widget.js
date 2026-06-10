@@ -407,6 +407,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderMessage(message) {
         const mine = normalizeId(message.user_id) === CURRENT_USER_ID;
+        const displayName = mine ? "Vous" : (message.username || "Utilisateur");
         const row = document.createElement("div");
         row.className = `chat-row ${mine ? "me" : "them"}`;
 
@@ -424,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
         meta.className = "chat-meta";
         meta.innerHTML = `
             <span class="chat-user-wrap">
-                <span class="chat-user">${escapeHTML(mine ? CURRENT_USERNAME : (message.username || "Utilisateur"))}</span>
+                <span class="chat-user">${escapeHTML(displayName)}</span>
                 <span class="chat-user-role">${escapeHTML(formatRoleLabel(message.user_role, message.user_role_label))}</span>
             </span>
             <span class="chat-time">${escapeHTML(formatTime(message.created_at))}</span>
@@ -462,11 +463,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 status.innerHTML = message.is_read
                     ? '<span class="chat-read read">Lu</span>'
                     : '<span class="chat-read sent">Envoye</span>';
-            } else {
-                status.innerHTML = '<span class="chat-read neutral">Equipe</span>';
+                bubble.appendChild(status);
             }
-
-            bubble.appendChild(status);
         }
 
         body.appendChild(bubble);

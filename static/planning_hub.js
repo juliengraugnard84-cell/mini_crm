@@ -440,7 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
             status: props.status || "confirmed",
             visibility: props.visibility || "private",
             assigned_to: props.assignedToId || "",
-            color: props.color || "#2563eb",
+            color: props.color || "#2f6cab",
             start_date: dateFields.startDate,
             end_date: dateFields.endDate,
             start_time: dateFields.startTime,
@@ -505,7 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
         nodes.status.value = "confirmed";
         nodes.visibility.value = "private";
         nodes.assignee.value = String(currentUser.id || "");
-        nodes.color.value = "#2563eb";
+        nodes.color.value = "#2f6cab";
         nodes.openLink.classList.add("d-none");
         nodes.openLink.removeAttribute("href");
         nodes.deleteButton.classList.add("d-none");
@@ -554,7 +554,7 @@ document.addEventListener("DOMContentLoaded", () => {
         nodes.startTime.value = dateFields.startTime || "";
         nodes.endTime.value = dateFields.endTime || "";
         nodes.location.value = props.location || "";
-        nodes.color.value = props.color || "#2563eb";
+        nodes.color.value = props.color || "#2f6cab";
         nodes.allDay.checked = Boolean(event.allDay);
         nodes.description.value = props.description || "";
 

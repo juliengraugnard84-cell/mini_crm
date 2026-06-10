@@ -3759,3 +3759,342 @@ textarea.form-control {
         justify-content: flex-start;
     }
 }
+
+/* =========================================================
+   CHAT READABILITY FIX
+========================================================= */
+
+.chat-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    width: 100%;
+}
+
+.chat-row-body {
+    width: min(82%, 320px);
+    min-width: min(220px, calc(100% - 46px));
+    max-width: calc(100% - 46px);
+}
+
+.chat-row.me .chat-row-body {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.chat-bubble {
+    width: 100%;
+    min-width: 0;
+    padding: 15px 16px 14px;
+}
+
+.chat-meta {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: nowrap;
+    margin-bottom: 8px;
+}
+
+.chat-user-wrap {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.chat-user {
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.25;
+    color: inherit;
+    overflow-wrap: anywhere;
+}
+
+.chat-user-role {
+    flex: 0 0 auto;
+}
+
+.chat-time {
+    flex: 0 0 auto;
+    margin-left: auto;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.chat-bubble.me .chat-time {
+    color: rgba(45, 33, 6, 0.76);
+}
+
+.chat-bubble.them .chat-time {
+    color: #64748b;
+}
+
+.chat-scope {
+    margin-bottom: 10px;
+}
+
+.chat-text {
+    display: block;
+    font-size: 14px;
+    line-height: 1.6;
+    color: inherit;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.chat-file {
+    width: 100%;
+    max-width: 100%;
+}
+
+.chat-status {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.chat-compose-footer {
+    align-items: center;
+}
+
+.chat-file-meta {
+    flex: 1 1 auto;
+}
+
+.chat-compose-hint {
+    flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+    .chat-row {
+        gap: 10px;
+    }
+
+    .chat-row-body {
+        width: calc(100% - 44px);
+        min-width: 0;
+        max-width: calc(100% - 44px);
+    }
+
+    .chat-bubble {
+        padding: 14px 14px 13px;
+    }
+
+    .chat-meta {
+        flex-wrap: wrap;
+        gap: 7px 10px;
+    }
+
+    .chat-time {
+        margin-left: 0;
+    }
+}
+
+.planning-shell {
+    --planning-brand-navy: #08133f;
+    --planning-brand-navy-soft: #123646;
+    --planning-brand-blue: #2f6cab;
+    --planning-brand-gold: #f2b233;
+    --planning-brand-gold-soft: #f7ca70;
+    --planning-brand-ink: #10212b;
+    --planning-brand-muted: #5f7084;
+}
+
+.content .planning-shell .planning-hero,
+.planning-shell .planning-hero {
+    background:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.24), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.08), transparent 26%),
+        linear-gradient(135deg, #08133f 0%, #0d2249 52%, #163e65 100%) !important;
+    box-shadow: 0 30px 70px rgba(8, 19, 63, 0.18);
+}
+
+.content .planning-shell .planning-hero h1,
+.planning-shell .planning-hero h1 {
+    color: #f8fafc !important;
+}
+
+.content .planning-shell .planning-hero p,
+.planning-shell .planning-hero p,
+.content .planning-shell .planning-eyebrow,
+.planning-shell .planning-eyebrow,
+.content .planning-shell .planning-hero-badge,
+.planning-shell .planning-hero-badge,
+.content .planning-shell .planning-hero-brief-item strong,
+.planning-shell .planning-hero-brief-item strong {
+    color: #f8fafc !important;
+}
+
+.content .planning-shell .planning-hero-brief-item span,
+.planning-shell .planning-hero-brief-item span {
+    color: rgba(248, 250, 252, 0.72) !important;
+}
+
+.planning-shell .planning-hero-badge {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(242, 178, 51, 0.18);
+}
+
+.planning-shell .planning-hero-actions .btn-dark {
+    background: linear-gradient(180deg, #f2b233, #f7ca70);
+    color: #10212b;
+    border: 0;
+    box-shadow: 0 14px 24px rgba(242, 178, 51, 0.2);
+}
+
+.planning-shell .planning-hero-actions .btn-outline-light {
+    background: rgba(255, 255, 255, 0.08);
+    color: #f8fafc;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.planning-shell .planning-hero-actions .btn-outline-light:hover {
+    background: rgba(242, 178, 51, 0.12);
+    border-color: rgba(242, 178, 51, 0.28);
+}
+
+.planning-shell .planning-hero-brief {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08));
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.planning-shell .planning-stat-card,
+.planning-shell .planning-panel,
+.planning-shell .planning-calendar-card {
+    background:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.08), transparent 24%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+    border-color: rgba(8, 19, 63, 0.08);
+}
+
+.planning-shell .planning-panel::before,
+.planning-shell .planning-calendar-card::before {
+    background: linear-gradient(90deg, rgba(8, 19, 63, 0), rgba(242, 178, 51, 0.45), rgba(8, 19, 63, 0));
+}
+
+.planning-shell .planning-panel-header span,
+.planning-shell .planning-field label,
+.planning-shell .planning-toggle,
+.planning-shell .planning-stat-card strong,
+.planning-shell .planning-calendar-topbar h2,
+.planning-shell .fc .fc-toolbar-title {
+    color: #10212b;
+}
+
+.planning-shell .planning-stat-label,
+.planning-shell .planning-panel-header small,
+.planning-shell .planning-calendar-side-note,
+.planning-shell .planning-empty,
+.planning-shell .planning-upcoming-owner,
+.planning-shell .planning-upcoming-meta,
+.planning-shell .planning-event-card-meta,
+.planning-shell .fc .fc-timegrid-slot-label-cushion {
+    color: #5f7084;
+}
+
+.planning-shell .planning-source-pill {
+    border-color: rgba(8, 19, 63, 0.1);
+    color: #10212b;
+}
+
+.planning-shell .planning-source-pill.is-active {
+    background: linear-gradient(135deg, #08133f, #123646);
+    color: #ffffff;
+    border-color: #08133f;
+}
+
+.planning-shell .planning-source-pill:not(.is-active):hover {
+    background: rgba(242, 178, 51, 0.08);
+    border-color: rgba(242, 178, 51, 0.28);
+}
+
+.planning-shell .planning-legend-swatch-cotation {
+    background: #f2b233;
+}
+
+.planning-shell .planning-legend-swatch-update {
+    background: #08133f;
+}
+
+.planning-shell .planning-legend-swatch-manual {
+    background: #2f6cab;
+}
+
+.planning-shell .planning-legend-chip {
+    background: rgba(8, 19, 63, 0.1);
+    color: #08133f;
+}
+
+.planning-shell .planning-legend-chip-soft {
+    background: rgba(242, 178, 51, 0.16);
+    color: #9a5f00;
+}
+
+.planning-shell .planning-badge-cotation {
+    background: rgba(242, 178, 51, 0.18);
+    color: #9a5f00;
+}
+
+.planning-shell .planning-badge-update {
+    background: rgba(8, 19, 63, 0.12);
+    color: #08133f;
+}
+
+.planning-shell .planning-badge-manual {
+    background: rgba(47, 108, 171, 0.12);
+    color: #1f5a96;
+}
+
+.planning-shell .planning-event-status {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+}
+
+.planning-shell .fc .fc-button-primary {
+    background: #08133f;
+    border-color: #08133f;
+    color: #f8fafc;
+}
+
+.planning-shell .fc .fc-button-primary:hover {
+    background: #102a5c;
+    border-color: #102a5c;
+}
+
+.planning-shell .fc .fc-button-primary:not(:disabled).fc-button-active,
+.planning-shell .fc .fc-button-primary:not(:disabled):active {
+    background: linear-gradient(180deg, #f2b233, #f7ca70);
+    border-color: #f2b233;
+    color: #10212b;
+}
+
+.planning-shell .fc .fc-button-primary:disabled {
+    background: rgba(148, 163, 184, 0.16);
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #475569;
+    opacity: 1;
+}
+
+.planning-shell .fc .fc-day-today {
+    background: linear-gradient(180deg, rgba(242, 178, 51, 0.14), rgba(242, 178, 51, 0.04)) !important;
+}
+
+.planning-shell .fc .fc-col-header-cell-cushion,
+.planning-shell .fc .fc-daygrid-day-number,
+.planning-shell .fc .fc-timegrid-axis-cushion {
+    color: #10212b;
+}
+
+.planning-shell .fc .fc-event {
+    box-shadow: 0 14px 28px rgba(8, 19, 63, 0.14);
+}
+
+.planning-shell .fc .fc-event-main {
+    border-radius: 12px;
+}
