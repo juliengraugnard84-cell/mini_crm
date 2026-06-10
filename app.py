@@ -5956,7 +5956,7 @@ def chat_send():
         conn = get_db()
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, username
+                SELECT id, username, role
                 FROM users
                 WHERE id = %s
             """, (recipient_id,))

@@ -62,6 +62,28 @@ document.addEventListener("DOMContentLoaded", () => {
         return widget.classList.contains("open");
     }
 
+    async function parseJSONResponse(response, fallbackMessage) {
+        const contentType = (response.headers.get("content-type") || "").toLowerCase();
+
+        if (contentType.includes("application/json")) {
+            return response.json();
+        }
+
+        const rawText = await response.text();
+        const trimmedText = rawText.trim();
+
+        if (trimmedText.startsWith("<")) {
+            throw new Error(fallbackMessage || `HTTP ${response.status}`);
+        }
+
+        const compactText = rawText
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+        throw new Error(compactText || fallbackMessage || `HTTP ${response.status}`);
+    }
+
     function parseChatDate(value) {
         if (!value) {
             return null;
@@ -583,7 +605,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(`HTTP ${response.status}`);
             }
 
-            const data = await response.json();
+            const data = await parseJSONResponse(response, "Impossible de charger les destinataires du chat.");
             populateRecipients(data.recipients || []);
             state.currentUser = data.current_user || null;
             state.isBootstrapLoaded = true;
@@ -628,7 +650,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(`HTTP ${response.status}`);
             }
 
-            const data = await response.json();
+            const data = await parseJSONResponse(response, "Impossible de charger les messages du chat.");
             const messages = Array.isArray(data.messages) ? data.messages : [];
             const signature = computeSignature(messages);
 
@@ -734,7 +756,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers,
             });
 
-            const data = await response.json();
+            const data = await parseJSONResponse(response, "Erreur lors de l'envoi du message.");
 
             if (!response.ok || !data.success) {
                 throw new Error(data.message || `HTTP ${response.status}`);

@@ -2256,9 +2256,7 @@ body.crm-body {
     width: 304px;
     display: flex;
     flex-direction: column;
-    background:
-        linear-gradient(180deg, rgba(8, 19, 63, 0.98), rgba(14, 43, 67, 0.98)),
-        linear-gradient(180deg, #08133f, #123646);
+    background: #08133f;
     border-right: 1px solid rgba(255, 255, 255, 0.06);
     box-shadow: 24px 0 60px rgba(8, 19, 63, 0.14);
 }
@@ -2332,15 +2330,15 @@ body.crm-body {
 .sidebar-nav a:hover {
     transform: translateX(4px);
     color: #ffffff;
-    background: rgba(242, 178, 51, 0.12);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-nav a.active {
     color: #ffffff;
-    background:
-        linear-gradient(90deg, rgba(242, 178, 51, 0.28), rgba(242, 178, 51, 0.1)),
-        rgba(255, 255, 255, 0.06);
-    box-shadow: inset 3px 0 0 #f2b233;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow:
+        inset 3px 0 0 #f2b233,
+        0 14px 28px rgba(8, 19, 63, 0.16);
 }
 
 .nav-alert-badge {
