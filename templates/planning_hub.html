@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+{% block title %}Agenda des negociations{% endblock %}
+
+{% block content %}
+<div class="planning-shell">
+    <section class="planning-hero">
+        <div class="planning-hero-copy">
+            <div class="planning-eyebrow">Agenda des negociations</div>
+            <h1>Un agenda d'equipe calibre pour suivre le closing en temps reel.</h1>
+            <p>
+                Centralise les negociations, les suivis clients et les rendez-vous internes
+                dans une seule vue fluide, exploitable par les admins comme par les commerciaux.
+            </p>
+
+            <div class="planning-hero-badges">
+                <span class="planning-hero-badge">Filtres instantanes</span>
+                <span class="planning-hero-badge">Vue equipe</span>
+                <span class="planning-hero-badge">Drag &amp; drop agenda</span>
+            </div>
+        </div>
+
+        <div class="planning-hero-rail">
+            <div class="planning-hero-actions">
+                <button id="planning-create-button" type="button" class="btn btn-dark btn-lg">
+                    Nouveau rendez-vous
+                </button>
+                <button id="planning-reset-filters" type="button" class="btn btn-outline-light btn-lg">
+                    Reinitialiser les filtres
+                </button>
+            </div>
+
+            <div class="planning-hero-brief">
+                <div class="planning-hero-brief-item">
+                    <span>Mode actif</span>
+                    <strong>{{ planning_bootstrap.current_user.role_label }}</strong>
+                </div>
+                <div class="planning-hero-brief-item">
+                    <span>Perimetre</span>
+                    <strong>
+                        {% if planning_bootstrap.can_manage_all %}
+                            Equipe complete
+                        {% else %}
+                            Mes dossiers + equipe
+                        {% endif %}
+                    </strong>
+                </div>
+                <div class="planning-hero-brief-item">
+                    <span>Style</span>
+                    <strong>Agenda business premium</strong>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div id="planning-feedback" class="planning-feedback" hidden></div>
+
+    <section class="planning-metrics">
+        <article class="planning-stat-card">
+            <span class="planning-stat-label">Aujourd'hui</span>
+            <strong id="planning-stat-today">0</strong>
+            <small>Actions visibles sur la journee</small>
+        </article>
+
+        <article class="planning-stat-card">
+            <span class="planning-stat-label">7 prochains jours</span>
+            <strong id="planning-stat-week">0</strong>
+            <small>Negociations, suivis et rendez-vous</small>
+        </article>
+
+        <article class="planning-stat-card">
+            <span class="planning-stat-label">Negociations</span>
+            <strong id="planning-stat-negociations">0</strong>
+            <small>Dossiers en phase de discussion</small>
+        </article>
+
+        <article class="planning-stat-card">
+            <span class="planning-stat-label">Agenda equipe</span>
+            <strong id="planning-stat-team">0</strong>
+            <small>Evenements partages et cibles</small>
+        </article>
+    </section>
+
+    <section class="planning-workspace">
+        <aside class="planning-sidebar">
+            <div class="planning-panel">
+                <div class="planning-panel-header">
+                    <span>Pilotage</span>
+                    <small>Filtres intelligents</small>
+                </div>
+
+                <div class="planning-field">
+                    <label for="planning-search">Recherche</label>
+                    <input
+                        id="planning-search"
+                        type="search"
+                        class="form-control"
+                        placeholder="Client, commercial, lieu, description">
+                </div>
+
+                <div class="planning-field">
+                    <label for="planning-user-filter">Responsable</label>
+                    <select id="planning-user-filter" class="form-select">
+                        <option value="all">Toute l'equipe</option>
+                        {% for member in planning_bootstrap.users %}
+                            <option value="{{ member.id }}">
+                                {{ member.username }} ({{ member.role_label }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="planning-field">
+                    <label for="planning-status-filter">Statut</label>
+                    <select id="planning-status-filter" class="form-select">
+                        <option value="all">Tous les statuts</option>
+                        {% for status in planning_bootstrap.statuses %}
+                            <option value="{{ status.value }}">{{ status.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="planning-toggle-list">
+                    <label class="planning-toggle">
+                        <input id="planning-mine-only" type="checkbox">
+                        <span>Afficher seulement mes elements</span>
+                    </label>
+
+                    <label class="planning-toggle">
+                        <input id="planning-weekends" type="checkbox" checked>
+                        <span>Afficher les week-ends</span>
+                    </label>
+
+                    <label class="planning-toggle">
+                        <input id="planning-show-cancelled" type="checkbox" checked>
+                        <span>Afficher les rendez-vous annules</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="planning-panel">
+                <div class="planning-panel-header">
+                    <span>Sources</span>
+                    <small>Vue Google Calendar orientee business</small>
+                </div>
+
+                <div class="planning-source-pills">
+                    <button type="button" class="planning-source-pill is-active" data-source="cotation">
+                        Negociations
+                    </button>
+                    <button type="button" class="planning-source-pill is-active" data-source="update">
+                        Suivis clients
+                    </button>
+                    <button type="button" class="planning-source-pill is-active" data-source="manual">
+                        Rendez-vous equipe
+                    </button>
+                </div>
+            </div>
+
+            <div class="planning-panel">
+                <div class="planning-panel-header">
+                    <span>Prochains rendez-vous</span>
+                    <small>Lecture rapide</small>
+                </div>
+
+                <div id="planning-upcoming" class="planning-upcoming"></div>
+                <div id="planning-upcoming-empty" class="planning-empty">
+                    Aucun evenement ne correspond aux filtres actifs.
+                </div>
+            </div>
+
+            <div class="planning-panel">
+                <div class="planning-panel-header">
+                    <span>Legende</span>
+                    <small>Lecture immediate des blocs</small>
+                </div>
+
+                <div class="planning-legend">
+                    <div class="planning-legend-item">
+                        <span class="planning-legend-swatch planning-legend-swatch-cotation"></span>
+                        <span>Negociation issue d'une cotation</span>
+                    </div>
+                    <div class="planning-legend-item">
+                        <span class="planning-legend-swatch planning-legend-swatch-update"></span>
+                        <span>Suivi client programme</span>
+                    </div>
+                    <div class="planning-legend-item">
+                        <span class="planning-legend-swatch planning-legend-swatch-manual"></span>
+                        <span>Rendez-vous manuel d'equipe</span>
+                    </div>
+                    <div class="planning-legend-item">
+                        <span class="planning-legend-chip">Equipe</span>
+                        <span>Visible par tous les admins/commerciaux</span>
+                    </div>
+                    <div class="planning-legend-item">
+                        <span class="planning-legend-chip planning-legend-chip-soft">Cible</span>
+                        <span>Visible par le createur et le destinataire</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="planning-main">
+            <div class="planning-calendar-card">
+                <div class="planning-calendar-topbar">
+                    <div>
+                        <div class="planning-calendar-kicker">Vue centrale</div>
+                        <h2>Timeline commerciale</h2>
+                    </div>
+
+                    <div class="planning-calendar-side-note">
+                        Glisser-deposer pour reprogrammer un rendez-vous manuel.
+                        Les negociations et suivis restent en lecture seule.
+                    </div>
+                </div>
+
+                <div id="planning-calendar"></div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<div class="modal fade planning-modal" id="planningEventModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div id="planning-modal-kicker" class="planning-modal-kicker">Agenda</div>
+                    <h5 id="planning-modal-title" class="modal-title">Rendez-vous</h5>
+                </div>
+
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+
+            <div class="modal-body">
+                <div id="planning-readonly-note" class="planning-readonly-note d-none">
+                    Cet element est pilote par un autre module du CRM. Il reste consultable ici
+                    mais ne se modifie pas depuis l'agenda.
+                </div>
+
+                <form id="planning-event-form" class="planning-event-form" novalidate>
+                    <input type="hidden" id="planning-event-id">
+                    <input type="hidden" id="planning-event-source" value="manual">
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="planning-event-title">Titre</label>
+                            <input id="planning-event-title" type="text" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="planning-event-category">Categorie</label>
+                            <select id="planning-event-category" class="form-select">
+                                {% for category in planning_bootstrap.categories %}
+                                    <option value="{{ category.value }}">{{ category.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="planning-event-status">Statut</label>
+                            <select id="planning-event-status" class="form-select">
+                                {% for status in planning_bootstrap.statuses %}
+                                    <option value="{{ status.value }}">{{ status.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="planning-event-visibility">Visibilite</label>
+                            <select id="planning-event-visibility" class="form-select">
+                                {% for visibility in planning_bootstrap.visibilities %}
+                                    <option value="{{ visibility.value }}">{{ visibility.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="planning-event-assignee">Destinataire / responsable</label>
+                            <select id="planning-event-assignee" class="form-select">
+                                <option value="">Aucun</option>
+                                {% for member in planning_bootstrap.users %}
+                                    <option value="{{ member.id }}">
+                                        {{ member.username }} ({{ member.role_label }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="planning-start-date">Date de debut</label>
+                            <input id="planning-start-date" type="date" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="planning-end-date">Date de fin</label>
+                            <input id="planning-end-date" type="date" class="form-control">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="planning-start-time">Heure de debut</label>
+                            <input id="planning-start-time" type="time" class="form-control">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="planning-end-time">Heure de fin</label>
+                            <input id="planning-end-time" type="time" class="form-control">
+                        </div>
+
+                        <div class="col-md-7">
+                            <label class="form-label" for="planning-event-location">Lieu</label>
+                            <input id="planning-event-location" type="text" class="form-control" placeholder="Bureau, visio, client...">
+                        </div>
+
+                        <div class="col-md-5">
+                            <label class="form-label" for="planning-event-color">Couleur</label>
+                            <input id="planning-event-color" type="color" class="form-control form-control-color" value="#2563eb">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="planning-toggle">
+                                <input id="planning-all-day" type="checkbox">
+                                <span>Journee entiere</span>
+                            </label>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="planning-event-description">Description</label>
+                            <textarea
+                                id="planning-event-description"
+                                class="form-control"
+                                rows="5"
+                                placeholder="Points a preparer, contexte client, objectif du rendez-vous..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <a id="planning-open-link" href="#" target="_self" class="btn btn-outline-secondary d-none">
+                    Ouvrir la fiche
+                </a>
+                <button id="planning-delete-button" type="button" class="btn btn-outline-danger d-none">
+                    Supprimer
+                </button>
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                    Fermer
+                </button>
+                <button id="planning-save-button" type="submit" form="planning-event-form" class="btn btn-dark">
+                    Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.PLANNING_BOOTSTRAP = {{ planning_bootstrap | tojson }};
+    window.PLANNING_CSRF_TOKEN = {{ csrf_token | tojson }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="{{ url_for('static', filename='planning_hub.js') }}?v=1"></script>
+{% endblock %}

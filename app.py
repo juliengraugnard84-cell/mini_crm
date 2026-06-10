@@ -9,7 +9,7 @@ import re
 import unicodedata
 import secrets
 import logging
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 from functools import wraps
 
@@ -66,6 +66,36 @@ ALLOWED_EXTENSIONS = {
     "jpg", "jpeg", "png",
     "doc", "docx",
     "xls", "xlsx", "csv",
+}
+
+CHAT_ALLOWED_ROLES = {"admin", "commercial"}
+PLANNING_ALLOWED_ROLES = {"admin", "commercial"}
+
+PLANNING_EVENT_CATEGORIES = {
+    "meeting": {"label": "Rendez-vous", "color": "#2563eb"},
+    "negociation": {"label": "Negociation", "color": "#0f766e"},
+    "relance": {"label": "Relance", "color": "#ea580c"},
+    "signature": {"label": "Signature", "color": "#16a34a"},
+    "visit": {"label": "Visite", "color": "#ca8a04"},
+    "internal": {"label": "Interne", "color": "#475569"},
+}
+
+PLANNING_EVENT_STATUSES = {
+    "confirmed": "Confirme",
+    "tentative": "Tentatif",
+    "cancelled": "Annule",
+}
+
+PLANNING_EVENT_VISIBILITIES = {
+    "private": "Prive",
+    "assigned": "Cible",
+    "team": "Equipe",
+}
+
+PLANNING_SOURCE_STYLES = {
+    "manual": {"label": "Agenda", "color": "#2563eb"},
+    "cotation": {"label": "Negociation", "color": "#0f766e"},
+    "update": {"label": "Suivi client", "color": "#d97706"},
 }
 
 # Max upload (MB) — configurable via Config.MAX_UPLOAD_MB sinon 10MB
@@ -184,6 +214,18 @@ def _try_add_column(conn, table, column_sql):
         conn.rollback()
 
 
+def _try_run_ddl(conn, sql):
+    """
+    Exécution DDL SAFE (table/index/contrainte idempotente).
+    """
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
+
 def init_db():
     """
     INITIALISATION MANUELLE UNIQUEMENT
@@ -276,11 +318,23 @@ def init_db():
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER,
                     username TEXT,
+                    recipient_id INTEGER,
+                    recipient_username TEXT,
+                    scope TEXT DEFAULT 'broadcast',
                     message TEXT,
                     file_key TEXT,
                     file_name TEXT,
                     is_read INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_message_reads (
+                    id SERIAL PRIMARY KEY,
+                    message_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
@@ -306,8 +360,17 @@ def init_db():
                     title TEXT NOT NULL,
                     description TEXT,
                     event_date DATE NOT NULL,
+                    end_date DATE,
                     event_time TIME,
+                    end_time TIME,
+                    all_day BOOLEAN DEFAULT FALSE,
+                    location TEXT,
+                    category TEXT DEFAULT 'meeting',
+                    status TEXT DEFAULT 'confirmed',
+                    visibility TEXT DEFAULT 'private',
+                    color TEXT,
                     created_by INTEGER,
+                    assigned_to INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -348,6 +411,36 @@ def init_db():
             _try_add_column(conn, "cspe_dossiers", "date_negociation DATE")
             _try_add_column(conn, "cspe_dossiers", "chiffre_affaire DOUBLE PRECISION DEFAULT 0")
             _try_add_column(conn, "cspe_dossiers", "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+
+            # CHAT
+            _try_add_column(conn, "chat_messages", "recipient_id INTEGER")
+            _try_add_column(conn, "chat_messages", "recipient_username TEXT")
+            _try_add_column(conn, "chat_messages", "scope TEXT DEFAULT 'broadcast'")
+            _try_run_ddl(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS chat_message_reads (
+                    id SERIAL PRIMARY KEY,
+                    message_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+            _try_run_ddl(
+                conn,
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_message_reads_unique
+                ON chat_message_reads (message_id, user_id)
+                """,
+            )
+            _try_run_ddl(
+                conn,
+                """
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_visibility
+                ON chat_messages (recipient_id, user_id, id)
+                """,
+            )
 
             # BASE COTATION
             _try_add_column(conn, "cotations", "type_compteur TEXT")
@@ -390,6 +483,13 @@ def init_db():
             # 🔥 FIX CRITIQUE — CALENDAR EVENTS
             _try_add_column(conn, "calendar_events", "end_time TIME")
             _try_add_column(conn, "calendar_events", "all_day BOOLEAN DEFAULT FALSE")
+            _try_add_column(conn, "calendar_events", "end_date DATE")
+            _try_add_column(conn, "calendar_events", "location TEXT")
+            _try_add_column(conn, "calendar_events", "category TEXT DEFAULT 'meeting'")
+            _try_add_column(conn, "calendar_events", "status TEXT DEFAULT 'confirmed'")
+            _try_add_column(conn, "calendar_events", "visibility TEXT DEFAULT 'private'")
+            _try_add_column(conn, "calendar_events", "color TEXT")
+            _try_add_column(conn, "calendar_events", "assigned_to INTEGER")
 
         conn.commit()
 
@@ -855,7 +955,10 @@ def can_access_document_key(key: str) -> bool:
 
 
 CSPE_SCHEMA_READY = False
+CHAT_SCHEMA_READY = False
+PLANNING_SCHEMA_READY = False
 CSPE_PREFIX = "cspe/"
+CHAT_UPLOAD_PREFIX = "chat/"
 LOCAL_UPLOAD_ROOT = os.path.join(app.root_path, "local_uploads")
 
 
@@ -1130,6 +1233,542 @@ def delete_cspe_documents_for_dossier(dossier_id: int):
             s3.delete_objects(Bucket=AWS_BUCKET, Delete={"Objects": chunk})
 
 
+def ensure_chat_schema():
+    """
+    Met à niveau le module chat à la demande.
+    Ajoute le ciblage par destinataire et le suivi de lecture par utilisateur.
+    """
+    global CHAT_SCHEMA_READY
+
+    if CHAT_SCHEMA_READY:
+        return
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER,
+                    username TEXT,
+                    recipient_id INTEGER,
+                    recipient_username TEXT,
+                    scope TEXT DEFAULT 'broadcast',
+                    message TEXT,
+                    file_key TEXT,
+                    file_name TEXT,
+                    is_read INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_message_reads (
+                    id SERIAL PRIMARY KEY,
+                    message_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+        _try_add_column(conn, "chat_messages", "recipient_id INTEGER")
+        _try_add_column(conn, "chat_messages", "recipient_username TEXT")
+        _try_add_column(conn, "chat_messages", "scope TEXT DEFAULT 'broadcast'")
+        _try_run_ddl(
+            conn,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_message_reads_unique
+            ON chat_message_reads (message_id, user_id)
+            """,
+        )
+        _try_run_ddl(
+            conn,
+            """
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_visibility
+            ON chat_messages (recipient_id, user_id, id)
+            """,
+        )
+
+        conn.commit()
+        CHAT_SCHEMA_READY = True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def ensure_planning_schema():
+    """
+    Met à niveau la table agenda sans dépendre d'une migration manuelle.
+    """
+    global PLANNING_SCHEMA_READY
+
+    if PLANNING_SCHEMA_READY:
+        return
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS calendar_events (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    event_date DATE NOT NULL,
+                    end_date DATE,
+                    event_time TIME,
+                    end_time TIME,
+                    all_day BOOLEAN DEFAULT FALSE,
+                    location TEXT,
+                    category TEXT DEFAULT 'meeting',
+                    status TEXT DEFAULT 'confirmed',
+                    visibility TEXT DEFAULT 'private',
+                    color TEXT,
+                    created_by INTEGER,
+                    assigned_to INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+        _try_add_column(conn, "calendar_events", "end_time TIME")
+        _try_add_column(conn, "calendar_events", "all_day BOOLEAN DEFAULT FALSE")
+        _try_add_column(conn, "calendar_events", "end_date DATE")
+        _try_add_column(conn, "calendar_events", "location TEXT")
+        _try_add_column(conn, "calendar_events", "category TEXT DEFAULT 'meeting'")
+        _try_add_column(conn, "calendar_events", "status TEXT DEFAULT 'confirmed'")
+        _try_add_column(conn, "calendar_events", "visibility TEXT DEFAULT 'private'")
+        _try_add_column(conn, "calendar_events", "color TEXT")
+        _try_add_column(conn, "calendar_events", "assigned_to INTEGER")
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE calendar_events
+                SET
+                    end_date = COALESCE(end_date, event_date),
+                    category = COALESCE(NULLIF(category, ''), 'meeting'),
+                    status = COALESCE(NULLIF(status, ''), 'confirmed'),
+                    visibility = COALESCE(NULLIF(visibility, ''), 'private')
+            """)
+
+        _try_run_ddl(
+            conn,
+            """
+            CREATE INDEX IF NOT EXISTS idx_calendar_events_range
+            ON calendar_events (event_date, end_date)
+            """,
+        )
+        _try_run_ddl(
+            conn,
+            """
+            CREATE INDEX IF NOT EXISTS idx_calendar_events_visibility
+            ON calendar_events (created_by, assigned_to, visibility)
+            """,
+        )
+
+        conn.commit()
+        PLANNING_SCHEMA_READY = True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def list_planning_users():
+    conn = get_db()
+    users = []
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, username, role
+                FROM users
+                WHERE role IN ('admin', 'commercial')
+                ORDER BY
+                    CASE WHEN role = 'admin' THEN 0 ELSE 1 END,
+                    LOWER(username) ASC
+            """)
+            rows = cur.fetchall()
+
+        for row in rows:
+            users.append({
+                "id": row["id"],
+                "username": row["username"],
+                "role": row["role"],
+                "role_label": chat_role_label(row["role"]),
+            })
+
+    except Exception as e:
+        logger.exception("Erreur chargement utilisateurs agenda : %r", e)
+
+    return users
+
+
+def planning_parse_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+
+    return str(value or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def planning_choice(value, allowed_values, default_value):
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in allowed_values else default_value
+
+
+def planning_category_label(category: str | None) -> str:
+    meta = PLANNING_EVENT_CATEGORIES.get(category or "")
+    return meta["label"] if meta else "Rendez-vous"
+
+
+def planning_status_label(status: str | None) -> str:
+    return PLANNING_EVENT_STATUSES.get(status or "", "Confirme")
+
+
+def planning_visibility_label(visibility: str | None) -> str:
+    return PLANNING_EVENT_VISIBILITIES.get(visibility or "", "Prive")
+
+
+def planning_event_color(
+    source_kind: str = "manual",
+    category: str | None = None,
+    explicit_color: str | None = None,
+    status: str | None = None,
+) -> str:
+    if status == "cancelled":
+        return "#94a3b8"
+
+    if explicit_color:
+        return explicit_color
+
+    if source_kind != "manual":
+        return PLANNING_SOURCE_STYLES.get(source_kind, {}).get("color", "#2563eb")
+
+    return PLANNING_EVENT_CATEGORIES.get(category or "meeting", {}).get("color", "#2563eb")
+
+
+def planning_event_can_edit(event_row, user) -> bool:
+    if not event_row:
+        return False
+
+    role = (user or {}).get("role")
+    user_id = (user or {}).get("id")
+
+    if role == "admin":
+        return True
+
+    return bool(user_id and event_row.get("created_by") == user_id)
+
+
+def planning_event_can_view(event_row, user) -> bool:
+    if not event_row:
+        return False
+
+    role = (user or {}).get("role")
+    user_id = (user or {}).get("id")
+
+    if role == "admin":
+        return True
+
+    if not user_id:
+        return False
+
+    visibility = event_row.get("visibility") or "private"
+
+    return (
+        event_row.get("created_by") == user_id
+        or event_row.get("assigned_to") == user_id
+        or visibility == "team"
+    )
+
+
+def fetch_calendar_event_row(event_id: int):
+    ensure_planning_schema()
+    conn = get_db()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                ce.*,
+                creator.username AS created_by_username,
+                creator.role AS created_by_role,
+                assignee.username AS assigned_to_username,
+                assignee.role AS assigned_to_role
+            FROM calendar_events ce
+            LEFT JOIN users creator ON creator.id = ce.created_by
+            LEFT JOIN users assignee ON assignee.id = ce.assigned_to
+            WHERE ce.id = %s
+            LIMIT 1
+        """, (event_id,))
+        return cur.fetchone()
+
+
+def serialize_planning_event_datetimes(event_date, end_date, event_time, end_time, all_day):
+    if not event_date:
+        return None, None, bool(all_day)
+
+    end_date_value = end_date or event_date
+
+    if all_day:
+        start_value = str(event_date)
+        end_value = None
+
+        if end_date_value and end_date_value > event_date:
+            end_value = str(end_date_value + timedelta(days=1))
+
+        return start_value, end_value, True
+
+    if event_time:
+        start_value = f"{event_date}T{event_time}"
+    else:
+        start_value = str(event_date)
+
+    end_value = None
+
+    if end_time or end_date_value != event_date:
+        if end_time:
+            end_value = f"{end_date_value}T{end_time}"
+        else:
+            end_value = str(end_date_value)
+
+    return start_value, end_value, False
+
+
+def serialize_manual_planning_event(row, user):
+    can_edit = planning_event_can_edit(row, user)
+    category = planning_choice(row.get("category"), PLANNING_EVENT_CATEGORIES, "meeting")
+    status = planning_choice(row.get("status"), PLANNING_EVENT_STATUSES, "confirmed")
+    visibility = planning_choice(row.get("visibility"), PLANNING_EVENT_VISIBILITIES, "private")
+    color = planning_event_color(
+        source_kind="manual",
+        category=category,
+        explicit_color=row.get("color"),
+        status=status,
+    )
+    start_value, end_value, all_day = serialize_planning_event_datetimes(
+        row.get("event_date"),
+        row.get("end_date"),
+        row.get("event_time"),
+        row.get("end_time"),
+        row.get("all_day"),
+    )
+
+    owner_user_id = row.get("assigned_to") or row.get("created_by")
+    owner_name = row.get("assigned_to_username") or row.get("created_by_username") or ""
+
+    return {
+        "id": f"manual_{row['id']}",
+        "title": row.get("title") or "Rendez-vous",
+        "start": start_value,
+        "end": end_value,
+        "allDay": all_day,
+        "backgroundColor": color,
+        "borderColor": color,
+        "editable": can_edit,
+        "startEditable": can_edit,
+        "durationEditable": can_edit,
+        "classNames": [
+            "planning-event",
+            "planning-source-manual",
+            f"planning-status-{status}",
+            f"planning-visibility-{visibility}",
+        ],
+        "extendedProps": {
+            "entityId": row["id"],
+            "sourceKind": "manual",
+            "sourceLabel": PLANNING_SOURCE_STYLES["manual"]["label"],
+            "description": row.get("description") or "",
+            "location": row.get("location") or "",
+            "category": category,
+            "categoryLabel": planning_category_label(category),
+            "status": status,
+            "statusLabel": planning_status_label(status),
+            "visibility": visibility,
+            "visibilityLabel": planning_visibility_label(visibility),
+            "createdById": row.get("created_by"),
+            "createdByName": row.get("created_by_username") or "",
+            "createdByRole": row.get("created_by_role"),
+            "assignedToId": row.get("assigned_to"),
+            "assignedToName": row.get("assigned_to_username") or "",
+            "assignedToRole": row.get("assigned_to_role"),
+            "ownerUserId": owner_user_id,
+            "ownerLabel": owner_name,
+            "routeUrl": None,
+            "canEdit": can_edit,
+            "canDelete": can_edit,
+            "color": color,
+        },
+    }
+
+
+def planning_build_payload(payload, current_user):
+    title = (payload.get("title") or "").strip()
+    description = (payload.get("description") or "").strip()
+    location = (payload.get("location") or "").strip()
+    start_date_raw = (payload.get("start_date") or payload.get("event_date") or "").strip()
+    end_date_raw = (payload.get("end_date") or "").strip()
+    start_time_raw = (payload.get("start_time") or "").strip()
+    end_time_raw = (payload.get("end_time") or "").strip()
+    all_day = planning_parse_bool(payload.get("all_day"))
+    category = planning_choice(payload.get("category"), PLANNING_EVENT_CATEGORIES, "meeting")
+    status = planning_choice(payload.get("status"), PLANNING_EVENT_STATUSES, "confirmed")
+    visibility = planning_choice(payload.get("visibility"), PLANNING_EVENT_VISIBILITIES, "private")
+    assigned_to = parse_int_safe(payload.get("assigned_to"))
+    color = (payload.get("color") or "").strip()
+
+    if not title:
+        return None, "Le titre est obligatoire."
+
+    start_date = parse_date_safe(start_date_raw)
+    if not start_date:
+        return None, "La date de debut est invalide."
+
+    end_date = parse_date_safe(end_date_raw) if end_date_raw else start_date
+    if end_date_raw and not end_date:
+        return None, "La date de fin est invalide."
+
+    if end_date < start_date:
+        return None, "La date de fin doit etre posterieure a la date de debut."
+
+    start_time = None
+    end_time = None
+
+    if not all_day:
+        start_time = parse_time_safe(start_time_raw or "09:00")
+
+        if start_time_raw and not start_time:
+            return None, "L'heure de debut est invalide."
+
+        if end_time_raw:
+            end_time = parse_time_safe(end_time_raw)
+            if not end_time:
+                return None, "L'heure de fin est invalide."
+
+        if end_date == start_date and start_time and end_time and end_time <= start_time:
+            return None, "L'heure de fin doit etre apres l'heure de debut."
+
+    current_user_id = current_user.get("id")
+
+    if visibility == "private":
+        assigned_to = current_user_id
+    elif visibility == "assigned" and not assigned_to:
+        return None, "Choisis le destinataire de ce rendez-vous."
+
+    if color and not re.match(r"^#[0-9A-Fa-f]{6}$", color):
+        color = ""
+
+    if assigned_to:
+        conn = get_db()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id
+                FROM users
+                WHERE id = %s
+                  AND role IN ('admin', 'commercial')
+                LIMIT 1
+            """, (assigned_to,))
+            assignee = cur.fetchone()
+
+        if not assignee:
+            return None, "Le destinataire selectionne est invalide."
+
+    return {
+        "title": title,
+        "description": description or None,
+        "location": location or None,
+        "event_date": start_date,
+        "end_date": end_date,
+        "event_time": start_time,
+        "end_time": end_time,
+        "all_day": all_day,
+        "category": category,
+        "status": status,
+        "visibility": visibility,
+        "assigned_to": assigned_to,
+        "color": color or None,
+    }, None
+
+
+def list_chat_recipients(current_user_id: int):
+    ensure_chat_schema()
+
+    conn = get_db()
+    recipients = []
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, username, role
+                FROM users
+                WHERE id <> %s
+                  AND role IN ('admin', 'commercial')
+                ORDER BY
+                    CASE WHEN role = 'admin' THEN 0 ELSE 1 END,
+                    LOWER(username) ASC
+            """, (current_user_id,))
+            rows = cur.fetchall()
+
+        for row in rows:
+            recipients.append({
+                "id": row["id"],
+                "username": row["username"],
+                "role": row["role"],
+                "role_label": chat_role_label(row["role"]),
+            })
+
+    except Exception as e:
+        logger.exception("Erreur chargement destinataires chat : %r", e)
+
+    return recipients
+
+
+def can_access_chat_file_key(key: str) -> bool:
+    if not key:
+        return False
+
+    user = session.get("user") or {}
+    user_id = user.get("id")
+    role = user.get("role")
+
+    if not user_id or role not in CHAT_ALLOWED_ROLES:
+        return False
+
+    ensure_chat_schema()
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 1
+                FROM chat_messages m
+                LEFT JOIN users sender ON sender.id = m.user_id
+                LEFT JOIN users recipient ON recipient.id = m.recipient_id
+                WHERE m.file_key = %s
+                  AND sender.role IN ('admin', 'commercial')
+                  AND (m.recipient_id IS NULL OR recipient.role IN ('admin', 'commercial'))
+                  AND (
+                      m.user_id = %s
+                      OR m.recipient_id = %s
+                      OR COALESCE(m.scope, 'broadcast') = 'broadcast'
+                  )
+                LIMIT 1
+            """, (key, user_id, user_id))
+            row = cur.fetchone()
+    except Exception:
+        return False
+
+    return bool(row)
+
+
+def chat_role_label(role: str | None) -> str:
+    if role == "admin":
+        return "Admin"
+    if role == "commercial":
+        return "Commercial"
+    return "Utilisateur"
+
+
 
 ############################################################
 # 5 BIS. DÉCORATEURS D’AUTHENTIFICATION & AUTORISATION
@@ -1159,6 +1798,38 @@ def admin_required(func):
         if session["user"].get("role") != "admin":
             flash("Accès réservé à l’administrateur.", "danger")
             return redirect(url_for("dashboard"))
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def chat_required(func):
+    """
+    Vérifie que l'utilisateur connecté peut accéder au chat interne.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if "user" not in session:
+            return redirect(url_for("login"))
+
+        if session["user"].get("role") not in CHAT_ALLOWED_ROLES:
+            abort(403)
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def planning_required(func):
+    """
+    Vérifie que l'utilisateur connecté peut accéder à l'agenda équipe.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if "user" not in session:
+            return redirect(url_for("login"))
+
+        if session["user"].get("role") not in PLANNING_ALLOWED_ROLES:
+            abort(403)
 
         return func(*args, **kwargs)
     return wrapper
@@ -2212,86 +2883,44 @@ def admin_dossiers_detail(commercial):
 # 10 TER. ADMIN — PLANNING (COTATIONS & MISES À JOUR)
 ############################################################
 
+def render_planning_hub():
+    ensure_planning_schema()
+
+    user = session.get("user") or {}
+    planning_bootstrap = {
+        "current_user": {
+            "id": user.get("id"),
+            "username": user.get("username"),
+            "role": user.get("role"),
+            "role_label": chat_role_label(user.get("role")),
+        },
+        "users": list_planning_users(),
+        "categories": [
+            {"value": key, "label": meta["label"], "color": meta["color"]}
+            for key, meta in PLANNING_EVENT_CATEGORIES.items()
+        ],
+        "statuses": [
+            {"value": key, "label": label}
+            for key, label in PLANNING_EVENT_STATUSES.items()
+        ],
+        "visibilities": [
+            {"value": key, "label": label}
+            for key, label in PLANNING_EVENT_VISIBILITIES.items()
+        ],
+        "source_styles": PLANNING_SOURCE_STYLES,
+        "can_manage_all": user.get("role") == "admin",
+    }
+
+    return render_template(
+        "planning_hub.html",
+        planning_bootstrap=planning_bootstrap,
+    )
+
+
 @app.route("/admin/planning")
 @admin_required
 def admin_planning():
-    conn = get_db()
-
-    # =========================
-    # NEGOCIATIONS (COTATIONS)
-    # =========================
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT
-                cotations.id,
-                cotations.date_negociation,
-                crm_clients.name AS client_name,
-                users.username AS commercial_name
-            FROM cotations
-            LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
-            LEFT JOIN users ON users.id = cotations.created_by
-            WHERE cotations.date_negociation IS NOT NULL
-              AND cotations.date_negociation >= CURRENT_DATE
-            ORDER BY cotations.date_negociation ASC
-        """)
-        cotations = cur.fetchall()
-
-    # =========================
-    # DEMANDES DE MISE A JOUR
-    # =========================
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT
-                client_updates.id,
-                client_updates.update_date,
-                client_updates.commentaire,
-                client_updates.client_name,
-                client_updates.commercial_name
-            FROM client_updates
-            WHERE client_updates.update_date IS NOT NULL
-              AND client_updates.update_date >= CURRENT_DATE
-            ORDER BY client_updates.update_date ASC
-        """)
-        updates = cur.fetchall()
-
-    # =========================
-    # EVENEMENTS ADMIN / COMMERCIAUX
-    # =========================
-    events = []
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT
-                    calendar_events.id,
-                    calendar_events.title,
-                    calendar_events.description,
-                    calendar_events.event_date,
-                    calendar_events.event_time,
-                    calendar_events.end_time,
-                    calendar_events.all_day,
-                    calendar_events.created_by,
-                    users.username AS created_by_username
-                FROM calendar_events
-                LEFT JOIN users ON users.id = calendar_events.created_by
-                WHERE calendar_events.event_date IS NOT NULL
-                  AND calendar_events.event_date >= CURRENT_DATE
-                ORDER BY calendar_events.event_date ASC
-            """)
-            rows = cur.fetchall()
-
-        events = [row_to_obj(r) for r in rows]
-
-    except Exception as e:
-        logger.exception("Erreur chargement events planning : %r", e)
-        events = []
-
-    return render_template(
-        "admin_planning.html",
-        cotations=[row_to_obj(c) for c in cotations],
-        updates=[row_to_obj(u) for u in updates],
-        events=events
-    )
+    return render_planning_hub()
 
 
 # ===============================
@@ -2374,92 +3003,11 @@ def add_calendar_event_admin_legacy():
 ############################################################
 
 @app.route("/planning")
-@login_required
+@planning_required
 def planning():
-
-    conn = get_db()
-    user = session.get("user") or {}
-
-    role = user.get("role")
-    user_id = user.get("id")
-
-    # =========================
-    # NEGOCIATIONS (COTATIONS)
-    # =========================
-    with conn.cursor() as cur:
-
-        if role == "admin":
-            cur.execute("""
-                SELECT
-                    cotations.id,
-                    cotations.date_negociation,
-                    crm_clients.name AS client_name,
-                    users.username AS commercial_name
-                FROM cotations
-                LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
-                LEFT JOIN users ON users.id = cotations.created_by
-                WHERE cotations.date_negociation IS NOT NULL
-                  AND cotations.date_negociation >= CURRENT_DATE
-                ORDER BY cotations.date_negociation ASC
-            """)
-        else:
-            cur.execute("""
-                SELECT
-                    cotations.id,
-                    cotations.date_negociation,
-                    crm_clients.name AS client_name,
-                    users.username AS commercial_name
-                FROM cotations
-                LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
-                LEFT JOIN users ON users.id = cotations.created_by
-                WHERE cotations.date_negociation IS NOT NULL
-                  AND cotations.date_negociation >= CURRENT_DATE
-                  AND cotations.created_by = %s
-                ORDER BY cotations.date_negociation ASC
-            """, (user_id,))
-
-        cotations = cur.fetchall()
-
-    # =========================
-    # DEMANDES DE MISE A JOUR
-    # =========================
-    with conn.cursor() as cur:
-
-        if role == "admin":
-            cur.execute("""
-                SELECT
-                    client_updates.id,
-                    client_updates.update_date,
-                    client_updates.commentaire,
-                    client_updates.client_name,
-                    client_updates.commercial_name
-                FROM client_updates
-                WHERE client_updates.update_date IS NOT NULL
-                  AND client_updates.update_date >= CURRENT_DATE
-                ORDER BY client_updates.update_date ASC
-            """)
-        else:
-            cur.execute("""
-                SELECT
-                    client_updates.id,
-                    client_updates.update_date,
-                    client_updates.commentaire,
-                    client_updates.client_name,
-                    client_updates.commercial_name
-                FROM client_updates
-                WHERE client_updates.update_date IS NOT NULL
-                  AND client_updates.update_date >= CURRENT_DATE
-                  AND LOWER(client_updates.commercial_name) = LOWER(%s)
-                ORDER BY client_updates.update_date ASC
-            """, (user.get("username"),))
-
-        updates = cur.fetchall()
-
-    # =========================
-    # EVENEMENTS (optionnel visibles)
-    # =========================
-    events = []
-
+    return render_planning_hub()
+    if False:
+        pass
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -2703,6 +3251,470 @@ def api_calendar():
         logger.exception("Erreur chargement events API calendar : %r", e)
 
     return jsonify(events)
+
+
+def planning_request_date(value):
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    return parse_date_safe(raw[:10])
+
+
+def planning_date_window():
+    start_date = planning_request_date(request.args.get("start"))
+    end_date = planning_request_date(request.args.get("end"))
+
+    if not start_date:
+        start_date = date.today() - timedelta(days=7)
+
+    if not end_date:
+        end_date = date.today() + timedelta(days=90)
+
+    return start_date, end_date
+
+
+def planning_actor_name(row, fallback="Non assigne"):
+    name = (row.get("commercial_name") or "").strip()
+    return name or fallback
+
+
+def planning_client_name(row, fallback="Client"):
+    name = (row.get("client_name") or "").strip()
+    return name or fallback
+
+
+def planning_external_title(prefix, row):
+    client_name = planning_client_name(row)
+    commercial_name = planning_actor_name(row)
+    return f"{prefix} - {client_name} - {commercial_name}"
+
+
+def serialize_cotation_planning_event(row):
+    start_value = str(row["date_negociation"])
+    all_day = True
+
+    if row.get("heure_negociation"):
+        start_value = f"{row['date_negociation']}T{row['heure_negociation']}"
+        all_day = False
+
+    color = planning_event_color(source_kind="cotation", category="negociation")
+
+    return {
+        "id": f"cotation_{row['id']}",
+        "title": planning_external_title("Negociation", row),
+        "start": start_value,
+        "allDay": all_day,
+        "backgroundColor": color,
+        "borderColor": color,
+        "editable": False,
+        "classNames": ["planning-event", "planning-source-cotation"],
+        "extendedProps": {
+            "entityId": row["id"],
+            "sourceKind": "cotation",
+            "sourceLabel": PLANNING_SOURCE_STYLES["cotation"]["label"],
+            "description": (
+                f"Negociation programmee automatiquement pour {planning_client_name(row)}. "
+                f"Commercial : {planning_actor_name(row)}."
+            ),
+            "location": "",
+            "category": "negociation",
+            "categoryLabel": planning_category_label("negociation"),
+            "status": "confirmed",
+            "statusLabel": planning_status_label("confirmed"),
+            "visibility": "assigned",
+            "visibilityLabel": planning_actor_name(row, "Commercial"),
+            "createdById": row.get("commercial_id"),
+            "createdByName": planning_actor_name(row, ""),
+            "assignedToId": row.get("commercial_id"),
+            "assignedToName": planning_actor_name(row, ""),
+            "ownerUserId": row.get("commercial_id"),
+            "ownerLabel": planning_actor_name(row, ""),
+            "clientName": planning_client_name(row),
+            "commercialName": planning_actor_name(row, ""),
+            "titleFull": planning_external_title("Negociation", row),
+            "routeUrl": (
+                url_for("client_detail", client_id=row["client_id"])
+                if row.get("client_id")
+                else None
+            ),
+            "canEdit": False,
+            "canDelete": False,
+            "color": color,
+        },
+    }
+
+
+def serialize_update_planning_event(row):
+    color = planning_event_color(source_kind="update", category="relance")
+
+    return {
+        "id": f"update_{row['id']}",
+        "title": planning_external_title("Mise a jour", row),
+        "start": str(row["update_date"]),
+        "allDay": True,
+        "backgroundColor": color,
+        "borderColor": color,
+        "editable": False,
+        "classNames": ["planning-event", "planning-source-update"],
+        "extendedProps": {
+            "entityId": row["id"],
+            "sourceKind": "update",
+            "sourceLabel": PLANNING_SOURCE_STYLES["update"]["label"],
+            "description": (
+                row.get("commentaire")
+                or f"Mise a jour programmee pour {planning_client_name(row)}. "
+                   f"Commercial : {planning_actor_name(row)}."
+            ),
+            "location": "",
+            "category": "relance",
+            "categoryLabel": planning_category_label("relance"),
+            "status": "confirmed",
+            "statusLabel": planning_status_label("confirmed"),
+            "visibility": "assigned",
+            "visibilityLabel": planning_actor_name(row, "Commercial"),
+            "createdById": row.get("commercial_id"),
+            "createdByName": planning_actor_name(row, ""),
+            "assignedToId": row.get("commercial_id"),
+            "assignedToName": planning_actor_name(row, ""),
+            "ownerUserId": row.get("commercial_id"),
+            "ownerLabel": planning_actor_name(row, ""),
+            "clientName": planning_client_name(row),
+            "commercialName": planning_actor_name(row, ""),
+            "titleFull": planning_external_title("Mise a jour", row),
+            "routeUrl": (
+                url_for("client_detail", client_id=row["client_id"])
+                if row.get("client_id")
+                else None
+            ),
+            "canEdit": False,
+            "canDelete": False,
+            "color": color,
+        },
+    }
+
+
+@app.route("/api/planning/events")
+@planning_required
+def api_planning_events():
+    ensure_planning_schema()
+
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
+    start_date, end_date = planning_date_window()
+
+    conn = get_db()
+    events = []
+
+    try:
+        with conn.cursor() as cur:
+            if role == "admin":
+                cur.execute("""
+                    SELECT
+                        cotations.id,
+                        cotations.client_id,
+                        cotations.date_negociation,
+                        cotations.heure_negociation,
+                        crm_clients.name AS client_name,
+                        COALESCE(crm_clients.owner_id, cotations.created_by) AS commercial_id,
+                        users.username AS commercial_name
+                    FROM cotations
+                    LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
+                    LEFT JOIN users ON users.id = COALESCE(crm_clients.owner_id, cotations.created_by)
+                    WHERE cotations.date_negociation IS NOT NULL
+                      AND cotations.date_negociation >= %s
+                      AND cotations.date_negociation < %s
+                """, (start_date, end_date))
+            else:
+                cur.execute("""
+                    SELECT
+                        cotations.id,
+                        cotations.client_id,
+                        cotations.date_negociation,
+                        cotations.heure_negociation,
+                        crm_clients.name AS client_name,
+                        COALESCE(crm_clients.owner_id, cotations.created_by) AS commercial_id,
+                        users.username AS commercial_name
+                    FROM cotations
+                    LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
+                    LEFT JOIN users ON users.id = COALESCE(crm_clients.owner_id, cotations.created_by)
+                    WHERE cotations.date_negociation IS NOT NULL
+                      AND cotations.date_negociation >= %s
+                      AND cotations.date_negociation < %s
+                      AND COALESCE(crm_clients.owner_id, cotations.created_by) = %s
+                """, (start_date, end_date, user_id))
+
+            cotations = cur.fetchall()
+
+        for row in cotations:
+            events.append(serialize_cotation_planning_event(row))
+
+        with conn.cursor() as cur:
+            if role == "admin":
+                cur.execute("""
+                    SELECT
+                        id,
+                        client_id,
+                        client_name,
+                        commercial_id,
+                        commercial_name,
+                        update_date,
+                        commentaire
+                    FROM client_updates
+                    WHERE update_date IS NOT NULL
+                      AND update_date >= %s
+                      AND update_date < %s
+                """, (start_date, end_date))
+            else:
+                cur.execute("""
+                    SELECT
+                        id,
+                        client_id,
+                        client_name,
+                        commercial_id,
+                        commercial_name,
+                        update_date,
+                        commentaire
+                    FROM client_updates
+                    WHERE update_date IS NOT NULL
+                      AND update_date >= %s
+                      AND update_date < %s
+                      AND commercial_id = %s
+                """, (start_date, end_date, user_id))
+
+            updates = cur.fetchall()
+
+        for row in updates:
+            events.append(serialize_update_planning_event(row))
+
+        with conn.cursor() as cur:
+            manual_sql = """
+                SELECT
+                    ce.*,
+                    creator.username AS created_by_username,
+                    creator.role AS created_by_role,
+                    assignee.username AS assigned_to_username,
+                    assignee.role AS assigned_to_role
+                FROM calendar_events ce
+                LEFT JOIN users creator ON creator.id = ce.created_by
+                LEFT JOIN users assignee ON assignee.id = ce.assigned_to
+                WHERE ce.event_date < %s
+                  AND COALESCE(ce.end_date, ce.event_date) >= %s
+            """
+            params = [end_date, start_date]
+
+            if role != "admin":
+                manual_sql += """
+                  AND (
+                      ce.created_by = %s
+                      OR ce.assigned_to = %s
+                      OR COALESCE(ce.visibility, 'private') = 'team'
+                  )
+                """
+                params.extend([user_id, user_id])
+
+            manual_sql += " ORDER BY ce.event_date ASC, COALESCE(ce.event_time, TIME '00:00') ASC"
+            cur.execute(manual_sql, tuple(params))
+            manual_rows = cur.fetchall()
+
+        for row in manual_rows:
+            if planning_event_can_view(row, user):
+                events.append(serialize_manual_planning_event(row, user))
+
+        events.sort(key=lambda item: (item.get("start") or "", item.get("title") or ""))
+
+        return jsonify({
+            "success": True,
+            "events": events,
+        })
+
+    except Exception as e:
+        logger.exception("Erreur agenda planning : %r", e)
+        return jsonify({
+            "success": False,
+            "events": [],
+            "message": "Impossible de charger l'agenda.",
+        }), 500
+
+
+@app.route("/api/planning/events", methods=["POST"])
+@planning_required
+def create_planning_event():
+    ensure_planning_schema()
+
+    user = session.get("user") or {}
+    payload = request.get_json(silent=True) or request.form
+    event_payload, error = planning_build_payload(payload, user)
+
+    if error:
+        return jsonify({"success": False, "message": error}), 400
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO calendar_events (
+                    title,
+                    description,
+                    event_date,
+                    end_date,
+                    event_time,
+                    end_time,
+                    all_day,
+                    location,
+                    category,
+                    status,
+                    visibility,
+                    color,
+                    created_by,
+                    assigned_to
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                event_payload["title"],
+                event_payload["description"],
+                event_payload["event_date"],
+                event_payload["end_date"],
+                event_payload["event_time"],
+                event_payload["end_time"],
+                event_payload["all_day"],
+                event_payload["location"],
+                event_payload["category"],
+                event_payload["status"],
+                event_payload["visibility"],
+                event_payload["color"],
+                user.get("id"),
+                event_payload["assigned_to"],
+            ))
+            created_id = cur.fetchone()["id"]
+
+        conn.commit()
+
+        row = fetch_calendar_event_row(created_id)
+
+        return jsonify({
+            "success": True,
+            "event": serialize_manual_planning_event(row, user),
+        })
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur creation evenement agenda : %r", e)
+        return jsonify({
+            "success": False,
+            "message": "Impossible de creer le rendez-vous.",
+        }), 500
+
+
+@app.route("/api/planning/events/<int:event_id>/update", methods=["POST"])
+@planning_required
+def update_planning_event(event_id):
+    ensure_planning_schema()
+
+    user = session.get("user") or {}
+    existing = fetch_calendar_event_row(event_id)
+
+    if not existing:
+        return jsonify({"success": False, "message": "Rendez-vous introuvable."}), 404
+
+    if not planning_event_can_edit(existing, user):
+        return jsonify({"success": False, "message": "Modification non autorisee."}), 403
+
+    payload = request.get_json(silent=True) or request.form
+    event_payload, error = planning_build_payload(payload, user)
+
+    if error:
+        return jsonify({"success": False, "message": error}), 400
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE calendar_events
+                SET
+                    title = %s,
+                    description = %s,
+                    event_date = %s,
+                    end_date = %s,
+                    event_time = %s,
+                    end_time = %s,
+                    all_day = %s,
+                    location = %s,
+                    category = %s,
+                    status = %s,
+                    visibility = %s,
+                    color = %s,
+                    assigned_to = %s
+                WHERE id = %s
+            """, (
+                event_payload["title"],
+                event_payload["description"],
+                event_payload["event_date"],
+                event_payload["end_date"],
+                event_payload["event_time"],
+                event_payload["end_time"],
+                event_payload["all_day"],
+                event_payload["location"],
+                event_payload["category"],
+                event_payload["status"],
+                event_payload["visibility"],
+                event_payload["color"],
+                event_payload["assigned_to"],
+                event_id,
+            ))
+
+        conn.commit()
+
+        row = fetch_calendar_event_row(event_id)
+
+        return jsonify({
+            "success": True,
+            "event": serialize_manual_planning_event(row, user),
+        })
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur modification evenement agenda : %r", e)
+        return jsonify({
+            "success": False,
+            "message": "Impossible de modifier le rendez-vous.",
+        }), 500
+
+
+@app.route("/api/planning/events/<int:event_id>/delete", methods=["POST"])
+@planning_required
+def remove_planning_event(event_id):
+    ensure_planning_schema()
+
+    user = session.get("user") or {}
+    existing = fetch_calendar_event_row(event_id)
+
+    if not existing:
+        return jsonify({"success": False, "message": "Rendez-vous introuvable."}), 404
+
+    if not planning_event_can_edit(existing, user):
+        return jsonify({"success": False, "message": "Suppression non autorisee."}), 403
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM calendar_events WHERE id = %s", (event_id,))
+
+        conn.commit()
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur suppression evenement agenda : %r", e)
+        return jsonify({
+            "success": False,
+            "message": "Impossible de supprimer le rendez-vous.",
+        }), 500
 ###########################################################
 # 11. DOCUMENTS (GLOBAL + PAR DOSSIER + RESSOURCES PARTAGÉES)
 ############################################################
@@ -4603,7 +5615,7 @@ from zoneinfo import ZoneInfo
 
 def _chat_store_file(file_storage):
     """
-    Stockage d’une pièce jointe du chat en S3 PRIVÉ.
+    Stockage d’une pièce jointe du chat.
     Retourne (file_key, file_name, error_code)
     """
     if not file_storage:
@@ -4618,21 +5630,27 @@ def _chat_store_file(file_storage):
     file_name_original = secure_filename(file_storage.filename)
     file_name_clean = clean_filename(file_name_original)
 
-    if LOCAL_MODE or not s3:
+    rnd = secrets.token_hex(6)
+    key_raw = f"{CHAT_UPLOAD_PREFIX}{rnd}_{file_name_clean}"
+
+    if LOCAL_MODE:
+        try:
+            key = _local_make_non_overwriting_key(key_raw)
+            path = local_storage_path(key)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            file_storage.save(path)
+            return (key, file_name_original, None)
+        except Exception as e:
+            logger.exception("Erreur upload chat local: %r", e)
+            return (None, None, "upload_failed")
+
+    if not s3 or not AWS_BUCKET:
         return (None, None, "upload_unavailable")
 
-    rnd = secrets.token_hex(6)
-    key_raw = f"chat/{rnd}_{file_name_clean}"
     key = _s3_make_non_overwriting_key(AWS_BUCKET, key_raw)
 
     try:
-        stream = getattr(file_storage, "stream", file_storage)
-        try:
-            stream.seek(0)
-        except Exception:
-            pass
-
-        s3_upload_fileobj(stream, AWS_BUCKET, key)
+        s3_upload_fileobj(file_storage, AWS_BUCKET, key)
 
         return (key, file_name_original, None)
 
@@ -4673,11 +5691,85 @@ def _serialize_chat_datetime(value):
 
 
 # =========================================================
+# CHAT BOOTSTRAP
+# =========================================================
+@app.route("/chat/bootstrap")
+@chat_required
+def chat_bootstrap():
+    ensure_chat_schema()
+
+    user = session.get("user") or {}
+    user_id = user.get("id")
+    role = user.get("role")
+
+    if not user_id:
+        return jsonify({
+            "success": False,
+            "recipients": [],
+            "message": "Utilisateur non identifié."
+        }), 400
+
+    return jsonify({
+        "success": True,
+        "recipients": list_chat_recipients(user_id),
+        "current_user": {
+            "id": user_id,
+            "username": user.get("username"),
+            "role": role,
+            "role_label": chat_role_label(role),
+        },
+    })
+
+
+# =========================================================
+# CHAT FILE DOWNLOAD
+# =========================================================
+@app.route("/chat/file")
+@chat_required
+def download_chat_file():
+    ensure_chat_schema()
+
+    key = (request.args.get("key") or "").strip()
+
+    if not key:
+        flash("Fichier chat invalide.", "danger")
+        return redirect(request.referrer or url_for("dashboard"))
+
+    if not can_access_chat_file_key(key):
+        abort(403)
+
+    try:
+        if LOCAL_MODE:
+            path = local_storage_path(key)
+            if not os.path.exists(path):
+                flash("Fichier introuvable.", "danger")
+                return redirect(request.referrer or url_for("dashboard"))
+            return send_file(path, as_attachment=False)
+
+        if not s3:
+            flash("Le stockage des pièces jointes du chat est indisponible.", "warning")
+            return redirect(request.referrer or url_for("dashboard"))
+
+        url = s3_presigned_url(key)
+        if not url:
+            flash("Impossible de générer le lien du fichier.", "danger")
+            return redirect(request.referrer or url_for("dashboard"))
+
+        return redirect(url)
+
+    except Exception as e:
+        logger.exception("Erreur download chat file : %r", e)
+        flash("Erreur lors de l'ouverture du fichier du chat.", "danger")
+        return redirect(request.referrer or url_for("dashboard"))
+
+
+# =========================================================
 # LOAD MESSAGES
 # =========================================================
 @app.route("/chat/messages")
-@login_required
+@chat_required
 def chat_messages():
+    ensure_chat_schema()
 
     limit = request.args.get("limit", "50")
 
@@ -4695,45 +5787,90 @@ def chat_messages():
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
-                    id,
-                    user_id,
-                    username,
-                    message,
-                    file_key,
-                    file_name,
-                    created_at,
-                    COALESCE(is_read, 0) AS is_read
-                FROM chat_messages
-                ORDER BY id DESC
+                    m.id,
+                    m.user_id,
+                    m.username,
+                    sender.role AS user_role,
+                    m.recipient_id,
+                    m.recipient_username,
+                    recipient.role AS recipient_role,
+                    COALESCE(m.scope, 'broadcast') AS scope,
+                    m.message,
+                    m.file_key,
+                    m.file_name,
+                    m.created_at,
+                    EXISTS (
+                        SELECT 1
+                        FROM chat_message_reads sender_reads
+                        WHERE sender_reads.message_id = m.id
+                          AND sender_reads.user_id = m.recipient_id
+                    ) AS direct_read_by_recipient,
+                    EXISTS (
+                        SELECT 1
+                        FROM chat_message_reads my_reads
+                        WHERE my_reads.message_id = m.id
+                          AND my_reads.user_id = %s
+                    ) AS read_by_me
+                FROM chat_messages m
+                LEFT JOIN users sender ON sender.id = m.user_id
+                LEFT JOIN users recipient ON recipient.id = m.recipient_id
+                WHERE
+                    sender.role IN ('admin', 'commercial')
+                    AND (m.recipient_id IS NULL OR recipient.role IN ('admin', 'commercial'))
+                    AND (
+                        m.user_id = %s
+                        OR m.recipient_id = %s
+                        OR COALESCE(m.scope, 'broadcast') = 'broadcast'
+                    )
+                ORDER BY m.id DESC
                 LIMIT %s
-            """, (limit_int,))
+            """, (user_id, user_id, user_id, limit_int))
             rows = cur.fetchall()
 
         messages = []
+        unread_count = 0
 
         for r in reversed(rows):
 
             file_url = None
 
-            if r["file_key"] and not LOCAL_MODE and s3:
-                file_url = s3_presigned_url(r["file_key"])
+            if r["file_key"]:
+                if LOCAL_MODE:
+                    file_url = url_for("download_chat_file", key=r["file_key"])
+                elif s3:
+                    file_url = s3_presigned_url(r["file_key"])
+
+            scope = r["scope"] or "broadcast"
+            is_mine = r["user_id"] == user_id
+            is_read = bool(r["direct_read_by_recipient"]) if is_mine else bool(r["read_by_me"])
+
+            if not is_mine and not is_read:
+                unread_count += 1
 
             messages.append({
                 "id": r["id"],
                 "user_id": r["user_id"],
                 "username": r["username"],
+                "user_role": r["user_role"],
+                "user_role_label": chat_role_label(r["user_role"]),
+                "recipient_id": r["recipient_id"],
+                "recipient_username": r["recipient_username"],
+                "recipient_role": r["recipient_role"],
+                "recipient_role_label": chat_role_label(r["recipient_role"]),
+                "scope": scope,
                 "message": r["message"],
                 "file_key": r["file_key"],
                 "file_name": r["file_name"],
                 "file_url": file_url,
                 "created_at": _serialize_chat_datetime(r["created_at"]),
-                "is_read": bool(r["is_read"]),
-                "is_mine": r["user_id"] == user_id,
+                "is_read": is_read,
+                "is_mine": is_mine,
             })
 
         return jsonify({
             "success": True,
             "messages": messages,
+            "unread_count": unread_count,
         })
 
     except Exception as e:
@@ -4749,11 +5886,64 @@ def chat_messages():
 # SEND MESSAGE (MULTI FILES FIX FINAL)
 # =========================================================
 @app.route("/chat/send", methods=["POST"])
-@login_required
+@chat_required
 def chat_send():
+    ensure_chat_schema()
 
     message = (request.form.get("message") or "").strip()
     user = session.get("user") or {}
+    user_id = user.get("id")
+    user_role = user.get("role")
+    recipient_raw = (request.form.get("recipient_id") or "").strip()
+
+    if not user_id or user_role not in CHAT_ALLOWED_ROLES:
+        return jsonify({
+            "success": False,
+            "message": "Acces au chat refuse."
+        }), 403
+
+    recipient_id = None
+    recipient_username = None
+    scope = "broadcast"
+
+    if recipient_raw and recipient_raw not in ("all", "broadcast", "team"):
+        try:
+            recipient_id = int(recipient_raw)
+        except Exception:
+            return jsonify({
+                "success": False,
+                "message": "Destinataire invalide."
+            }), 400
+
+        if recipient_id == user_id:
+            return jsonify({
+                "success": False,
+                "message": "Vous ne pouvez pas vous écrire à vous-même."
+            }), 400
+
+        conn = get_db()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, username
+                FROM users
+                WHERE id = %s
+            """, (recipient_id,))
+            recipient_row = cur.fetchone()
+
+        if not recipient_row:
+            return jsonify({
+                "success": False,
+                "message": "Destinataire introuvable."
+            }), 404
+
+        if recipient_row["role"] not in CHAT_ALLOWED_ROLES:
+            return jsonify({
+                "success": False,
+                "message": "Ce destinataire n'a pas acces au chat."
+            }), 403
+
+        recipient_username = recipient_row["username"]
+        scope = "direct"
 
     files = []
 
@@ -4798,44 +5988,52 @@ def chat_send():
 
         with conn.cursor() as cur:
 
-            # MESSAGE SEUL
-            if message and not uploaded_files:
+            if message:
 
                 cur.execute("""
                     INSERT INTO chat_messages (
                         user_id,
                         username,
+                        recipient_id,
+                        recipient_username,
+                        scope,
                         message,
                         is_read
                     )
-                    VALUES (%s, %s, %s, 0)
+                    VALUES (%s, %s, %s, %s, %s, %s, 0)
                     RETURNING id
                 """, (
-                    user.get("id"),
+                    user_id,
                     user.get("username"),
+                    recipient_id,
+                    recipient_username,
+                    scope,
                     message,
                 ))
 
                 inserted_ids.append(cur.fetchone()["id"])
 
-            # FICHIERS
             for file_key, file_name in uploaded_files:
 
                 cur.execute("""
                     INSERT INTO chat_messages (
                         user_id,
                         username,
-                        message,
+                        recipient_id,
+                        recipient_username,
+                        scope,
                         file_key,
                         file_name,
                         is_read
                     )
-                    VALUES (%s, %s, %s, %s, %s, 0)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 0)
                     RETURNING id
                 """, (
-                    user.get("id"),
+                    user_id,
                     user.get("username"),
-                    message if message else None,
+                    recipient_id,
+                    recipient_username,
+                    scope,
                     file_key,
                     file_name,
                 ))
@@ -4849,6 +6047,9 @@ def chat_send():
             "ids": inserted_ids,
             "uploaded": len(uploaded_files),
             "errors": errors,
+            "scope": scope,
+            "recipient_id": recipient_id,
+            "recipient_username": recipient_username,
         })
 
     except Exception as e:
@@ -4865,8 +6066,9 @@ def chat_send():
 # MARK AS READ
 # =========================================================
 @app.route("/chat/mark_read", methods=["POST"])
-@login_required
+@chat_required
 def chat_mark_read():
+    ensure_chat_schema()
 
     u = session.get("user") or {}
     user_id = u.get("id")
@@ -4882,11 +6084,25 @@ def chat_mark_read():
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                UPDATE chat_messages
-                SET is_read = 1
-                WHERE COALESCE(is_read, 0) = 0
-                  AND user_id <> %s
-            """, (user_id,))
+                INSERT INTO chat_message_reads (message_id, user_id)
+                SELECT m.id, %s
+                FROM chat_messages m
+                LEFT JOIN users sender ON sender.id = m.user_id
+                LEFT JOIN users recipient ON recipient.id = m.recipient_id
+                WHERE m.user_id <> %s
+                  AND sender.role IN ('admin', 'commercial')
+                  AND (m.recipient_id IS NULL OR recipient.role IN ('admin', 'commercial'))
+                  AND (
+                      m.recipient_id = %s
+                      OR COALESCE(m.scope, 'broadcast') = 'broadcast'
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM chat_message_reads r
+                      WHERE r.message_id = m.id
+                        AND r.user_id = %s
+                  )
+            """, (user_id, user_id, user_id, user_id))
 
         conn.commit()
 
