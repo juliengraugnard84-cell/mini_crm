@@ -3342,3 +3342,420 @@ textarea.form-control {
         max-width: none;
     }
 }
+
+/* =========================================================
+   UNIFIED BRAND PASS - CHAT / AGENDA / DATA PAGES
+========================================================= */
+
+.chat-toggle {
+    width: 68px;
+    height: 68px;
+    border-radius: 24px;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.24), transparent 34%),
+        linear-gradient(135deg, #08133f 0%, #123646 58%, #0d2249 100%);
+    color: #f8fafc;
+    border: 1px solid rgba(242, 178, 51, 0.34);
+    box-shadow: 0 24px 40px rgba(8, 19, 63, 0.24);
+}
+
+.chat-toggle::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: 23px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    pointer-events: none;
+}
+
+.chat-toggle:hover {
+    background:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.3), transparent 34%),
+        linear-gradient(135deg, #0d2249 0%, #163e65 58%, #0e2b52 100%);
+    color: #ffffff;
+}
+
+.chat-toggle-icon,
+.chat-action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-toggle-icon svg {
+    width: 30px;
+    height: 30px;
+}
+
+.chat-action-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+.chat-widget {
+    background:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.12), transparent 26%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 247, 251, 0.96));
+    border: 1px solid rgba(8, 19, 63, 0.08);
+}
+
+.chat-header {
+    background:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.24), transparent 34%),
+        linear-gradient(135deg, #08133f 0%, #123646 58%, #0d2249 100%);
+    color: #ffffff;
+}
+
+.chat-subtitle {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.chat-live-pill {
+    background: rgba(242, 178, 51, 0.16);
+    color: #f8d57f;
+    border: 1px solid rgba(242, 178, 51, 0.22);
+}
+
+.chat-close,
+.chat-icon-btn,
+.chat-send,
+.chat-attach {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-close,
+.chat-icon-btn {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.chat-close:hover,
+.chat-icon-btn:hover {
+    background: rgba(242, 178, 51, 0.16);
+    color: #ffffff;
+}
+
+.chat-toolbar,
+.chat-quick-recipients {
+    background: rgba(248, 250, 252, 0.96);
+}
+
+.chat-quick-chip.active {
+    background: linear-gradient(135deg, #08133f, #123646);
+    color: #ffffff;
+    box-shadow: 0 12px 22px rgba(8, 19, 63, 0.18);
+}
+
+.chat-context-banner {
+    background: linear-gradient(135deg, #08133f, #123646 58%, #0d2249);
+    color: #f8fafc;
+}
+
+.chat-context-banner[data-mode="direct"] {
+    background: linear-gradient(135deg, #f2b233, #d89a24);
+    color: #2d2106;
+}
+
+.chat-avatar {
+    background: linear-gradient(180deg, #f8d57f, #f2b233);
+    color: #6f4700;
+}
+
+.chat-row.me .chat-avatar {
+    background: linear-gradient(180deg, #123646, #08133f);
+}
+
+.chat-bubble.me {
+    background: linear-gradient(135deg, #f2b233, #db9a24);
+    color: #2d2106;
+}
+
+.chat-bubble.them {
+    background: rgba(255, 255, 255, 0.98);
+    border-color: rgba(8, 19, 63, 0.08);
+}
+
+.chat-read.read {
+    background: rgba(8, 19, 63, 0.12);
+    color: #08133f;
+}
+
+.chat-attach {
+    color: #10212b;
+    background: rgba(8, 19, 63, 0.05);
+}
+
+.chat-attach:hover {
+    color: #08133f;
+    background: rgba(242, 178, 51, 0.18);
+}
+
+.chat-input:focus,
+.chat-recipient:focus {
+    border-color: rgba(8, 19, 63, 0.35);
+    box-shadow: 0 0 0 4px rgba(8, 19, 63, 0.08);
+}
+
+.chat-send {
+    background: linear-gradient(135deg, #08133f, #123646);
+    color: #ffffff;
+}
+
+.chat-send:hover {
+    background: linear-gradient(135deg, #0d2249, #163e65);
+    color: #ffffff;
+}
+
+.planning-shell {
+    --planning-ink: #10212b;
+    --planning-muted: #64748b;
+    --planning-line: rgba(8, 19, 63, 0.08);
+    --planning-panel: rgba(255, 255, 255, 0.92);
+    --planning-accent: #f2b233;
+}
+
+.planning-shell::before {
+    background:
+        radial-gradient(circle at 14% 18%, rgba(242, 178, 51, 0.09), transparent 26%),
+        radial-gradient(circle at 86% 14%, rgba(8, 19, 63, 0.08), transparent 24%),
+        linear-gradient(180deg, rgba(252, 247, 239, 0.6), rgba(250, 251, 253, 0));
+}
+
+.planning-hero {
+    background:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.24), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.08), transparent 26%),
+        linear-gradient(135deg, #08133f 0%, #123646 58%, #0d2249 100%);
+}
+
+.planning-hero-actions .btn-dark {
+    background: linear-gradient(180deg, #f2b233, #f7ca70);
+    color: #10212b;
+    border: 0;
+}
+
+.planning-hero-actions .btn-outline-light {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.planning-panel::before,
+.planning-calendar-card::before {
+    background: linear-gradient(90deg, rgba(242, 178, 51, 0), rgba(242, 178, 51, 0.38), rgba(8, 19, 63, 0));
+}
+
+.planning-source-pill.is-active {
+    background: linear-gradient(135deg, #08133f, #123646);
+    color: #ffffff;
+    border-color: #08133f;
+}
+
+.planning-legend-swatch-cotation {
+    background: #f2b233;
+}
+
+.planning-legend-swatch-update {
+    background: #08133f;
+}
+
+.planning-legend-swatch-manual {
+    background: #2f6cab;
+}
+
+.planning-legend-chip {
+    background: rgba(8, 19, 63, 0.1);
+    color: #08133f;
+}
+
+.planning-legend-chip-soft {
+    background: rgba(242, 178, 51, 0.16);
+    color: #9a5f00;
+}
+
+.planning-badge-cotation {
+    background: rgba(242, 178, 51, 0.18);
+    color: #9a5f00;
+}
+
+.planning-badge-update {
+    background: rgba(8, 19, 63, 0.12);
+    color: #08133f;
+}
+
+.planning-badge-manual {
+    background: rgba(47, 108, 171, 0.12);
+    color: #1f5a96;
+}
+
+.fc .fc-button-primary {
+    background: #08133f;
+    border-color: #08133f;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active,
+.fc .fc-button-primary:hover {
+    background: #102a5c;
+    border-color: #102a5c;
+}
+
+.fc .fc-day-today {
+    background: linear-gradient(180deg, rgba(242, 178, 51, 0.12), rgba(242, 178, 51, 0.03)) !important;
+}
+
+.fc .fc-event {
+    box-shadow: 0 14px 28px rgba(8, 19, 63, 0.14);
+}
+
+.fc .fc-event-main {
+    border-radius: 12px;
+}
+
+.crm-page-hero--compact {
+    align-items: center;
+    padding: 28px 30px;
+}
+
+.crm-page-hero--compact h1 {
+    font-size: clamp(28px, 3vw, 38px);
+}
+
+.crm-page-hero--compact p {
+    max-width: 720px;
+}
+
+.crm-data-table-card .card-body {
+    padding-top: 18px;
+}
+
+.crm-records-table thead th {
+    white-space: nowrap;
+}
+
+.crm-records-table td {
+    font-size: 14px;
+}
+
+.crm-clickable-row {
+    cursor: pointer;
+}
+
+.crm-clickable-row:hover {
+    background: linear-gradient(180deg, rgba(242, 178, 51, 0.06), rgba(255, 255, 255, 0));
+}
+
+.crm-primary-link {
+    color: #0d3b66;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.crm-primary-link:hover {
+    color: #08133f;
+    text-decoration: underline;
+}
+
+.crm-cell-stack {
+    display: grid;
+    gap: 4px;
+}
+
+.crm-cell-stack small {
+    color: #64748b;
+}
+
+.crm-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.crm-pill-primary {
+    background: rgba(47, 108, 171, 0.12);
+    color: #1f5a96;
+}
+
+.crm-pill-warning {
+    background: rgba(242, 178, 51, 0.18);
+    color: #9a5f00;
+}
+
+.crm-pill-success {
+    background: rgba(22, 163, 74, 0.14);
+    color: #166534;
+}
+
+.crm-pill-danger {
+    background: rgba(239, 68, 68, 0.14);
+    color: #b91c1c;
+}
+
+.crm-pill-info {
+    background: rgba(8, 19, 63, 0.1);
+    color: #08133f;
+}
+
+.crm-pill-muted {
+    background: rgba(148, 163, 184, 0.16);
+    color: #475569;
+}
+
+.crm-action-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.crm-empty-state {
+    display: grid;
+    gap: 8px;
+    padding: 24px;
+    border-radius: 18px;
+    background: rgba(8, 19, 63, 0.03);
+    color: #64748b;
+    text-align: center;
+}
+
+.crm-empty-state strong {
+    color: #10212b;
+    font-size: 16px;
+}
+
+.crm-note-card .alert-info {
+    background: rgba(242, 178, 51, 0.16);
+    color: #7a4b00;
+}
+
+.crm-upload-card .card-body,
+.crm-note-card .card-body {
+    padding-top: 22px;
+}
+
+.crm-table-top--flush {
+    padding: 0 0 18px;
+}
+
+.crm-mono {
+    font-family: "Consolas", "SFMono-Regular", "Liberation Mono", monospace;
+    font-weight: 700;
+    color: #10212b;
+}
+
+@media (max-width: 900px) {
+    .crm-action-row {
+        justify-content: flex-start;
+    }
+}

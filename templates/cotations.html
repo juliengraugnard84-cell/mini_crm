@@ -1,59 +1,120 @@
 {% extends "base.html" %}
 {% block title %}Mes cotations{% endblock %}
 
+{% set cotation_list = cotations if cotations else [] %}
+{% set ns = namespace(scheduled=0, open=0) %}
+{% for c in cotation_list %}
+    {% if c.date_negociation %}
+        {% set ns.scheduled = ns.scheduled + 1 %}
+    {% endif %}
+    {% if (c.status or "nouvelle")|lower in ["nouvelle", "en attente", "pending", "a traiter"] %}
+        {% set ns.open = ns.open + 1 %}
+    {% endif %}
+{% endfor %}
+
 {% block content %}
-<div class="page-header mb-4">
-    <h1>Cotations</h1>
-    <p class="text-muted mb-0">Historique des demandes de cotation</p>
-</div>
 
-<div class="card">
-    <div class="card-header">
-        <strong>Historique</strong>
+<section class="crm-page-hero crm-page-hero--compact">
+    <div>
+        <span class="crm-page-kicker">Vue commerciale</span>
+        <h1>Mes cotations</h1>
+        <p>Suivi clair des demandes envoyees, des energies traitees et des prochaines negociations programmees.</p>
     </div>
 
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">{{ cotation_list|length }} demandes</span>
+        <span class="crm-hero-pill">{{ ns.open }} a suivre</span>
+        <span class="crm-hero-pill">{{ ns.scheduled }} negociees planifiees</span>
+    </div>
+</section>
+
+<section class="kpi-grid">
+    <article class="kpi-tile">
+        <span class="kpi-label">Total cotations</span>
+        <div class="kpi-value">{{ cotation_list|length }}</div>
+    </article>
+
+    <article class="kpi-tile">
+        <span class="kpi-label">Demandes ouvertes</span>
+        <div class="kpi-value">{{ ns.open }}</div>
+    </article>
+
+    <article class="kpi-tile">
+        <span class="kpi-label">Negociations datees</span>
+        <div class="kpi-value">{{ ns.scheduled }}</div>
+    </article>
+</section>
+
+<div class="card crm-data-table-card">
+    <div class="crm-table-top">
+        <div>
+            <h5>Historique</h5>
+            <p class="crm-soft-note">Retrouve rapidement chaque demande et ouvre directement le dossier associe.</p>
+        </div>
+        <span class="crm-soft-note">{{ cotation_list|length }} element(s)</span>
+    </div>
+
+    {% if cotation_list %}
     <div class="card-body">
-        {% if cotations and cotations|length > 0 %}
-            <div class="table-responsive">
-                <table class="table table-sm align-middle">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Client</th>
-                            <th>Date création</th>
-                            <th>Date négociation</th>
-                            <th>Énergie</th>
-                            <th>PDL/PCE</th>
-                            <th>Statut</th>
-                            <th style="width: 140px;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for c in cotations %}
-                        <tr>
-                            <td>#{{ c.id }}</td>
-                            <td>{{ c.client_name or ("#"+(c.client_id|string)) }}</td>
-                            <td>{{ c.date_creation or "—" }}</td>
-                            <td>{{ c.date_negociation or "—" }}</td>
-                            <td>{{ c.energie_type or "—" }}</td>
-                            <td>{{ c.pdl_pce or "—" }}</td>
-                            <td>{{ c.status or "nouvelle" }}</td>
-                            <td>
-                                {% if available_endpoints and 'client_detail' in available_endpoints %}
-                                    <a class="btn btn-sm btn-outline-primary"
-                                       href="{{ url_for('client_detail', client_id=c.client_id) }}">
-                                        Ouvrir dossier
-                                    </a>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <p class="text-muted mb-0">Aucune demande de cotation trouvée.</p>
-        {% endif %}
+        <div class="table-responsive">
+            <table class="table align-middle crm-records-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Client</th>
+                        <th>Date creation</th>
+                        <th>Date negociation</th>
+                        <th>Energie</th>
+                        <th>PDL / PCE</th>
+                        <th>Statut</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in cotation_list %}
+                    {% set energie = (c.energie_type or "")|lower %}
+                    <tr>
+                        <td class="crm-mono">#{{ c.id }}</td>
+                        <td>{{ c.client_name or ("#" ~ (c.client_id|string)) }}</td>
+                        <td>{{ format_date(c.date_creation) if c.date_creation else "-" }}</td>
+                        <td>{{ format_date(c.date_negociation) if c.date_negociation else "-" }}</td>
+                        <td>
+                            {% if "gaz" in energie and "elec" in energie %}
+                                <span class="crm-pill crm-pill-info">Elec + gaz</span>
+                            {% elif "gaz" in energie %}
+                                <span class="crm-pill crm-pill-warning">Gaz</span>
+                            {% elif "elec" in energie %}
+                                <span class="crm-pill crm-pill-primary">Electricite</span>
+                            {% else %}
+                                <span class="crm-pill crm-pill-muted">Non renseigne</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ c.pdl_pce or "-" }}</td>
+                        <td>
+                            <span class="crm-pill crm-pill-muted">{{ c.status or "nouvelle" }}</span>
+                        </td>
+                        <td class="text-end">
+                            {% if available_endpoints and 'client_detail' in available_endpoints %}
+                                <a class="btn btn-secondary btn-sm"
+                                   href="{{ url_for('client_detail', client_id=c.client_id) }}">
+                                    Ouvrir dossier
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+    {% else %}
+    <div class="card-body">
+        <div class="crm-empty-state">
+            <strong>Aucune demande de cotation trouvee.</strong>
+            <span>Les demandes deposees depuis les fiches clients apparaitront ici.</span>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
 {% endblock %}

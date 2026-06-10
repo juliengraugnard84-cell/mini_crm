@@ -1,115 +1,138 @@
 {% extends "base.html" %}
+{% block title %}Ressources{% endblock %}
+
+{% set resource_count = fichiers|length if fichiers else 0 %}
+
 {% block content %}
 
-<div class="container-fluid">
+<section class="crm-page-hero crm-page-hero--compact">
+    <div>
+        <span class="crm-page-kicker">Espace equipe</span>
+        <h1>Ressources partagees</h1>
+        <p>Une base documentaire d'equipe assortie au CRM, pour centraliser les supports utiles aux admins comme aux commerciaux.</p>
+    </div>
 
-  <!-- ================= HEADER ================= -->
-  <div class="mb-4">
-    <h2 class="mb-1">Ressources partagées</h2>
-    <p class="text-muted mb-0">
-      Documents partagés accessibles aux administrateurs et commerciaux.
-    </p>
-  </div>
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">{{ resource_count }} ressource(s)</span>
+        <span class="crm-hero-pill">Partage equipe</span>
+        <span class="crm-hero-pill">Acces admin + commercial</span>
+    </div>
+</section>
 
-  <!-- ================= UPLOAD ================= -->
-  {% if current_user and current_user.role in ["admin", "commercial"] %}
-  <div class="card mb-4 shadow-sm">
+<section class="kpi-grid">
+    <article class="kpi-tile">
+        <span class="kpi-label">Ressources disponibles</span>
+        <div class="kpi-value">{{ resource_count }}</div>
+    </article>
+
+    <article class="kpi-tile">
+        <span class="kpi-label">Canal</span>
+        <div class="kpi-value">Equipe</div>
+    </article>
+</section>
+
+{% if current_user and current_user.role in ["admin", "commercial"] %}
+<div class="card crm-upload-card">
     <div class="card-body">
-      <h5 class="card-title mb-3">➕ Ajouter un document</h5>
-
-      <form method="POST"
-            action="{{ url_for('shared_resources_upload') }}"
-            enctype="multipart/form-data"
-            class="row g-3">
-
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-        <div class="col-md-5">
-          <label class="form-label">Nom du document</label>
-          <input
-            type="text"
-            name="doc_name"
-            class="form-control"
-            placeholder="Ex : Mandat EDF client X"
-            required>
+        <div class="crm-table-top crm-table-top--flush">
+            <div>
+                <h5>Ajouter une ressource</h5>
+                <p class="crm-soft-note">Depose un document commun utilisable par toute l'equipe.</p>
+            </div>
         </div>
 
-        <div class="col-md-5">
-          <label class="form-label">Fichier</label>
-          <input type="file" name="file" class="form-control" required>
+        <form method="post"
+              action="{{ url_for('shared_resources_upload') }}"
+              enctype="multipart/form-data"
+              class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="col-md-5">
+                <label class="form-label">Nom du document</label>
+                <input type="text"
+                       name="doc_name"
+                       class="form-control"
+                       placeholder="Ex : Trame de negociation"
+                       required>
+            </div>
+
+            <div class="col-md-5">
+                <label class="form-label">Fichier</label>
+                <input type="file" name="file" class="form-control" required>
+            </div>
+
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">Publier</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<div class="card crm-data-table-card">
+    <div class="crm-table-top">
+        <div>
+            <h5>Documents partages</h5>
+            <p class="crm-soft-note">Modeles, supports et references utiles au quotidien commercial.</p>
         </div>
+        <span class="crm-soft-note">{{ resource_count }} ressource(s)</span>
+    </div>
 
-        <div class="col-md-2 d-flex align-items-end">
-          <button type="submit" class="btn btn-primary w-100">
-            Uploader
-          </button>
+    {% if fichiers %}
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle crm-records-table">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th style="width: 160px;">Date</th>
+                        <th style="width: 120px;">Taille</th>
+                        <th class="text-end" style="width: 200px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for f in fichiers %}
+                    <tr>
+                        <td>
+                            <div class="crm-cell-stack">
+                                <strong>{{ f.nom }}</strong>
+                                <small>Ressource partagee</small>
+                            </div>
+                        </td>
+                        <td>{{ format_date(f.date) }}</td>
+                        <td>{{ f.taille }}</td>
+                        <td class="text-end">
+                            <div class="crm-action-row">
+                                <a class="btn btn-secondary btn-sm"
+                                   href="{{ url_for('download_document', key=f.key) }}">
+                                    Telecharger
+                                </a>
+
+                                {% if current_user.role == "admin" %}
+                                <form method="post"
+                                      action="{{ url_for('delete_document') }}"
+                                      onsubmit="return confirm('Supprimer cette ressource ?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <input type="hidden" name="key" value="{{ f.key }}">
+                                    <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
         </div>
-
-      </form>
     </div>
-  </div>
-  {% endif %}
-
-  <!-- ================= DOCUMENTS PARTAGÉS ================= -->
-  <div class="card mb-4 shadow-sm">
-    <div class="card-header bg-light">
-      <strong>📂 Documents partagés</strong>
+    {% else %}
+    <div class="card-body">
+        <div class="crm-empty-state">
+            <strong>Aucune ressource disponible.</strong>
+            <span>Ajoute un premier support partage pour l'equipe.</span>
+        </div>
     </div>
-    <div class="card-body p-0">
-
-      <table class="table table-striped table-hover mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Nom</th>
-            <th style="width: 160px;">Date</th>
-            <th style="width: 120px;">Taille</th>
-            <th style="width: 160px;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-
-        {% if fichiers %}
-          {% for f in fichiers %}
-          <tr>
-            <td>{{ f.nom }}</td>
-            <td>{{ format_date(f.date) }}</td>
-            <td>{{ f.taille }}</td>
-            <td>
-              <a class="btn btn-sm btn-outline-primary"
-                 href="{{ url_for('download_document', key=f.key) }}">
-                Télécharger
-              </a>
-
-              {% if current_user.role == "admin" %}
-              <form method="POST"
-                    action="{{ url_for('delete_document') }}"
-                    class="d-inline">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="key" value="{{ f.key }}">
-                <button type="submit"
-                        class="btn btn-sm btn-outline-danger"
-                        onclick="return confirm('Supprimer ce document ?')">
-                  Supprimer
-                </button>
-              </form>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="4" class="text-center text-muted py-4">
-              Aucun document disponible
-            </td>
-          </tr>
-        {% endif %}
-
-        </tbody>
-      </table>
-
-    </div>
-  </div>
-
+    {% endif %}
 </div>
 
 {% endblock %}

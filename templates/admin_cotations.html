@@ -1,157 +1,162 @@
 {% extends "base.html" %}
+{% block title %}Demandes de cotation{% endblock %}
+
+{% set cotation_list = cotations if cotations else [] %}
+{% set ns = namespace(unread=0, scheduled=0, gaz=0, elec=0, dual=0) %}
+{% for c in cotation_list %}
+    {% if not c.is_read %}
+        {% set ns.unread = ns.unread + 1 %}
+    {% endif %}
+    {% if c.date_negociation %}
+        {% set ns.scheduled = ns.scheduled + 1 %}
+    {% endif %}
+    {% set energie = (c.energie_type or "")|lower %}
+    {% if "gaz" in energie and "elec" in energie %}
+        {% set ns.dual = ns.dual + 1 %}
+    {% elif "gaz" in energie %}
+        {% set ns.gaz = ns.gaz + 1 %}
+    {% elif "elec" in energie %}
+        {% set ns.elec = ns.elec + 1 %}
+    {% endif %}
+{% endfor %}
 
 {% block content %}
 
-<!-- ================= PAGE HEADER ================= -->
-<div class="page-header mb-4">
-    <h1>Demandes de cotation</h1>
-    <p class="text-muted mb-0">
-        Liste complète des demandes de cotation (administration).
-    </p>
-</div>
+<section class="crm-page-hero crm-page-hero--compact">
+    <div>
+        <span class="crm-page-kicker">Vue administration</span>
+        <h1>Demandes de cotation</h1>
+        <p>Pilotage propre des demandes entrantes, avec lecture rapide des commerciaux, energies et prochaines negociations.</p>
+    </div>
 
-<!-- ================= TABLE ================= -->
-<div class="card">
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">{{ cotation_list|length }} demandes</span>
+        <span class="crm-hero-pill">{{ ns.unread }} non lues</span>
+        <span class="crm-hero-pill">{{ ns.scheduled }} negociees planifiees</span>
+    </div>
+</section>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">Historique des cotations</h5>
-        <div class="text-muted small">
-            Total : {{ cotations|length if cotations else 0 }}
+<section class="kpi-grid">
+    <article class="kpi-tile">
+        <span class="kpi-label">Demandes a traiter</span>
+        <div class="kpi-value">{{ ns.unread }}</div>
+    </article>
+
+    <article class="kpi-tile">
+        <span class="kpi-label">Electricite</span>
+        <div class="kpi-value">{{ ns.elec }}</div>
+    </article>
+
+    <article class="kpi-tile">
+        <span class="kpi-label">Gaz</span>
+        <div class="kpi-value">{{ ns.gaz }}</div>
+    </article>
+
+    <article class="kpi-tile">
+        <span class="kpi-label">Mixte</span>
+        <div class="kpi-value">{{ ns.dual }}</div>
+    </article>
+</section>
+
+<div class="card crm-data-table-card">
+    <div class="crm-table-top">
+        <div>
+            <h5>Historique des cotations</h5>
+            <p class="crm-soft-note">Clique sur une ligne pour ouvrir la demande complete, ou passe par le dossier client.</p>
+        </div>
+        <span class="crm-soft-note">Total : {{ cotation_list|length }}</span>
+    </div>
+
+    {% if cotation_list %}
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle crm-records-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Date creation</th>
+                        <th>Dossier</th>
+                        <th>Commercial</th>
+                        <th>Energie</th>
+                        <th>Date negociation</th>
+                        <th>Facturation</th>
+                        <th>Consommation</th>
+                        <th>Statut</th>
+                        <th>Lecture</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in cotation_list %}
+                    {% set energie = (c.energie_type or "")|lower %}
+                    <tr class="crm-clickable-row"
+                        onclick="window.location='{{ url_for('admin_cotation_detail', cotation_id=c.id) }}'">
+                        <td class="crm-mono">#{{ c.id }}</td>
+                        <td>{{ format_date(c.date_creation) if c.date_creation else "-" }}</td>
+                        <td>
+                            <div class="crm-cell-stack">
+                                <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
+                                   class="crm-primary-link"
+                                   onclick="event.stopPropagation();">
+                                    {{ c.client_name or ("Client #" ~ c.client_id) }}
+                                </a>
+                                <small>Dossier CRM</small>
+                            </div>
+                        </td>
+                        <td>{{ c.commercial_name or "-" }}</td>
+                        <td>
+                            {% if "gaz" in energie and "elec" in energie %}
+                                <span class="crm-pill crm-pill-info">Elec + gaz</span>
+                            {% elif "gaz" in energie %}
+                                <span class="crm-pill crm-pill-warning">Gaz</span>
+                            {% elif "elec" in energie %}
+                                <span class="crm-pill crm-pill-primary">Electricite</span>
+                            {% else %}
+                                <span class="crm-pill crm-pill-muted">Non renseigne</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ format_date(c.date_negociation) if c.date_negociation else "-" }}</td>
+                        <td>{{ c.adresse_facturation or "-" }}</td>
+                        <td>{{ c.adresse_consommation or "-" }}</td>
+                        <td>
+                            <span class="crm-pill crm-pill-muted">{{ c.status or "nouvelle" }}</span>
+                        </td>
+                        <td>
+                            {% if c.is_read %}
+                                <span class="crm-pill crm-pill-success">Lue</span>
+                            {% else %}
+                                <span class="crm-pill crm-pill-danger">A lire</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end" onclick="event.stopPropagation();">
+                            <div class="crm-action-row">
+                                <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
+                                   class="btn btn-secondary btn-sm">
+                                    Ouvrir
+                                </a>
+
+                                <form method="post"
+                                      action="{{ url_for('delete_cotation_admin', cotation_id=c.id) }}"
+                                      onsubmit="return confirm('Supprimer definitivement cette cotation ?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button class="btn btn-danger btn-sm">Supprimer</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
-
-    {% if cotations %}
-    <div class="table-responsive">
-        <table class="table align-middle table-hover">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Date création</th>
-                    <th>Dossier</th>
-                    <th>Commercial</th>
-                    <th>Énergie</th>
-                    <th>Date négociation</th>
-                    <th>Adresse facturation</th>
-                    <th>Adresse consommation</th>
-                    <th>Statut</th>
-                    <th>Lu</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                {% for c in cotations %}
-                <tr
-                    style="cursor:pointer"
-                    onclick="window.location='{{ url_for('admin_cotation_detail', cotation_id=c.id) }}'"
-                >
-
-                    <!-- ================= ID ================= -->
-                    <td class="text-muted">
-                        #{{ c.id }}
-                    </td>
-
-                    <!-- ================= DATE CREATION ================= -->
-                    <td>
-                        {{ format_date(c.date_creation) if c.date_creation else "—" }}
-                    </td>
-
-                    <!-- ================= DOSSIER ================= -->
-                    <td>
-                        <a href="{{ url_for('client_detail', client_id=c.client_id) }}"
-                           onclick="event.stopPropagation();">
-                            {{ c.client_name or ("Client #" ~ c.client_id) }}
-                        </a>
-                    </td>
-
-                    <!-- ================= COMMERCIAL ================= -->
-                    <td>
-                        {{ c.commercial_name or "—" }}
-                    </td>
-
-                    <!-- ================= ENERGIE (ROBUSTE 🔥) ================= -->
-                    <td>
-                        {% set energie = (c.energie_type or "").strip().lower() %}
-
-                        {% if "gaz" in energie %}
-                            <span class="badge bg-warning text-dark">
-                                🔥 Gaz
-                            </span>
-
-                        {% elif "elec" in energie %}
-                            <span class="badge bg-info text-dark">
-                                ⚡ Électricité
-                            </span>
-
-                        {% else %}
-                            <span class="text-muted">—</span>
-                        {% endif %}
-                    </td>
-
-                    <!-- ================= DATE NEGOCIATION ================= -->
-                    <td>
-                        {{ format_date(c.date_negociation) if c.date_negociation else "—" }}
-                    </td>
-
-                    <!-- ================= ADRESSE FACTURATION ================= -->
-                    <td>
-                        {{ c.adresse_facturation or "—" }}
-                    </td>
-
-                    <!-- ================= ADRESSE CONSOMMATION ================= -->
-                    <td>
-                        {{ c.adresse_consommation or "—" }}
-                    </td>
-
-                    <!-- ================= STATUT ================= -->
-                    <td>
-                        {{ c.status or "—" }}
-                    </td>
-
-                    <!-- ================= LU ================= -->
-                    <td>
-                        {% if c.is_read %}
-                            <span class="badge bg-success">Oui</span>
-                        {% else %}
-                            <span class="badge bg-warning text-dark">Non</span>
-                        {% endif %}
-                    </td>
-
-                    <!-- ================= ACTIONS ================= -->
-                    <td class="text-end" onclick="event.stopPropagation();">
-                        <div class="d-inline-flex gap-2">
-
-                            <!-- OUVRIR -->
-                            <a href="{{ url_for('admin_cotation_detail', cotation_id=c.id) }}"
-                               class="btn btn-outline-primary btn-sm">
-                                Ouvrir
-                            </a>
-
-                            <!-- SUPPRIMER -->
-                            <form method="post"
-                                  action="{{ url_for('delete_cotation_admin', cotation_id=c.id) }}"
-                                  onsubmit="return confirm('Supprimer définitivement cette cotation ?');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button class="btn btn-danger btn-sm">
-                                    Supprimer
-                                </button>
-                            </form>
-
-                        </div>
-                    </td>
-
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
     {% else %}
-        <p class="text-muted mb-0">
-            Aucune demande de cotation enregistrée.
-        </p>
+    <div class="card-body">
+        <div class="crm-empty-state">
+            <strong>Aucune demande de cotation.</strong>
+            <span>Les nouvelles demandes remonteront ici automatiquement.</span>
+        </div>
+    </div>
     {% endif %}
-
 </div>
 
 {% endblock %}

@@ -1,90 +1,117 @@
 {% extends "base.html" %}
 {% block title %}Documents{% endblock %}
 
+{% set file_count = fichiers|length if fichiers else 0 %}
+
 {% block content %}
 
-<div class="page-header mb-4">
-    <h1>Documents</h1>
-    <p class="text-muted">Bibliotheque documentaire centralisee pour toute l'equipe.</p>
-</div>
+<section class="crm-page-hero crm-page-hero--compact">
+    <div>
+        <span class="crm-page-kicker">Bibliotheque admin</span>
+        <h1>Documents</h1>
+        <p>Une vue propre pour retrouver les fichiers stockes, tout en gardant les depots directement rattaches aux dossiers clients.</p>
+    </div>
 
-<div class="card mb-4">
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">{{ file_count }} fichier(s)</span>
+        <span class="crm-hero-pill">Stock centralise</span>
+        <span class="crm-hero-pill">Tracabilite par dossier</span>
+    </div>
+</section>
+
+<section class="kpi-grid">
+    <article class="kpi-tile">
+        <span class="kpi-label">Documents visibles</span>
+        <div class="kpi-value">{{ file_count }}</div>
+    </article>
+
+    <article class="kpi-tile">
+        <span class="kpi-label">Mode d'ajout</span>
+        <div class="kpi-value">Client</div>
+    </article>
+</section>
+
+<div class="card crm-note-card">
     <div class="card-body">
-        <h5>Ajouter un document</h5>
-        <p class="text-muted mb-3">Les documents se gerent directement depuis la fiche d'un dossier client.</p>
-
+        <h5>Ajout des documents</h5>
+        <p class="text-muted mb-3">Les documents continuent d'etre ajoutes depuis la fiche d'un dossier client pour garder un historique propre.</p>
         <div class="alert alert-info mb-0">
-            Pour garder une tracabilite propre, l'ajout de documents se fait uniquement depuis un dossier client.
-            <br>
-            <strong>Clients &rarr; Ouvrir un dossier &rarr; Documents</strong>
+            Clients &rarr; Ouvrir un dossier &rarr; Documents
         </div>
     </div>
 </div>
 
-<div class="card">
+<div class="card crm-data-table-card">
     <div class="crm-table-top">
         <div>
-            <h5>Documents</h5>
-            <p class="crm-soft-note">Acces rapide aux pieces partagees et archives client.</p>
+            <h5>Bibliotheque</h5>
+            <p class="crm-soft-note">Acces rapide aux pieces partagees et archives deja stockees.</p>
         </div>
-        <span class="crm-soft-note">{{ fichiers|length if fichiers else 0 }} fichier(s)</span>
+        <span class="crm-soft-note">{{ file_count }} fichier(s)</span>
     </div>
 
-    {% if not fichiers %}
+    {% if fichiers %}
     <div class="card-body">
-        <div class="text-muted">Aucun document pour le moment.</div>
+        <div class="table-responsive">
+            <table class="table align-middle crm-records-table">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th style="width:120px;">Taille</th>
+                        <th class="text-end" style="width:220px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for f in fichiers %}
+                    <tr>
+                        <td>
+                            <div class="crm-cell-stack">
+                                <strong>{{ f.nom }}</strong>
+                                <small>Archive CRM</small>
+                            </div>
+                        </td>
+
+                        <td class="text-muted">
+                            {% set s = f.taille or 0 %}
+                            {% if s >= 1048576 %}
+                                {{ "%.2f"|format(s / 1048576) }} Mo
+                            {% elif s >= 1024 %}
+                                {{ "%.0f"|format(s / 1024) }} Ko
+                            {% else %}
+                                {{ s }} o
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end">
+                            <div class="crm-action-row">
+                                <a href="{{ url_for('download_document', key=f.key) }}"
+                                   class="btn btn-secondary btn-sm">
+                                    Ouvrir
+                                </a>
+
+                                {% if current_user and current_user.role == 'admin' %}
+                                <form method="post"
+                                      action="{{ url_for('delete_document') }}"
+                                      onsubmit="return confirm('Supprimer definitivement ce document ?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <input type="hidden" name="key" value="{{ f.key }}">
+                                    <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
     {% else %}
     <div class="card-body">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>Nom</th>
-                    <th style="width:120px;">Taille</th>
-                    <th class="text-end" style="width:220px;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for f in fichiers %}
-                <tr>
-                    <td>
-                        <strong>{{ f.nom }}</strong>
-                    </td>
-
-                    <td class="text-muted">
-                        {% set s = f.taille or 0 %}
-                        {% if s >= 1048576 %}
-                            {{ "%.2f"|format(s / 1048576) }} Mo
-                        {% elif s >= 1024 %}
-                            {{ "%.0f"|format(s / 1024) }} Ko
-                        {% else %}
-                            {{ s }} o
-                        {% endif %}
-                    </td>
-
-                    <td class="text-end">
-                        <a href="{{ url_for('download_document', key=f.key) }}"
-                           class="btn btn-secondary btn-sm">
-                            Ouvrir
-                        </a>
-
-                        {% if current_user and current_user.role == 'admin' %}
-                        <form method="post"
-                              action="{{ url_for('delete_document') }}"
-                              style="display:inline;"
-                              onsubmit="return confirm('Supprimer definitivement ce document ?');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <input type="hidden" name="key" value="{{ f.key }}">
-                            <button type="submit" class="btn btn-danger btn-sm">
-                                Supprimer
-                            </button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <div class="crm-empty-state">
+            <strong>Aucun document pour le moment.</strong>
+            <span>Les archives de dossiers seront listees ici automatiquement.</span>
+        </div>
     </div>
     {% endif %}
 </div>

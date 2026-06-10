@@ -72,11 +72,11 @@ CHAT_ALLOWED_ROLES = {"admin", "commercial"}
 PLANNING_ALLOWED_ROLES = {"admin", "commercial"}
 
 PLANNING_EVENT_CATEGORIES = {
-    "meeting": {"label": "Rendez-vous", "color": "#2563eb"},
-    "negociation": {"label": "Negociation", "color": "#0f766e"},
-    "relance": {"label": "Relance", "color": "#ea580c"},
+    "meeting": {"label": "Rendez-vous", "color": "#2f6cab"},
+    "negociation": {"label": "Negociation", "color": "#f2b233"},
+    "relance": {"label": "Relance", "color": "#123646"},
     "signature": {"label": "Signature", "color": "#16a34a"},
-    "visit": {"label": "Visite", "color": "#ca8a04"},
+    "visit": {"label": "Visite", "color": "#d89a24"},
     "internal": {"label": "Interne", "color": "#475569"},
 }
 
@@ -93,9 +93,9 @@ PLANNING_EVENT_VISIBILITIES = {
 }
 
 PLANNING_SOURCE_STYLES = {
-    "manual": {"label": "Agenda", "color": "#2563eb"},
-    "cotation": {"label": "Negociation", "color": "#0f766e"},
-    "update": {"label": "Suivi client", "color": "#d97706"},
+    "manual": {"label": "Agenda", "color": "#2f6cab"},
+    "cotation": {"label": "Negociation", "color": "#f2b233"},
+    "update": {"label": "Suivi client", "color": "#08133f"},
 }
 
 # Max upload (MB) — configurable via Config.MAX_UPLOAD_MB sinon 10MB

@@ -31,7 +31,6 @@
         </div>
 
         <nav class="sidebar-nav">
-
             <a href="{{ url_for('dashboard') }}"
                class="{% if request.path.startswith('/dashboard') %}active{% endif %}">
                 Tableau de bord
@@ -84,7 +83,6 @@
             {% endif %}
 
             {% if current_user and current_user.role == "admin" %}
-
                 <a href="{{ url_for('admin_updates') }}"
                    class="{% if request.path.startswith('/admin/updates') %}active{% endif %}">
                     Demandes de mise a jour
@@ -115,7 +113,6 @@
                    class="{% if request.path.startswith('/admin/users') %}active{% endif %}">
                     Utilisateurs
                 </a>
-
             {% endif %}
         </nav>
 
@@ -125,7 +122,6 @@
     </aside>
 
     <div class="main-content">
-
         <div class="topbar">
             <div class="topbar-copy">
                 <span class="topbar-kicker">Synergygroup CRM</span>
@@ -161,12 +157,17 @@
 {% if current_user and current_user.role in ["admin", "commercial"] %}
 
 <button id="chat-toggle" class="chat-toggle" type="button" aria-label="Ouvrir la messagerie">
-    <span class="chat-toggle-icon">ðŸ’¬</span>
+    <span class="chat-toggle-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" focusable="false" aria-hidden="true">
+            <path d="M6.5 8.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M6.5 12h7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M8.5 17.5H5.75A2.75 2.75 0 0 1 3 14.75V6.75A2.75 2.75 0 0 1 5.75 4h12.5A2.75 2.75 0 0 1 21 6.75v8A2.75 2.75 0 0 1 18.25 17.5h-5.2l-3.35 2.5a.45.45 0 0 1-.72-.36v-2.14Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        </svg>
+    </span>
     <span id="chat-badge" class="chat-badge" style="display:none;">0</span>
 </button>
 
 <div id="chat-widget" class="chat-widget" aria-hidden="true">
-
     <div class="chat-header">
         <div class="chat-header-left">
             <div class="chat-title-row">
@@ -177,7 +178,13 @@
                 Canal {{ "Admin" if current_user.role == "admin" else "Commercial" }}
             </div>
         </div>
-        <button id="chat-close" class="chat-close" type="button" aria-label="Fermer la messagerie">âœ•</button>
+        <button id="chat-close" class="chat-close" type="button" aria-label="Fermer la messagerie">
+            <span class="chat-action-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" focusable="false" aria-hidden="true">
+                    <path d="M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </span>
+        </button>
     </div>
 
     <div class="chat-toolbar">
@@ -189,7 +196,12 @@
         </div>
 
         <button id="chat-refresh" class="chat-icon-btn" type="button" aria-label="Rafraichir le chat">
-            â†»
+            <span class="chat-action-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" focusable="false" aria-hidden="true">
+                    <path d="M20 12a8 8 0 0 1-13.66 5.66M4 12a8 8 0 0 1 13.66-5.66" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path d="M15.5 4.5h3.5V8M8.5 19.5H5V16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </span>
         </button>
     </div>
 
@@ -204,10 +216,13 @@
     <div id="chat-preview" class="chat-preview"></div>
 
     <form id="chat-form" class="chat-inputbar" enctype="multipart/form-data">
-
         <div class="chat-compose-shell">
             <label class="chat-attach" title="Joindre un ou plusieurs fichiers">
-                ðŸ“Ž
+                <span class="chat-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" focusable="false" aria-hidden="true">
+                        <path d="M8.5 12.5 14.8 6.2a3.1 3.1 0 1 1 4.4 4.4l-8.1 8.1a5.2 5.2 0 0 1-7.35-7.35l8.1-8.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
                 <input id="chat-file" type="file" name="file" multiple tabindex="-1">
             </label>
 
@@ -218,14 +233,20 @@
                 rows="1"
                 placeholder="Ecrire un message..."></textarea>
 
-            <button class="chat-send" type="submit" aria-label="Envoyer le message">âž¤</button>
+            <button class="chat-send" type="submit" aria-label="Envoyer le message">
+                <span class="chat-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" focusable="false" aria-hidden="true">
+                        <path d="M4 11.5 19 4l-3.7 16-3.85-5.95L4 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                        <path d="m11.5 14 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                </span>
+            </button>
         </div>
 
         <div class="chat-compose-footer">
             <div id="chat-file-meta" class="chat-file-meta">Aucun fichier selectionne</div>
             <div class="chat-compose-hint">Entree pour envoyer, Maj+Entree pour une ligne</div>
         </div>
-
     </form>
 </div>
 
