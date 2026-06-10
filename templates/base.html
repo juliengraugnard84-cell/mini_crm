@@ -69,6 +69,13 @@
                 Clients
             </a>
 
+            {% if current_user and current_user.role in ["admin", "commercial"] %}
+                <a href="{{ url_for('cspe_index') }}"
+                   class="{% if request.path.startswith('/cspe') %}active{% endif %}">
+                    CSPE
+                </a>
+            {% endif %}
+
             <a href="{{ url_for('chiffre_affaire') }}"
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
                 Chiffre d’affaires

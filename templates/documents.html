@@ -77,10 +77,11 @@
                         <!-- ================= SUPPRIMER (ADMIN SEULEMENT) ================= -->
                         {% if current_user and current_user.role == 'admin' %}
                         <form method="post"
-                              action="{{ url_for('delete_document', key=f.key) }}"
+                              action="{{ url_for('delete_document') }}"
                               style="display:inline;"
                               onsubmit="return confirm('Supprimer définitivement ce document ?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="key" value="{{ f.key }}">
                             <button type="submit"
                                     class="btn btn-danger btn-sm">
                                 Supprimer

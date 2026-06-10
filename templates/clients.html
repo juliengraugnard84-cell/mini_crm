@@ -83,11 +83,12 @@
                     {% if current_user and current_user.role == "admin" %}
                     <div class="col-md-6">
                         <label class="form-label">Commercial *</label>
-                        <input type="text"
-                               name="commercial"
-                               class="form-control"
-                               placeholder="Ex : Julien, Admin, Jeremy"
-                               required>
+                        <select name="owner_id" class="form-select" required>
+                            <option value="">Selectionner un commercial</option>
+                            {% for u in users %}
+                            <option value="{{ u.id }}">{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     {% endif %}
 

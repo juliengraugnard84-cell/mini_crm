@@ -257,6 +257,19 @@ def init_db():
                 )
             """)
 
+            # ================= CSPE =================
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS cspe_dossiers (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    notes TEXT,
+                    owner_id INTEGER,
+                    date_negociation DATE,
+                    chiffre_affaire DOUBLE PRECISION DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # ================= CHAT =================
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS chat_messages (
@@ -329,6 +342,13 @@ def init_db():
             _try_add_column(conn, "crm_clients", "siret TEXT")
             _try_add_column(conn, "crm_clients", "gerant_nom TEXT")
 
+            # CSPE
+            _try_add_column(conn, "cspe_dossiers", "notes TEXT")
+            _try_add_column(conn, "cspe_dossiers", "owner_id INTEGER")
+            _try_add_column(conn, "cspe_dossiers", "date_negociation DATE")
+            _try_add_column(conn, "cspe_dossiers", "chiffre_affaire DOUBLE PRECISION DEFAULT 0")
+            _try_add_column(conn, "cspe_dossiers", "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+
             # BASE COTATION
             _try_add_column(conn, "cotations", "type_compteur TEXT")
             _try_add_column(conn, "cotations", "heure_negociation TIME")
@@ -390,7 +410,11 @@ def init_db():
 
 s3 = None
 
-if not LOCAL_MODE:
+if LOCAL_MODE:
+    logger.info("ℹ️ Mode local actif : S3 désactivé.")
+elif not AWS_BUCKET:
+    logger.warning("S3 désactivé : AWS_BUCKET manquant.")
+else:
     try:
         s3 = boto3.client(
             "s3",
@@ -411,8 +435,6 @@ if not LOCAL_MODE:
     except Exception as e:
         logger.exception("❌ Erreur connexion S3 : %r", e)
         s3 = None
-else:
-    logger.info("ℹ️ Mode local actif : S3 désactivé.")
 
 
 # =========================================================
@@ -498,7 +520,7 @@ def s3_upload_fileobj(fileobj, bucket: str, key: str):
     """
     Upload PRIVÉ S3 (Block Public Access OK).
     """
-    if not s3:
+    if not s3 or not bucket:
         raise RuntimeError("Client S3 non initialisé.")
 
     stream = getattr(fileobj, "stream", fileobj)
@@ -528,7 +550,7 @@ def s3_presigned_url(key: str, expires_in: int = 3600) -> str:
     """
     Génère une URL signée (lecture privée).
     """
-    if LOCAL_MODE or not s3:
+    if LOCAL_MODE or not s3 or not AWS_BUCKET:
         return ""
 
     try:
@@ -559,7 +581,7 @@ def s3_list_all_objects(bucket: str, prefix: str | None = None):
     """
     Liste complète S3 avec pagination.
     """
-    if not s3:
+    if not s3 or not bucket:
         return []
 
     items = []
@@ -591,7 +613,7 @@ def _s3_object_exists(bucket: str, key: str) -> bool:
     """
     Test existence objet S3.
     """
-    if not s3:
+    if not s3 or not bucket:
         return False
 
     try:
@@ -830,6 +852,282 @@ def can_access_document_key(key: str) -> bool:
         return False
 
     return can_access_client(client_id)
+
+
+CSPE_SCHEMA_READY = False
+CSPE_PREFIX = "cspe/"
+LOCAL_UPLOAD_ROOT = os.path.join(app.root_path, "local_uploads")
+
+
+def ensure_cspe_schema():
+    """
+    Crée la table CSPE à la demande pour éviter une migration manuelle
+    lors de l'activation du module.
+    """
+    global CSPE_SCHEMA_READY
+
+    if CSPE_SCHEMA_READY:
+        return
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS cspe_dossiers (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    notes TEXT,
+                    owner_id INTEGER,
+                    date_negociation DATE,
+                    chiffre_affaire DOUBLE PRECISION DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+        _try_add_column(conn, "cspe_dossiers", "notes TEXT")
+        _try_add_column(conn, "cspe_dossiers", "owner_id INTEGER")
+        _try_add_column(conn, "cspe_dossiers", "date_negociation DATE")
+        _try_add_column(conn, "cspe_dossiers", "chiffre_affaire DOUBLE PRECISION DEFAULT 0")
+        _try_add_column(conn, "cspe_dossiers", "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+
+        conn.commit()
+        CSPE_SCHEMA_READY = True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def can_access_cspe_dossier(dossier_id: int) -> bool:
+    """
+    Admin : accès total.
+    Commercial : accès uniquement à ses dossiers CSPE.
+    """
+    try:
+        dossier_id_int = int(dossier_id)
+    except Exception:
+        return False
+
+    if dossier_id_int <= 0:
+        return False
+
+    try:
+        ensure_cspe_schema()
+    except Exception:
+        return False
+
+    user = session.get("user") or {}
+    user_id = user.get("id")
+    role = user.get("role")
+
+    if not user_id or not role:
+        return False
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT owner_id FROM cspe_dossiers WHERE id = %s",
+                (dossier_id_int,),
+            )
+            row = cur.fetchone()
+    except Exception:
+        return False
+
+    if not row:
+        return False
+
+    if role == "admin":
+        return True
+
+    return row.get("owner_id") == user_id
+
+
+def cspe_storage_prefix(dossier_id: int, dossier_name: str | None = None) -> str:
+    """
+    Préfixe de stockage unique par dossier CSPE.
+    """
+    if dossier_name is None:
+        ensure_cspe_schema()
+        conn = get_db()
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT name FROM cspe_dossiers WHERE id = %s",
+                (dossier_id,),
+            )
+            row = cur.fetchone()
+
+        dossier_name = row.get("name") if row else ""
+
+    slug = slugify(dossier_name or "")
+    base = f"{slug}_{dossier_id}" if slug else f"dossier_{dossier_id}"
+    return f"{CSPE_PREFIX}{base}/"
+
+
+def extract_cspe_id_from_storage_key(key: str):
+    """
+    Extrait l'id du dossier CSPE depuis une clé de stockage.
+    """
+    if not key:
+        return None
+
+    match = re.match(r"^cspe\/[^\/]+_(\d+)\/", key)
+    if not match:
+        return None
+
+    try:
+        return int(match.group(1))
+    except Exception:
+        return None
+
+
+def can_access_cspe_document_key(key: str) -> bool:
+    """
+    Vérifie qu'une pièce jointe CSPE appartient bien à un dossier accessible.
+    """
+    dossier_id = extract_cspe_id_from_storage_key(key)
+    if not dossier_id:
+        return False
+
+    return can_access_cspe_dossier(dossier_id)
+
+
+def _local_storage_parts(key: str):
+    normalized = (key or "").replace("\\", "/").strip("/")
+    parts = [part for part in normalized.split("/") if part and part != "."]
+
+    if not parts or any(part == ".." for part in parts):
+        raise ValueError("Clé de stockage invalide.")
+
+    return parts
+
+
+def local_storage_path(key: str) -> str:
+    root = os.path.abspath(LOCAL_UPLOAD_ROOT)
+    parts = _local_storage_parts(key)
+    path = os.path.abspath(os.path.join(root, *parts))
+
+    if path != root and not path.startswith(root + os.sep):
+        raise ValueError("Chemin de stockage invalide.")
+
+    return path
+
+
+def _local_make_non_overwriting_key(key: str) -> str:
+    if not os.path.exists(local_storage_path(key)):
+        return key
+
+    base, ext = os.path.splitext(key)
+
+    for _ in range(20):
+        candidate = f"{base}_{secrets.token_hex(3)}{ext}"
+        if not os.path.exists(local_storage_path(candidate)):
+            return candidate
+
+    return f"{base}_{secrets.token_hex(8)}{ext}"
+
+
+def list_local_storage_objects(prefix: str):
+    try:
+        directory = local_storage_path(prefix)
+    except ValueError:
+        return []
+
+    if not os.path.isdir(directory):
+        return []
+
+    root = os.path.abspath(LOCAL_UPLOAD_ROOT)
+    items = []
+
+    for current_root, _, filenames in os.walk(directory):
+        for filename in sorted(filenames):
+            full_path = os.path.join(current_root, filename)
+            key = os.path.relpath(full_path, root).replace("\\", "/")
+            items.append({
+                "Key": key,
+                "Size": os.path.getsize(full_path),
+            })
+
+    return items
+
+
+def delete_local_storage_object(key: str):
+    path = local_storage_path(key)
+
+    if not os.path.exists(path):
+        return
+
+    os.remove(path)
+
+    root = os.path.abspath(LOCAL_UPLOAD_ROOT)
+    current_dir = os.path.dirname(path)
+
+    while current_dir.startswith(root) and current_dir != root:
+        if os.listdir(current_dir):
+            break
+        os.rmdir(current_dir)
+        current_dir = os.path.dirname(current_dir)
+
+
+def list_cspe_documents(dossier_id: int):
+    ensure_cspe_schema()
+    docs = []
+
+    try:
+        if LOCAL_MODE:
+            items = list_local_storage_objects(CSPE_PREFIX)
+        elif s3:
+            items = s3_list_all_objects(AWS_BUCKET, prefix=CSPE_PREFIX)
+        else:
+            items = []
+
+        for item in items:
+            key = item.get("Key")
+
+            if not key or key.endswith("/"):
+                continue
+
+            if extract_cspe_id_from_storage_key(key) != dossier_id:
+                continue
+
+            docs.append({
+                "nom": key.split("/")[-1],
+                "key": key,
+                "taille": item.get("Size", 0),
+            })
+
+    except Exception as e:
+        logger.exception("Erreur list_cspe_documents : %r", e)
+
+    return docs
+
+
+def delete_cspe_documents_for_dossier(dossier_id: int):
+    documents = list_cspe_documents(dossier_id)
+
+    if LOCAL_MODE:
+        for document in documents:
+            try:
+                delete_local_storage_object(document["key"])
+            except Exception:
+                logger.exception(
+                    "Erreur suppression document local CSPE : %s",
+                    document.get("key"),
+                )
+        return
+
+    if not s3:
+        return
+
+    keys = [{"Key": document["key"]} for document in documents if document.get("key")]
+
+    for idx in range(0, len(keys), 1000):
+        chunk = keys[idx:idx + 1000]
+        if chunk:
+            s3.delete_objects(Bucket=AWS_BUCKET, Delete={"Objects": chunk})
 
 
 
@@ -2540,11 +2838,16 @@ def upload_client_document(client_id):
         try:
             original_name = secure_filename(fichier.filename) or "document"
             ext = os.path.splitext(original_name)[1].lower()
-
-            base_name = clean_filename(doc_name) if doc_name else clean_filename(original_name)
+            if doc_name:
+                base_name = os.path.splitext(clean_filename(doc_name))[0]
+            else:
+                base_name = os.path.splitext(clean_filename(original_name))[0]
 
             if pdl:
                 base_name = f"{base_name}_{pdl}"
+
+            if not base_name:
+                base_name = "document"
 
             filename = f"{base_name}{ext}"
             prefix = client_s3_prefix(client_id)
@@ -2630,8 +2933,19 @@ def shared_resources_upload():
         return redirect(url_for("shared_resources"))
 
     try:
+        doc_name = (request.form.get("doc_name") or "").strip()
         original_name = secure_filename(fichier.filename) or "document"
-        filename = clean_filename(original_name)
+        ext = os.path.splitext(original_name)[1].lower()
+
+        if doc_name:
+            base_name = os.path.splitext(clean_filename(doc_name))[0]
+        else:
+            base_name = os.path.splitext(clean_filename(original_name))[0]
+
+        if not base_name:
+            base_name = "document"
+
+        filename = f"{base_name}{ext}"
 
         key = _s3_make_non_overwriting_key(
             AWS_BUCKET,
@@ -2693,6 +3007,28 @@ def parse_int_safe(val):
         return None
 
 
+def parse_amount_safe(val):
+    try:
+        cleaned = (val or "").strip()
+        if not cleaned:
+            return 0.0
+
+        cleaned = (
+            cleaned
+            .replace("\xa0", "")
+            .replace(" ", "")
+            .replace(",", ".")
+        )
+
+        amount = float(cleaned)
+        if amount < 0:
+            return None
+
+        return amount
+    except Exception:
+        return None
+
+
 # =========================
 # FORMAT DATE FR
 # =========================
@@ -2725,8 +3061,9 @@ def clients():
     if role == "admin":
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, username, role
+                SELECT id, username
                 FROM users
+                WHERE role = 'commercial'
                 ORDER BY username ASC
             """)
             users = cur.fetchall()
@@ -2845,28 +3182,30 @@ def create_client():
         if role == "admin":
             owner_raw = (request.form.get("owner_id") or "").strip()
 
-            if owner_raw:
-                try:
-                    owner_id = int(owner_raw)
-                except Exception:
-                    flash("Commercial invalide.", "danger")
-                    return redirect(url_for("clients"))
+            if not owner_raw:
+                flash("Veuillez assigner un commercial.", "danger")
+                return redirect(url_for("clients"))
 
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT id, username
-                        FROM users
-                        WHERE id = %s
-                          AND role = 'commercial'
-                    """, (owner_id,))
-                    owner_row = cur.fetchone()
+            try:
+                owner_id = int(owner_raw)
+            except Exception:
+                flash("Commercial invalide.", "danger")
+                return redirect(url_for("clients"))
 
-                if not owner_row:
-                    flash("Commercial introuvable.", "danger")
-                    return redirect(url_for("clients"))
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, username
+                    FROM users
+                    WHERE id = %s
+                      AND role = 'commercial'
+                """, (owner_id,))
+                owner_row = cur.fetchone()
 
-                if not commercial:
-                    commercial = owner_row["username"]
+            if not owner_row:
+                flash("Commercial introuvable.", "danger")
+                return redirect(url_for("clients"))
+
+            commercial = owner_row["username"]
 
         else:
             owner_id = current_user_id
@@ -3041,6 +3380,22 @@ def edit_client(client_id):
         owner_id = None
 
         if role == "admin":
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT owner_id, commercial
+                    FROM crm_clients
+                    WHERE id = %s
+                """, (client_id,))
+                existing_client = cur.fetchone()
+
+            if not existing_client:
+                flash("Client introuvable.", "danger")
+                return redirect(url_for("clients"))
+
+            owner_id = existing_client["owner_id"]
+            if not commercial:
+                commercial = existing_client["commercial"]
+
             owner_raw = (request.form.get("owner_id") or "").strip()
 
             if owner_raw:
@@ -3063,8 +3418,7 @@ def edit_client(client_id):
                     flash("Commercial introuvable.", "danger")
                     return redirect(url_for("client_detail", client_id=client_id))
 
-                if not commercial:
-                    commercial = owner_row["username"]
+                commercial = owner_row["username"]
 
             with conn.cursor() as cur:
                 cur.execute("""
@@ -3513,6 +3867,550 @@ def upload_client_document_legacy(client_id):
         flash("Aucun upload réussi.", "danger")
 
     return redirect(url_for("client_detail", client_id=client_id))
+
+
+############################################################
+# 12 BIS. CSPE — RÉCUPÉRATION DE TAXES
+############################################################
+
+@app.route("/cspe", endpoint="cspe_index")
+@login_required
+def cspe_index():
+    ensure_cspe_schema()
+
+    conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+    user_id = user.get("id")
+    q = (request.args.get("q") or "").strip()
+
+    if role not in ("admin", "commercial"):
+        abort(403)
+
+    users = []
+    if role == "admin":
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, username
+                FROM users
+                WHERE role = 'commercial'
+                ORDER BY username ASC
+            """)
+            users = cur.fetchall()
+
+    with conn.cursor() as cur:
+        if role == "admin":
+            if q:
+                cur.execute("""
+                    SELECT d.*, users.username AS commercial
+                    FROM cspe_dossiers d
+                    LEFT JOIN users ON users.id = d.owner_id
+                    WHERE
+                        d.name ILIKE %s
+                        OR COALESCE(d.notes, '') ILIKE %s
+                        OR COALESCE(users.username, '') ILIKE %s
+                    ORDER BY d.created_at DESC, d.id DESC
+                """, (f"%{q}%", f"%{q}%", f"%{q}%"))
+            else:
+                cur.execute("""
+                    SELECT d.*, users.username AS commercial
+                    FROM cspe_dossiers d
+                    LEFT JOIN users ON users.id = d.owner_id
+                    ORDER BY d.created_at DESC, d.id DESC
+                """)
+        else:
+            if q:
+                cur.execute("""
+                    SELECT d.*, users.username AS commercial
+                    FROM cspe_dossiers d
+                    LEFT JOIN users ON users.id = d.owner_id
+                    WHERE d.owner_id = %s
+                      AND (
+                          d.name ILIKE %s
+                          OR COALESCE(d.notes, '') ILIKE %s
+                      )
+                    ORDER BY d.created_at DESC, d.id DESC
+                """, (user_id, f"%{q}%", f"%{q}%"))
+            else:
+                cur.execute("""
+                    SELECT d.*, users.username AS commercial
+                    FROM cspe_dossiers d
+                    LEFT JOIN users ON users.id = d.owner_id
+                    WHERE d.owner_id = %s
+                    ORDER BY d.created_at DESC, d.id DESC
+                """, (user_id,))
+
+        rows = cur.fetchall()
+
+    commercial_stats = {}
+    total_chiffre_affaire = 0.0
+
+    for row in rows:
+        amount = float(row.get("chiffre_affaire") or 0)
+        total_chiffre_affaire += amount
+
+        commercial_name = row.get("commercial") or "Non assigné"
+        if commercial_name not in commercial_stats:
+            commercial_stats[commercial_name] = {
+                "commercial": commercial_name,
+                "dossiers": 0,
+                "chiffre_affaire": 0.0,
+            }
+
+        commercial_stats[commercial_name]["dossiers"] += 1
+        commercial_stats[commercial_name]["chiffre_affaire"] += amount
+
+    stats_list = sorted(
+        commercial_stats.values(),
+        key=lambda item: item["commercial"].lower(),
+    )
+
+    return render_template(
+        "cspe.html",
+        dossiers=[row_to_obj(r) for r in rows],
+        users=[row_to_obj(u) for u in users],
+        commercial_stats=stats_list,
+        total_dossiers=len(rows),
+        total_chiffre_affaire=total_chiffre_affaire,
+        q=q,
+        current_user=session.get("user"),
+        available_endpoints=[rule.endpoint for rule in app.url_map.iter_rules()],
+    )
+
+
+@app.route("/cspe/create", methods=["POST"], endpoint="create_cspe_dossier")
+@login_required
+def create_cspe_dossier():
+    ensure_cspe_schema()
+
+    conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    if role not in ("admin", "commercial"):
+        abort(403)
+
+    name = (request.form.get("name") or "").strip()
+    notes = (request.form.get("notes") or "").strip()
+    date_negociation_raw = (request.form.get("date_negociation") or "").strip()
+    date_negociation = parse_date_safe(date_negociation_raw)
+    chiffre_affaire = parse_amount_safe(
+        (request.form.get("chiffre_affaire") or "").strip()
+    )
+
+    if not name:
+        flash("Le nom du dossier est obligatoire.", "danger")
+        return redirect(url_for("cspe_index"))
+
+    if chiffre_affaire is None:
+        flash("Le chiffre d'affaires est invalide.", "danger")
+        return redirect(url_for("cspe_index"))
+
+    if date_negociation_raw and not date_negociation:
+        flash("La date de négociation est invalide.", "danger")
+        return redirect(url_for("cspe_index"))
+
+    owner_id = None
+
+    try:
+        if role == "admin":
+            owner_raw = (request.form.get("owner_id") or "").strip()
+
+            if not owner_raw:
+                flash("Veuillez assigner un commercial.", "danger")
+                return redirect(url_for("cspe_index"))
+
+            try:
+                owner_id = int(owner_raw)
+            except Exception:
+                flash("Commercial invalide.", "danger")
+                return redirect(url_for("cspe_index"))
+
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id
+                    FROM users
+                    WHERE id = %s
+                      AND role = 'commercial'
+                """, (owner_id,))
+                owner_row = cur.fetchone()
+
+            if not owner_row:
+                flash("Commercial introuvable.", "danger")
+                return redirect(url_for("cspe_index"))
+
+        else:
+            owner_id = user.get("id")
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO cspe_dossiers (
+                    name,
+                    notes,
+                    owner_id,
+                    date_negociation,
+                    chiffre_affaire
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                name,
+                notes or None,
+                owner_id,
+                date_negociation,
+                chiffre_affaire or 0,
+            ))
+            dossier_id = cur.fetchone()["id"]
+
+        conn.commit()
+        flash("Dossier CSPE créé avec succès.", "success")
+        return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur création dossier CSPE : %r", e)
+        flash("Erreur lors de la création du dossier CSPE.", "danger")
+        return redirect(url_for("cspe_index"))
+
+
+@app.route("/cspe/<int:dossier_id>", endpoint="cspe_detail")
+@login_required
+def cspe_detail(dossier_id):
+    ensure_cspe_schema()
+
+    if not can_access_cspe_dossier(dossier_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT d.*, users.username AS commercial
+            FROM cspe_dossiers d
+            LEFT JOIN users ON users.id = d.owner_id
+            WHERE d.id = %s
+        """, (dossier_id,))
+        dossier = cur.fetchone()
+
+    if not dossier:
+        flash("Dossier CSPE introuvable.", "danger")
+        return redirect(url_for("cspe_index"))
+
+    users = []
+    if role == "admin":
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, username
+                FROM users
+                WHERE role = 'commercial'
+                ORDER BY username ASC
+            """)
+            users = cur.fetchall()
+
+    documents = list_cspe_documents(dossier_id)
+
+    return render_template(
+        "cspe_detail.html",
+        dossier=row_to_obj(dossier),
+        users=[row_to_obj(u) for u in users],
+        documents=documents,
+        current_user=session.get("user"),
+        available_endpoints=[rule.endpoint for rule in app.url_map.iter_rules()],
+    )
+
+
+@app.route("/cspe/<int:dossier_id>/edit", methods=["POST"], endpoint="edit_cspe_dossier")
+@login_required
+def edit_cspe_dossier(dossier_id):
+    ensure_cspe_schema()
+
+    if not can_access_cspe_dossier(dossier_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+    role = user.get("role")
+
+    name = (request.form.get("name") or "").strip()
+    notes = (request.form.get("notes") or "").strip()
+    date_negociation_raw = (request.form.get("date_negociation") or "").strip()
+    date_negociation = parse_date_safe(date_negociation_raw)
+    chiffre_affaire = parse_amount_safe(
+        (request.form.get("chiffre_affaire") or "").strip()
+    )
+
+    if not name:
+        flash("Le nom du dossier est obligatoire.", "danger")
+        return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+    if chiffre_affaire is None:
+        flash("Le chiffre d'affaires est invalide.", "danger")
+        return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+    if date_negociation_raw and not date_negociation:
+        flash("La date de négociation est invalide.", "danger")
+        return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+    try:
+        if role == "admin":
+            owner_raw = (request.form.get("owner_id") or "").strip()
+
+            if not owner_raw:
+                flash("Veuillez assigner un commercial.", "danger")
+                return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+            try:
+                owner_id = int(owner_raw)
+            except Exception:
+                flash("Commercial invalide.", "danger")
+                return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id
+                    FROM users
+                    WHERE id = %s
+                      AND role = 'commercial'
+                """, (owner_id,))
+                owner_row = cur.fetchone()
+
+            if not owner_row:
+                flash("Commercial introuvable.", "danger")
+                return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE cspe_dossiers
+                    SET
+                        name = %s,
+                        notes = %s,
+                        owner_id = %s,
+                        date_negociation = %s,
+                        chiffre_affaire = %s
+                    WHERE id = %s
+                """, (
+                    name,
+                    notes or None,
+                    owner_id,
+                    date_negociation,
+                    chiffre_affaire or 0,
+                    dossier_id,
+                ))
+        else:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE cspe_dossiers
+                    SET
+                        name = %s,
+                        notes = %s,
+                        date_negociation = %s,
+                        chiffre_affaire = %s
+                    WHERE id = %s
+                """, (
+                    name,
+                    notes or None,
+                    date_negociation,
+                    chiffre_affaire or 0,
+                    dossier_id,
+                ))
+
+        conn.commit()
+        flash("Dossier CSPE mis à jour.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur modification dossier CSPE : %r", e)
+        flash("Erreur lors de la mise à jour du dossier CSPE.", "danger")
+
+    return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+
+@app.route("/cspe/<int:dossier_id>/delete", methods=["POST"], endpoint="delete_cspe_dossier")
+@login_required
+def delete_cspe_dossier(dossier_id):
+    ensure_cspe_schema()
+
+    if not can_access_cspe_dossier(dossier_id):
+        abort(403)
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM cspe_dossiers WHERE id = %s",
+                (dossier_id,),
+            )
+            dossier = cur.fetchone()
+
+        if not dossier:
+            flash("Dossier CSPE introuvable.", "danger")
+            return redirect(url_for("cspe_index"))
+
+        delete_cspe_documents_for_dossier(dossier_id)
+
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM cspe_dossiers WHERE id = %s", (dossier_id,))
+
+        conn.commit()
+        flash("Dossier CSPE supprimé.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur suppression dossier CSPE : %r", e)
+        flash("Erreur lors de la suppression du dossier CSPE.", "danger")
+
+    return redirect(url_for("cspe_index"))
+
+
+@app.route(
+    "/cspe/<int:dossier_id>/documents/upload",
+    methods=["POST"],
+    endpoint="upload_cspe_document",
+)
+@login_required
+def upload_cspe_document(dossier_id):
+    ensure_cspe_schema()
+
+    if not can_access_cspe_dossier(dossier_id):
+        abort(403)
+
+    if not LOCAL_MODE and not s3:
+        flash("Le stockage des documents CSPE est indisponible.", "warning")
+        return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+    files = request.files.getlist("files")
+    if not files:
+        legacy_file = request.files.get("file")
+        if legacy_file and getattr(legacy_file, "filename", ""):
+            files = [legacy_file]
+
+    files = [f for f in files if f and getattr(f, "filename", "")]
+
+    if not files:
+        flash("Aucun fichier sélectionné.", "danger")
+        return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+    dossier_name = (request.form.get("doc_name") or "").strip()
+    prefix = cspe_storage_prefix(dossier_id)
+    success_count = 0
+    failed = []
+
+    for fichier in files:
+        if not allowed_file(fichier.filename):
+            failed.append(fichier.filename or "fichier_invalide")
+            continue
+
+        try:
+            original_name = secure_filename(fichier.filename) or "document"
+            ext = os.path.splitext(original_name)[1].lower()
+
+            if dossier_name:
+                base_name = os.path.splitext(clean_filename(dossier_name))[0]
+            else:
+                base_name = os.path.splitext(clean_filename(original_name))[0]
+
+            if not base_name:
+                base_name = "document"
+
+            key = f"{prefix}{base_name}{ext}"
+
+            if LOCAL_MODE:
+                key = _local_make_non_overwriting_key(key)
+                path = local_storage_path(key)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                fichier.save(path)
+            else:
+                key = _s3_make_non_overwriting_key(AWS_BUCKET, key)
+                s3_upload_fileobj(fichier, AWS_BUCKET, key)
+
+            success_count += 1
+
+        except Exception as e:
+            logger.exception("Erreur upload document CSPE : %r", e)
+            failed.append(fichier.filename or "fichier_erreur")
+
+    if success_count > 0 and not failed:
+        flash(f"{success_count} document(s) CSPE ajouté(s).", "success")
+    elif success_count > 0:
+        flash(f"{success_count} document(s) ajoutés, {len(failed)} échec(s).", "warning")
+    else:
+        flash("Aucun upload CSPE réussi.", "danger")
+
+    return redirect(url_for("cspe_detail", dossier_id=dossier_id))
+
+
+@app.route("/cspe/document/download", endpoint="download_cspe_document")
+@login_required
+def download_cspe_document():
+    ensure_cspe_schema()
+
+    key = (request.args.get("key") or "").strip()
+
+    if not key:
+        flash("Document invalide.", "danger")
+        return redirect(request.referrer or url_for("cspe_index"))
+
+    if not can_access_cspe_document_key(key):
+        abort(403)
+
+    try:
+        if LOCAL_MODE:
+            path = local_storage_path(key)
+            if not os.path.exists(path):
+                flash("Document introuvable.", "danger")
+                return redirect(request.referrer or url_for("cspe_index"))
+            return send_file(path, as_attachment=False)
+
+        if not s3:
+            flash("Le stockage des documents CSPE est indisponible.", "warning")
+            return redirect(request.referrer or url_for("cspe_index"))
+
+        url = s3_presigned_url(key)
+        if not url:
+            flash("Impossible de générer le lien du document.", "danger")
+            return redirect(request.referrer or url_for("cspe_index"))
+
+        return redirect(url)
+
+    except Exception as e:
+        logger.exception("Erreur download document CSPE : %r", e)
+        flash("Erreur lors de l'ouverture du document CSPE.", "danger")
+        return redirect(request.referrer or url_for("cspe_index"))
+
+
+@app.route("/cspe/document/delete", methods=["POST"], endpoint="delete_cspe_document")
+@login_required
+def delete_cspe_document():
+    ensure_cspe_schema()
+
+    key = (request.form.get("key") or "").strip()
+
+    if not key:
+        flash("Document invalide.", "danger")
+        return redirect(request.referrer or url_for("cspe_index"))
+
+    if not can_access_cspe_document_key(key):
+        abort(403)
+
+    try:
+        if LOCAL_MODE:
+            delete_local_storage_object(key)
+        else:
+            if not s3:
+                flash("Le stockage des documents CSPE est indisponible.", "warning")
+                return redirect(request.referrer or url_for("cspe_index"))
+            s3.delete_object(Bucket=AWS_BUCKET, Key=key)
+
+        flash("Document CSPE supprimé.", "success")
+
+    except Exception as e:
+        logger.exception("Erreur suppression document CSPE : %r", e)
+        flash("Erreur lors de la suppression du document CSPE.", "danger")
+
+    return redirect(request.referrer or url_for("cspe_index"))
 
 ############################################################
 # 13. DEMANDES DE MISE À JOUR DOSSIER (ADMIN)
@@ -4021,6 +4919,20 @@ def index():
 
 
 ############################################################
+# DEBUG — LISTE DES ROUTES CHARGÉES
+############################################################
+
+@app.route("/__routes__")
+def debug_routes():
+    user = session.get("user") or {}
+
+    if not (LOCAL_MODE or DEBUG or user.get("role") == "admin"):
+        abort(404)
+
+    return "<br>".join(sorted(app.view_functions.keys()))
+
+
+############################################################
 # 16. RUN (LOCAL / PROD SAFE)
 ############################################################
 
@@ -4036,14 +4948,6 @@ if __name__ == "__main__":
         port=int(os.environ.get("PORT", 5000)),
         debug=DEBUG,
     )
-
-
-############################################################
-# DEBUG — LISTE DES ROUTES CHARGÉES
-############################################################
-@app.route("/__routes__")
-def debug_routes():
-    return "<br>".join(sorted(app.view_functions.keys()))
 
 
 # ============================

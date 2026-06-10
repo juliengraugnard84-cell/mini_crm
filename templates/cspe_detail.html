@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}CSPE — {{ dossier.name }}{% endblock %}
+
+{% block content %}
+
+<div class="page-header mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+        <h1 class="mb-1">Dossier CSPE</h1>
+        <p class="text-muted mb-0">{{ dossier.name }}</p>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('cspe_index') }}" class="btn btn-outline-secondary">Retour</a>
+
+        {% if current_user and (current_user.role == "admin" or current_user.id == dossier.owner_id) %}
+        <form method="post"
+              action="{{ url_for('delete_cspe_dossier', dossier_id=dossier.id) }}"
+              onsubmit="return confirm('Supprimer définitivement ce dossier CSPE et ses documents ?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn-danger">Supprimer</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Informations du dossier</strong>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('edit_cspe_dossier', dossier_id=dossier.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Nom du dossier / client *</label>
+                    <input type="text"
+                           name="name"
+                           class="form-control"
+                           value="{{ dossier.name }}"
+                           required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Date de négociation</label>
+                    <input type="date"
+                           name="date_negociation"
+                           class="form-control"
+                           value="{{ dossier.date_negociation or '' }}">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Chiffre d'affaires</label>
+                    <input type="number"
+                           name="chiffre_affaire"
+                           class="form-control"
+                           min="0"
+                           step="0.01"
+                           value="{{ dossier.chiffre_affaire or 0 }}">
+                </div>
+
+                {% if current_user and current_user.role == "admin" %}
+                <div class="col-md-6">
+                    <label class="form-label">Commercial *</label>
+                    <select name="owner_id" class="form-select" required>
+                        <option value="">Sélectionner un commercial</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}" {% if dossier.owner_id == u.id %}selected{% endif %}>
+                            {{ u.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <div class="col-md-6">
+                    <label class="form-label">Commercial assigné</label>
+                    <input type="text"
+                           class="form-control"
+                           value="{{ dossier.commercial or 'Non assigné' }}"
+                           disabled>
+                </div>
+                {% endif %}
+
+                <div class="col-md-6">
+                    <label class="form-label">Créé le</label>
+                    <input type="text"
+                           class="form-control"
+                           value="{{ format_datetime_fr(dossier.created_at, False) }}"
+                           disabled>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Notes</label>
+                    <textarea name="notes"
+                              class="form-control"
+                              rows="5"
+                              placeholder="Informations utiles, avancement, éléments fiscaux...">{{ dossier.notes or "" }}</textarea>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-success">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <strong>Documents du dossier</strong>
+    </div>
+    <div class="card-body">
+        <form method="post"
+              action="{{ url_for('upload_cspe_document', dossier_id=dossier.id) }}"
+              enctype="multipart/form-data"
+              class="mb-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label">Fichiers</label>
+                    <input type="file" name="files" class="form-control" multiple>
+                </div>
+
+                <div class="col-md-5">
+                    <label class="form-label">Nom du document</label>
+                    <input type="text"
+                           name="doc_name"
+                           class="form-control"
+                           placeholder="Optionnel">
+                </div>
+
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Uploader</button>
+                </div>
+            </div>
+        </form>
+
+        {% if documents %}
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Taille</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in documents %}
+                    <tr>
+                        <td>{{ d.nom }}</td>
+                        <td class="text-muted">
+                            {% set s = d.taille or 0 %}
+                            {% if s >= 1048576 %}
+                                {{ "%.2f"|format(s / 1048576) }} Mo
+                            {% elif s >= 1024 %}
+                                {{ "%.0f"|format(s / 1024) }} Ko
+                            {% else %}
+                                {{ s }} o
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('download_cspe_document') }}?key={{ d.key }}"
+                               class="btn btn-sm btn-outline-primary">
+                                Ouvrir / télécharger
+                            </a>
+
+                            <form method="post"
+                                  action="{{ url_for('delete_cspe_document') }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Supprimer ce document CSPE ?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="key" value="{{ d.key }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    Supprimer
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Aucun document CSPE pour le moment.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
