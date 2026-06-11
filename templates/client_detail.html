@@ -249,19 +249,39 @@ and 'update_client_status' in available_endpoints %}
             </div>
             <div class="card-body">
 
-                <form method="post" action="{{ url_for('create_cotation', client_id=client.id) }}">
+                <form method="post"
+                      action="{{ url_for('create_cotation', client_id=client.id) }}"
+                      class="crm-cotation-form"
+                      data-cotation-form>
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-                    <div class="row">
+                    <div class="crm-cotation-form-toolbar">
+                        <div>
+                            <h5 class="crm-cotation-form-title">Preparer la demande</h5>
+                            <p class="crm-cotation-form-copy">
+                                Les coordonnees du dossier sont pre-remplies. Choisissez d'abord le type
+                                d'energie pour afficher uniquement les champs utiles.
+                            </p>
+                        </div>
+                        <div class="crm-cotation-form-tip" data-energy-status>
+                            Selectionnez une energie pour filtrer automatiquement les blocs de consommation.
+                        </div>
+                    </div>
+
+                    <div class="crm-cotation-energy-empty" data-energy-empty>
+                        Choisissez un type d'energie pour afficher les blocs de consommation correspondants.
+                    </div>
+
+                    <div class="row crm-cotation-form-grid">
 
                         <!-- ================= DONNÉES CLIENT ================= -->
-                        <div class="col-lg-6 mb-4">
-                            <div class="border rounded p-3 h-100">
+                        <div class="col-lg-6 mb-4 crm-cotation-panel-wrap">
+                            <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--client">
                                 <h5 class="mb-3">Données client</h5>
 
                                 <div class="mb-2">
                                     <label class="form-label">Type d’énergie</label>
-                                    <select name="energie_type" class="form-select">
+                                    <select id="cotation-energie-type" name="energie_type" class="form-select" data-energy-select>
                                         <option value="">Sélectionner</option>
                                         <option value="electricite">Électricité</option>
                                         <option value="gaz">Gaz</option>
@@ -332,8 +352,8 @@ and 'update_client_status' in available_endpoints %}
                         </div>
 
                         <!-- ================= DONNÉES CONSOMMATION ÉLECTRICITÉ ================= -->
-                        <div class="col-lg-6 mb-4">
-                            <div class="border rounded p-3 h-100">
+                        <div class="col-lg-6 mb-4 crm-cotation-panel-wrap" data-energy-section="electricite">
+                            <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--energy">
                                 <h5 class="mb-3">Données consommation électricité</h5>
 
                                 <div class="mb-2">
@@ -413,8 +433,8 @@ and 'update_client_status' in available_endpoints %}
                         </div>
 
                         <!-- ================= DONNÉES CONSOMMATION GAZ ================= -->
-                        <div class="col-lg-6 mb-4">
-                            <div class="border rounded p-3 h-100">
+                        <div class="col-lg-6 mb-4 crm-cotation-panel-wrap" data-energy-section="gaz">
+                            <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--energy">
                                 <h5 class="mb-3">Données consommation gaz</h5>
 
                                 <div class="mb-2">
@@ -460,8 +480,8 @@ and 'update_client_status' in available_endpoints %}
                         </div>
 
                         <!-- ================= INFOS MÉTIER EXISTANTES / COMPAT ================= -->
-                        <div class="col-lg-6 mb-4">
-                            <div class="border rounded p-3 h-100">
+                        <div class="col-lg-6 mb-4 crm-cotation-panel-wrap">
+                            <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--meta">
                                 <h5 class="mb-3">Informations complémentaires</h5>
 
                                 <div class="mb-2">
@@ -493,7 +513,13 @@ and 'update_client_status' in available_endpoints %}
 
                     </div>
 
-                    <button class="btn btn-primary mt-2">Envoyer</button>
+                    <div class="crm-cotation-form-actions">
+                        <div class="crm-cotation-form-actions-copy">
+                            <strong>Demande prete a l'envoi</strong>
+                            <span>Verifiez les coordonnees et les donnees de consommation avant validation.</span>
+                        </div>
+                        <button class="btn btn-primary">Envoyer la demande</button>
+                    </div>
                 </form>
 
             </div>
@@ -509,7 +535,7 @@ and 'update_client_status' in available_endpoints %}
                 {% if cotations %}
 
                     {% for c in cotations %}
-                    <div class="cotation-card"></div>
+                    <div class="cotation-card">
 
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
@@ -837,4 +863,71 @@ and 'update_client_status' in available_endpoints %}
 
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.querySelector("[data-cotation-form]");
+    if (!form) {
+        return;
+    }
+
+    const energySelect = form.querySelector("[data-energy-select]");
+    const energySections = form.querySelectorAll("[data-energy-section]");
+    const emptyState = form.querySelector("[data-energy-empty]");
+    const status = form.querySelector("[data-energy-status]");
+
+    if (!energySelect || !energySections.length) {
+        return;
+    }
+
+    const energyLabels = {
+        electricite: "Electricite",
+        gaz: "Gaz",
+        elec_gaz: "Electricite & gaz",
+    };
+
+    const activeGroups = (value) => {
+        if (value === "electricite") {
+            return ["electricite"];
+        }
+        if (value === "gaz") {
+            return ["gaz"];
+        }
+        if (value === "elec_gaz") {
+            return ["electricite", "gaz"];
+        }
+        return [];
+    };
+
+    const syncEnergySections = () => {
+        const value = energySelect.value;
+        const groups = activeGroups(value);
+
+        energySections.forEach((section) => {
+            const shouldShow = groups.includes(section.dataset.energySection);
+            section.hidden = !shouldShow;
+            section.classList.toggle("is-hidden", !shouldShow);
+
+            section.querySelectorAll("input, select, textarea").forEach((field) => {
+                field.disabled = !shouldShow;
+            });
+        });
+
+        if (emptyState) {
+            emptyState.hidden = groups.length > 0;
+        }
+
+        if (status) {
+            status.textContent = value
+                ? `Bloc actif : ${energyLabels[value] || "Demande"}`
+                : "Selectionnez une energie pour filtrer automatiquement les blocs de consommation.";
+        }
+    };
+
+    energySelect.addEventListener("change", syncEnergySections);
+    syncEnergySections();
+});
+</script>
 {% endblock %}

@@ -1102,6 +1102,151 @@ main.content {
     white-space: pre-wrap;
 }
 
+.crm-cotation-form {
+    display: grid;
+    gap: 22px;
+}
+
+.crm-cotation-form-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    padding: 20px 22px;
+    border-radius: 22px;
+    background:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.14), transparent 24%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 252, 0.92));
+    border: 1px solid rgba(16, 33, 43, 0.08);
+}
+
+.crm-cotation-form-title {
+    margin: 0;
+    color: #10212b;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.crm-cotation-form-copy {
+    margin: 8px 0 0;
+    max-width: 720px;
+    color: #5f7084;
+}
+
+.crm-cotation-form-tip {
+    max-width: 320px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: rgba(8, 19, 63, 0.06);
+    color: #10212b;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.crm-cotation-energy-empty {
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: rgba(242, 178, 51, 0.12);
+    color: #9a5f00;
+    font-weight: 700;
+}
+
+.crm-cotation-form-grid {
+    align-items: stretch;
+}
+
+.crm-cotation-panel-wrap {
+    display: flex;
+}
+
+.crm-cotation-section {
+    width: 100%;
+    border-color: rgba(16, 33, 43, 0.08) !important;
+    border-radius: 24px !important;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.92));
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.06);
+}
+
+.crm-cotation-section--energy {
+    position: relative;
+}
+
+.crm-cotation-section--energy::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    border-radius: 24px 24px 0 0;
+    background: linear-gradient(90deg, rgba(242, 178, 51, 0), rgba(242, 178, 51, 0.72), rgba(242, 178, 51, 0));
+}
+
+.crm-cotation-section[hidden],
+.crm-cotation-panel-wrap[hidden] {
+    display: none !important;
+}
+
+.crm-cotation-panel-wrap.is-hidden {
+    display: none !important;
+}
+
+.crm-cotation-section h5 {
+    color: #10212b;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.crm-cotation-section h6 {
+    color: #10212b;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.crm-cotation-section hr {
+    margin: 18px 0;
+    border-color: rgba(16, 33, 43, 0.08);
+}
+
+.crm-cotation-form-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: center;
+    padding: 18px 20px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(8, 19, 63, 0.05), rgba(255, 255, 255, 0.9));
+    border: 1px solid rgba(16, 33, 43, 0.08);
+}
+
+.crm-cotation-form-actions-copy {
+    display: grid;
+    gap: 4px;
+}
+
+.crm-cotation-form-actions-copy strong {
+    color: #10212b;
+}
+
+.crm-cotation-form-actions-copy span {
+    color: #5f7084;
+    font-size: 13px;
+}
+
+@media (max-width: 992px) {
+    .crm-cotation-form-toolbar,
+    .crm-cotation-form-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .crm-cotation-form-tip {
+        max-width: none;
+    }
+}
+
 /* =========================================================
    CHAT OVERRIDES - REWORK CIBLE, DIRECT MESSAGES, UI PREMIUM
    ========================================================= */
