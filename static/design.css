@@ -1569,7 +1569,7 @@ main.content {
     --planning-muted: #5d6f79;
     --planning-line: rgba(16, 33, 43, 0.08);
     --planning-panel: rgba(255, 255, 255, 0.88);
-    --planning-accent: #0f766e;
+    --planning-accent: #f2b233;
     position: relative;
     display: grid;
     gap: 22px;
@@ -1581,9 +1581,9 @@ main.content {
     position: fixed;
     inset: 0;
     background:
-        radial-gradient(circle at 14% 18%, rgba(15, 118, 110, 0.08), transparent 26%),
-        radial-gradient(circle at 86% 14%, rgba(245, 158, 11, 0.08), transparent 24%),
-        linear-gradient(180deg, rgba(255, 250, 240, 0.58), rgba(250, 250, 249, 0));
+        radial-gradient(circle at 14% 18%, rgba(242, 178, 51, 0.09), transparent 26%),
+        radial-gradient(circle at 86% 14%, rgba(8, 19, 63, 0.08), transparent 24%),
+        linear-gradient(180deg, rgba(252, 247, 239, 0.6), rgba(250, 251, 253, 0));
     pointer-events: none;
     z-index: 0;
 }
@@ -1602,9 +1602,9 @@ main.content {
     border-radius: 28px;
     overflow: hidden;
     background:
-        radial-gradient(circle at top right, rgba(16, 185, 129, 0.24), transparent 34%),
-        radial-gradient(circle at bottom left, rgba(245, 158, 11, 0.22), transparent 28%),
-        linear-gradient(135deg, #0f172a 0%, #123646 56%, #1f6758 100%);
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.24), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.08), transparent 26%),
+        linear-gradient(135deg, #08133f 0%, #0f1e4d 54%, #15265b 100%);
     color: #f8fafc;
     box-shadow: 0 30px 80px rgba(15, 23, 42, 0.14);
 }
@@ -3527,7 +3527,7 @@ textarea.form-control {
     background:
         radial-gradient(circle at top right, rgba(242, 178, 51, 0.24), transparent 34%),
         radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.08), transparent 26%),
-        linear-gradient(135deg, #08133f 0%, #123646 58%, #0d2249 100%);
+        linear-gradient(135deg, #08133f 0%, #0f1e4d 54%, #15265b 100%);
 }
 
 .planning-hero-actions .btn-dark {
@@ -3548,7 +3548,7 @@ textarea.form-control {
 }
 
 .planning-source-pill.is-active {
-    background: linear-gradient(135deg, #08133f, #123646);
+    background: linear-gradient(135deg, #08133f, #0f1e4d);
     color: #ffffff;
     border-color: #08133f;
 }
@@ -3896,7 +3896,8 @@ textarea.form-control {
 
 .planning-shell {
     --planning-brand-navy: #08133f;
-    --planning-brand-navy-soft: #123646;
+    --planning-brand-navy-soft: #0f1e4d;
+    --planning-brand-navy-mid: #15265b;
     --planning-brand-blue: #2f6cab;
     --planning-brand-gold: #f2b233;
     --planning-brand-gold-soft: #f7ca70;
@@ -3909,7 +3910,12 @@ textarea.form-control {
     background:
         radial-gradient(circle at top right, rgba(242, 178, 51, 0.24), transparent 34%),
         radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.08), transparent 26%),
-        linear-gradient(135deg, #08133f 0%, #0d2249 52%, #163e65 100%) !important;
+        linear-gradient(
+            135deg,
+            var(--planning-brand-navy) 0%,
+            var(--planning-brand-navy-soft) 54%,
+            var(--planning-brand-navy-mid) 100%
+        ) !important;
     box-shadow: 0 30px 70px rgba(8, 19, 63, 0.18);
 }
 
@@ -4002,9 +4008,13 @@ textarea.form-control {
 }
 
 .planning-shell .planning-source-pill.is-active {
-    background: linear-gradient(135deg, #08133f, #123646);
+    background: linear-gradient(
+        135deg,
+        var(--planning-brand-navy),
+        var(--planning-brand-navy-soft)
+    );
     color: #ffffff;
-    border-color: #08133f;
+    border-color: var(--planning-brand-navy);
 }
 
 .planning-shell .planning-source-pill:not(.is-active):hover {
@@ -4055,14 +4065,14 @@ textarea.form-control {
 }
 
 .planning-shell .fc .fc-button-primary {
-    background: #08133f;
-    border-color: #08133f;
+    background: var(--planning-brand-navy);
+    border-color: var(--planning-brand-navy);
     color: #f8fafc;
 }
 
 .planning-shell .fc .fc-button-primary:hover {
-    background: #102a5c;
-    border-color: #102a5c;
+    background: var(--planning-brand-navy-soft);
+    border-color: var(--planning-brand-navy-soft);
 }
 
 .planning-shell .fc .fc-button-primary:not(:disabled).fc-button-active,
