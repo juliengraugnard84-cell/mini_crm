@@ -108,21 +108,6 @@
 </div>
 {% endif %}
 
-{% if ca_mensuel_par_commercial %}
-<div class="card mb-5">
-    <div class="card-body">
-        <h5>
-            {% if current_user and current_user.role == 'admin' %}
-            Graphique - CA mensuel par commercial ({{ selected_year|default('') }})
-            {% else %}
-            Mon chiffre d'affaires mensuel ({{ selected_year|default('') }})
-            {% endif %}
-        </h5>
-        <canvas id="caChart" height="120"></canvas>
-    </div>
-</div>
-{% endif %}
-
 {% if current_user and current_user.role == 'admin' and ca_mensuel_par_commercial %}
 <div class="card mb-5">
     <div class="crm-table-top">
@@ -158,6 +143,22 @@
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+{% endif %}
+
+{% if ca_mensuel_par_commercial %}
+<div class="card mb-5">
+    <div class="card-body">
+        <h5>
+            {% if current_user and current_user.role == 'admin' %}
+            Graphique - CA mensuel par commercial ({{ selected_year|default('') }})
+            {% else %}
+            Mon chiffre d'affaires mensuel ({{ selected_year|default('') }})
+            {% endif %}
+        </h5>
+        <p class="crm-soft-note mb-3">Vue synthese pour completer la lecture du tableau.</p>
+        <canvas id="caChart" height="92"></canvas>
     </div>
 </div>
 {% endif %}
@@ -237,6 +238,8 @@
         data: { labels, datasets },
         options: {
             responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.45,
             plugins: {
                 legend: { position: 'bottom' }
             },
