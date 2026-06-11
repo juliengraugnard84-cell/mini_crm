@@ -4622,6 +4622,25 @@ textarea.form-control {
     border-style: solid;
 }
 
+.crm-cotation-detail-hero,
+.crm-cotation-detail-layout .card,
+.crm-cotation-detail-layout .crm-info-card,
+.crm-cotation-detail-layout .crm-cotation-summary-item,
+.crm-cotation-detail-layout .crm-cotation-comment-box,
+.crm-cotation-detail-layout .btn,
+.crm-cotation-detail-toolbar .btn {
+    border-radius: 0 !important;
+}
+
+.crm-cotation-detail-hero,
+.crm-cotation-detail-layout .card,
+.crm-cotation-detail-layout .crm-info-card,
+.crm-cotation-detail-layout .crm-cotation-summary-item,
+.crm-cotation-detail-layout .crm-cotation-comment-box {
+    overflow: visible !important;
+    background-image: none !important;
+}
+
 @media (max-width: 900px) {
     .crm-action-row {
         justify-content: flex-start;
