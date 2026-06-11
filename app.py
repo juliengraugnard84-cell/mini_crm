@@ -6,10 +6,13 @@
 
 import os
 import re
+import smtplib
+import ssl
 import unicodedata
 import secrets
 import logging
 from datetime import date, timedelta
+from email.message import EmailMessage
 from types import SimpleNamespace
 from functools import wraps
 
@@ -57,6 +60,15 @@ AWS_ACCESS_KEY = Config.AWS_ACCESS_KEY
 AWS_SECRET_KEY = Config.AWS_SECRET_KEY
 AWS_REGION = Config.AWS_REGION
 AWS_BUCKET = Config.AWS_BUCKET
+SMTP_HOST = Config.SMTP_HOST
+SMTP_PORT = Config.SMTP_PORT
+SMTP_USERNAME = Config.SMTP_USERNAME
+SMTP_PASSWORD = Config.SMTP_PASSWORD
+SMTP_USE_TLS = Config.SMTP_USE_TLS
+SMTP_USE_SSL = Config.SMTP_USE_SSL
+SMTP_FROM_EMAIL = Config.SMTP_FROM_EMAIL
+NOTIFICATION_EMAIL = Config.NOTIFICATION_EMAIL
+APP_BASE_URL = Config.APP_BASE_URL
 
 # ✅ PostgreSQL: on utilise DATABASE_URL
 DATABASE_URL = getattr(Config, "DATABASE_URL", None) or os.environ.get("DATABASE_URL")
@@ -70,6 +82,19 @@ ALLOWED_EXTENSIONS = {
 
 CHAT_ALLOWED_ROLES = {"admin", "commercial"}
 PLANNING_ALLOWED_ROLES = {"admin", "commercial"}
+DOCUMENT_UPLOAD_KINDS = {
+    "factures": "factures",
+    "mandats": "mandats",
+    "contrats": "contrats",
+    "summary": "summary",
+    "autres": "autres",
+}
+
+NOTIFICATION_EMAIL_RECIPIENTS = [
+    recipient.strip()
+    for recipient in (NOTIFICATION_EMAIL or "").split(",")
+    if recipient.strip()
+]
 
 PLANNING_EVENT_CATEGORIES = {
     "meeting": {"label": "Rendez-vous", "color": "#2f6cab"},
@@ -232,7 +257,6 @@ def init_db():
     ⚠️ NE JAMAIS APPELER AUTOMATIQUEMENT EN PROD
     """
     conn = _connect_db()
-
     try:
         with conn.cursor() as cur:
 
@@ -587,26 +611,116 @@ def slugify(text: str) -> str:
     return re.sub(r"[^a-zA-Z0-9]+", "_", text).strip("_").lower()
 
 
+def normalize_document_kind(value: str) -> str:
+    kind = slugify(value or "")
+    return kind if kind in DOCUMENT_UPLOAD_KINDS else "autres"
+
+
+def build_document_upload_base_name(
+    container_name: str,
+    original_name: str,
+    manual_name: str = "",
+    doc_kind: str = "autres",
+    auto_name: bool = False,
+    extra_suffix: str = "",
+):
+    normalized_kind = normalize_document_kind(doc_kind)
+    safe_suffix = slugify(extra_suffix or "")
+
+    if auto_name:
+        container_slug = slugify(container_name or "") or "dossier"
+        parts = [container_slug, normalized_kind]
+        if safe_suffix:
+            parts.append(safe_suffix)
+        base_name = "_".join(part for part in parts if part)
+    else:
+        source_name = manual_name or original_name or "document"
+        base_name = os.path.splitext(clean_filename(source_name))[0]
+        if safe_suffix:
+            base_name = f"{base_name}_{safe_suffix}"
+
+    return base_name or "document"
+
+
+def build_app_url(path: str) -> str:
+    clean_path = path or "/"
+    if clean_path.startswith("http://") or clean_path.startswith("https://"):
+        return clean_path
+
+    base_url = APP_BASE_URL or request.url_root.rstrip("/")
+    return f"{base_url}{clean_path if clean_path.startswith('/') else f'/{clean_path}'}"
+
+
+def send_notification_email(subject: str, body: str, recipients=None):
+    targets = recipients or NOTIFICATION_EMAIL_RECIPIENTS
+
+    if not SMTP_HOST or not targets:
+        logger.warning(
+            "Notification email skipped: SMTP or recipient not configured."
+        )
+        return False
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = SMTP_FROM_EMAIL
+    message["To"] = ", ".join(targets)
+    message.set_content(body)
+
+    server = None
+
+    try:
+        if SMTP_USE_SSL:
+            server = smtplib.SMTP_SSL(
+                SMTP_HOST,
+                SMTP_PORT,
+                timeout=20,
+                context=ssl.create_default_context(),
+            )
+        else:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20)
+            server.ehlo()
+            if SMTP_USE_TLS:
+                server.starttls(context=ssl.create_default_context())
+                server.ehlo()
+
+        if SMTP_USERNAME and SMTP_PASSWORD:
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+
+        server.send_message(message)
+        return True
+
+    except Exception as e:
+        logger.exception("Notification email failed: %r", e)
+        return False
+
+    finally:
+        try:
+            if server:
+                server.quit()
+        except Exception:
+            pass
+
+
 # =========================================================
 # PREFIX S3 CLIENT — SOURCE DE VÉRITÉ UNIQUE
 # =========================================================
 
-def client_s3_prefix(client_id: int) -> str:
+def client_s3_prefix(client_id: int, client_name: str | None = None) -> str:
     """
     Préfixe S3 UNIQUE par client :
     clients/<slug_nom>_<client_id>/
     """
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT name FROM crm_clients WHERE id = %s",
-            (client_id,),
-        )
-        row = cur.fetchone()
+    if client_name is None:
+        conn = get_db()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT name FROM crm_clients WHERE id = %s",
+                (client_id,),
+            )
+            row = cur.fetchone()
+        client_name = row.get("name") if row else ""
 
-    slug = ""
-    if row and row.get("name"):
-        slug = slugify(row["name"])
+    slug = slugify(client_name or "")
 
     base = f"{slug}_{client_id}" if slug else f"client_{client_id}"
     return f"clients/{base}/"
@@ -3002,7 +3116,6 @@ def add_calendar_event():
             ))
 
         conn.commit()
-
         flash("Rendez-vous ajouté au planning.", "success")
 
     except Exception as e:
@@ -3857,6 +3970,8 @@ def upload_client_document(client_id):
     files = request.files.getlist("files")
 
     doc_name = (request.form.get("doc_name") or "").strip()
+    doc_kind = normalize_document_kind(request.form.get("doc_kind") or "")
+    auto_name = (request.form.get("auto_name") or "").strip().lower() in {"1", "true", "on", "yes"}
     pdl = re.sub(r"[^0-9]", "", (request.form.get("pdl") or ""))
 
     if not files:
@@ -3872,6 +3987,19 @@ def upload_client_document(client_id):
 
     success_count = 0
     failed = []
+    client_name = ""
+
+    if auto_name:
+        conn = get_db()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT name FROM crm_clients WHERE id = %s",
+                (client_id,),
+            )
+            row = cur.fetchone()
+        client_name = (row.get("name") or "").strip() if row else ""
+
+    prefix = client_s3_prefix(client_id, client_name or None)
 
     for fichier in files:
 
@@ -3882,20 +4010,15 @@ def upload_client_document(client_id):
         try:
             original_name = secure_filename(fichier.filename) or "document"
             ext = os.path.splitext(original_name)[1].lower()
-            if doc_name:
-                base_name = os.path.splitext(clean_filename(doc_name))[0]
-            else:
-                base_name = os.path.splitext(clean_filename(original_name))[0]
-
-            if pdl:
-                base_name = f"{base_name}_{pdl}"
-
-            if not base_name:
-                base_name = "document"
-
+            base_name = build_document_upload_base_name(
+                client_name or f"client_{client_id}",
+                original_name,
+                manual_name=doc_name,
+                doc_kind=doc_kind,
+                auto_name=auto_name,
+                extra_suffix=pdl,
+            )
             filename = f"{base_name}{ext}"
-            prefix = client_s3_prefix(client_id)
-
             key = _s3_make_non_overwriting_key(
                 AWS_BUCKET,
                 f"{prefix}{filename}"
@@ -4620,6 +4743,16 @@ def create_cotation(client_id):
 
     conn = get_db()
     user = session.get("user") or {}
+    cotation_id = None
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT name FROM crm_clients WHERE id = %s",
+            (client_id,),
+        )
+        client = cur.fetchone()
+
+    client_name = (client.get("name") or "").strip() if client else f"Client {client_id}"
 
     date_negociation = parse_date_safe((request.form.get("date_negociation") or "").strip())
     heure_negociation = parse_time_safe((request.form.get("heure_negociation") or "").strip())
@@ -4726,6 +4859,7 @@ def create_cotation(client_id):
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s
                 )
+                RETURNING id
             """, (
                 client_id,
                 date_negociation,
@@ -4771,9 +4905,41 @@ def create_cotation(client_id):
                 gaz_car or None,
                 gaz_fournisseur_actuel or None,
             ))
+            cotation_id = cur.fetchone()[0]
 
         conn.commit()
         flash("Cotation créée.", "success")
+
+        cotation_link = build_app_url(
+            url_for("admin_cotation_detail", cotation_id=cotation_id)
+        )
+        heure_display = (
+            heure_negociation.strftime("%H:%M")
+            if hasattr(heure_negociation, "strftime")
+            else (str(heure_negociation)[:5] if heure_negociation else "-")
+        )
+        email_sent = send_notification_email(
+            subject=f"Nouvelle demande de cotation - {client_name}",
+            body=(
+                "Une nouvelle demande de cotation vient d'etre creee.\n\n"
+                f"Dossier : {client_name}\n"
+                f"Commercial : {user.get('username') or 'Inconnu'}\n"
+                f"Energie : {energie_type or '-'}\n"
+                f"Date de negociation : {format_date_safe(date_negociation)}\n"
+                f"Heure de negociation : {heure_display}\n"
+                f"Signataire : {signataire_nom or '-'}\n"
+                f"Email signataire : {signataire_email or '-'}\n"
+                f"PDL / PCE : {pdl_pce or pce or '-'}\n"
+                f"Commentaire : {commentaire or '-'}\n\n"
+                f"Ouvrir la demande : {cotation_link}\n"
+            ),
+        )
+
+        if not email_sent:
+            flash(
+                "La cotation a ete creee, mais l'email de notification n'a pas pu etre envoye.",
+                "warning",
+            )
 
     except Exception as e:
         conn.rollback()
@@ -4879,8 +5045,23 @@ def upload_client_document_legacy(client_id):
 
     success_count = 0
     failed = []
+    doc_name = (request.form.get("doc_name") or "").strip()
+    doc_kind = normalize_document_kind(request.form.get("doc_kind") or "")
+    auto_name = (request.form.get("auto_name") or "").strip().lower() in {"1", "true", "on", "yes"}
+    pdl = re.sub(r"[^0-9]", "", (request.form.get("pdl") or ""))
+    client_name = ""
 
-    prefix = client_s3_prefix(client_id)
+    if auto_name:
+        conn = get_db()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT name FROM crm_clients WHERE id = %s",
+                (client_id,),
+            )
+            row = cur.fetchone()
+        client_name = (row.get("name") or "").strip() if row else ""
+
+    prefix = client_s3_prefix(client_id, client_name or None)
 
     for f in files:
         try:
@@ -4889,7 +5070,16 @@ def upload_client_document_legacy(client_id):
                 continue
 
             original_name = secure_filename(f.filename) or "document"
-            filename = clean_filename(original_name)
+            ext = os.path.splitext(original_name)[1].lower()
+            base_name = build_document_upload_base_name(
+                client_name or f"client_{client_id}",
+                original_name,
+                manual_name=doc_name,
+                doc_kind=doc_kind,
+                auto_name=auto_name,
+                extra_suffix=pdl,
+            )
+            filename = f"{base_name}{ext}"
 
             key = _s3_make_non_overwriting_key(
                 AWS_BUCKET,
@@ -5337,8 +5527,22 @@ def upload_cspe_document(dossier_id):
         flash("Aucun fichier sélectionné.", "danger")
         return redirect(url_for("cspe_detail", dossier_id=dossier_id))
 
-    dossier_name = (request.form.get("doc_name") or "").strip()
-    prefix = cspe_storage_prefix(dossier_id)
+    manual_name = (request.form.get("doc_name") or "").strip()
+    doc_kind = normalize_document_kind(request.form.get("doc_kind") or "")
+    auto_name = (request.form.get("auto_name") or "").strip().lower() in {"1", "true", "on", "yes"}
+    dossier_name = ""
+
+    if auto_name:
+        conn = get_db()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT name FROM cspe_dossiers WHERE id = %s",
+                (dossier_id,),
+            )
+            row = cur.fetchone()
+        dossier_name = (row.get("name") or "").strip() if row else ""
+
+    prefix = cspe_storage_prefix(dossier_id, dossier_name or None)
     success_count = 0
     failed = []
 
@@ -5350,15 +5554,13 @@ def upload_cspe_document(dossier_id):
         try:
             original_name = secure_filename(fichier.filename) or "document"
             ext = os.path.splitext(original_name)[1].lower()
-
-            if dossier_name:
-                base_name = os.path.splitext(clean_filename(dossier_name))[0]
-            else:
-                base_name = os.path.splitext(clean_filename(original_name))[0]
-
-            if not base_name:
-                base_name = "document"
-
+            base_name = build_document_upload_base_name(
+                dossier_name or f"dossier_{dossier_id}",
+                original_name,
+                manual_name=manual_name,
+                doc_kind=doc_kind,
+                auto_name=auto_name,
+            )
             key = f"{prefix}{base_name}{ext}"
 
             if LOCAL_MODE:
@@ -5471,6 +5673,7 @@ def update_client(client_id):
 
     conn = get_db()
     user = session.get("user") or {}
+    update_id = None
 
     update_date = (request.form.get("update_date") or "").strip()
     commentaire = (request.form.get("update_commentaire") or "").strip()
@@ -5493,32 +5696,59 @@ def update_client(client_id):
         flash("Dossier introuvable.", "danger")
         return redirect(url_for("clients"))
 
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO client_updates (
-                client_id,
-                client_name,
-                commercial_id,
-                commercial_name,
-                update_date,
-                commentaire,
-                is_read
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO client_updates (
+                    client_id,
+                    client_name,
+                    commercial_id,
+                    commercial_name,
+                    update_date,
+                    commentaire,
+                    is_read
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, 0)
+                RETURNING id
+                """,
+                (
+                    client_id,
+                    client["name"],
+                    user.get("id"),
+                    user.get("username"),
+                    update_date,
+                    commentaire,
+                ),
             )
-            VALUES (%s, %s, %s, %s, %s, %s, 0)
-            """,
-            (
-                client_id,
-                client["name"],
-                user.get("id"),
-                user.get("username"),
-                update_date,
-                commentaire,
+            update_id = cur.fetchone()[0]
+
+        conn.commit()
+        flash("Demande de mise à jour envoyée à l’administrateur.", "success")
+
+        update_link = build_app_url(url_for("open_update", update_id=update_id))
+        email_sent = send_notification_email(
+            subject=f"Nouvelle demande de mise a jour - {client['name']}",
+            body=(
+                "Une nouvelle demande de mise a jour vient d'etre creee.\n\n"
+                f"Dossier : {client['name']}\n"
+                f"Commercial : {user.get('username') or 'Inconnu'}\n"
+                f"Date de mise a jour : {update_date}\n"
+                f"Commentaire : {commentaire or '-'}\n\n"
+                f"Ouvrir la demande : {update_link}\n"
             ),
         )
 
-    conn.commit()
-    flash("Demande de mise à jour envoyée à l’administrateur.", "success")
+        if not email_sent:
+            flash(
+                "La demande a ete enregistree, mais l'email de notification n'a pas pu etre envoye.",
+                "warning",
+            )
+
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur mise a jour client : %r", e)
+        flash("Erreur lors de l'envoi de la demande de mise a jour.", "danger")
 
     try:
         return redirect(url_for("client_detail", client_id=client_id))

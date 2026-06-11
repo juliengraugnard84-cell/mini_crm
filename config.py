@@ -50,6 +50,22 @@ class Config:
     AWS_BUCKET = os.environ.get("AWS_BUCKET")
 
     # =========================
+    # Email notifications
+    # =========================
+    SMTP_HOST = os.environ.get("SMTP_HOST")
+    SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
+    SMTP_USERNAME = os.environ.get("SMTP_USERNAME")
+    SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
+    SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "1").lower() in ("1", "true", "yes", "on")
+    SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "0").lower() in ("1", "true", "yes", "on")
+    SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL") or SMTP_USERNAME or "no-reply@synergyconsulting.fr"
+    NOTIFICATION_EMAIL = os.environ.get(
+        "NOTIFICATION_EMAIL",
+        "j.graugnard@synergyconsulting.fr",
+    )
+    APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
+
+    # =========================
     # Upload
     # =========================
     MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 10))

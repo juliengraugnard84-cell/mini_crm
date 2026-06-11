@@ -125,4 +125,57 @@ document.addEventListener("DOMContentLoaded", () => {
         input.addEventListener("change", render);
         render();
     });
+
+    const docKindLabels = {
+        factures: "factures",
+        mandats: "mandats",
+        contrats: "contrats",
+        summary: "summary",
+        autres: "autres",
+    };
+
+    const docUploadForms = document.querySelectorAll("[data-doc-upload-form]");
+
+    docUploadForms.forEach((form) => {
+        const autoToggle = form.querySelector("[data-doc-auto-toggle]");
+        const manualInput = form.querySelector("[data-doc-name-input]");
+        const manualField = form.querySelector("[data-doc-manual-field]");
+        const note = form.querySelector("[data-doc-name-note]");
+        const kindInputs = Array.from(form.querySelectorAll("[data-doc-kind-input]"));
+        const extraCodeInput = form.querySelector("[data-doc-extra-code-input]");
+        const contextName = (form.dataset.docContextName || "dossier").trim();
+
+        if (!autoToggle || !manualInput || !note || !kindInputs.length) {
+            return;
+        }
+
+        const renderNamingState = () => {
+            const selectedKind = kindInputs.find((input) => input.checked)?.value || "autres";
+            const kindLabel = docKindLabels[selectedKind] || docKindLabels.autres;
+            const autoEnabled = autoToggle.checked;
+            const extraCode = (extraCodeInput?.value || "").trim();
+
+            manualInput.disabled = autoEnabled;
+            manualInput.setAttribute("aria-disabled", autoEnabled ? "true" : "false");
+
+            if (manualField) {
+                manualField.classList.toggle("is-disabled", autoEnabled);
+            }
+
+            if (autoEnabled) {
+                note.textContent = `Nom auto : ${contextName} + ${kindLabel}${extraCode ? ` + ${extraCode}` : ""}`;
+            } else {
+                note.textContent = "Nom personnalise actif. Le champ ci-dessous sera utilise pour nommer le document.";
+            }
+        };
+
+        autoToggle.addEventListener("change", renderNamingState);
+        kindInputs.forEach((input) => input.addEventListener("change", renderNamingState));
+
+        if (extraCodeInput) {
+            extraCodeInput.addEventListener("input", renderNamingState);
+        }
+
+        renderNamingState();
+    });
 });

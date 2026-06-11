@@ -118,35 +118,80 @@
 
             <div class="row g-3 align-items-end">
                 <div class="col-12">
-                    <label class="form-label">Fichiers</label>
-                    <div class="crm-file-drop" data-file-dropzone>
-                        <label class="crm-file-drop-surface" data-file-surface tabindex="0" role="button">
-                            <input
-                                type="file"
-                                name="files"
-                                multiple
-                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv"
-                                class="crm-file-drop-input"
-                                data-file-input>
-                            <span class="crm-file-drop-kicker">Glisser-deposer</span>
-                            <strong>Deposez les fichiers du dossier ici</strong>
-                            <span>ou cliquez pour selectionner les pieces a joindre</span>
-                            <small>Formats autorises : PDF, image, Word, Excel, CSV</small>
-                        </label>
-                        <div class="crm-file-drop-summary" data-file-summary>Aucun fichier selectionne</div>
-                        <div class="crm-file-drop-list" data-file-list hidden></div>
+                    <div class="crm-doc-upload-layout"
+                         data-doc-upload-form
+                         data-doc-context-name="{{ dossier.name }}">
+                        <div>
+                            <label class="form-label">Fichiers</label>
+                            <div class="crm-file-drop" data-file-dropzone>
+                                <label class="crm-file-drop-surface" data-file-surface tabindex="0" role="button">
+                                    <input
+                                        type="file"
+                                        name="files"
+                                        multiple
+                                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv"
+                                        class="crm-file-drop-input"
+                                        data-file-input>
+                                    <span class="crm-file-drop-kicker">Glisser-deposer</span>
+                                    <strong>Deposez les fichiers du dossier ici</strong>
+                                    <span>ou cliquez pour selectionner les pieces a joindre</span>
+                                    <small>Formats autorises : PDF, image, Word, Excel, CSV</small>
+                                </label>
+                                <div class="crm-file-drop-summary" data-file-summary>Aucun fichier selectionne</div>
+                                <div class="crm-file-drop-list" data-file-list hidden></div>
+                            </div>
+                        </div>
+
+                        <div class="crm-doc-upload-panel">
+                            <div>
+                                <label class="form-label d-block mb-2">Type de document</label>
+                                <div class="crm-doc-kind-tabs" role="tablist" aria-label="Type de document">
+                                    <label class="crm-doc-kind-tab">
+                                        <input type="radio" name="doc_kind" value="factures" checked data-doc-kind-input>
+                                        <span>Factures</span>
+                                    </label>
+                                    <label class="crm-doc-kind-tab">
+                                        <input type="radio" name="doc_kind" value="mandats" data-doc-kind-input>
+                                        <span>Mandats</span>
+                                    </label>
+                                    <label class="crm-doc-kind-tab">
+                                        <input type="radio" name="doc_kind" value="contrats" data-doc-kind-input>
+                                        <span>Contrats</span>
+                                    </label>
+                                    <label class="crm-doc-kind-tab">
+                                        <input type="radio" name="doc_kind" value="summary" data-doc-kind-input>
+                                        <span>Summary</span>
+                                    </label>
+                                    <label class="crm-doc-kind-tab">
+                                        <input type="radio" name="doc_kind" value="autres" data-doc-kind-input>
+                                        <span>Autres</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <label class="crm-doc-auto-toggle">
+                                <input type="checkbox" name="auto_name" value="1" checked data-doc-auto-toggle>
+                                <span>Nommer automatiquement avec le nom du dossier et le type choisi</span>
+                            </label>
+
+                            <p class="crm-doc-name-note" data-doc-name-note>
+                                Nom auto : {{ dossier.name }} + factures
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="col-md-8">
-                    <label class="form-label">Nom du document</label>
+                <div class="col-md-8 crm-doc-manual-field" data-doc-manual-field>
+                    <label class="form-label">Nom personnalise</label>
                     <input type="text"
                            name="doc_name"
                            class="form-control"
-                           placeholder="Optionnel">
+                           placeholder="Utilise seulement si le nom auto est desactive"
+                           data-doc-name-input>
                 </div>
 
                 <div class="col-md-4">
+                    <label class="form-label d-none d-md-block">&nbsp;</label>
                     <button type="submit" class="btn btn-primary w-100">Uploader</button>
                 </div>
             </div>
