@@ -16,6 +16,8 @@
             --login-ink: #10212b;
             --login-muted: #64748b;
             --login-line: rgba(255, 255, 255, 0.12);
+            --login-font-body: "Corbel", "Aptos", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+            --login-font-heading: "Candara", "Corbel", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
         }
 
         * {
@@ -32,7 +34,7 @@
                 radial-gradient(circle at top left, rgba(242, 178, 51, 0.16), transparent 24%),
                 radial-gradient(circle at bottom right, rgba(17, 53, 75, 0.32), transparent 28%),
                 linear-gradient(135deg, var(--login-navy) 0%, #0b1f53 42%, var(--login-navy-soft) 100%);
-            font-family: "Aptos", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
+            font-family: var(--login-font-body);
             color: #fff;
         }
 
@@ -108,7 +110,7 @@
             font-size: clamp(34px, 4.6vw, 58px);
             line-height: 0.98;
             letter-spacing: -0.05em;
-            font-family: "Cambria", "Constantia", serif;
+            font-family: var(--login-font-heading);
         }
 
         .login-brand-text {
@@ -155,12 +157,13 @@
             margin: 0 0 8px;
             font-size: 34px;
             letter-spacing: -0.04em;
-            font-family: "Cambria", "Constantia", serif;
+            font-family: var(--login-font-heading);
         }
 
         .login-card p {
             margin: 0 0 24px;
             color: var(--login-muted);
+            display: none;
         }
 
         .login-form-card {

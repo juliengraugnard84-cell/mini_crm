@@ -10,6 +10,8 @@
     --primary-soft: #0F1E4D;
     --accent: #F5B335;
     --accent-soft: #F8C86A;
+    --font-body: "Corbel", "Aptos", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+    --font-heading: "Candara", "Corbel", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
 
     --bg: #f3f5f9;
     --surface: #ffffff;
@@ -61,9 +63,17 @@ body {
 body {
     background: linear-gradient(90deg,#eef2f7 0%,#f7f9fc 100%);
     color: var(--text);
-    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-family: var(--font-body);
     font-size: 14.5px;
     line-height: 1.55;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+    font-family: var(--font-body);
 }
 
 /* ================= LAYOUT GLOBAL ================= */
@@ -1839,7 +1849,7 @@ main.content {
     position: relative;
     display: grid;
     gap: 22px;
-    font-family: "Aptos", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
+    font-family: var(--font-body);
 }
 
 .planning-shell::before {
@@ -1918,7 +1928,7 @@ main.content {
     font-size: clamp(30px, 4vw, 48px);
     line-height: 1.05;
     letter-spacing: -0.04em;
-    font-family: "Cambria", "Constantia", serif;
+    font-family: var(--font-heading);
 }
 
 .planning-hero p {
@@ -2271,7 +2281,7 @@ main.content {
     color: var(--planning-ink);
     font-size: 28px;
     letter-spacing: -0.03em;
-    font-family: "Cambria", "Constantia", serif;
+    font-family: var(--font-heading);
 }
 
 #planning-calendar {
@@ -2498,7 +2508,7 @@ body.crm-body {
         radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 20%),
         linear-gradient(180deg, #f4efe6 0%, #f7f8fb 42%, #f9fbfd 100%);
     color: #10212b;
-    font-family: "Aptos", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
+    font-family: var(--font-body);
 }
 
 .crm-body::before {
@@ -2679,7 +2689,7 @@ body.crm-body {
     font-size: clamp(28px, 3vw, 40px);
     line-height: 1;
     letter-spacing: -0.04em;
-    font-family: "Cambria", "Constantia", serif;
+    font-family: var(--font-heading);
 }
 
 .topbar-userbox {
@@ -2715,11 +2725,7 @@ body.crm-body {
 .content h6 {
     color: #10212b;
     letter-spacing: -0.03em;
-}
-
-.content h1,
-.content h2 {
-    font-family: "Cambria", "Constantia", serif;
+    font-family: var(--font-heading);
 }
 
 .page-header {
@@ -2742,6 +2748,17 @@ body.crm-body {
 .page-header .text-muted,
 .page-header small {
     color: rgba(255, 255, 255, 0.78) !important;
+}
+
+.page-header p,
+.page-header .text-muted,
+.page-header small,
+.crm-page-hero p,
+.crm-table-top p.crm-soft-note,
+.planning-hero p,
+.planning-panel-header small,
+.planning-calendar-side-note {
+    display: none;
 }
 
 .flash-container {
@@ -2984,6 +3001,7 @@ textarea.form-control {
     line-height: 1.02;
     letter-spacing: -0.05em;
     color: #ffffff;
+    font-family: var(--font-heading);
 }
 
 .crm-page-hero p {
@@ -4426,11 +4444,11 @@ body.crm-body.planning-page {
 
 .crm-body.planning-page .topbar-title {
     color: #f8fafc;
-    font-size: 18px;
-    line-height: 1.2;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-family: "Aptos", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
+    font-size: 21px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    text-transform: none;
+    font-family: var(--font-heading);
 }
 
 .crm-body.planning-page .topbar-userbox {
