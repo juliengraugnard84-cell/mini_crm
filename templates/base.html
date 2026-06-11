@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='design.css') }}">
 </head>
 
-<body class="crm-body role-{{ current_user.role if current_user and current_user.role else 'guest' }}">
+<body class="crm-body role-{{ current_user.role if current_user and current_user.role else 'guest' }}{% if request.path.startswith('/admin/planning') or request.path.startswith('/planning') %} planning-page{% endif %}">
 
 <div class="app-layout">
 
