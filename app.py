@@ -2845,6 +2845,8 @@ def admin_cotation_detail(cotation_id):
             (cotation_id,)
         )
     conn.commit()
+    cotation = dict(cotation)
+    cotation["is_read"] = 1
 
     return render_template(
         "admin_cotation_detail.html",

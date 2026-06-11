@@ -1,148 +1,463 @@
 {% extends "base.html" %}
-{% block title %}Détail demande de cotation{% endblock %}
+{% block title %}Demande de cotation{% endblock %}
+
+{% set energie = (cotation.energie_type or "")|lower %}
+{% set status = (cotation.status or "nouvelle")|lower %}
+{% set show_elec = "elec" in energie
+    or cotation.pdl_pce
+    or cotation.type_compteur
+    or cotation.elec_fournisseur_actuel
+    or cotation.fournisseur_actuel
+    or cotation.elec_debut_fourniture
+    or cotation.elec_fin_fourniture
+    or cotation.elec_nb_mois
+    or cotation.elec_segment
+    or cotation.formule_acheminement
+    or cotation.elec_car
+    or cotation.puissance_souscrite
+    or cotation.pointe
+    or cotation.hph
+    or cotation.hch
+    or cotation.hpr
+    or cotation.hce %}
+{% set show_gaz = "gaz" in energie
+    or cotation.pce
+    or cotation.gaz_fournisseur_actuel
+    or cotation.gaz_debut_fourniture
+    or cotation.gaz_fin_fourniture
+    or cotation.gaz_nb_mois
+    or cotation.gaz_segment
+    or cotation.profil
+    or cotation.gaz_car %}
+{% set status_labels = {
+    "nouvelle": "Nouvelle",
+    "en_cours": "En cours",
+    "envoyee": "Envoyee",
+    "acceptee": "Acceptee",
+    "refusee": "Refusee"
+} %}
+{% set status_classes = {
+    "nouvelle": "crm-pill-warning",
+    "en_cours": "crm-pill-info",
+    "envoyee": "crm-pill-primary",
+    "acceptee": "crm-pill-success",
+    "refusee": "crm-pill-danger"
+} %}
 
 {% block content %}
 
-<div class="page-header mb-4">
-    <h1>Demande de cotation</h1>
-    <p class="text-muted">Consultation détaillée de la demande</p>
-</div>
+<section class="crm-page-hero crm-page-hero--compact crm-cotation-detail-hero">
+    <div>
+        <span class="crm-page-kicker">Demande admin</span>
+        <h1>{{ cotation.client_name or ("Client #" ~ cotation.client_id) }}</h1>
+        <p>
+            Lecture claire de la demande envoyee par le commercial, avec les
+            informations utiles pour traiter la cotation sans chercher dans
+            plusieurs ecrans.
+        </p>
+    </div>
 
-<div class="card mb-4">
-    <h5>Informations générales</h5>
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">Demande #{{ cotation.id }}</span>
+        <span class="crm-hero-pill">{{ cotation.commercial_name or "Commercial non renseigne" }}</span>
+        <span class="crm-hero-pill">{{ format_date(cotation.date_creation) if cotation.date_creation else "Date non renseignee" }}</span>
+    </div>
+</section>
 
-    <div class="info-grid">
-        <div class="info-item"><span>Dossier</span><strong>{{ cotation.client_name or "—" }}</strong></div>
-        <div class="info-item"><span>Commercial</span><strong>{{ cotation.commercial_name or "—" }}</strong></div>
-        <div class="info-item"><span>Énergie</span><strong>{{ cotation.energie_type or "—" }}</strong></div>
-        <div class="info-item"><span>Statut</span><strong>{{ cotation.status or "—" }}</strong></div>
-        <div class="info-item"><span>Date création</span><strong>{{ format_date(cotation.date_creation) if cotation.date_creation else "—" }}</strong></div>
-        <div class="info-item"><span>Date négociation</span><strong>{{ format_date(cotation.date_negociation) if cotation.date_negociation else "—" }}</strong></div>
-        <div class="info-item"><span>Heure négociation</span><strong>{{ cotation.heure_negociation or "—" }}</strong></div>
-        <div class="info-item"><span>Date remise offre</span><strong>{{ format_date(cotation.date_remise_offre) if cotation.date_remise_offre else "—" }}</strong></div>
-        <div class="info-item"><span>Date échéance</span><strong>{{ format_date(cotation.date_echeance) if cotation.date_echeance else "—" }}</strong></div>
+<div class="crm-page-header-split crm-cotation-detail-toolbar">
+    <div class="crm-cotation-chip-row">
+        {% if "gaz" in energie and "elec" in energie %}
+            <span class="crm-pill crm-pill-info">Electricite + gaz</span>
+        {% elif "gaz" in energie %}
+            <span class="crm-pill crm-pill-warning">Gaz</span>
+        {% elif "elec" in energie %}
+            <span class="crm-pill crm-pill-primary">Electricite</span>
+        {% else %}
+            <span class="crm-pill crm-pill-muted">Energie non renseignee</span>
+        {% endif %}
+
+        <span class="crm-pill {{ status_classes.get(status, 'crm-pill-muted') }}">
+            {{ status_labels.get(status, cotation.status or "Nouvelle") }}
+        </span>
+
+        {% if cotation.is_read %}
+            <span class="crm-pill crm-pill-success">Lue par l'admin</span>
+        {% else %}
+            <span class="crm-pill crm-pill-danger">A lire</span>
+        {% endif %}
+    </div>
+
+    <div class="crm-page-header-actions">
+        {% if cotation.client_id %}
+            <a href="{{ url_for('client_detail', client_id=cotation.client_id) }}" class="btn btn-primary">
+                Ouvrir le dossier
+            </a>
+        {% endif %}
+        <a href="{{ url_for('admin_cotations') }}" class="btn btn-secondary">
+            Retour a la liste
+        </a>
     </div>
 </div>
 
-<div class="card mb-4">
-    <h5>Données client / entreprise</h5>
+<section class="crm-cotation-detail-layout">
+    <aside class="crm-cotation-side-column">
+        <article class="card crm-cotation-summary-card">
+            <div class="crm-cotation-summary-head">
+                <span class="crm-page-kicker">Synthese</span>
+                <strong>Lecture rapide</strong>
+            </div>
 
-    <div class="info-grid">
-        <div class="info-item"><span>Raison sociale</span><strong>{{ cotation.entreprise_nom or "—" }}</strong></div>
-        <div class="info-item"><span>Nom commercial du site</span><strong>{{ cotation.site_nom or "—" }}</strong></div>
-        <div class="info-item"><span>SIRET</span><strong>{{ cotation.siret or "—" }}</strong></div>
-        <div class="info-item"><span>Code NAF</span><strong>{{ cotation.code_naf or "—" }}</strong></div>
-        <div class="info-item"><span>Adresse facturation</span><strong>{{ cotation.adresse_facturation or "—" }}</strong></div>
-        <div class="info-item"><span>Adresse consommation</span><strong>{{ cotation.adresse_consommation or "—" }}</strong></div>
+            <div class="crm-cotation-summary-list">
+                <div class="crm-cotation-summary-item">
+                    <span>Dossier</span>
+                    <strong>{{ cotation.client_name or ("Client #" ~ cotation.client_id) }}</strong>
+                </div>
+                <div class="crm-cotation-summary-item">
+                    <span>Commercial</span>
+                    <strong>{{ cotation.commercial_name or "-" }}</strong>
+                </div>
+                <div class="crm-cotation-summary-item">
+                    <span>Negociation</span>
+                    <strong>{{ format_date(cotation.date_negociation) if cotation.date_negociation else "-" }}</strong>
+                </div>
+                <div class="crm-cotation-summary-item">
+                    <span>Heure</span>
+                    <strong>{{ cotation.heure_negociation or "-" }}</strong>
+                </div>
+                <div class="crm-cotation-summary-item">
+                    <span>Remise offre</span>
+                    <strong>{{ format_date(cotation.date_remise_offre) if cotation.date_remise_offre else "-" }}</strong>
+                </div>
+                <div class="crm-cotation-summary-item">
+                    <span>Echeance</span>
+                    <strong>{{ format_date(cotation.date_echeance) if cotation.date_echeance else "-" }}</strong>
+                </div>
+            </div>
+        </article>
+
+        <article class="card crm-cotation-side-card">
+            <div class="crm-cotation-card-head">
+                <h2>Contacts utiles</h2>
+                <p class="crm-soft-note">Acces rapide sans repasser par le dossier.</p>
+            </div>
+
+            <div class="crm-cotation-contact-list">
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Signataire</span>
+                    <div class="crm-info-value">{{ cotation.signataire_nom or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Email</span>
+                    <div class="crm-info-value">
+                        {% if cotation.signataire_email %}
+                            <a href="mailto:{{ cotation.signataire_email }}" class="crm-primary-link">
+                                {{ cotation.signataire_email }}
+                            </a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Telephone</span>
+                    <div class="crm-info-value">
+                        {% if cotation.signataire_tel %}
+                            <a href="tel:{{ cotation.signataire_tel }}" class="crm-primary-link">
+                                {{ cotation.signataire_tel }}
+                            </a>
+                        {% elif cotation.signataire_mobile %}
+                            <a href="tel:{{ cotation.signataire_mobile }}" class="crm-primary-link">
+                                {{ cotation.signataire_mobile }}
+                            </a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <article class="card crm-cotation-side-card">
+            <div class="crm-cotation-card-head">
+                <h2>Action sensible</h2>
+                <p class="crm-soft-note">A utiliser seulement si la demande doit etre retiree.</p>
+            </div>
+
+            <form method="POST"
+                  action="{{ url_for('delete_cotation_admin', cotation_id=cotation.id) }}"
+                  onsubmit="return confirm('Supprimer definitivement cette demande de cotation ?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="btn btn-danger crm-cotation-danger-btn">
+                    Supprimer la demande
+                </button>
+            </form>
+        </article>
+    </aside>
+
+    <div class="crm-cotation-main-column">
+        <article class="card crm-cotation-panel">
+            <div class="crm-cotation-card-head">
+                <h2>Informations generales</h2>
+                <p class="crm-soft-note">Les points cles de la demande et du calendrier de negociation.</p>
+            </div>
+
+            <div class="crm-info-grid">
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Dossier</span>
+                    <div class="crm-info-value">{{ cotation.client_name or ("Client #" ~ cotation.client_id) }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Commercial</span>
+                    <div class="crm-info-value">{{ cotation.commercial_name or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Energie</span>
+                    <div class="crm-info-value">{{ cotation.energie_type or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Statut</span>
+                    <div class="crm-info-value">{{ status_labels.get(status, cotation.status or "Nouvelle") }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Date creation</span>
+                    <div class="crm-info-value">{{ format_date(cotation.date_creation) if cotation.date_creation else "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Date negociation</span>
+                    <div class="crm-info-value">{{ format_date(cotation.date_negociation) if cotation.date_negociation else "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Heure negociation</span>
+                    <div class="crm-info-value">{{ cotation.heure_negociation or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Date remise offre</span>
+                    <div class="crm-info-value">{{ format_date(cotation.date_remise_offre) if cotation.date_remise_offre else "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Date echeance</span>
+                    <div class="crm-info-value">{{ format_date(cotation.date_echeance) if cotation.date_echeance else "-" }}</div>
+                </div>
+            </div>
+        </article>
+
+        <article class="card crm-cotation-panel">
+            <div class="crm-cotation-card-head">
+                <h2>Entreprise et site</h2>
+                <p class="crm-soft-note">Les informations juridiques et d'implantation du dossier.</p>
+            </div>
+
+            <div class="crm-info-grid">
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Raison sociale</span>
+                    <div class="crm-info-value">{{ cotation.entreprise_nom or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Nom commercial du site</span>
+                    <div class="crm-info-value">{{ cotation.site_nom or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">SIRET</span>
+                    <div class="crm-info-value">{{ cotation.siret or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Code NAF</span>
+                    <div class="crm-info-value">{{ cotation.code_naf or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Adresse facturation</span>
+                    <div class="crm-info-value">{{ cotation.adresse_facturation or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Adresse consommation</span>
+                    <div class="crm-info-value">{{ cotation.adresse_consommation or "-" }}</div>
+                </div>
+            </div>
+        </article>
+
+        <article class="card crm-cotation-panel">
+            <div class="crm-cotation-card-head">
+                <h2>Signataire</h2>
+                <p class="crm-soft-note">Contact principal associe a la demande.</p>
+            </div>
+
+            <div class="crm-info-grid">
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Nom</span>
+                    <div class="crm-info-value">{{ cotation.signataire_nom or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Fonction</span>
+                    <div class="crm-info-value">{{ cotation.fonction_signataire or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Email</span>
+                    <div class="crm-info-value">{{ cotation.signataire_email or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Telephone</span>
+                    <div class="crm-info-value">{{ cotation.signataire_tel or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Portable</span>
+                    <div class="crm-info-value">{{ cotation.signataire_mobile or "-" }}</div>
+                </div>
+            </div>
+        </article>
+
+        {% if show_elec %}
+        <article class="card crm-cotation-panel">
+            <div class="crm-cotation-card-head">
+                <h2>Bloc electricite</h2>
+                <p class="crm-soft-note">Consommation, acheminement et structure de fourniture elec.</p>
+            </div>
+
+            <div class="crm-info-grid">
+                <div class="crm-info-card">
+                    <span class="crm-info-label">PDL</span>
+                    <div class="crm-info-value">{{ cotation.pdl_pce or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Type compteur</span>
+                    <div class="crm-info-value">{{ cotation.type_compteur or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Fournisseur actuel</span>
+                    <div class="crm-info-value">{{ cotation.elec_fournisseur_actuel or cotation.fournisseur_actuel or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Debut fourniture</span>
+                    <div class="crm-info-value">{{ format_date(cotation.elec_debut_fourniture) if cotation.elec_debut_fourniture else "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Fin fourniture</span>
+                    <div class="crm-info-value">{{ format_date(cotation.elec_fin_fourniture) if cotation.elec_fin_fourniture else "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Nombre de mois</span>
+                    <div class="crm-info-value">{{ cotation.elec_nb_mois or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Segment</span>
+                    <div class="crm-info-value">{{ cotation.elec_segment or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Formule acheminement</span>
+                    <div class="crm-info-value">{{ cotation.formule_acheminement or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">CAR</span>
+                    <div class="crm-info-value">{{ cotation.elec_car or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Puissance souscrite</span>
+                    <div class="crm-info-value">{{ cotation.puissance_souscrite or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Pointe</span>
+                    <div class="crm-info-value">{{ cotation.pointe or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">HPH</span>
+                    <div class="crm-info-value">{{ cotation.hph or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">HCH</span>
+                    <div class="crm-info-value">{{ cotation.hch or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">HPR</span>
+                    <div class="crm-info-value">{{ cotation.hpr or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">HCE</span>
+                    <div class="crm-info-value">{{ cotation.hce or "-" }}</div>
+                </div>
+            </div>
+        </article>
+        {% endif %}
+
+        {% if show_gaz %}
+        <article class="card crm-cotation-panel">
+            <div class="crm-cotation-card-head">
+                <h2>Bloc gaz</h2>
+                <p class="crm-soft-note">Fourniture, profil et donnees de consommation gaz.</p>
+            </div>
+
+            <div class="crm-info-grid">
+                <div class="crm-info-card">
+                    <span class="crm-info-label">PCE</span>
+                    <div class="crm-info-value">{{ cotation.pce or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Fournisseur actuel</span>
+                    <div class="crm-info-value">{{ cotation.gaz_fournisseur_actuel or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Debut fourniture</span>
+                    <div class="crm-info-value">{{ format_date(cotation.gaz_debut_fourniture) if cotation.gaz_debut_fourniture else "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Fin fourniture</span>
+                    <div class="crm-info-value">{{ format_date(cotation.gaz_fin_fourniture) if cotation.gaz_fin_fourniture else "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Nombre de mois</span>
+                    <div class="crm-info-value">{{ cotation.gaz_nb_mois or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Segment</span>
+                    <div class="crm-info-value">{{ cotation.gaz_segment or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Profil</span>
+                    <div class="crm-info-value">{{ cotation.profil or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">CAR</span>
+                    <div class="crm-info-value">{{ cotation.gaz_car or "-" }}</div>
+                </div>
+            </div>
+        </article>
+        {% endif %}
+
+        <article class="card crm-cotation-panel">
+            <div class="crm-cotation-card-head">
+                <h2>Commentaire du commercial</h2>
+                <p class="crm-soft-note">Contexte libre laisse au moment de la demande.</p>
+            </div>
+
+            <div class="crm-cotation-comment-box">
+                {{ cotation.commentaire or "Aucun commentaire renseigne." }}
+            </div>
+        </article>
+
+        <details class="card crm-cotation-panel crm-cotation-tech-panel">
+            <summary>Voir le resume technique admin</summary>
+            <div class="crm-info-grid crm-cotation-tech-grid">
+                <div class="crm-info-card">
+                    <span class="crm-info-label">ID demande</span>
+                    <div class="crm-info-value">#{{ cotation.id }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Client ID</span>
+                    <div class="crm-info-value">{{ cotation.client_id or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Created by</span>
+                    <div class="crm-info-value">{{ cotation.created_by or "-" }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">Lecture admin</span>
+                    <div class="crm-info-value">{{ cotation.is_read }}</div>
+                </div>
+                <div class="crm-info-card">
+                    <span class="crm-info-label">PDL / PCE</span>
+                    <div class="crm-info-value">{{ cotation.pdl_pce or cotation.pce or "-" }}</div>
+                </div>
+            </div>
+        </details>
     </div>
-</div>
-
-<div class="card mb-4">
-    <h5>Signataire</h5>
-
-    <div class="info-grid">
-        <div class="info-item"><span>Nom</span><strong>{{ cotation.signataire_nom or "—" }}</strong></div>
-        <div class="info-item"><span>Fonction</span><strong>{{ cotation.fonction_signataire or "—" }}</strong></div>
-        <div class="info-item"><span>Email</span><strong>{{ cotation.signataire_email or "—" }}</strong></div>
-        <div class="info-item"><span>Téléphone</span><strong>{{ cotation.signataire_tel or "—" }}</strong></div>
-        <div class="info-item"><span>Portable</span><strong>{{ cotation.signataire_mobile or "—" }}</strong></div>
-    </div>
-</div>
-
-<div class="card mb-4">
-    <h5>Données électricité</h5>
-
-    <div class="info-grid">
-        <div class="info-item"><span>PDL</span><strong>{{ cotation.pdl_pce or "—" }}</strong></div>
-        <div class="info-item"><span>Type compteur</span><strong>{{ cotation.type_compteur or "—" }}</strong></div>
-        <div class="info-item"><span>Fournisseur actuel</span><strong>{{ cotation.elec_fournisseur_actuel or cotation.fournisseur_actuel or "—" }}</strong></div>
-        <div class="info-item"><span>Début fourniture</span><strong>{{ format_date(cotation.elec_debut_fourniture) if cotation.elec_debut_fourniture else "—" }}</strong></div>
-        <div class="info-item"><span>Fin fourniture</span><strong>{{ format_date(cotation.elec_fin_fourniture) if cotation.elec_fin_fourniture else "—" }}</strong></div>
-        <div class="info-item"><span>Nombre de mois</span><strong>{{ cotation.elec_nb_mois or "—" }}</strong></div>
-        <div class="info-item"><span>Segment</span><strong>{{ cotation.elec_segment or "—" }}</strong></div>
-        <div class="info-item"><span>Formule acheminement</span><strong>{{ cotation.formule_acheminement or "—" }}</strong></div>
-        <div class="info-item"><span>CAR</span><strong>{{ cotation.elec_car or "—" }}</strong></div>
-        <div class="info-item"><span>Puissance souscrite</span><strong>{{ cotation.puissance_souscrite or "—" }}</strong></div>
-    </div>
-</div>
-
-<div class="card mb-4">
-    <h5>Puissances par poste</h5>
-
-    <div class="info-grid">
-        <div class="info-item"><span>Pointe</span><strong>{{ cotation.pointe or "—" }}</strong></div>
-        <div class="info-item"><span>HPH</span><strong>{{ cotation.hph or "—" }}</strong></div>
-        <div class="info-item"><span>HCH</span><strong>{{ cotation.hch or "—" }}</strong></div>
-        <div class="info-item"><span>HPR</span><strong>{{ cotation.hpr or "—" }}</strong></div>
-        <div class="info-item"><span>HCE</span><strong>{{ cotation.hce or "—" }}</strong></div>
-    </div>
-</div>
-
-<div class="card mb-4">
-    <h5>Données gaz</h5>
-
-    <div class="info-grid">
-        <div class="info-item"><span>PCE</span><strong>{{ cotation.pce or "—" }}</strong></div>
-        <div class="info-item"><span>Fournisseur actuel</span><strong>{{ cotation.gaz_fournisseur_actuel or "—" }}</strong></div>
-        <div class="info-item"><span>Début fourniture</span><strong>{{ format_date(cotation.gaz_debut_fourniture) if cotation.gaz_debut_fourniture else "—" }}</strong></div>
-        <div class="info-item"><span>Fin fourniture</span><strong>{{ format_date(cotation.gaz_fin_fourniture) if cotation.gaz_fin_fourniture else "—" }}</strong></div>
-        <div class="info-item"><span>Nombre de mois</span><strong>{{ cotation.gaz_nb_mois or "—" }}</strong></div>
-        <div class="info-item"><span>Segment</span><strong>{{ cotation.gaz_segment or "—" }}</strong></div>
-        <div class="info-item"><span>Profil</span><strong>{{ cotation.profil or "—" }}</strong></div>
-        <div class="info-item"><span>CAR</span><strong>{{ cotation.gaz_car or "—" }}</strong></div>
-    </div>
-</div>
-
-<div class="card mb-4">
-    <h5>Commentaire</h5>
-    <div class="alert alert-light" style="white-space:pre-line;">
-        {{ cotation.commentaire or "Aucun commentaire." }}
-    </div>
-</div>
-
-{% if current_user and current_user.role == "admin" %}
-<div class="card mt-4 shadow-sm">
-    <div class="card-header debug-header d-flex justify-content-between align-items-center">
-        <span>🔧 Résumé technique admin</span>
-        <button class="btn btn-sm btn-outline-light" onclick="toggleDebug()">
-            Afficher / Masquer
-        </button>
-    </div>
-
-    <div id="debug-content" class="card-body" style="display:none;">
-        <div class="debug-grid">
-            <div class="debug-item"><span>ID</span><strong>{{ cotation.id }}</strong></div>
-            <div class="debug-item"><span>Client ID</span><strong>{{ cotation.client_id }}</strong></div>
-            <div class="debug-item"><span>Created by</span><strong>{{ cotation.created_by or "—" }}</strong></div>
-            <div class="debug-item"><span>Lu admin</span><strong>{{ cotation.is_read }}</strong></div>
-            <div class="debug-item"><span>Énergie</span><strong>{{ cotation.energie_type or "—" }}</strong></div>
-            <div class="debug-item"><span>PDL / PCE</span><strong>{{ cotation.pdl_pce or cotation.pce or "—" }}</strong></div>
-            <div class="debug-item"><span>Échéance</span><strong>{{ format_date(cotation.date_echeance) if cotation.date_echeance else "—" }}</strong></div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<div class="d-flex justify-content-between mt-4">
-    <a href="{{ url_for('admin_cotations') }}" class="btn btn-secondary">
-        ← Retour
-    </a>
-
-    <form method="POST"
-          action="{{ url_for('delete_cotation_admin', cotation_id=cotation.id) }}"
-          onsubmit="return confirm('Supprimer ?');">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button class="btn btn-danger">
-            Supprimer
-        </button>
-    </form>
-</div>
-
-<script>
-function toggleDebug() {
-    const el = document.getElementById("debug-content");
-    el.style.display = (el.style.display === "none") ? "block" : "none";
-}
-</script>
+</section>
 
 {% endblock %}
