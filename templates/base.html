@@ -273,6 +273,7 @@
 {% if current_user and current_user.role in ["admin", "commercial"] %}
 <script src="{{ url_for('static', filename='chat_widget.js') }}?v=4"></script>
 {% endif %}
+<script src="{{ url_for('static', filename='file_dropzone.js') }}?v=1"></script>
 
 {% block scripts %}{% endblock %}
 

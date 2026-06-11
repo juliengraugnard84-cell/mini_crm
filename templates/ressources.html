@@ -47,7 +47,7 @@
               class="row g-3">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-            <div class="col-md-5">
+            <div class="col-md-9">
                 <label class="form-label">Nom du document</label>
                 <input type="text"
                        name="doc_name"
@@ -56,12 +56,27 @@
                        required>
             </div>
 
-            <div class="col-md-5">
+            <div class="col-12">
                 <label class="form-label">Fichier</label>
-                <input type="file" name="file" class="form-control" required>
+                <div class="crm-file-drop" data-file-dropzone>
+                    <label class="crm-file-drop-surface" data-file-surface tabindex="0" role="button">
+                        <input
+                            type="file"
+                            name="file"
+                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv"
+                            class="crm-file-drop-input"
+                            data-file-input>
+                        <span class="crm-file-drop-kicker">Glisser-deposer</span>
+                        <strong>Deposez la ressource partagee ici</strong>
+                        <span>ou cliquez pour choisir le fichier a publier</span>
+                        <small>Formats autorises : PDF, image, Word, Excel, CSV</small>
+                    </label>
+                    <div class="crm-file-drop-summary" data-file-summary>Aucun fichier selectionne</div>
+                    <div class="crm-file-drop-list" data-file-list hidden></div>
+                </div>
             </div>
 
-            <div class="col-md-2 d-flex align-items-end">
+            <div class="col-md-3 ms-md-auto d-flex align-items-end">
                 <button type="submit" class="btn btn-primary w-100">Publier</button>
             </div>
         </form>

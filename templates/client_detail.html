@@ -640,23 +640,41 @@ and 'update_client_status' in available_endpoints %}
                 <!-- UPLOAD -->
                 <form method="post"
                       action="{{ url_for('upload_client_document', client_id=client.id) }}"
-                      enctype="multipart/form-data">
+                      enctype="multipart/form-data"
+                      class="row g-3">
 
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-                    <div class="row">
-                        <div class="col-md-5 mb-2">
-                            <input type="file" name="files" multiple class="form-control">
-                        </div>
-                        <div class="col-md-4 mb-2">
-                            <input type="text" name="doc_name" class="form-control" placeholder="Nom du document">
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <input type="text" name="pdl" class="form-control" placeholder="PDL / PCE">
+                    <div class="col-12">
+                        <label class="form-label">Fichiers</label>
+                        <div class="crm-file-drop" data-file-dropzone>
+                            <label class="crm-file-drop-surface" data-file-surface tabindex="0" role="button">
+                                <input
+                                    type="file"
+                                    name="files"
+                                    multiple
+                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv"
+                                    class="crm-file-drop-input"
+                                    data-file-input>
+                                <span class="crm-file-drop-kicker">Glisser-deposer</span>
+                                <strong>Deposez les documents du client ici</strong>
+                                <span>ou cliquez pour selectionner un ou plusieurs fichiers</span>
+                                <small>Formats autorises : PDF, image, Word, Excel, CSV</small>
+                            </label>
+                            <div class="crm-file-drop-summary" data-file-summary>Aucun fichier selectionne</div>
+                            <div class="crm-file-drop-list" data-file-list hidden></div>
                         </div>
                     </div>
 
-                    <button class="btn btn-success">Uploader</button>
+                    <div class="col-md-5">
+                        <input type="text" name="doc_name" class="form-control" placeholder="Nom du document">
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" name="pdl" class="form-control" placeholder="PDL / PCE">
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-success w-100">Uploader</button>
+                    </div>
                 </form>
 
                 <hr>

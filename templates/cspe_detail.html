@@ -117,12 +117,28 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
             <div class="row g-3 align-items-end">
-                <div class="col-md-5">
+                <div class="col-12">
                     <label class="form-label">Fichiers</label>
-                    <input type="file" name="files" class="form-control" multiple>
+                    <div class="crm-file-drop" data-file-dropzone>
+                        <label class="crm-file-drop-surface" data-file-surface tabindex="0" role="button">
+                            <input
+                                type="file"
+                                name="files"
+                                multiple
+                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv"
+                                class="crm-file-drop-input"
+                                data-file-input>
+                            <span class="crm-file-drop-kicker">Glisser-deposer</span>
+                            <strong>Deposez les fichiers du dossier ici</strong>
+                            <span>ou cliquez pour selectionner les pieces a joindre</span>
+                            <small>Formats autorises : PDF, image, Word, Excel, CSV</small>
+                        </label>
+                        <div class="crm-file-drop-summary" data-file-summary>Aucun fichier selectionne</div>
+                        <div class="crm-file-drop-list" data-file-list hidden></div>
+                    </div>
                 </div>
 
-                <div class="col-md-5">
+                <div class="col-md-8">
                     <label class="form-label">Nom du document</label>
                     <input type="text"
                            name="doc_name"
@@ -130,7 +146,7 @@
                            placeholder="Optionnel">
                 </div>
 
-                <div class="col-md-2">
+                <div class="col-md-4">
                     <button type="submit" class="btn btn-primary w-100">Uploader</button>
                 </div>
             </div>
