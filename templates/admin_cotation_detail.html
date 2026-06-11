@@ -43,10 +43,13 @@
     "acceptee": "crm-pill-success",
     "refusee": "crm-pill-danger"
 } %}
+{% set square_panel_style = "border-radius:0 !important; overflow:visible !important; background-image:none !important;" %}
+{% set square_field_style = "border-radius:0 !important; overflow:visible !important; background-image:none !important;" %}
+{% set square_button_style = "border-radius:0 !important;" %}
 
 {% block content %}
 
-<section class="crm-page-hero crm-page-hero--compact crm-cotation-detail-hero">
+<section class="crm-page-hero crm-page-hero--compact crm-cotation-detail-hero" style="{{ square_panel_style }}">
     <div>
         <span class="crm-page-kicker">Demande admin</span>
         <h1>{{ cotation.client_name or ("Client #" ~ cotation.client_id) }}</h1>
@@ -89,11 +92,11 @@
 
     <div class="crm-page-header-actions">
         {% if cotation.client_id %}
-            <a href="{{ url_for('client_detail', client_id=cotation.client_id) }}" class="btn btn-primary">
+            <a href="{{ url_for('client_detail', client_id=cotation.client_id) }}" class="btn btn-primary" style="{{ square_button_style }}">
                 Ouvrir le dossier
             </a>
         {% endif %}
-        <a href="{{ url_for('admin_cotations') }}" class="btn btn-secondary">
+        <a href="{{ url_for('admin_cotations') }}" class="btn btn-secondary" style="{{ square_button_style }}">
             Retour a la liste
         </a>
     </div>
@@ -101,52 +104,52 @@
 
 <section class="crm-cotation-detail-layout">
     <aside class="crm-cotation-side-column">
-        <article class="card crm-cotation-summary-card">
+        <article class="card crm-cotation-summary-card" style="{{ square_panel_style }}">
             <div class="crm-cotation-summary-head">
                 <span class="crm-page-kicker">Synthese</span>
                 <strong>Lecture rapide</strong>
             </div>
 
             <div class="crm-cotation-summary-list">
-                <div class="crm-cotation-summary-item">
+                <div class="crm-cotation-summary-item" style="{{ square_field_style }}">
                     <span>Dossier</span>
                     <strong>{{ cotation.client_name or ("Client #" ~ cotation.client_id) }}</strong>
                 </div>
-                <div class="crm-cotation-summary-item">
+                <div class="crm-cotation-summary-item" style="{{ square_field_style }}">
                     <span>Commercial</span>
                     <strong>{{ cotation.commercial_name or "-" }}</strong>
                 </div>
-                <div class="crm-cotation-summary-item">
+                <div class="crm-cotation-summary-item" style="{{ square_field_style }}">
                     <span>Negociation</span>
                     <strong>{{ format_date(cotation.date_negociation) if cotation.date_negociation else "-" }}</strong>
                 </div>
-                <div class="crm-cotation-summary-item">
+                <div class="crm-cotation-summary-item" style="{{ square_field_style }}">
                     <span>Heure</span>
                     <strong>{{ cotation.heure_negociation or "-" }}</strong>
                 </div>
-                <div class="crm-cotation-summary-item">
+                <div class="crm-cotation-summary-item" style="{{ square_field_style }}">
                     <span>Remise offre</span>
                     <strong>{{ format_date(cotation.date_remise_offre) if cotation.date_remise_offre else "-" }}</strong>
                 </div>
-                <div class="crm-cotation-summary-item">
+                <div class="crm-cotation-summary-item" style="{{ square_field_style }}">
                     <span>Echeance</span>
                     <strong>{{ format_date(cotation.date_echeance) if cotation.date_echeance else "-" }}</strong>
                 </div>
             </div>
         </article>
 
-        <article class="card crm-cotation-side-card">
+        <article class="card crm-cotation-side-card" style="{{ square_panel_style }}">
             <div class="crm-cotation-card-head">
                 <h2>Contacts utiles</h2>
                 <p class="crm-soft-note">Acces rapide sans repasser par le dossier.</p>
             </div>
 
             <div class="crm-cotation-contact-list">
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Signataire</span>
                     <div class="crm-info-value">{{ cotation.signataire_nom or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Email</span>
                     <div class="crm-info-value">
                         {% if cotation.signataire_email %}
@@ -158,7 +161,7 @@
                         {% endif %}
                     </div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Telephone</span>
                     <div class="crm-info-value">
                         {% if cotation.signataire_tel %}
@@ -177,7 +180,7 @@
             </div>
         </article>
 
-        <article class="card crm-cotation-side-card">
+        <article class="card crm-cotation-side-card" style="{{ square_panel_style }}">
             <div class="crm-cotation-card-head">
                 <h2>Action sensible</h2>
                 <p class="crm-soft-note">A utiliser seulement si la demande doit etre retiree.</p>
@@ -187,7 +190,7 @@
                   action="{{ url_for('delete_cotation_admin', cotation_id=cotation.id) }}"
                   onsubmit="return confirm('Supprimer definitivement cette demande de cotation ?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <button class="btn btn-danger crm-cotation-danger-btn">
+                <button class="btn btn-danger crm-cotation-danger-btn" style="{{ square_button_style }}">
                     Supprimer la demande
                 </button>
             </form>
@@ -195,110 +198,110 @@
     </aside>
 
     <div class="crm-cotation-main-column">
-        <article class="card crm-cotation-panel">
+        <article class="card crm-cotation-panel" style="{{ square_panel_style }}">
             <div class="crm-cotation-card-head">
                 <h2>Informations generales</h2>
                 <p class="crm-soft-note">Les points cles de la demande et du calendrier de negociation.</p>
             </div>
 
             <div class="crm-info-grid">
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Dossier</span>
                     <div class="crm-info-value">{{ cotation.client_name or ("Client #" ~ cotation.client_id) }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Commercial</span>
                     <div class="crm-info-value">{{ cotation.commercial_name or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Energie</span>
                     <div class="crm-info-value">{{ cotation.energie_type or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Statut</span>
                     <div class="crm-info-value">{{ status_labels.get(status, cotation.status or "Nouvelle") }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Date creation</span>
                     <div class="crm-info-value">{{ format_date(cotation.date_creation) if cotation.date_creation else "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Date negociation</span>
                     <div class="crm-info-value">{{ format_date(cotation.date_negociation) if cotation.date_negociation else "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Heure negociation</span>
                     <div class="crm-info-value">{{ cotation.heure_negociation or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Date remise offre</span>
                     <div class="crm-info-value">{{ format_date(cotation.date_remise_offre) if cotation.date_remise_offre else "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Date echeance</span>
                     <div class="crm-info-value">{{ format_date(cotation.date_echeance) if cotation.date_echeance else "-" }}</div>
                 </div>
             </div>
         </article>
 
-        <article class="card crm-cotation-panel">
+        <article class="card crm-cotation-panel" style="{{ square_panel_style }}">
             <div class="crm-cotation-card-head">
                 <h2>Entreprise et site</h2>
                 <p class="crm-soft-note">Les informations juridiques et d'implantation du dossier.</p>
             </div>
 
             <div class="crm-info-grid">
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Raison sociale</span>
                     <div class="crm-info-value">{{ cotation.entreprise_nom or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Nom commercial du site</span>
                     <div class="crm-info-value">{{ cotation.site_nom or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">SIRET</span>
                     <div class="crm-info-value">{{ cotation.siret or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Code NAF</span>
                     <div class="crm-info-value">{{ cotation.code_naf or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Adresse facturation</span>
                     <div class="crm-info-value">{{ cotation.adresse_facturation or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Adresse consommation</span>
                     <div class="crm-info-value">{{ cotation.adresse_consommation or "-" }}</div>
                 </div>
             </div>
         </article>
 
-        <article class="card crm-cotation-panel">
+        <article class="card crm-cotation-panel" style="{{ square_panel_style }}">
             <div class="crm-cotation-card-head">
                 <h2>Signataire</h2>
                 <p class="crm-soft-note">Contact principal associe a la demande.</p>
             </div>
 
             <div class="crm-info-grid">
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Nom</span>
                     <div class="crm-info-value">{{ cotation.signataire_nom or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Fonction</span>
                     <div class="crm-info-value">{{ cotation.fonction_signataire or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Email</span>
                     <div class="crm-info-value">{{ cotation.signataire_email or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Telephone</span>
                     <div class="crm-info-value">{{ cotation.signataire_tel or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Portable</span>
                     <div class="crm-info-value">{{ cotation.signataire_mobile or "-" }}</div>
                 </div>
@@ -306,70 +309,70 @@
         </article>
 
         {% if show_elec %}
-        <article class="card crm-cotation-panel">
+        <article class="card crm-cotation-panel" style="{{ square_panel_style }}">
             <div class="crm-cotation-card-head">
                 <h2>Bloc electricite</h2>
                 <p class="crm-soft-note">Consommation, acheminement et structure de fourniture elec.</p>
             </div>
 
             <div class="crm-info-grid">
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">PDL</span>
                     <div class="crm-info-value">{{ cotation.pdl_pce or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Type compteur</span>
                     <div class="crm-info-value">{{ cotation.type_compteur or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Fournisseur actuel</span>
                     <div class="crm-info-value">{{ cotation.elec_fournisseur_actuel or cotation.fournisseur_actuel or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Debut fourniture</span>
                     <div class="crm-info-value">{{ format_date(cotation.elec_debut_fourniture) if cotation.elec_debut_fourniture else "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Fin fourniture</span>
                     <div class="crm-info-value">{{ format_date(cotation.elec_fin_fourniture) if cotation.elec_fin_fourniture else "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Nombre de mois</span>
                     <div class="crm-info-value">{{ cotation.elec_nb_mois or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Segment</span>
                     <div class="crm-info-value">{{ cotation.elec_segment or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Formule acheminement</span>
                     <div class="crm-info-value">{{ cotation.formule_acheminement or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">CAR</span>
                     <div class="crm-info-value">{{ cotation.elec_car or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Puissance souscrite</span>
                     <div class="crm-info-value">{{ cotation.puissance_souscrite or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Pointe</span>
                     <div class="crm-info-value">{{ cotation.pointe or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">HPH</span>
                     <div class="crm-info-value">{{ cotation.hph or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">HCH</span>
                     <div class="crm-info-value">{{ cotation.hch or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">HPR</span>
                     <div class="crm-info-value">{{ cotation.hpr or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">HCE</span>
                     <div class="crm-info-value">{{ cotation.hce or "-" }}</div>
                 </div>
@@ -378,42 +381,42 @@
         {% endif %}
 
         {% if show_gaz %}
-        <article class="card crm-cotation-panel">
+        <article class="card crm-cotation-panel" style="{{ square_panel_style }}">
             <div class="crm-cotation-card-head">
                 <h2>Bloc gaz</h2>
                 <p class="crm-soft-note">Fourniture, profil et donnees de consommation gaz.</p>
             </div>
 
             <div class="crm-info-grid">
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">PCE</span>
                     <div class="crm-info-value">{{ cotation.pce or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Fournisseur actuel</span>
                     <div class="crm-info-value">{{ cotation.gaz_fournisseur_actuel or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Debut fourniture</span>
                     <div class="crm-info-value">{{ format_date(cotation.gaz_debut_fourniture) if cotation.gaz_debut_fourniture else "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Fin fourniture</span>
                     <div class="crm-info-value">{{ format_date(cotation.gaz_fin_fourniture) if cotation.gaz_fin_fourniture else "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Nombre de mois</span>
                     <div class="crm-info-value">{{ cotation.gaz_nb_mois or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Segment</span>
                     <div class="crm-info-value">{{ cotation.gaz_segment or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Profil</span>
                     <div class="crm-info-value">{{ cotation.profil or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">CAR</span>
                     <div class="crm-info-value">{{ cotation.gaz_car or "-" }}</div>
                 </div>
@@ -421,37 +424,37 @@
         </article>
         {% endif %}
 
-        <article class="card crm-cotation-panel">
+        <article class="card crm-cotation-panel" style="{{ square_panel_style }}">
             <div class="crm-cotation-card-head">
                 <h2>Commentaire du commercial</h2>
                 <p class="crm-soft-note">Contexte libre laisse au moment de la demande.</p>
             </div>
 
-            <div class="crm-cotation-comment-box">
+            <div class="crm-cotation-comment-box" style="{{ square_field_style }}">
                 {{ cotation.commentaire or "Aucun commentaire renseigne." }}
             </div>
         </article>
 
-        <details class="card crm-cotation-panel crm-cotation-tech-panel">
+        <details class="card crm-cotation-panel crm-cotation-tech-panel" style="{{ square_panel_style }}">
             <summary>Voir le resume technique admin</summary>
             <div class="crm-info-grid crm-cotation-tech-grid">
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">ID demande</span>
                     <div class="crm-info-value">#{{ cotation.id }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Client ID</span>
                     <div class="crm-info-value">{{ cotation.client_id or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Created by</span>
                     <div class="crm-info-value">{{ cotation.created_by or "-" }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">Lecture admin</span>
                     <div class="crm-info-value">{{ cotation.is_read }}</div>
                 </div>
-                <div class="crm-info-card">
+                <div class="crm-info-card" style="{{ square_field_style }}">
                     <span class="crm-info-label">PDL / PCE</span>
                     <div class="crm-info-value">{{ cotation.pdl_pce or cotation.pce or "-" }}</div>
                 </div>
