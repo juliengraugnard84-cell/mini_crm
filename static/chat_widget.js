@@ -214,6 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const hasUnread = safeCount > 0;
         const compactCount = safeCount > 99 ? "99+" : String(safeCount);
         const messageLabel = safeCount > 1 ? "messages" : "message";
+        const newLabel = safeCount > 1 ? "nouveaux" : "nouveau";
 
         toggleBtn.classList.toggle("has-unread", hasUnread);
 
@@ -227,13 +228,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (toggleLabel) {
-            toggleLabel.textContent = hasUnread ? "Messages en attente" : "Chat live";
+            toggleLabel.textContent = hasUnread ? "Nouveaux" : "Messagerie";
         }
 
         if (toggleState) {
             toggleState.textContent = hasUnread
-                ? `${compactCount} ${messageLabel}`
-                : "Aucun message";
+                ? `${compactCount} ${newLabel}`
+                : "En ligne";
         }
 
         toggleBtn.setAttribute(

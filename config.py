@@ -92,6 +92,10 @@ class Config:
         or SMTP_USERNAME
         or "no-reply@synergyconsulting.fr"
     )
+    EMAIL_NOTIFICATIONS_ENABLED = (
+        os.environ.get("EMAIL_NOTIFICATIONS_ENABLED")
+        or "0"
+    ).lower() in ("1", "true", "yes", "on")
     NOTIFICATION_EMAIL = os.environ.get(
         "NOTIFICATION_EMAIL",
         "j.graugnard@synergyconsulting.fr",

@@ -69,6 +69,7 @@ SMTP_PASSWORD = Config.SMTP_PASSWORD
 SMTP_USE_TLS = Config.SMTP_USE_TLS
 SMTP_USE_SSL = Config.SMTP_USE_SSL
 SMTP_FROM_EMAIL = Config.SMTP_FROM_EMAIL
+EMAIL_NOTIFICATIONS_ENABLED = Config.EMAIL_NOTIFICATIONS_ENABLED
 NOTIFICATION_EMAIL = Config.NOTIFICATION_EMAIL
 APP_BASE_URL = Config.APP_BASE_URL
 
@@ -690,6 +691,10 @@ def resolve_smtp_settings():
 
 
 def send_notification_email(subject: str, body: str, recipients=None):
+    if not EMAIL_NOTIFICATIONS_ENABLED:
+        logger.info("Notification email skipped: email notifications disabled.")
+        return False, "emails desactives"
+
     targets = recipients or NOTIFICATION_EMAIL_RECIPIENTS
     settings = resolve_smtp_settings()
     smtp_host = settings["host"]
@@ -5011,28 +5016,29 @@ def create_cotation(client_id):
             if hasattr(heure_negociation, "strftime")
             else (str(heure_negociation)[:5] if heure_negociation else "-")
         )
-        email_sent, email_error = send_notification_email(
-            subject=f"Nouvelle demande de cotation - {client_name}",
-            body=(
-                "Une nouvelle demande de cotation vient d'etre creee.\n\n"
-                f"Dossier : {client_name}\n"
-                f"Commercial : {user.get('username') or 'Inconnu'}\n"
-                f"Energie : {energie_type or '-'}\n"
-                f"Date de negociation : {format_date_safe(date_negociation)}\n"
-                f"Heure de negociation : {heure_display}\n"
-                f"Signataire : {signataire_nom or '-'}\n"
-                f"Email signataire : {signataire_email or '-'}\n"
-                f"PDL / PCE : {pdl_pce or pce or '-'}\n"
-                f"Commentaire : {commentaire or '-'}\n\n"
-                f"Ouvrir la demande : {cotation_link}\n"
-            ),
-        )
-
-        if not email_sent:
-            flash(
-                f"La cotation a ete creee, mais l'email de notification n'a pas pu etre envoye ({email_error or 'erreur SMTP'}).",
-                "warning",
+        if EMAIL_NOTIFICATIONS_ENABLED:
+            email_sent, email_error = send_notification_email(
+                subject=f"Nouvelle demande de cotation - {client_name}",
+                body=(
+                    "Une nouvelle demande de cotation vient d'etre creee.\n\n"
+                    f"Dossier : {client_name}\n"
+                    f"Commercial : {user.get('username') or 'Inconnu'}\n"
+                    f"Energie : {energie_type or '-'}\n"
+                    f"Date de negociation : {format_date_safe(date_negociation)}\n"
+                    f"Heure de negociation : {heure_display}\n"
+                    f"Signataire : {signataire_nom or '-'}\n"
+                    f"Email signataire : {signataire_email or '-'}\n"
+                    f"PDL / PCE : {pdl_pce or pce or '-'}\n"
+                    f"Commentaire : {commentaire or '-'}\n\n"
+                    f"Ouvrir la demande : {cotation_link}\n"
+                ),
             )
+
+            if not email_sent:
+                flash(
+                    f"La cotation a ete creee, mais l'email de notification n'a pas pu etre envoye ({email_error or 'erreur SMTP'}).",
+                    "warning",
+                )
 
     except Exception as e:
         conn.rollback()
@@ -5820,23 +5826,24 @@ def update_client(client_id):
         flash("Demande de mise à jour envoyée à l’administrateur.", "success")
 
         update_link = build_app_url(url_for("open_update", update_id=update_id))
-        email_sent, email_error = send_notification_email(
-            subject=f"Nouvelle demande de mise a jour - {client['name']}",
-            body=(
-                "Une nouvelle demande de mise a jour vient d'etre creee.\n\n"
-                f"Dossier : {client['name']}\n"
-                f"Commercial : {user.get('username') or 'Inconnu'}\n"
-                f"Date de mise a jour : {update_date}\n"
-                f"Commentaire : {commentaire or '-'}\n\n"
-                f"Ouvrir la demande : {update_link}\n"
-            ),
-        )
-
-        if not email_sent:
-            flash(
-                f"La demande a ete enregistree, mais l'email de notification n'a pas pu etre envoye ({email_error or 'erreur SMTP'}).",
-                "warning",
+        if EMAIL_NOTIFICATIONS_ENABLED:
+            email_sent, email_error = send_notification_email(
+                subject=f"Nouvelle demande de mise a jour - {client['name']}",
+                body=(
+                    "Une nouvelle demande de mise a jour vient d'etre creee.\n\n"
+                    f"Dossier : {client['name']}\n"
+                    f"Commercial : {user.get('username') or 'Inconnu'}\n"
+                    f"Date de mise a jour : {update_date}\n"
+                    f"Commentaire : {commentaire or '-'}\n\n"
+                    f"Ouvrir la demande : {update_link}\n"
+                ),
             )
+
+            if not email_sent:
+                flash(
+                    f"La demande a ete enregistree, mais l'email de notification n'a pas pu etre envoye ({email_error or 'erreur SMTP'}).",
+                    "warning",
+                )
 
     except Exception as e:
         conn.rollback()
