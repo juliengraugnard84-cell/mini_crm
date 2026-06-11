@@ -4040,34 +4040,83 @@ textarea.form-control {
 ========================================================= */
 
 .chat-toggle {
-    width: 68px;
-    height: 68px;
-    border-radius: 24px;
-    overflow: hidden;
-    background:
-        radial-gradient(circle at top right, rgba(242, 178, 51, 0.24), transparent 34%),
+    --chat-toggle-bg:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.22), transparent 34%),
         linear-gradient(135deg, #08133f 0%, #123646 58%, #0d2249 100%);
+    --chat-toggle-tail:
+        linear-gradient(135deg, #123646 0%, #0d2249 100%);
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 124px;
+    height: 88px;
+    padding: 14px 16px 18px;
+    border-radius: 26px 26px 12px 26px;
+    overflow: visible;
+    isolation: isolate;
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 12px;
+    background: var(--chat-toggle-bg);
     color: #f8fafc;
     border: 1px solid rgba(242, 178, 51, 0.34);
-    box-shadow: 0 24px 40px rgba(8, 19, 63, 0.24);
+    box-shadow: 0 24px 42px rgba(8, 19, 63, 0.24);
+    text-align: left;
+    transition:
+        transform 0.22s ease,
+        box-shadow 0.22s ease,
+        background 0.22s ease,
+        color 0.22s ease,
+        border-color 0.22s ease;
 }
 
 .chat-toggle::before {
     content: "";
     position: absolute;
     inset: 1px;
-    border-radius: 23px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 25px 25px 11px 25px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     pointer-events: none;
 }
 
+.chat-toggle::after {
+    content: "";
+    position: absolute;
+    right: 18px;
+    bottom: -7px;
+    width: 18px;
+    height: 18px;
+    background: var(--chat-toggle-tail);
+    border-right: 1px solid rgba(242, 178, 51, 0.26);
+    border-bottom: 1px solid rgba(242, 178, 51, 0.26);
+    transform: rotate(45deg);
+    border-radius: 0 0 6px 0;
+    z-index: -1;
+}
+
 .chat-toggle:hover {
-    background:
-        radial-gradient(circle at top right, rgba(242, 178, 51, 0.3), transparent 34%),
-        linear-gradient(135deg, #0d2249 0%, #163e65 58%, #0e2b52 100%);
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 28px 52px rgba(8, 19, 63, 0.28);
     color: #ffffff;
 }
 
+.chat-toggle.has-unread {
+    --chat-toggle-bg:
+        radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 34%),
+        linear-gradient(135deg, #f2b233 0%, #ef8f7c 52%, #d96473 100%);
+    --chat-toggle-tail:
+        linear-gradient(135deg, #ef8f7c 0%, #d96473 100%);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow: 0 28px 54px rgba(217, 100, 115, 0.28);
+}
+
+.chat-toggle.has-unread::before {
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.chat-toggle-shell,
 .chat-toggle-icon,
 .chat-action-icon {
     display: inline-flex;
@@ -4075,14 +4124,130 @@ textarea.form-control {
     justify-content: center;
 }
 
+.chat-toggle-shell {
+    width: 100%;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.chat-toggle-icon {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.chat-toggle.has-unread .chat-toggle-icon {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.chat-toggle-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding-top: 2px;
+}
+
+.chat-toggle-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: 0.78;
+}
+
+.chat-toggle-state {
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.15;
+}
+
+.chat-badge {
+    position: absolute;
+    top: -10px;
+    right: -8px;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ffffff, #eef4ff);
+    color: #0d2249;
+    font-size: 12px;
+    font-weight: 900;
+    border: 1px solid rgba(13, 34, 73, 0.12);
+    box-shadow: 0 14px 24px rgba(8, 19, 63, 0.2);
+}
+
+.chat-toggle.has-unread .chat-badge {
+    background: linear-gradient(135deg, #08133f, #123646);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
 .chat-toggle-icon svg {
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
 }
 
 .chat-action-icon svg {
     width: 18px;
     height: 18px;
+}
+
+.chat-pulse {
+    animation: chatTogglePulse 1.85s infinite;
+}
+
+@keyframes chatTogglePulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(217, 100, 115, 0.34);
+    }
+    70% {
+        box-shadow: 0 0 0 18px rgba(217, 100, 115, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(217, 100, 115, 0);
+    }
+}
+
+@media (max-width: 640px) {
+    .chat-toggle {
+        right: 14px;
+        bottom: 14px;
+        width: 88px;
+        height: 74px;
+        padding: 12px 12px 16px;
+        border-radius: 24px 24px 12px 24px;
+        justify-content: center;
+        align-items: center;
+        gap: 0;
+    }
+
+    .chat-toggle-copy {
+        display: none;
+    }
+
+    .chat-toggle-shell {
+        justify-content: center;
+        gap: 0;
+    }
+
+    .chat-toggle-icon {
+        width: 40px;
+        height: 40px;
+        flex-basis: 40px;
+    }
+
+    .chat-badge {
+        top: -8px;
+        right: -6px;
+        min-width: 28px;
+        height: 28px;
+        padding: 0 8px;
+    }
 }
 
 .chat-widget {

@@ -52,13 +52,46 @@ class Config:
     # =========================
     # Email notifications
     # =========================
-    SMTP_HOST = os.environ.get("SMTP_HOST")
-    SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
-    SMTP_USERNAME = os.environ.get("SMTP_USERNAME")
-    SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
-    SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "1").lower() in ("1", "true", "yes", "on")
-    SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "0").lower() in ("1", "true", "yes", "on")
-    SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL") or SMTP_USERNAME or "no-reply@synergyconsulting.fr"
+    SMTP_HOST = (
+        os.environ.get("SMTP_HOST")
+        or os.environ.get("SMTP_SERVER")
+        or os.environ.get("MAIL_SERVER")
+        or os.environ.get("MAIL_HOST")
+    )
+    SMTP_PORT = int(
+        os.environ.get("SMTP_PORT")
+        or os.environ.get("MAIL_PORT")
+        or 587
+    )
+    SMTP_USERNAME = (
+        os.environ.get("SMTP_USERNAME")
+        or os.environ.get("SMTP_USER")
+        or os.environ.get("MAIL_USERNAME")
+        or os.environ.get("MAIL_USER")
+    )
+    SMTP_PASSWORD = (
+        os.environ.get("SMTP_PASSWORD")
+        or os.environ.get("SMTP_PASS")
+        or os.environ.get("MAIL_PASSWORD")
+        or os.environ.get("MAIL_PASS")
+    )
+    SMTP_USE_TLS = (
+        os.environ.get("SMTP_USE_TLS")
+        or os.environ.get("MAIL_USE_TLS")
+        or "1"
+    ).lower() in ("1", "true", "yes", "on")
+    SMTP_USE_SSL = (
+        os.environ.get("SMTP_USE_SSL")
+        or os.environ.get("MAIL_USE_SSL")
+        or "0"
+    ).lower() in ("1", "true", "yes", "on")
+    SMTP_FROM_EMAIL = (
+        os.environ.get("SMTP_FROM_EMAIL")
+        or os.environ.get("MAIL_DEFAULT_SENDER")
+        or os.environ.get("MAIL_FROM")
+        or SMTP_USERNAME
+        or "no-reply@synergyconsulting.fr"
+    )
     NOTIFICATION_EMAIL = os.environ.get(
         "NOTIFICATION_EMAIL",
         "j.graugnard@synergyconsulting.fr",

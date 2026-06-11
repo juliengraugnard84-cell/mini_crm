@@ -17,7 +17,7 @@
             <a href="{{ url_for('client_detail', client_id=c.id) }}" class="crm-board-item">
                 <div class="crm-board-item-top">
                     <strong>{{ c.name }}</strong>
-                    {% if not current_user or current_user.role != 'admin' %}
+                    {% if not current_user or current_user.role not in ['admin', 'commercial'] %}
                     <span class="crm-board-state">{{ title }}</span>
                     {% endif %}
                 </div>
@@ -26,7 +26,7 @@
                     <span>Commercial : {{ c.commercial or "-" }}</span>
                 </div>
 
-                {% if current_user and current_user.role == 'admin' %}
+                {% if current_user and current_user.role in ['admin', 'commercial'] %}
                 <form method="post"
                       action="{{ url_for('update_client_status', client_id=c.id) }}"
                       class="crm-board-form"

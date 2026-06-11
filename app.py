@@ -6,6 +6,7 @@
 
 import os
 import re
+import socket
 import smtplib
 import ssl
 import unicodedata
@@ -15,6 +16,7 @@ from datetime import date, timedelta
 from email.message import EmailMessage
 from types import SimpleNamespace
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import (
     Flask,
@@ -651,35 +653,81 @@ def build_app_url(path: str) -> str:
     return f"{base_url}{clean_path if clean_path.startswith('/') else f'/{clean_path}'}"
 
 
+def resolve_smtp_settings():
+    raw_host = (SMTP_HOST or "").strip()
+    port = int(SMTP_PORT or 587)
+    use_ssl = bool(SMTP_USE_SSL)
+    use_tls = bool(SMTP_USE_TLS)
+
+    if raw_host.startswith(("smtp://", "smtps://")):
+        parsed = urlparse(raw_host)
+        if parsed.hostname:
+            raw_host = parsed.hostname
+        if parsed.port:
+            port = parsed.port
+        if parsed.scheme == "smtps":
+            use_ssl = True
+            use_tls = False
+
+    elif ":" in raw_host:
+        host_candidate, port_candidate = raw_host.rsplit(":", 1)
+        if port_candidate.isdigit():
+            raw_host = host_candidate.strip()
+            port = int(port_candidate)
+
+    if port == 465 and not use_tls:
+        use_ssl = True
+    elif use_ssl:
+        use_tls = False
+
+    return {
+        "host": raw_host.strip(),
+        "port": port,
+        "use_ssl": use_ssl,
+        "use_tls": use_tls,
+        "from_email": (SMTP_FROM_EMAIL or SMTP_USERNAME or "").strip(),
+    }
+
+
 def send_notification_email(subject: str, body: str, recipients=None):
     targets = recipients or NOTIFICATION_EMAIL_RECIPIENTS
+    settings = resolve_smtp_settings()
+    smtp_host = settings["host"]
+    smtp_port = settings["port"]
+    smtp_use_ssl = settings["use_ssl"]
+    smtp_use_tls = settings["use_tls"]
+    from_email = settings["from_email"] or "no-reply@synergyconsulting.fr"
 
-    if not SMTP_HOST or not targets:
+    if not smtp_host:
+        logger.warning("Notification email skipped: SMTP_HOST not configured.")
+        return False, "SMTP non configure"
+
+    if not targets:
         logger.warning(
-            "Notification email skipped: SMTP or recipient not configured."
+            "Notification email skipped: recipient not configured."
         )
-        return False
+        return False, "destinataire de notification absent"
 
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = SMTP_FROM_EMAIL
+    message["From"] = from_email
     message["To"] = ", ".join(targets)
     message.set_content(body)
 
     server = None
 
     try:
-        if SMTP_USE_SSL:
+        if smtp_use_ssl:
             server = smtplib.SMTP_SSL(
-                SMTP_HOST,
-                SMTP_PORT,
+                smtp_host,
+                smtp_port,
                 timeout=20,
                 context=ssl.create_default_context(),
             )
         else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20)
+            server = smtplib.SMTP(smtp_host, smtp_port, timeout=20)
             server.ehlo()
-            if SMTP_USE_TLS:
+            if smtp_use_tls:
                 server.starttls(context=ssl.create_default_context())
                 server.ehlo()
 
@@ -687,11 +735,46 @@ def send_notification_email(subject: str, body: str, recipients=None):
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
 
         server.send_message(message)
-        return True
+        return True, None
+
+    except smtplib.SMTPAuthenticationError as e:
+        logger.exception(
+            "Notification email authentication failed on %s:%s",
+            smtp_host,
+            smtp_port,
+        )
+        return False, "identifiants SMTP invalides"
+
+    except smtplib.SMTPRecipientsRefused as e:
+        logger.exception("Notification email recipient refused: %r", e)
+        return False, "adresse destinataire refusee"
+
+    except smtplib.SMTPConnectError as e:
+        logger.exception(
+            "Notification email connection failed on %s:%s",
+            smtp_host,
+            smtp_port,
+        )
+        return False, "connexion SMTP impossible"
+
+    except (socket.gaierror, TimeoutError) as e:
+        logger.exception(
+            "Notification email network error on %s:%s",
+            smtp_host,
+            smtp_port,
+        )
+        return False, "serveur SMTP introuvable ou delai depasse"
 
     except Exception as e:
-        logger.exception("Notification email failed: %r", e)
-        return False
+        logger.exception(
+            "Notification email failed on %s:%s (ssl=%s tls=%s): %r",
+            smtp_host,
+            smtp_port,
+            smtp_use_ssl,
+            smtp_use_tls,
+            e,
+        )
+        return False, "verifie SMTP_HOST, SMTP_PORT, SMTP_USE_TLS et SMTP_USE_SSL"
 
     finally:
         try:
@@ -4432,6 +4515,7 @@ def client_detail(client_id):
         abort(403)
 
     conn = get_db()
+    user = session.get("user") or {}
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -4502,6 +4586,17 @@ def client_detail(client_id):
         """, (client_id,))
         updates = cur.fetchall()
 
+    commercial_users = []
+    if user.get("role") == "admin":
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, username
+                FROM users
+                WHERE role = 'commercial'
+                ORDER BY username ASC
+            """)
+            commercial_users = [row_to_obj(row) for row in cur.fetchall()]
+
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
@@ -4509,7 +4604,8 @@ def client_detail(client_id):
         cotations=[row_to_obj(c) for c in cotations],
         timeline=[row_to_obj(t) for t in timeline],
         updates=[row_to_obj(u) for u in updates],
-        current_user=session.get("user"),
+        current_user=user,
+        commercial_users=commercial_users,
         available_endpoints=[rule.endpoint for rule in app.url_map.iter_rules()],
     )
 
@@ -4533,7 +4629,7 @@ def edit_client(client_id):
     phone = (request.form.get("phone") or "").strip()
     address = (request.form.get("address") or "").strip()
     commercial = (request.form.get("commercial") or "").strip()
-    status = (request.form.get("status") or "en_cours").strip().lower()
+    status = (request.form.get("status") or "").strip().lower()
     notes = (request.form.get("notes") or "").strip()
     siret = (request.form.get("siret") or "").strip()
     gerant_nom = (request.form.get("gerant_nom") or "").strip()
@@ -4542,25 +4638,25 @@ def edit_client(client_id):
         flash("Le nom du client est obligatoire.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT id, owner_id, commercial, status
+            FROM crm_clients
+            WHERE id = %s
+        """, (client_id,))
+        existing_client = cur.fetchone()
+
+    if not existing_client:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
     if status not in ("en_cours", "en_attente", "gagne", "perdu", "nouveau"):
-        status = "en_cours"
+        status = (existing_client.get("status") or "en_cours").strip().lower()
 
     try:
         owner_id = None
 
         if role == "admin":
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT owner_id, commercial
-                    FROM crm_clients
-                    WHERE id = %s
-                """, (client_id,))
-                existing_client = cur.fetchone()
-
-            if not existing_client:
-                flash("Client introuvable.", "danger")
-                return redirect(url_for("clients"))
-
             owner_id = existing_client["owner_id"]
             if not commercial:
                 commercial = existing_client["commercial"]
@@ -4694,18 +4790,13 @@ def update_client_status(client_id):
 # CLIENT — SUPPRESSION
 # =========================
 @app.route("/clients/<int:client_id>/delete", methods=["POST"], endpoint="delete_client")
-@login_required
+@admin_required
 def delete_client(client_id):
 
     if not can_access_client(client_id):
         abort(403)
 
     conn = get_db()
-    user = session.get("user") or {}
-    role = user.get("role")
-
-    if role not in ("admin", "commercial"):
-        abort(403)
 
     try:
         with conn.cursor() as cur:
@@ -4920,7 +5011,7 @@ def create_cotation(client_id):
             if hasattr(heure_negociation, "strftime")
             else (str(heure_negociation)[:5] if heure_negociation else "-")
         )
-        email_sent = send_notification_email(
+        email_sent, email_error = send_notification_email(
             subject=f"Nouvelle demande de cotation - {client_name}",
             body=(
                 "Une nouvelle demande de cotation vient d'etre creee.\n\n"
@@ -4939,7 +5030,7 @@ def create_cotation(client_id):
 
         if not email_sent:
             flash(
-                "La cotation a ete creee, mais l'email de notification n'a pas pu etre envoye.",
+                f"La cotation a ete creee, mais l'email de notification n'a pas pu etre envoye ({email_error or 'erreur SMTP'}).",
                 "warning",
             )
 
@@ -5729,7 +5820,7 @@ def update_client(client_id):
         flash("Demande de mise à jour envoyée à l’administrateur.", "success")
 
         update_link = build_app_url(url_for("open_update", update_id=update_id))
-        email_sent = send_notification_email(
+        email_sent, email_error = send_notification_email(
             subject=f"Nouvelle demande de mise a jour - {client['name']}",
             body=(
                 "Une nouvelle demande de mise a jour vient d'etre creee.\n\n"
@@ -5743,7 +5834,7 @@ def update_client(client_id):
 
         if not email_sent:
             flash(
-                "La demande a ete enregistree, mais l'email de notification n'a pas pu etre envoye.",
+                f"La demande a ete enregistree, mais l'email de notification n'a pas pu etre envoye ({email_error or 'erreur SMTP'}).",
                 "warning",
             )
 

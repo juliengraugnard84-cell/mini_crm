@@ -137,6 +137,113 @@ and 'update_client_status' in available_endpoints %}
             <div class="col-md-6 mb-2"><strong>SIRET :</strong><br>{{ client.siret or "—" }}</div>
             <div class="col-md-6 mb-2"><strong>Adresse :</strong><br>{{ client.address or "—" }}</div>
         </div>
+
+        {% if current_user and (current_user.role == "admin" or current_user.id == client.owner_id) %}
+        <hr class="my-4">
+
+        <form method="post" action="{{ url_for('edit_client', client_id=client.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div>
+                    <h5 class="mb-1">Modifier la fiche client</h5>
+                </div>
+                <button type="submit" class="btn btn-success">Enregistrer la fiche</button>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Nom du dossier *</label>
+                    <input type="text"
+                           name="name"
+                           class="form-control"
+                           value="{{ client.name }}"
+                           required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Nom du gerant</label>
+                    <input type="text"
+                           name="gerant_nom"
+                           class="form-control"
+                           value="{{ client.gerant_nom or '' }}">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Email</label>
+                    <input type="email"
+                           name="email"
+                           class="form-control"
+                           value="{{ client.email or '' }}">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Telephone</label>
+                    <input type="text"
+                           name="phone"
+                           class="form-control"
+                           value="{{ client.phone or '' }}">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Adresse</label>
+                    <input type="text"
+                           name="address"
+                           class="form-control"
+                           value="{{ client.address or '' }}">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">SIRET</label>
+                    <input type="text"
+                           name="siret"
+                           class="form-control"
+                           value="{{ client.siret or '' }}">
+                </div>
+
+                {% if current_user.role == "admin" %}
+                <div class="col-md-6">
+                    <label class="form-label">Commercial assigne</label>
+                    <select name="owner_id" class="form-select">
+                        <option value="">Selectionner un commercial</option>
+                        {% for user in commercial_users %}
+                        <option value="{{ user.id }}" {% if client.owner_id == user.id %}selected{% endif %}>
+                            {{ user.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <div class="col-md-6">
+                    <label class="form-label">Commercial assigne</label>
+                    <input type="text"
+                           class="form-control"
+                           value="{{ client.commercial or current_user.username }}"
+                           disabled>
+                </div>
+                {% endif %}
+
+                <div class="col-md-6">
+                    <label class="form-label">Statut du dossier</label>
+                    <select name="status" class="form-select">
+                        <option value="nouveau" {% if client_status == "nouveau" %}selected{% endif %}>Nouveau</option>
+                        <option value="en_cours" {% if client_status == "en_cours" %}selected{% endif %}>En cours</option>
+                        <option value="en_attente" {% if client_status == "en_attente" %}selected{% endif %}>En attente</option>
+                        <option value="gagne" {% if client_status == "gagne" %}selected{% endif %}>Gagne</option>
+                        <option value="perdu" {% if client_status == "perdu" %}selected{% endif %}>Perdu</option>
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Notes</label>
+                    <textarea name="notes"
+                              class="form-control"
+                              rows="4"
+                              placeholder="Informations utiles sur le dossier, preferences client, contexte commercial...">{{ client.notes or "" }}</textarea>
+                </div>
+            </div>
+        </form>
+        {% endif %}
     </div>
 </div>
 

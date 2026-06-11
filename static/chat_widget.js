@@ -13,6 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("chat-file");
     const messagesBox = document.getElementById("chat-messages");
     const badge = document.getElementById("chat-badge");
+    const toggleLabel = document.getElementById("chat-toggle-label");
+    const toggleState = document.getElementById("chat-toggle-state");
     const recipientSelect = document.getElementById("chat-recipient");
     const quickRecipients = document.getElementById("chat-quick-recipients");
     const contextBanner = document.getElementById("chat-context-banner");
@@ -41,6 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
         isSending: false,
         isFirstLoad: true,
         audioUnlocked: false,
+        audioContext: null,
         lastReceiveSoundAt: 0,
         lastMessageId: null,
         lastRenderedSignature: "",
@@ -184,21 +187,61 @@ document.addEventListener("DOMContentLoaded", () => {
         input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
     }
 
+    function ensureAudioContext() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+        if (!AudioContextClass) {
+            return null;
+        }
+
+        if (!state.audioContext) {
+            try {
+                state.audioContext = new AudioContextClass();
+            } catch (_error) {
+                return null;
+            }
+        }
+
+        return state.audioContext;
+    }
+
     function setBadge(count) {
         if (!badge) {
             return;
         }
 
         const safeCount = Math.max(0, Number(count) || 0);
+        const hasUnread = safeCount > 0;
+        const compactCount = safeCount > 99 ? "99+" : String(safeCount);
+        const messageLabel = safeCount > 1 ? "messages" : "message";
 
-        if (safeCount > 0) {
-            badge.textContent = safeCount > 99 ? "99+" : String(safeCount);
+        toggleBtn.classList.toggle("has-unread", hasUnread);
+
+        if (hasUnread) {
+            badge.textContent = compactCount;
             badge.style.display = "flex";
             toggleBtn.classList.add("chat-pulse");
         } else {
             badge.style.display = "none";
             toggleBtn.classList.remove("chat-pulse");
         }
+
+        if (toggleLabel) {
+            toggleLabel.textContent = hasUnread ? "Messages en attente" : "Chat live";
+        }
+
+        if (toggleState) {
+            toggleState.textContent = hasUnread
+                ? `${compactCount} ${messageLabel}`
+                : "Aucun message";
+        }
+
+        toggleBtn.setAttribute(
+            "aria-label",
+            hasUnread
+                ? `Ouvrir la messagerie, ${compactCount} ${messageLabel} en attente`
+                : "Ouvrir la messagerie"
+        );
     }
 
     function scrollBottom() {
@@ -316,6 +359,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function unlockAudio() {
+        const context = ensureAudioContext();
+
+        if (context && context.state === "suspended") {
+            context.resume().catch(() => {});
+        }
+
         if (state.audioUnlocked) {
             return;
         }
@@ -339,11 +388,45 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function playReceiveSound() {
-        if (!receiveAudio || !state.audioUnlocked) {
-            return;
+    function playReceiveBeep() {
+        if (!state.audioUnlocked) {
+            return false;
         }
 
+        const context = ensureAudioContext();
+
+        if (!context || context.state === "closed") {
+            return false;
+        }
+
+        const startAt = context.currentTime;
+        const tones = [
+            { frequency: 880, offset: 0, duration: 0.09, gain: 0.05 },
+            { frequency: 1240, offset: 0.11, duration: 0.12, gain: 0.04 },
+        ];
+
+        tones.forEach((tone) => {
+            const oscillator = context.createOscillator();
+            const gainNode = context.createGain();
+            const toneStart = startAt + tone.offset;
+            const toneEnd = toneStart + tone.duration;
+
+            oscillator.type = "sine";
+            oscillator.frequency.setValueAtTime(tone.frequency, toneStart);
+            gainNode.gain.setValueAtTime(0.0001, toneStart);
+            gainNode.gain.exponentialRampToValueAtTime(tone.gain, toneStart + 0.02);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, toneEnd);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(context.destination);
+            oscillator.start(toneStart);
+            oscillator.stop(toneEnd + 0.02);
+        });
+
+        return true;
+    }
+
+    function playReceiveSound() {
         const now = Date.now();
 
         if (now - state.lastReceiveSoundAt < 1200) {
@@ -351,6 +434,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         state.lastReceiveSoundAt = now;
+
+        if (playReceiveBeep()) {
+            return;
+        }
+
+        if (!receiveAudio || !state.audioUnlocked) {
+            return;
+        }
+
         receiveAudio.currentTime = 0;
         receiveAudio.play().catch(() => {});
     }
