@@ -4448,6 +4448,7 @@ textarea.form-control {
 
 .crm-cotation-detail-hero {
     margin-bottom: 18px;
+    border-radius: 8px;
 }
 
 .crm-cotation-detail-toolbar {
@@ -4476,19 +4477,18 @@ textarea.form-control {
 .crm-cotation-summary-card {
     position: sticky;
     top: 18px;
-    overflow: hidden;
+    padding: 22px;
+    overflow: visible;
     background:
-        radial-gradient(circle at top right, rgba(241, 193, 175, 0.28), transparent 32%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 255, 0.94));
-    border: 1px solid rgba(109, 126, 176, 0.12);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(249, 250, 255, 0.97));
+    border: 1px solid rgba(109, 126, 176, 0.18);
+    border-left: 3px solid rgba(223, 162, 135, 0.9);
+    border-radius: 8px;
+    box-shadow: 0 10px 24px rgba(109, 126, 176, 0.06);
 }
 
 .crm-cotation-summary-card::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 5px;
-    background: linear-gradient(180deg, var(--accent), rgba(241, 193, 175, 0.2));
+    content: none;
 }
 
 .crm-cotation-summary-head {
@@ -4512,9 +4512,9 @@ textarea.form-control {
     display: grid;
     gap: 4px;
     padding: 14px 16px;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.88);
-    border: 1px solid rgba(109, 126, 176, 0.12);
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid rgba(109, 126, 176, 0.16);
 }
 
 .crm-cotation-summary-item span {
@@ -4533,13 +4533,20 @@ textarea.form-control {
 
 .crm-cotation-side-card,
 .crm-cotation-panel {
-    border: 1px solid rgba(109, 126, 176, 0.12);
+    padding: 22px;
+    border: 1px solid rgba(109, 126, 176, 0.18);
+    border-radius: 8px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(249, 250, 255, 0.97));
+    box-shadow: 0 10px 24px rgba(109, 126, 176, 0.06);
+    overflow: visible;
 }
 
 .crm-cotation-card-head {
     display: grid;
     gap: 6px;
     margin-bottom: 18px;
+    padding-left: 2px;
 }
 
 .crm-cotation-card-head h2 {
@@ -4560,19 +4567,31 @@ textarea.form-control {
 
 .crm-cotation-danger-btn {
     width: 100%;
+    border-radius: 6px;
 }
 
 .crm-cotation-comment-box {
     padding: 18px 20px;
-    border-radius: 18px;
-    background:
-        radial-gradient(circle at top right, rgba(241, 193, 175, 0.16), transparent 24%),
-        linear-gradient(180deg, rgba(255, 249, 245, 0.9), rgba(255, 255, 255, 0.96));
-    border: 1px solid rgba(223, 162, 135, 0.2);
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid rgba(223, 162, 135, 0.32);
     color: #30415f;
     font-size: 15px;
     line-height: 1.7;
     white-space: pre-line;
+}
+
+.crm-cotation-detail-layout .crm-info-card {
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid rgba(109, 126, 176, 0.16);
+    box-shadow: none;
+}
+
+.crm-cotation-detail-layout .crm-info-value,
+.crm-cotation-summary-item strong,
+.crm-cotation-comment-box {
+    overflow-wrap: anywhere;
 }
 
 .crm-cotation-tech-panel summary {
@@ -4595,6 +4614,10 @@ textarea.form-control {
 
 .crm-cotation-tech-grid {
     padding-top: 4px;
+}
+
+.crm-cotation-tech-panel {
+    border-style: solid;
 }
 
 @media (max-width: 900px) {
