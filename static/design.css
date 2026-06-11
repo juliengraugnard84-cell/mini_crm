@@ -6,23 +6,31 @@
 /* ================= VARIABLES ================= */
 
 :root {
-    --primary: #0B1437;
-    --primary-soft: #0F1E4D;
-    --accent: #F5B335;
-    --accent-soft: #F8C86A;
+    --primary: #6d7eb0;
+    --primary-soft: #95a6d7;
+    --primary-deep: #586997;
+    --accent: #f1c1af;
+    --accent-soft: #f8ddd2;
+    --accent-strong: #dfa287;
     --font-body: "Corbel", "Aptos", "Segoe UI Variable Text", "Segoe UI", sans-serif;
     --font-heading: "Candara", "Corbel", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
 
-    --bg: #f3f5f9;
+    --bg: #f8f4f6;
     --surface: #ffffff;
-    --border: #dde3ee;
+    --surface-soft: #fcfcff;
+    --surface-warm: #fff9f5;
+    --border: #dbe1ef;
 
-    --text: #0f172a;
-    --muted: #475569;
+    --text: #23314d;
+    --muted: #66758f;
 
-    --success: #22c55e;
-    --danger: #ef4444;
-    --secondary: #64748b;
+    --success: #7ac7a2;
+    --danger: #e57f90;
+    --secondary: #7a88a7;
+    --pastel-blue: #e8efff;
+    --pastel-lilac: #f0ebff;
+    --pastel-peach: #fff1e6;
+    --pastel-mint: #eaf5ef;
 
     --radius: 16px;
     --radius-sm: 12px;
@@ -2504,10 +2512,11 @@ body.crm-body {
     position: relative;
     min-height: 100vh;
     background:
-        radial-gradient(circle at top left, rgba(242, 178, 51, 0.08), transparent 20%),
-        radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 20%),
-        linear-gradient(180deg, #f4efe6 0%, #f7f8fb 42%, #f9fbfd 100%);
-    color: #10212b;
+        radial-gradient(circle at 12% 10%, rgba(240, 235, 255, 0.92), transparent 22%),
+        radial-gradient(circle at 86% 12%, rgba(255, 241, 230, 0.88), transparent 22%),
+        radial-gradient(circle at 68% 82%, rgba(234, 245, 239, 0.78), transparent 20%),
+        linear-gradient(180deg, #fdf9f7 0%, #f8f7fb 44%, #f8fbff 100%);
+    color: var(--text);
     font-family: var(--font-body);
 }
 
@@ -2517,8 +2526,8 @@ body.crm-body {
     inset: 0;
     pointer-events: none;
     background:
-        linear-gradient(135deg, rgba(8, 19, 63, 0.02), transparent 40%),
-        radial-gradient(circle at 50% 0%, rgba(242, 178, 51, 0.06), transparent 18%);
+        linear-gradient(135deg, rgba(109, 126, 176, 0.08), transparent 42%),
+        radial-gradient(circle at 52% 0%, rgba(241, 193, 175, 0.14), transparent 18%);
 }
 
 .app-layout {
@@ -2532,9 +2541,11 @@ body.crm-body {
     width: 304px;
     display: flex;
     flex-direction: column;
-    background: #08133f;
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 24px 0 60px rgba(8, 19, 63, 0.14);
+    background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.22), transparent 18%),
+        linear-gradient(180deg, #6b7bb0 0%, #7d8ec1 42%, #95a6d7 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 24px 0 60px rgba(88, 105, 151, 0.16);
 }
 
 .sidebar::after {
@@ -2551,9 +2562,9 @@ body.crm-body {
     display: block;
     padding: 14px;
     border-radius: 22px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .brand-logo {
@@ -2569,7 +2580,7 @@ body.crm-body {
 }
 
 .brand-kicker {
-    color: rgba(255, 255, 255, 0.58);
+    color: rgba(255, 255, 255, 0.78);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.14em;
@@ -2583,7 +2594,7 @@ body.crm-body {
 }
 
 .brand-meta small {
-    color: rgba(255, 255, 255, 0.68);
+    color: rgba(255, 255, 255, 0.84);
     font-size: 13px;
 }
 
@@ -2597,7 +2608,7 @@ body.crm-body {
     position: relative;
     padding: 14px 16px;
     border-radius: 16px;
-    color: rgba(230, 238, 247, 0.78);
+    color: rgba(255, 255, 255, 0.9);
     font-weight: 700;
     letter-spacing: 0.01em;
     transition: transform 0.18s ease, color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
@@ -2606,15 +2617,15 @@ body.crm-body {
 .sidebar-nav a:hover {
     transform: translateX(4px);
     color: #ffffff;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.16);
 }
 
 .sidebar-nav a.active {
     color: #ffffff;
-    background: rgba(255, 255, 255, 0.12);
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.14));
     box-shadow:
-        inset 3px 0 0 #f2b233,
-        0 14px 28px rgba(8, 19, 63, 0.16);
+        inset 3px 0 0 var(--accent-strong),
+        0 14px 28px rgba(88, 105, 151, 0.16);
 }
 
 .nav-alert-badge {
@@ -2647,7 +2658,8 @@ body.crm-body {
     min-height: 48px;
     padding: 12px 16px;
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     color: #ffffff;
     font-weight: 700;
     text-decoration: none;
@@ -2666,9 +2678,10 @@ body.crm-body {
     padding: 22px 24px;
     border-radius: 26px;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.84));
-    border: 1px solid rgba(16, 33, 43, 0.08);
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+        radial-gradient(circle at top right, rgba(241, 193, 175, 0.28), transparent 26%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(240, 235, 255, 0.86));
+    border: 1px solid rgba(109, 126, 176, 0.12);
+    box-shadow: 0 18px 40px rgba(109, 126, 176, 0.1);
 }
 
 .topbar-copy {
@@ -2677,7 +2690,7 @@ body.crm-body {
 }
 
 .topbar-kicker {
-    color: #64748b;
+    color: #7a86a2;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.16em;
@@ -2685,7 +2698,7 @@ body.crm-body {
 }
 
 .topbar-title {
-    color: #10212b;
+    color: var(--text);
     font-size: clamp(28px, 3vw, 40px);
     line-height: 1;
     letter-spacing: -0.04em;
@@ -2698,14 +2711,17 @@ body.crm-body {
     min-width: 180px;
     padding: 14px 16px;
     border-radius: 18px;
-    background: linear-gradient(180deg, rgba(8, 19, 63, 0.94), rgba(17, 53, 75, 0.92));
-    color: #fff;
+    background:
+        radial-gradient(circle at top right, rgba(255, 255, 255, 0.36), transparent 42%),
+        linear-gradient(180deg, rgba(240, 235, 255, 0.96), rgba(232, 239, 255, 0.9));
+    border: 1px solid rgba(109, 126, 176, 0.14);
+    color: var(--text);
     text-align: right;
-    box-shadow: 0 16px 34px rgba(8, 19, 63, 0.18);
+    box-shadow: 0 16px 34px rgba(109, 126, 176, 0.12);
 }
 
 .topbar-user-role {
-    color: rgba(255, 255, 255, 0.68);
+    color: #7a86a2;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.12em;
@@ -2723,7 +2739,7 @@ body.crm-body {
 .content h4,
 .content h5,
 .content h6 {
-    color: #10212b;
+    color: var(--text);
     letter-spacing: -0.03em;
     font-family: var(--font-heading);
 }
@@ -2732,15 +2748,17 @@ body.crm-body {
     padding: 24px 26px;
     border-radius: 26px;
     background:
-        radial-gradient(circle at top right, rgba(242, 178, 51, 0.18), transparent 28%),
-        linear-gradient(135deg, rgba(8, 19, 63, 0.96), rgba(17, 53, 75, 0.92));
-    color: #fff;
-    box-shadow: 0 22px 50px rgba(8, 19, 63, 0.16);
+        radial-gradient(circle at top right, rgba(241, 193, 175, 0.34), transparent 28%),
+        radial-gradient(circle at bottom left, rgba(232, 239, 255, 0.62), transparent 28%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(240, 235, 255, 0.84));
+    border: 1px solid rgba(109, 126, 176, 0.12);
+    color: var(--text);
+    box-shadow: 0 22px 50px rgba(109, 126, 176, 0.1);
 }
 
 .page-header h1 {
     margin: 0;
-    color: #fff;
+    color: var(--text);
     font-size: clamp(30px, 3.2vw, 42px);
 }
 
@@ -2795,20 +2813,21 @@ body.crm-body {
 
 .card,
 .content .card {
-    border: 1px solid rgba(16, 33, 43, 0.08);
+    border: 1px solid rgba(109, 126, 176, 0.12);
     border-radius: 24px;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
-    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.07);
+        radial-gradient(circle at top right, rgba(241, 193, 175, 0.16), transparent 26%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 255, 0.94));
+    box-shadow: 0 18px 36px rgba(109, 126, 176, 0.08);
     padding: 0;
     overflow: hidden;
 }
 
 .card-header {
     padding: 18px 22px;
-    border-bottom: 1px solid rgba(16, 33, 43, 0.07);
-    background: linear-gradient(180deg, rgba(8, 19, 63, 0.04), rgba(255, 255, 255, 0.86));
-    color: #10212b;
+    border-bottom: 1px solid rgba(109, 126, 176, 0.1);
+    background: linear-gradient(180deg, rgba(232, 239, 255, 0.5), rgba(255, 255, 255, 0.92));
+    color: var(--text);
     font-weight: 800;
 }
 
@@ -2822,7 +2841,7 @@ body.crm-body {
 }
 
 .form-label {
-    color: #10212b;
+    color: var(--text);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -2833,15 +2852,15 @@ body.crm-body {
 .form-select {
     min-height: 48px;
     border-radius: 16px;
-    border-color: rgba(16, 33, 43, 0.12);
-    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(109, 126, 176, 0.16);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 249, 255, 0.9));
     box-shadow: none;
 }
 
 .form-control:focus,
 .form-select:focus {
-    border-color: rgba(242, 178, 51, 0.82);
-    box-shadow: 0 0 0 4px rgba(242, 178, 51, 0.16);
+    border-color: rgba(223, 162, 135, 0.9);
+    box-shadow: 0 0 0 4px rgba(241, 193, 175, 0.2);
 }
 
 textarea.form-control {
@@ -2857,8 +2876,8 @@ textarea.form-control {
 }
 
 .btn-primary {
-    background: linear-gradient(180deg, #f2b233, #f7ca70);
-    color: #10212b;
+    background: linear-gradient(180deg, var(--accent), var(--accent-soft));
+    color: var(--text);
     border: 0;
 }
 
@@ -2871,27 +2890,27 @@ textarea.form-control {
 }
 
 .btn-success {
-    background: linear-gradient(180deg, #16a34a, #22c55e);
-    color: #fff;
+    background: linear-gradient(180deg, #bfe3d0, #8fccb0);
+    color: var(--text);
     border: 0;
 }
 
 .btn-secondary,
 .btn-outline-secondary {
-    background: #e8edf4;
-    color: #10212b;
+    background: linear-gradient(180deg, rgba(232, 239, 255, 0.96), rgba(240, 235, 255, 0.92));
+    color: var(--text);
     border: 0;
 }
 
 .btn-danger {
-    background: linear-gradient(180deg, #ef4444, #dc2626);
-    color: #fff;
+    background: linear-gradient(180deg, #f3bbc5, #e58b99);
+    color: var(--text);
     border: 0;
 }
 
 .btn-warning {
-    background: linear-gradient(180deg, #f59e0b, #f7ca70);
-    color: #10212b;
+    background: linear-gradient(180deg, #f7deae, #f1c793);
+    color: var(--text);
     border: 0;
 }
 
@@ -2901,24 +2920,24 @@ textarea.form-control {
 }
 
 .table thead th {
-    border-bottom: 1px solid rgba(16, 33, 43, 0.1);
-    color: #475569;
+    border-bottom: 1px solid rgba(109, 126, 176, 0.12);
+    color: var(--muted);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    background: rgba(8, 19, 63, 0.03);
+    background: linear-gradient(180deg, rgba(232, 239, 255, 0.56), rgba(255, 241, 230, 0.48));
 }
 
 .table td,
 .table th {
     padding: 14px 16px;
-    border-color: rgba(16, 33, 43, 0.08);
+    border-color: rgba(109, 126, 176, 0.1);
     vertical-align: middle;
 }
 
 .table tbody tr:hover {
-    background: rgba(242, 178, 51, 0.06);
+    background: rgba(240, 235, 255, 0.42);
 }
 
 .nav-tabs {
@@ -2927,18 +2946,18 @@ textarea.form-control {
 }
 
 .nav-tabs .nav-link {
-    border: 1px solid rgba(16, 33, 43, 0.08);
+    border: 1px solid rgba(109, 126, 176, 0.12);
     border-radius: 14px;
-    color: #475569;
+    color: var(--muted);
     font-weight: 700;
-    background: rgba(255, 255, 255, 0.86);
+    background: rgba(255, 255, 255, 0.88);
 }
 
 .nav-tabs .nav-link.active {
-    color: #10212b;
-    background: linear-gradient(180deg, #ffffff, #f4efe6);
-    border-color: rgba(242, 178, 51, 0.3);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    color: var(--text);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 235, 255, 0.86));
+    border-color: rgba(223, 162, 135, 0.32);
+    box-shadow: 0 10px 24px rgba(109, 126, 176, 0.08);
 }
 
 .modal-content {
@@ -2968,6 +2987,177 @@ textarea.form-control {
     text-align: center;
 }
 
+.crm-dashboard {
+    display: grid;
+    gap: 24px;
+}
+
+.crm-dashboard-hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 420px);
+    gap: 24px;
+    align-items: stretch;
+    padding: 32px;
+    border-radius: 32px;
+    overflow: hidden;
+    border: 1px solid rgba(109, 126, 176, 0.14);
+    box-shadow: 0 28px 64px rgba(109, 126, 176, 0.12);
+}
+
+.crm-dashboard-hero::before {
+    content: "";
+    position: absolute;
+    inset: auto -6% -22% auto;
+    width: 280px;
+    height: 280px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.3);
+    filter: blur(8px);
+}
+
+.crm-dashboard-hero--admin {
+    background:
+        radial-gradient(circle at top right, rgba(241, 193, 175, 0.36), transparent 26%),
+        radial-gradient(circle at bottom left, rgba(232, 239, 255, 0.72), transparent 30%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 235, 255, 0.9));
+}
+
+.crm-dashboard-hero--commercial {
+    background:
+        radial-gradient(circle at top left, rgba(241, 193, 175, 0.34), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(234, 245, 239, 0.72), transparent 28%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(232, 239, 255, 0.9));
+}
+
+.crm-dashboard-hero-main,
+.crm-dashboard-glance-grid {
+    position: relative;
+    z-index: 1;
+}
+
+.crm-dashboard-hero-main {
+    display: grid;
+    align-content: center;
+    gap: 18px;
+}
+
+.crm-dashboard-hero-main h1 {
+    margin: 0;
+    max-width: 720px;
+    font-size: clamp(36px, 4.3vw, 58px);
+    line-height: 0.96;
+    letter-spacing: -0.05em;
+    color: var(--text);
+    font-family: var(--font-heading);
+}
+
+.crm-dashboard-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.crm-dashboard-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 0 18px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.68);
+    border: 1px solid rgba(109, 126, 176, 0.14);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 800;
+    text-decoration: none;
+    box-shadow: 0 14px 28px rgba(109, 126, 176, 0.08);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.crm-dashboard-action:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 18px 34px rgba(109, 126, 176, 0.12);
+    color: var(--text);
+}
+
+.crm-dashboard-glance-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.crm-dashboard-glance-card {
+    padding: 20px 18px;
+    border-radius: 24px;
+    border: 1px solid rgba(109, 126, 176, 0.12);
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 18px 30px rgba(109, 126, 176, 0.08);
+    backdrop-filter: blur(12px);
+}
+
+.crm-dashboard-glance-card span {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.crm-dashboard-glance-card strong {
+    display: block;
+    margin-top: 12px;
+    color: var(--text);
+    font-size: clamp(26px, 3vw, 40px);
+    line-height: 1;
+    letter-spacing: -0.05em;
+}
+
+.crm-dashboard-glance-card--blue,
+.crm-metric-card--blue,
+.crm-pipeline-tile--blue,
+.crm-stage-card--blue {
+    background:
+        radial-gradient(circle at top right, rgba(232, 239, 255, 0.92), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 246, 255, 0.94));
+}
+
+.crm-dashboard-glance-card--peach,
+.crm-metric-card--peach,
+.crm-pipeline-tile--peach,
+.crm-stage-card--peach {
+    background:
+        radial-gradient(circle at top right, rgba(255, 241, 230, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 247, 242, 0.94));
+}
+
+.crm-dashboard-glance-card--mint,
+.crm-metric-card--mint,
+.crm-pipeline-tile--mint,
+.crm-stage-card--mint {
+    background:
+        radial-gradient(circle at top right, rgba(234, 245, 239, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 251, 247, 0.94));
+}
+
+.crm-dashboard-glance-card--lilac,
+.crm-metric-card--lilac,
+.crm-pipeline-tile--lilac,
+.crm-stage-card--lilac {
+    background:
+        radial-gradient(circle at top right, rgba(240, 235, 255, 0.94), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 242, 255, 0.94));
+}
+
+.crm-pipeline-tile--rose,
+.crm-stage-card--rose {
+    background:
+        radial-gradient(circle at top right, rgba(248, 226, 232, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 243, 246, 0.94));
+}
+
 .crm-page-hero {
     display: flex;
     justify-content: space-between;
@@ -2976,10 +3166,12 @@ textarea.form-control {
     padding: 30px 32px;
     border-radius: 28px;
     background:
-        radial-gradient(circle at top right, rgba(242, 178, 51, 0.18), transparent 26%),
-        linear-gradient(135deg, rgba(8, 19, 63, 0.96), rgba(17, 53, 75, 0.92));
-    color: #ffffff;
-    box-shadow: 0 26px 60px rgba(8, 19, 63, 0.16);
+        radial-gradient(circle at top right, rgba(241, 193, 175, 0.34), transparent 28%),
+        radial-gradient(circle at bottom left, rgba(232, 239, 255, 0.7), transparent 24%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(240, 235, 255, 0.88));
+    border: 1px solid rgba(109, 126, 176, 0.12);
+    color: var(--text);
+    box-shadow: 0 26px 60px rgba(109, 126, 176, 0.1);
 }
 
 .crm-page-kicker,
@@ -2987,7 +3179,7 @@ textarea.form-control {
 .crm-metric-label {
     display: inline-flex;
     margin-bottom: 12px;
-    color: rgba(255, 255, 255, 0.68);
+    color: #7a86a2;
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.14em;
@@ -3000,14 +3192,14 @@ textarea.form-control {
     font-size: clamp(30px, 3.8vw, 46px);
     line-height: 1.02;
     letter-spacing: -0.05em;
-    color: #ffffff;
+    color: var(--text);
     font-family: var(--font-heading);
 }
 
 .crm-page-hero p {
     margin: 14px 0 0;
     max-width: 660px;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--muted);
 }
 
 .crm-hero-pillbox {
@@ -3020,9 +3212,9 @@ textarea.form-control {
 .crm-hero-pill {
     padding: 10px 14px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #ffffff;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(109, 126, 176, 0.12);
+    color: var(--text);
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -3039,18 +3231,21 @@ textarea.form-control {
     padding: 22px;
     border-radius: 24px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
-    border: 1px solid rgba(16, 33, 43, 0.08);
-    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.07);
+    border: 1px solid rgba(109, 126, 176, 0.12);
+    box-shadow: 0 18px 36px rgba(109, 126, 176, 0.08);
+    background:
+        radial-gradient(circle at top right, rgba(232, 239, 255, 0.54), transparent 26%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 255, 0.94));
 }
 
 .crm-metric-card .crm-metric-label {
     margin-bottom: 8px;
-    color: #64748b;
+    color: var(--muted);
 }
 
 .crm-metric-card strong {
     display: block;
-    color: #10212b;
+    color: var(--text);
     font-size: clamp(28px, 3vw, 42px);
     line-height: 1;
     letter-spacing: -0.05em;
@@ -3059,21 +3254,47 @@ textarea.form-control {
 .crm-metric-card small {
     display: block;
     margin-top: 10px;
-    color: #64748b;
+    color: var(--muted);
 }
 
 .crm-metric-card-alert {
     background:
-        radial-gradient(circle at top right, rgba(239, 68, 68, 0.12), transparent 28%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 247, 0.92));
+        radial-gradient(circle at top right, rgba(243, 187, 197, 0.34), transparent 28%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 247, 0.92));
+}
+
+.crm-metric-card.crm-metric-card--blue {
+    background:
+        radial-gradient(circle at top right, rgba(232, 239, 255, 0.92), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 246, 255, 0.94));
+}
+
+.crm-metric-card.crm-metric-card--peach {
+    background:
+        radial-gradient(circle at top right, rgba(255, 241, 230, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 247, 242, 0.94));
+}
+
+.crm-metric-card.crm-metric-card--mint {
+    background:
+        radial-gradient(circle at top right, rgba(234, 245, 239, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 251, 247, 0.94));
+}
+
+.crm-metric-card.crm-metric-card--lilac {
+    background:
+        radial-gradient(circle at top right, rgba(240, 235, 255, 0.94), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 242, 255, 0.94));
 }
 
 .crm-panel {
     padding: 24px;
     border-radius: 26px;
-    background: rgba(255, 255, 255, 0.88);
-    border: 1px solid rgba(16, 33, 43, 0.08);
-    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.07);
+    background:
+        radial-gradient(circle at top right, rgba(232, 239, 255, 0.44), transparent 26%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 247, 255, 0.92));
+    border: 1px solid rgba(109, 126, 176, 0.12);
+    box-shadow: 0 18px 36px rgba(109, 126, 176, 0.08);
 }
 
 .crm-panel-heading {
@@ -3084,11 +3305,11 @@ textarea.form-control {
 }
 
 .crm-panel-kicker {
-    color: #64748b;
+    color: #7a86a2;
 }
 
 .crm-panel h2 {
-    color: #10212b;
+    color: var(--text);
     font-size: clamp(24px, 3vw, 34px);
 }
 
@@ -3101,13 +3322,13 @@ textarea.form-control {
 .crm-pipeline-tile {
     padding: 20px;
     border-radius: 20px;
-    background: linear-gradient(180deg, rgba(8, 19, 63, 0.04), rgba(255, 255, 255, 0.92));
-    border: 1px solid rgba(16, 33, 43, 0.08);
+    background: linear-gradient(180deg, rgba(232, 239, 255, 0.54), rgba(255, 255, 255, 0.92));
+    border: 1px solid rgba(109, 126, 176, 0.12);
 }
 
 .crm-pipeline-tile span {
     display: block;
-    color: #64748b;
+    color: var(--muted);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -3118,7 +3339,31 @@ textarea.form-control {
     display: block;
     margin-top: 10px;
     font-size: 36px;
-    color: #10212b;
+    color: var(--text);
+}
+
+.crm-pipeline-tile.crm-pipeline-tile--blue {
+    background:
+        radial-gradient(circle at top right, rgba(232, 239, 255, 0.92), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 246, 255, 0.94));
+}
+
+.crm-pipeline-tile.crm-pipeline-tile--peach {
+    background:
+        radial-gradient(circle at top right, rgba(255, 241, 230, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 247, 242, 0.94));
+}
+
+.crm-pipeline-tile.crm-pipeline-tile--mint {
+    background:
+        radial-gradient(circle at top right, rgba(234, 245, 239, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 251, 247, 0.94));
+}
+
+.crm-pipeline-tile.crm-pipeline-tile--rose {
+    background:
+        radial-gradient(circle at top right, rgba(248, 226, 232, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 243, 246, 0.94));
 }
 
 .crm-stage-grid {
@@ -3130,8 +3375,32 @@ textarea.form-control {
 .crm-stage-card {
     padding: 18px;
     border-radius: 22px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 252, 0.92));
-    border: 1px solid rgba(16, 33, 43, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(249, 247, 255, 0.92));
+    border: 1px solid rgba(109, 126, 176, 0.12);
+}
+
+.crm-stage-card.crm-stage-card--blue {
+    background:
+        radial-gradient(circle at top right, rgba(232, 239, 255, 0.92), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 246, 255, 0.94));
+}
+
+.crm-stage-card.crm-stage-card--peach {
+    background:
+        radial-gradient(circle at top right, rgba(255, 241, 230, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 247, 242, 0.94));
+}
+
+.crm-stage-card.crm-stage-card--mint {
+    background:
+        radial-gradient(circle at top right, rgba(234, 245, 239, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 251, 247, 0.94));
+}
+
+.crm-stage-card.crm-stage-card--rose {
+    background:
+        radial-gradient(circle at top right, rgba(248, 226, 232, 0.96), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 243, 246, 0.94));
 }
 
 .crm-stage-title {
@@ -3154,6 +3423,26 @@ textarea.form-control {
     background: rgba(242, 178, 51, 0.16);
     color: #a16207;
     font-size: 12px;
+}
+
+.crm-stage-card--blue .crm-stage-title span {
+    background: rgba(154, 181, 255, 0.34);
+    color: #4a6298;
+}
+
+.crm-stage-card--peach .crm-stage-title span {
+    background: rgba(241, 193, 175, 0.34);
+    color: #9b6b57;
+}
+
+.crm-stage-card--mint .crm-stage-title span {
+    background: rgba(122, 199, 162, 0.28);
+    color: #2e7a5e;
+}
+
+.crm-stage-card--rose .crm-stage-title span {
+    background: rgba(229, 127, 144, 0.24);
+    color: #9b4a5b;
 }
 
 .crm-stage-list {
@@ -3186,6 +3475,10 @@ textarea.form-control {
 }
 
 @media (max-width: 1280px) {
+    .crm-dashboard-hero {
+        grid-template-columns: 1fr;
+    }
+
     .crm-metric-grid,
     .crm-pipeline-summary,
     .crm-stage-grid {
@@ -3223,6 +3516,14 @@ textarea.form-control {
 }
 
 @media (max-width: 768px) {
+    .crm-dashboard-hero {
+        padding: 26px 22px;
+    }
+
+    .crm-dashboard-glance-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
     .topbar,
     .crm-page-hero {
         flex-direction: column;
@@ -3242,6 +3543,20 @@ textarea.form-control {
     .crm-pipeline-summary,
     .crm-stage-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 560px) {
+    .crm-dashboard-glance-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .crm-dashboard-action-row {
+        flex-direction: column;
+    }
+
+    .crm-dashboard-action {
+        width: 100%;
     }
 }
 
@@ -3282,16 +3597,16 @@ textarea.form-control {
     border-radius: 24px;
     overflow: hidden;
     background:
-        radial-gradient(circle at top right, rgba(242, 178, 51, 0.14), transparent 30%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 252, 0.94));
-    border: 1px solid rgba(16, 33, 43, 0.08);
-    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.07);
+        radial-gradient(circle at top right, rgba(241, 193, 175, 0.24), transparent 30%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 255, 0.94));
+    border: 1px solid rgba(109, 126, 176, 0.12);
+    box-shadow: 0 18px 36px rgba(109, 126, 176, 0.08);
 }
 
 .kpi-label {
     display: inline-flex;
     margin-bottom: 10px;
-    color: #64748b;
+    color: var(--muted);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -3299,7 +3614,7 @@ textarea.form-control {
 }
 
 .kpi-value {
-    color: #10212b;
+    color: var(--text);
     font-size: clamp(26px, 3vw, 40px);
     font-weight: 800;
     line-height: 1;
@@ -3321,7 +3636,7 @@ textarea.form-control {
 }
 
 .crm-soft-note {
-    color: #64748b;
+    color: var(--muted);
     font-size: 13px;
 }
 
@@ -3333,9 +3648,9 @@ textarea.form-control {
 
 .crm-board-column {
     border-radius: 26px;
-    border: 1px solid rgba(16, 33, 43, 0.08);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 252, 0.92));
-    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.07);
+    border: 1px solid rgba(109, 126, 176, 0.12);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(249, 247, 255, 0.92));
+    box-shadow: 0 18px 36px rgba(109, 126, 176, 0.08);
     overflow: hidden;
 }
 
@@ -4397,9 +4712,9 @@ textarea.form-control {
 
 body.crm-body.planning-page {
     background:
-        radial-gradient(circle at 12% 14%, rgba(242, 178, 51, 0.14), transparent 18%),
-        radial-gradient(circle at 88% 10%, rgba(255, 255, 255, 0.08), transparent 16%),
-        linear-gradient(180deg, #08133f 0%, #0d1d4f 48%, #10265d 100%);
+        radial-gradient(circle at 12% 14%, rgba(241, 193, 175, 0.18), transparent 18%),
+        radial-gradient(circle at 88% 10%, rgba(255, 255, 255, 0.12), transparent 16%),
+        linear-gradient(180deg, #5f71a8 0%, #7488be 48%, #8ca0d2 100%);
     color: #f8fafc;
 }
 
@@ -4413,17 +4728,17 @@ body.crm-body.planning-page {
     padding: 16px 20px;
     border-radius: 24px;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05));
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 18px 38px rgba(2, 8, 28, 0.22);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08));
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 18px 38px rgba(88, 105, 151, 0.18);
     backdrop-filter: blur(16px);
 }
 
 .crm-body.planning-page .sidebar {
     background:
-        radial-gradient(circle at top left, rgba(242, 178, 51, 0.12), transparent 18%),
-        linear-gradient(180deg, #08133f 0%, #0a1746 42%, #0c1d56 100%);
-    box-shadow: 24px 0 60px rgba(2, 8, 28, 0.22);
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 18%),
+        linear-gradient(180deg, #6072a8 0%, #7387bf 42%, #8ea1d4 100%);
+    box-shadow: 24px 0 60px rgba(88, 105, 151, 0.2);
 }
 
 .crm-body.planning-page .brand-lockup {
@@ -4432,10 +4747,10 @@ body.crm-body.planning-page {
 }
 
 .crm-body.planning-page .sidebar-nav a.active {
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.22);
     box-shadow:
-        inset 4px 0 0 #f2b233,
-        0 16px 30px rgba(2, 8, 28, 0.24);
+        inset 4px 0 0 var(--accent-strong),
+        0 16px 30px rgba(88, 105, 151, 0.2);
 }
 
 .crm-body.planning-page .topbar-kicker {
@@ -4486,12 +4801,12 @@ body.crm-body.planning-page {
 .crm-body.planning-page .planning-hero {
     padding: 34px 36px;
     border-radius: 32px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     background:
-        radial-gradient(circle at top left, rgba(242, 178, 51, 0.18), transparent 24%),
-        radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.08), transparent 20%),
-        linear-gradient(135deg, #071237 0%, #10265d 54%, #17357a 100%) !important;
-    box-shadow: 0 34px 70px rgba(2, 8, 28, 0.28);
+        radial-gradient(circle at top left, rgba(241, 193, 175, 0.22), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.12), transparent 20%),
+        linear-gradient(135deg, #5a6fa9 0%, #6f87c1 54%, #88a0d8 100%) !important;
+    box-shadow: 0 34px 70px rgba(88, 105, 151, 0.22);
 }
 
 .crm-body.planning-page .planning-hero::after {

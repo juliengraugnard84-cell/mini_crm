@@ -9,13 +9,13 @@
 
     <style>
         :root {
-            --login-navy: #08133f;
-            --login-navy-soft: #11354b;
-            --login-gold: #f2b233;
-            --login-gold-soft: #f7ca70;
-            --login-ink: #10212b;
-            --login-muted: #64748b;
-            --login-line: rgba(255, 255, 255, 0.12);
+            --login-navy: #6c7db0;
+            --login-navy-soft: #95a6d7;
+            --login-gold: #f1c1af;
+            --login-gold-soft: #f8ddd2;
+            --login-ink: #23314d;
+            --login-muted: #6a7791;
+            --login-line: rgba(255, 255, 255, 0.2);
             --login-font-body: "Corbel", "Aptos", "Segoe UI Variable Text", "Segoe UI", sans-serif;
             --login-font-heading: "Candara", "Corbel", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
         }
@@ -31,11 +31,11 @@
             place-items: center;
             padding: 28px;
             background:
-                radial-gradient(circle at top left, rgba(242, 178, 51, 0.16), transparent 24%),
-                radial-gradient(circle at bottom right, rgba(17, 53, 75, 0.32), transparent 28%),
-                linear-gradient(135deg, var(--login-navy) 0%, #0b1f53 42%, var(--login-navy-soft) 100%);
+                radial-gradient(circle at top left, rgba(241, 193, 175, 0.3), transparent 24%),
+                radial-gradient(circle at bottom right, rgba(240, 235, 255, 0.5), transparent 28%),
+                linear-gradient(135deg, #fdf9f7 0%, #f6f4fb 42%, #eff5ff 100%);
             font-family: var(--login-font-body);
-            color: #fff;
+            color: var(--login-ink);
         }
 
         .login-scene {
@@ -62,8 +62,8 @@
             justify-content: space-between;
             min-height: 640px;
             background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
-                linear-gradient(145deg, rgba(8, 19, 63, 0.92), rgba(11, 46, 68, 0.82));
+                linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)),
+                linear-gradient(145deg, rgba(108, 125, 176, 0.94), rgba(149, 166, 215, 0.88));
             backdrop-filter: blur(16px);
         }
 
@@ -74,7 +74,7 @@
             width: 360px;
             height: 360px;
             border-radius: 999px;
-            background: rgba(242, 178, 51, 0.12);
+            background: rgba(241, 193, 175, 0.22);
             filter: blur(10px);
         }
 
@@ -148,7 +148,7 @@
         }
 
         .login-card {
-            background: rgba(255, 255, 255, 0.98);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 255, 0.94));
             color: var(--login-ink);
             padding: 32px;
         }
@@ -169,8 +169,8 @@
         .login-form-card {
             padding: 22px;
             border-radius: 24px;
-            background: linear-gradient(180deg, #ffffff, #f8fafc);
-            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: linear-gradient(180deg, #ffffff, #f8f9ff);
+            border: 1px solid rgba(108, 125, 176, 0.12);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
         }
 
@@ -186,15 +186,16 @@
         .form-control {
             min-height: 52px;
             border-radius: 16px;
-            border-color: rgba(15, 23, 42, 0.12);
+            border-color: rgba(108, 125, 176, 0.14);
             padding: 12px 14px;
             font-size: 15px;
             box-shadow: none;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 249, 255, 0.92));
         }
 
         .form-control:focus {
-            border-color: rgba(242, 178, 51, 0.8);
-            box-shadow: 0 0 0 4px rgba(242, 178, 51, 0.18);
+            border-color: rgba(223, 162, 135, 0.82);
+            box-shadow: 0 0 0 4px rgba(241, 193, 175, 0.2);
         }
 
         .btn-login {
@@ -203,7 +204,7 @@
             border: 0;
             border-radius: 16px;
             background: linear-gradient(180deg, var(--login-gold), var(--login-gold-soft));
-            color: #10212b;
+            color: var(--login-ink);
             font-weight: 800;
             letter-spacing: 0.02em;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -211,7 +212,7 @@
 
         .btn-login:hover {
             transform: translateY(-1px);
-            box-shadow: 0 18px 36px rgba(242, 178, 51, 0.26);
+            box-shadow: 0 18px 36px rgba(223, 162, 135, 0.22);
         }
 
         .login-form-note {
