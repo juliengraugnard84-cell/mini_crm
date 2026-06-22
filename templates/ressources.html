@@ -52,8 +52,7 @@
                 <input type="text"
                        name="doc_name"
                        class="form-control"
-                       placeholder="Ex : Trame de negociation"
-                       required>
+                       placeholder="Ex : Trame de negociation (optionnel si multi-fichiers)">
             </div>
 
             <div class="col-12">
@@ -62,13 +61,14 @@
                     <label class="crm-file-drop-surface" data-file-surface tabindex="0" role="button">
                         <input
                             type="file"
-                            name="file"
+                            name="files"
+                            multiple
                             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv"
                             class="crm-file-drop-input"
                             data-file-input>
                         <span class="crm-file-drop-kicker">Glisser-deposer</span>
-                        <strong>Deposez la ressource partagee ici</strong>
-                        <span>ou cliquez pour choisir le fichier a publier</span>
+                        <strong>Deposez une ou plusieurs ressources partagees ici</strong>
+                        <span>ou cliquez pour choisir un ou plusieurs fichiers a publier</span>
                         <small>Formats autorises : PDF, image, Word, Excel, CSV</small>
                     </label>
                     <div class="crm-file-drop-summary" data-file-summary>Aucun fichier selectionne</div>
@@ -118,6 +118,13 @@
                         <td>{{ f.taille }}</td>
                         <td class="text-end">
                             <div class="crm-action-row">
+                                <a class="btn btn-outline-secondary btn-sm"
+                                   href="{{ url_for('preview_document', key=f.key) }}"
+                                   data-doc-preview-link
+                                   data-doc-preview-title="{{ f.nom }}">
+                                    Consulter
+                                </a>
+
                                 <a class="btn btn-secondary btn-sm"
                                    href="{{ url_for('download_document', key=f.key) }}">
                                     Telecharger

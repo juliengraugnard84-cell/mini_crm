@@ -879,6 +879,13 @@ and 'update_client_status' in available_endpoints %}
                     <tr>
                         <td>{{ d.nom }}</td>
                         <td class="text-end">
+                            <a href="{{ url_for('preview_document', key=d.key) }}"
+                               class="btn btn-sm btn-outline-secondary"
+                               data-doc-preview-link
+                               data-doc-preview-title="{{ d.nom }}">
+                                Consulter
+                            </a>
+
                             <a href="{{ url_for('download_document') }}?key={{ d.key }}"
                                class="btn btn-sm btn-outline-primary">
                                 Télécharger
@@ -914,6 +921,12 @@ and 'update_client_status' in available_endpoints %}
                         {% for d in shared_mandats %}
                         <li class="mb-1">
                             {{ d.nom }}
+                            <a href="{{ url_for('preview_document', key=d.key) }}"
+                               class="ms-2"
+                               data-doc-preview-link
+                               data-doc-preview-title="{{ d.nom }}">
+                                Consulter
+                            </a>
                             <a href="{{ url_for('download_document') }}?key={{ d.key }}" class="ms-2">
                                 Télécharger
                             </a>
@@ -941,6 +954,12 @@ and 'update_client_status' in available_endpoints %}
                         {% for d in shared_resiliations %}
                         <li class="mb-1">
                             {{ d.nom }}
+                            <a href="{{ url_for('preview_document', key=d.key) }}"
+                               class="ms-2"
+                               data-doc-preview-link
+                               data-doc-preview-title="{{ d.nom }}">
+                                Consulter
+                            </a>
                             <a href="{{ url_for('download_document') }}?key={{ d.key }}" class="ms-2">
                                 Télécharger
                             </a>

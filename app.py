@@ -848,7 +848,11 @@ def s3_upload_fileobj(fileobj, bucket: str, key: str):
 # URL SIGNÉE
 # =========================================================
 
-def s3_presigned_url(key: str, expires_in: int = 3600) -> str:
+def s3_presigned_url(
+    key: str,
+    expires_in: int = 3600,
+    response_disposition: str | None = None,
+) -> str:
     """
     Génère une URL signée (lecture privée).
     """
@@ -856,12 +860,20 @@ def s3_presigned_url(key: str, expires_in: int = 3600) -> str:
         return ""
 
     try:
+        params = {
+            "Bucket": AWS_BUCKET,
+            "Key": key,
+        }
+
+        if response_disposition:
+            filename = os.path.basename(key) or "document"
+            params["ResponseContentDisposition"] = (
+                f'{response_disposition}; filename="{filename}"'
+            )
+
         return s3.generate_presigned_url(
             "get_object",
-            Params={
-                "Bucket": AWS_BUCKET,
-                "Key": key,
-            },
+            Params=params,
             ExpiresIn=expires_in,
         )
     except ClientError as e:
@@ -873,6 +885,35 @@ def s3_presigned_url(key: str, expires_in: int = 3600) -> str:
     except Exception as e:
         logger.exception("Erreur presigned URL S3 : %r", e)
         return ""
+
+
+DOCUMENT_PREVIEW_KIND_MAP = {
+    ".pdf": "pdf",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".gif": "image",
+    ".webp": "image",
+    ".bmp": "image",
+    ".svg": "image",
+    ".txt": "text",
+    ".csv": "text",
+}
+
+
+def document_preview_kind(filename: str | None) -> str:
+    ext = os.path.splitext((filename or "").lower())[1]
+    return DOCUMENT_PREVIEW_KIND_MAP.get(ext, "unsupported")
+
+
+def build_document_preview_meta(key: str) -> dict:
+    filename = (key or "").split("/")[-1]
+    preview_kind = document_preview_kind(filename)
+    return {
+        "filename": filename,
+        "preview_kind": preview_kind,
+        "previewable": preview_kind != "unsupported",
+    }
 
 
 # =========================================================
@@ -985,10 +1026,13 @@ def list_client_documents(client_id: int):
             if extracted_client_id != client_id:
                 continue
 
+            preview_meta = build_document_preview_meta(key)
             docs.append({
                 "nom": key.split("/")[-1],
                 "key": key,
                 "taille": item.get("Size", 0),
+                "preview_kind": preview_meta["preview_kind"],
+                "previewable": preview_meta["previewable"],
                 "url": (
                     s3_presigned_url(key)
                     if not LOCAL_MODE
@@ -1398,10 +1442,13 @@ def list_cspe_documents(dossier_id: int):
             if extract_cspe_id_from_storage_key(key) != dossier_id:
                 continue
 
+            preview_meta = build_document_preview_meta(key)
             docs.append({
                 "nom": key.split("/")[-1],
                 "key": key,
                 "taille": item.get("Size", 0),
+                "preview_kind": preview_meta["preview_kind"],
+                "previewable": preview_meta["previewable"],
             })
 
     except Exception as e:
@@ -3984,11 +4031,14 @@ def documents():
             if not key or key.endswith("/"):
                 continue
 
+            preview_meta = build_document_preview_meta(key)
             fichiers.append({
                 "nom": key,
                 "key": key,
                 "taille": item.get("Size", 0),
                 "date": item.get("LastModified"),
+                "preview_kind": preview_meta["preview_kind"],
+                "previewable": preview_meta["previewable"],
                 "url": None,
             })
 
@@ -4154,11 +4204,14 @@ def shared_resources():
             if not key or key.endswith("/"):
                 continue
 
+            preview_meta = build_document_preview_meta(key)
             fichiers.append({
                 "nom": key.replace(SHARED_PREFIX, "", 1),
                 "key": key,
                 "taille": item.get("Size", 0),
                 "date": item.get("LastModified"),
+                "preview_kind": preview_meta["preview_kind"],
+                "previewable": preview_meta["previewable"],
             })
 
     except Exception as e:
@@ -4218,6 +4271,74 @@ def shared_resources_upload():
         flash("Erreur lors de l’upload.", "danger")
 
     return redirect(url_for("shared_resources"))
+
+def _shared_resources_upload_endpoint():
+
+    if LOCAL_MODE or not s3:
+        flash("Upload indisponible en mode local.", "warning")
+        return redirect(url_for("shared_resources"))
+
+    files = request.files.getlist("files")
+    if not files:
+        legacy_file = request.files.get("file")
+        if legacy_file and getattr(legacy_file, "filename", ""):
+            files = [legacy_file]
+
+    files = [f for f in files if f and getattr(f, "filename", "")]
+
+    if not files:
+        flash("Fichier invalide.", "danger")
+        return redirect(url_for("shared_resources"))
+
+    try:
+        doc_name = (request.form.get("doc_name") or "").strip()
+        success_count = 0
+        failed = []
+
+        for index, fichier in enumerate(files):
+            if not allowed_file(fichier.filename):
+                failed.append(fichier.filename or "fichier_invalide")
+                continue
+
+            original_name = secure_filename(fichier.filename) or "document"
+            ext = os.path.splitext(original_name)[1].lower()
+
+            if doc_name and len(files) == 1:
+                base_name = os.path.splitext(clean_filename(doc_name))[0]
+            else:
+                base_name = os.path.splitext(clean_filename(original_name))[0]
+
+            if not base_name:
+                base_name = "document"
+
+            if doc_name and len(files) > 1:
+                base_name = f"{base_name}_{index + 1}"
+
+            filename = f"{base_name}{ext}"
+
+            key = _s3_make_non_overwriting_key(
+                AWS_BUCKET,
+                f"{SHARED_PREFIX}{filename}"
+            )
+
+            s3_upload_fileobj(fichier, AWS_BUCKET, key)
+            success_count += 1
+
+        if success_count > 0 and not failed:
+            flash(f"{success_count} ressource(s) ajoutee(s).", "success")
+        elif success_count > 0:
+            flash(f"{success_count} ressource(s) ajoutee(s), {len(failed)} echec(s).", "warning")
+        else:
+            flash("Aucune ressource n'a pu etre ajoutee.", "danger")
+
+    except Exception as e:
+        logger.exception("Erreur upload ressource partagee : %r", e)
+        flash("Erreur lors de l'upload.", "danger")
+
+    return redirect(url_for("shared_resources"))
+
+
+app.view_functions["shared_resources_upload"] = login_required(_shared_resources_upload_endpoint)
 
 
 # ===============================
@@ -5049,13 +5170,77 @@ def create_cotation(client_id):
 
 
 # =========================
+# DOCUMENT PREVIEW
+# =========================
+@app.route("/document/preview", endpoint="preview_document")
+@login_required
+def preview_document():
+
+    key = (request.args.get("key") or "").strip()
+
+    if not key:
+        return redirect(request.referrer or url_for("clients"))
+
+    if not can_access_document_key(key):
+        abort(403)
+
+    preview_meta = build_document_preview_meta(key)
+
+    return render_template(
+        "document_preview.html",
+        document_name=preview_meta["filename"] or "Document",
+        preview_kind=preview_meta["preview_kind"],
+        previewable=preview_meta["previewable"],
+        inline_url=url_for("inline_document", key=key),
+        download_url=url_for("download_document", key=key),
+    )
+
+
+@app.route("/document/inline", endpoint="inline_document")
+@login_required
+def inline_document():
+
+    key = (request.args.get("key") or "").strip()
+
+    if not key:
+        return redirect(request.referrer or url_for("clients"))
+
+    if not can_access_document_key(key):
+        abort(403)
+
+    try:
+        if LOCAL_MODE:
+            path = local_storage_path(key)
+            if not os.path.exists(path):
+                flash("Document introuvable.", "danger")
+                return redirect(request.referrer or url_for("clients"))
+            return send_file(path, as_attachment=False)
+
+        if not s3:
+            flash("Ouverture indisponible pour ce document.", "warning")
+            return redirect(request.referrer or url_for("clients"))
+
+        url = s3_presigned_url(key, response_disposition="inline")
+        if not url:
+            flash("Impossible de generer la previsualisation du document.", "danger")
+            return redirect(request.referrer or url_for("clients"))
+
+        return redirect(url)
+
+    except Exception as e:
+        logger.exception("Erreur preview document : %r", e)
+        flash("Erreur lors de l'ouverture du document.", "danger")
+        return redirect(request.referrer or url_for("clients"))
+
+
+# =========================
 # DOCUMENT DOWNLOAD
 # =========================
 @app.route("/document/download", endpoint="download_document")
 @login_required
 def download_document():
 
-    key = request.args.get("key")
+    key = (request.args.get("key") or "").strip()
 
     if not key:
         return redirect(url_for("clients"))
@@ -5064,11 +5249,18 @@ def download_document():
         abort(403)
 
     try:
-        if LOCAL_MODE or not s3:
+        if LOCAL_MODE:
+            path = local_storage_path(key)
+            if not os.path.exists(path):
+                flash("Document introuvable.", "danger")
+                return redirect(request.referrer or url_for("clients"))
+            return send_file(path, as_attachment=True)
+
+        if not s3:
             flash("Téléchargement indisponible en mode local.", "warning")
             return redirect(request.referrer or url_for("clients"))
 
-        url = s3_presigned_url(key)
+        url = s3_presigned_url(key, response_disposition="attachment")
         if not url:
             flash("Impossible de générer le lien de téléchargement.", "danger")
             return redirect(request.referrer or url_for("clients"))
@@ -5079,6 +5271,43 @@ def download_document():
         logger.exception("Erreur download : %r", e)
         flash("Erreur lors du téléchargement.", "danger")
         return redirect(request.referrer or url_for("clients"))
+
+def _download_document_endpoint():
+
+    key = (request.args.get("key") or "").strip()
+
+    if not key:
+        return redirect(url_for("clients"))
+
+    if not can_access_document_key(key):
+        abort(403)
+
+    try:
+        if LOCAL_MODE:
+            path = local_storage_path(key)
+            if not os.path.exists(path):
+                flash("Document introuvable.", "danger")
+                return redirect(request.referrer or url_for("clients"))
+            return send_file(path, as_attachment=True)
+
+        if not s3:
+            flash("Telechargement indisponible pour ce document.", "warning")
+            return redirect(request.referrer or url_for("clients"))
+
+        url = s3_presigned_url(key, response_disposition="attachment")
+        if not url:
+            flash("Impossible de generer le lien de telechargement.", "danger")
+            return redirect(request.referrer or url_for("clients"))
+
+        return redirect(url)
+
+    except Exception as e:
+        logger.exception("Erreur download : %r", e)
+        flash("Erreur lors du telechargement.", "danger")
+        return redirect(request.referrer or url_for("clients"))
+
+
+app.view_functions["download_document"] = login_required(_download_document_endpoint)
 
 
 # =========================
@@ -5687,6 +5916,69 @@ def upload_cspe_document(dossier_id):
     return redirect(url_for("cspe_detail", dossier_id=dossier_id))
 
 
+@app.route("/cspe/document/preview", endpoint="preview_cspe_document")
+@login_required
+def preview_cspe_document():
+    ensure_cspe_schema()
+
+    key = (request.args.get("key") or "").strip()
+
+    if not key:
+        return redirect(request.referrer or url_for("cspe_index"))
+
+    if not can_access_cspe_document_key(key):
+        abort(403)
+
+    preview_meta = build_document_preview_meta(key)
+
+    return render_template(
+        "document_preview.html",
+        document_name=preview_meta["filename"] or "Document CSPE",
+        preview_kind=preview_meta["preview_kind"],
+        previewable=preview_meta["previewable"],
+        inline_url=url_for("inline_cspe_document", key=key),
+        download_url=url_for("download_cspe_document", key=key),
+    )
+
+
+@app.route("/cspe/document/inline", endpoint="inline_cspe_document")
+@login_required
+def inline_cspe_document():
+    ensure_cspe_schema()
+
+    key = (request.args.get("key") or "").strip()
+
+    if not key:
+        return redirect(request.referrer or url_for("cspe_index"))
+
+    if not can_access_cspe_document_key(key):
+        abort(403)
+
+    try:
+        if LOCAL_MODE:
+            path = local_storage_path(key)
+            if not os.path.exists(path):
+                flash("Document introuvable.", "danger")
+                return redirect(request.referrer or url_for("cspe_index"))
+            return send_file(path, as_attachment=False)
+
+        if not s3:
+            flash("Ouverture indisponible pour ce document CSPE.", "warning")
+            return redirect(request.referrer or url_for("cspe_index"))
+
+        url = s3_presigned_url(key, response_disposition="inline")
+        if not url:
+            flash("Impossible de generer la previsualisation du document CSPE.", "danger")
+            return redirect(request.referrer or url_for("cspe_index"))
+
+        return redirect(url)
+
+    except Exception as e:
+        logger.exception("Erreur preview document CSPE : %r", e)
+        flash("Erreur lors de l'ouverture du document CSPE.", "danger")
+        return redirect(request.referrer or url_for("cspe_index"))
+
+
 @app.route("/cspe/document/download", endpoint="download_cspe_document")
 @login_required
 def download_cspe_document():
@@ -5724,6 +6016,45 @@ def download_cspe_document():
         logger.exception("Erreur download document CSPE : %r", e)
         flash("Erreur lors de l'ouverture du document CSPE.", "danger")
         return redirect(request.referrer or url_for("cspe_index"))
+
+def _download_cspe_document_endpoint():
+    ensure_cspe_schema()
+
+    key = (request.args.get("key") or "").strip()
+
+    if not key:
+        flash("Document invalide.", "danger")
+        return redirect(request.referrer or url_for("cspe_index"))
+
+    if not can_access_cspe_document_key(key):
+        abort(403)
+
+    try:
+        if LOCAL_MODE:
+            path = local_storage_path(key)
+            if not os.path.exists(path):
+                flash("Document introuvable.", "danger")
+                return redirect(request.referrer or url_for("cspe_index"))
+            return send_file(path, as_attachment=True)
+
+        if not s3:
+            flash("Le stockage des documents CSPE est indisponible.", "warning")
+            return redirect(request.referrer or url_for("cspe_index"))
+
+        url = s3_presigned_url(key, response_disposition="attachment")
+        if not url:
+            flash("Impossible de generer le telechargement du document CSPE.", "danger")
+            return redirect(request.referrer or url_for("cspe_index"))
+
+        return redirect(url)
+
+    except Exception as e:
+        logger.exception("Erreur download document CSPE : %r", e)
+        flash("Erreur lors du telechargement du document CSPE.", "danger")
+        return redirect(request.referrer or url_for("cspe_index"))
+
+
+app.view_functions["download_cspe_document"] = login_required(_download_cspe_document_endpoint)
 
 
 @app.route("/cspe/document/delete", methods=["POST"], endpoint="delete_cspe_document")

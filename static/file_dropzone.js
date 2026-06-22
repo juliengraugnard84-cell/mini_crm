@@ -1,10 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
     const zones = document.querySelectorAll("[data-file-dropzone]");
 
-    if (!zones.length) {
-        return;
-    }
-
     const formatBytes = (bytes) => {
         if (!Number.isFinite(bytes) || bytes <= 0) {
             return "0 o";
@@ -23,7 +19,14 @@ document.addEventListener("DOMContentLoaded", () => {
         return `${rounded} ${units[unitIndex]}`;
     };
 
-    const assignFiles = (input, files) => {
+    const buildFileKey = (file) => [
+        file.name || "",
+        file.size || 0,
+        file.lastModified || 0,
+        file.type || "",
+    ].join("::");
+
+    const syncInputFiles = (input, files) => {
         if (!window.DataTransfer) {
             return false;
         }
@@ -31,7 +34,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const transfer = new DataTransfer();
         files.forEach((file) => transfer.items.add(file));
         input.files = transfer.files;
-        input.dispatchEvent(new Event("change", { bubbles: true }));
         return true;
     };
 
@@ -46,36 +48,82 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         let dragDepth = 0;
+        let selectedFiles = Array.from(input.files || []);
 
         const render = () => {
-            const files = Array.from(input.files || []);
-            zone.classList.toggle("is-filled", files.length > 0);
+            zone.classList.toggle("is-filled", selectedFiles.length > 0);
             list.innerHTML = "";
 
-            if (!files.length) {
+            if (!selectedFiles.length) {
                 summary.textContent = "Aucun fichier selectionne";
                 list.hidden = true;
                 return;
             }
 
-            const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
-            summary.textContent = `${files.length} fichier${files.length > 1 ? "s" : ""} selectionne${files.length > 1 ? "s" : ""} • ${formatBytes(totalSize)}`;
+            const totalSize = selectedFiles.reduce((sum, file) => sum + (file.size || 0), 0);
+            summary.textContent = `${selectedFiles.length} fichier${selectedFiles.length > 1 ? "s" : ""} selectionne${selectedFiles.length > 1 ? "s" : ""} - ${formatBytes(totalSize)}`;
 
-            files.forEach((file) => {
+            selectedFiles.forEach((file, index) => {
                 const chip = document.createElement("div");
                 chip.className = "crm-file-drop-chip";
-                const name = document.createElement("span");
-                name.textContent = file.name;
+
+                const label = document.createElement("span");
+                label.textContent = file.name;
+                label.title = file.name;
 
                 const size = document.createElement("small");
                 size.textContent = formatBytes(file.size || 0);
 
-                chip.appendChild(name);
+                chip.appendChild(label);
                 chip.appendChild(size);
+
+                if (input.multiple) {
+                    const removeBtn = document.createElement("button");
+                    removeBtn.type = "button";
+                    removeBtn.className = "crm-file-drop-remove";
+                    removeBtn.dataset.fileRemoveIndex = String(index);
+                    removeBtn.setAttribute("aria-label", `Retirer ${file.name}`);
+                    removeBtn.textContent = "x";
+                    chip.appendChild(removeBtn);
+                }
+
                 list.appendChild(chip);
             });
 
             list.hidden = false;
+        };
+
+        const applyFiles = (incomingFiles, append = true) => {
+            const files = Array.from(incomingFiles || []).filter(Boolean);
+
+            if (!files.length) {
+                render();
+                return;
+            }
+
+            if (!input.multiple) {
+                selectedFiles = files.slice(0, 1);
+            } else if (append) {
+                const merged = new Map();
+                selectedFiles.forEach((file) => merged.set(buildFileKey(file), file));
+                files.forEach((file) => merged.set(buildFileKey(file), file));
+                selectedFiles = Array.from(merged.values());
+            } else {
+                selectedFiles = files;
+            }
+
+            syncInputFiles(input, selectedFiles);
+            render();
+        };
+
+        const removeAt = (index) => {
+            if (!Number.isInteger(index) || index < 0 || index >= selectedFiles.length) {
+                return;
+            }
+
+            selectedFiles.splice(index, 1);
+            syncInputFiles(input, selectedFiles);
+            render();
         };
 
         ["dragenter", "dragover"].forEach((eventName) => {
@@ -106,11 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            const nextFiles = input.multiple ? droppedFiles : droppedFiles.slice(0, 1);
-
-            if (!assignFiles(input, nextFiles)) {
-                summary.textContent = `${nextFiles.length} fichier${nextFiles.length > 1 ? "s" : ""} pret${nextFiles.length > 1 ? "s" : ""} a etre ajoute${nextFiles.length > 1 ? "s" : ""}. Cliquez pour confirmer la selection.`;
-            }
+            applyFiles(droppedFiles, Boolean(input.multiple));
         });
 
         surface.addEventListener("keydown", (event) => {
@@ -122,7 +166,30 @@ document.addEventListener("DOMContentLoaded", () => {
             input.click();
         });
 
-        input.addEventListener("change", render);
+        input.addEventListener("change", () => {
+            const pickedFiles = Array.from(input.files || []);
+            if (!pickedFiles.length) {
+                render();
+                return;
+            }
+
+            applyFiles(pickedFiles, Boolean(input.multiple));
+
+            if (window.DataTransfer) {
+                input.value = "";
+                syncInputFiles(input, selectedFiles);
+            }
+        });
+
+        list.addEventListener("click", (event) => {
+            const button = event.target.closest("[data-file-remove-index]");
+            if (!button) {
+                return;
+            }
+
+            removeAt(Number(button.dataset.fileRemoveIndex));
+        });
+
         render();
     });
 
@@ -170,7 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         autoToggle.addEventListener("change", renderNamingState);
-        kindInputs.forEach((input) => input.addEventListener("change", renderNamingState));
+        kindInputs.forEach((item) => item.addEventListener("change", renderNamingState));
 
         if (extraCodeInput) {
             extraCodeInput.addEventListener("input", renderNamingState);
@@ -178,4 +245,45 @@ document.addEventListener("DOMContentLoaded", () => {
 
         renderNamingState();
     });
+
+    const previewModal = document.getElementById("crmDocumentPreviewModal");
+    const previewFrame = document.getElementById("crmDocumentPreviewFrame");
+    const previewTitle = document.getElementById("crmDocumentPreviewTitle");
+    const previewOpen = document.getElementById("crmDocumentPreviewOpen");
+
+    if (previewModal && previewFrame && window.bootstrap?.Modal) {
+        const modal = window.bootstrap.Modal.getOrCreateInstance(previewModal);
+
+        document.addEventListener("click", (event) => {
+            const link = event.target.closest("[data-doc-preview-link]");
+            if (!link) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const href = link.getAttribute("href");
+            if (!href) {
+                return;
+            }
+
+            if (previewTitle) {
+                previewTitle.textContent = link.dataset.docPreviewTitle || "Previsualisation du document";
+            }
+
+            if (previewOpen) {
+                previewOpen.href = href;
+            }
+
+            previewFrame.src = href;
+            modal.show();
+        });
+
+        previewModal.addEventListener("hidden.bs.modal", () => {
+            previewFrame.src = "about:blank";
+            if (previewOpen) {
+                previewOpen.removeAttribute("href");
+            }
+        });
+    }
 });

@@ -405,11 +405,106 @@ main.content {
     font-weight: 700;
 }
 
+.crm-file-drop-remove {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(8, 19, 63, 0.1);
+    color: #08133f;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.crm-file-drop-remove:hover {
+    background: rgba(242, 178, 51, 0.24);
+    transform: scale(1.04);
+}
+
+.crm-file-drop-remove:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(242, 178, 51, 0.2);
+}
+
 .crm-doc-upload-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
     gap: 18px;
     align-items: start;
+}
+
+.crm-document-modal .modal-dialog {
+    max-width: min(1180px, calc(100vw - 32px));
+}
+
+.crm-document-modal .modal-content {
+    border: 1px solid rgba(8, 19, 63, 0.08);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 34px 90px rgba(8, 19, 63, 0.22);
+}
+
+.crm-document-modal .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 22px;
+    background:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.18), transparent 26%),
+        linear-gradient(135deg, #08133f, #123646);
+    color: #fff;
+    border-bottom: 0;
+}
+
+.crm-document-modal-head {
+    min-width: 0;
+}
+
+.crm-document-modal-kicker {
+    display: block;
+    margin-bottom: 4px;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.crm-document-modal .modal-title {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.crm-document-modal-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.crm-document-modal .btn-close {
+    filter: invert(1);
+    opacity: 0.88;
+}
+
+.crm-document-modal .modal-body {
+    padding: 0;
+    background: linear-gradient(180deg, #eef2f8, #f8fafc);
+}
+
+.crm-document-preview-frame {
+    width: 100%;
+    height: min(78vh, 920px);
+    border: 0;
+    background: #fff;
 }
 
 .crm-doc-upload-panel {

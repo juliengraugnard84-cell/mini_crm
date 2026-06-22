@@ -274,12 +274,46 @@
 
 {% endif %}
 
+<div class="modal fade crm-document-modal" id="crmDocumentPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="crm-document-modal-head">
+                    <span class="crm-document-modal-kicker">Apercu CRM</span>
+                    <h5 class="modal-title" id="crmDocumentPreviewTitle">Previsualisation du document</h5>
+                </div>
+
+                <div class="crm-document-modal-actions">
+                    <a id="crmDocumentPreviewOpen"
+                       class="btn btn-outline-light btn-sm"
+                       href="#"
+                       target="_blank"
+                       rel="noopener">
+                        Ouvrir seul
+                    </a>
+
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+            </div>
+
+            <div class="modal-body">
+                <iframe
+                    id="crmDocumentPreviewFrame"
+                    class="crm-document-preview-frame"
+                    src="about:blank"
+                    loading="lazy"
+                    title="Previsualisation du document"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 {% if current_user and current_user.role in ["admin", "commercial"] %}
 <script src="{{ url_for('static', filename='chat_widget.js') }}?v=5"></script>
 {% endif %}
-<script src="{{ url_for('static', filename='file_dropzone.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='file_dropzone.js') }}?v=3"></script>
 
 {% block scripts %}{% endblock %}
 

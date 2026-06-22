@@ -222,6 +222,13 @@
                             {% endif %}
                         </td>
                         <td class="text-end">
+                            <a href="{{ url_for('preview_cspe_document', key=d.key) }}"
+                               class="btn btn-sm btn-outline-secondary"
+                               data-doc-preview-link
+                               data-doc-preview-title="{{ d.nom }}">
+                                Consulter
+                            </a>
+
                             <a href="{{ url_for('download_cspe_document') }}?key={{ d.key }}"
                                class="btn btn-sm btn-outline-primary">
                                 Ouvrir / télécharger
