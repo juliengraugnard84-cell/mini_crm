@@ -220,7 +220,7 @@
 </div>
 
 <div class="modal fade planning-modal" id="planningEventModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-scrollable planning-modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
@@ -241,95 +241,120 @@
                     <input type="hidden" id="planning-event-id">
                     <input type="hidden" id="planning-event-source" value="manual">
 
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label" for="planning-event-title">Titre</label>
-                            <input id="planning-event-title" type="text" class="form-control" required>
+                    <div class="planning-form-section planning-form-section-primary">
+                        <div class="planning-form-section-head">
+                            <span>Bloc agenda</span>
+                            <small>Le coeur du rendez-vous : titre, categorie, statut et cible.</small>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label" for="planning-event-category">Categorie</label>
-                            <select id="planning-event-category" class="form-select">
-                                {% for category in planning_bootstrap.categories %}
-                                    <option value="{{ category.value }}">{{ category.label }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label" for="planning-event-title">Titre</label>
+                                <input id="planning-event-title" type="text" class="form-control" required>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="planning-event-category">Categorie</label>
+                                <select id="planning-event-category" class="form-select">
+                                    {% for category in planning_bootstrap.categories %}
+                                        <option value="{{ category.value }}">{{ category.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="planning-event-status">Statut</label>
+                                <select id="planning-event-status" class="form-select">
+                                    {% for status in planning_bootstrap.statuses %}
+                                        <option value="{{ status.value }}">{{ status.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="planning-event-visibility">Visibilite</label>
+                                <select id="planning-event-visibility" class="form-select">
+                                    {% for visibility in planning_bootstrap.visibilities %}
+                                        <option value="{{ visibility.value }}">{{ visibility.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="planning-event-assignee">Destinataire / responsable</label>
+                                <select id="planning-event-assignee" class="form-select">
+                                    <option value="">Aucun</option>
+                                    {% for member in planning_bootstrap.users %}
+                                        <option value="{{ member.id }}">
+                                            {{ member.username }} ({{ member.role_label }})
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="planning-form-section">
+                        <div class="planning-form-section-head">
+                            <span>Creneau</span>
+                            <small>Choisis la plage horaire, le lieu et l'apparence du rendez-vous.</small>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label" for="planning-event-status">Statut</label>
-                            <select id="planning-event-status" class="form-select">
-                                {% for status in planning_bootstrap.statuses %}
-                                    <option value="{{ status.value }}">{{ status.label }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="planning-start-date">Date de debut</label>
+                                <input id="planning-start-date" type="date" class="form-control" required>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="planning-end-date">Date de fin</label>
+                                <input id="planning-end-date" type="date" class="form-control">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="planning-start-time">Heure de debut</label>
+                                <input id="planning-start-time" type="time" class="form-control">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="planning-end-time">Heure de fin</label>
+                                <input id="planning-end-time" type="time" class="form-control">
+                            </div>
+
+                            <div class="col-md-8">
+                                <label class="form-label" for="planning-event-location">Lieu</label>
+                                <input id="planning-event-location" type="text" class="form-control" placeholder="Bureau, visio, client...">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label" for="planning-event-color">Couleur</label>
+                                <input id="planning-event-color" type="color" class="form-control form-control-color" value="#2f6cab">
+                            </div>
+
+                            <div class="col-12">
+                                <label class="planning-toggle planning-toggle-card">
+                                    <input id="planning-all-day" type="checkbox">
+                                    <span>Journee entiere</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="planning-form-section">
+                        <div class="planning-form-section-head">
+                            <span>Contexte</span>
+                            <small>Ajoute les points utiles pour preparer ou transmettre le rendez-vous.</small>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label" for="planning-event-visibility">Visibilite</label>
-                            <select id="planning-event-visibility" class="form-select">
-                                {% for visibility in planning_bootstrap.visibilities %}
-                                    <option value="{{ visibility.value }}">{{ visibility.label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label" for="planning-event-assignee">Destinataire / responsable</label>
-                            <select id="planning-event-assignee" class="form-select">
-                                <option value="">Aucun</option>
-                                {% for member in planning_bootstrap.users %}
-                                    <option value="{{ member.id }}">
-                                        {{ member.username }} ({{ member.role_label }})
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label" for="planning-start-date">Date de debut</label>
-                            <input id="planning-start-date" type="date" class="form-control" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label" for="planning-end-date">Date de fin</label>
-                            <input id="planning-end-date" type="date" class="form-control">
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label" for="planning-start-time">Heure de debut</label>
-                            <input id="planning-start-time" type="time" class="form-control">
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label" for="planning-end-time">Heure de fin</label>
-                            <input id="planning-end-time" type="time" class="form-control">
-                        </div>
-
-                        <div class="col-md-7">
-                            <label class="form-label" for="planning-event-location">Lieu</label>
-                            <input id="planning-event-location" type="text" class="form-control" placeholder="Bureau, visio, client...">
-                        </div>
-
-                        <div class="col-md-5">
-                            <label class="form-label" for="planning-event-color">Couleur</label>
-                            <input id="planning-event-color" type="color" class="form-control form-control-color" value="#2f6cab">
-                        </div>
-
-                        <div class="col-12">
-                            <label class="planning-toggle">
-                                <input id="planning-all-day" type="checkbox">
-                                <span>Journee entiere</span>
-                            </label>
-                        </div>
-
-                        <div class="col-12">
-                            <label class="form-label" for="planning-event-description">Description</label>
-                            <textarea
-                                id="planning-event-description"
-                                class="form-control"
-                                rows="5"
-                                placeholder="Points a preparer, contexte client, objectif du rendez-vous..."></textarea>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label" for="planning-event-description">Description</label>
+                                <textarea
+                                    id="planning-event-description"
+                                    class="form-control"
+                                    rows="5"
+                                    placeholder="Points a preparer, contexte client, objectif du rendez-vous..."></textarea>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -360,5 +385,5 @@
     window.PLANNING_CSRF_TOKEN = {{ csrf_token | tojson }};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-<script src="{{ url_for('static', filename='planning_hub.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='planning_hub.js') }}?v=2"></script>
 {% endblock %}

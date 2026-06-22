@@ -10,6 +10,10 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
+    if (modalEl.parentElement !== document.body) {
+        document.body.appendChild(modalEl);
+    }
+
     const nodes = {
         feedback: document.getElementById("planning-feedback"),
         statToday: document.getElementById("planning-stat-today"),
@@ -54,7 +58,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const state = {
         activeSources: new Set(["cotation", "update", "manual"]),
         calendar: null,
-        modal: new bootstrap.Modal(modalEl),
+        modal: new bootstrap.Modal(modalEl, {
+            backdrop: true,
+            keyboard: true,
+            focus: true,
+        }),
         rawEvents: [],
         searchTimer: null,
         saving: false,
@@ -514,6 +522,14 @@ document.addEventListener("DOMContentLoaded", () => {
         setModalReadOnly(false);
     }
 
+    function focusModalPrimaryField() {
+        window.setTimeout(() => {
+            if (nodes.title && !nodes.title.disabled) {
+                nodes.title.focus({ preventScroll: true });
+            }
+        }, 90);
+    }
+
     function openCreateModalFromSelection(selection = null) {
         resetModalForm();
 
@@ -533,6 +549,7 @@ document.addEventListener("DOMContentLoaded", () => {
         syncAllDayFields();
         syncVisibilityFields();
         state.modal.show();
+        focusModalPrimaryField();
     }
 
     function fillModalFromEvent(event) {
@@ -574,6 +591,7 @@ document.addEventListener("DOMContentLoaded", () => {
         syncAllDayFields();
         syncVisibilityFields();
         state.modal.show();
+        focusModalPrimaryField();
     }
 
     function collectFormPayload() {
@@ -771,6 +789,10 @@ document.addEventListener("DOMContentLoaded", () => {
         nodes.deleteButton.addEventListener("click", deleteCurrentEvent);
         nodes.allDay.addEventListener("change", syncAllDayFields);
         nodes.visibility.addEventListener("change", syncVisibilityFields);
+        modalEl.addEventListener("shown.bs.modal", focusModalPrimaryField);
+        modalEl.addEventListener("hidden.bs.modal", () => {
+            state.calendar?.unselect();
+        });
     }
 
     function initCalendar() {
