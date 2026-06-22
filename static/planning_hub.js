@@ -223,11 +223,17 @@ document.addEventListener("DOMContentLoaded", () => {
             "Rendez-vous - ",
         ].filter(Boolean);
 
-        removablePrefixes.forEach((prefix) => {
-            if (title.toLowerCase().startsWith(prefix.toLowerCase())) {
-                title = title.slice(prefix.length).trim();
-            }
-        });
+        let hasPrefix = true;
+        while (hasPrefix) {
+            hasPrefix = false;
+
+            removablePrefixes.forEach((prefix) => {
+                if (title.toLowerCase().startsWith(prefix.toLowerCase())) {
+                    title = title.slice(prefix.length).trim();
+                    hasPrefix = true;
+                }
+            });
+        }
 
         if (owner) {
             const ownerSuffix = ` - ${owner}`;
@@ -236,7 +242,22 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
+        title = title
+            .replace(/^\s*-\s*/g, "")
+            .replace(/\s{2,}/g, " ")
+            .trim();
+
         return title || String(rawTitle || "").trim();
+    }
+
+    function getSourceBadgeLabel(sourceKind, sourceLabel) {
+        const shortLabels = {
+            cotation: "Nego",
+            update: "Suivi",
+            manual: "Agenda",
+        };
+
+        return shortLabels[sourceKind] || sourceLabel || "Agenda";
     }
 
     function buildEventStatusMarkup(props) {
@@ -263,16 +284,72 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function buildEventMetaMarkup(items) {
         const safeItems = items
-            .map((value) => String(value || "").trim())
-            .filter(Boolean);
+            .map((item) => {
+                if (typeof item === "string") {
+                    return {
+                        value: item,
+                        className: "",
+                    };
+                }
+
+                return {
+                    value: String(item?.value || "").trim(),
+                    className: item?.className || "",
+                };
+            })
+            .filter((item) => item.value);
 
         if (!safeItems.length) {
             return "";
         }
 
         return safeItems
-            .map((value) => `<span>${escapeHTML(value)}</span>`)
+            .map((item) => `<span class="${escapeHTML(item.className)}">${escapeHTML(item.value)}</span>`)
             .join("");
+    }
+
+    function syncEventLayoutState(eventEl) {
+        if (!eventEl) {
+            return;
+        }
+
+        const width = eventEl.offsetWidth || 0;
+        const height = eventEl.offsetHeight || 0;
+
+        eventEl.classList.toggle("is-narrow", width > 0 && width < 190);
+        eventEl.classList.toggle("is-tight", width > 0 && width < 145);
+        eventEl.classList.toggle("is-compact", height > 0 && height < 96);
+        eventEl.classList.toggle("is-micro", height > 0 && height < 72);
+    }
+
+    function attachEventLayoutObserver(eventEl) {
+        if (!eventEl) {
+            return;
+        }
+
+        syncEventLayoutState(eventEl);
+
+        if (typeof ResizeObserver === "undefined") {
+            return;
+        }
+
+        if (eventEl._planningResizeObserver) {
+            eventEl._planningResizeObserver.disconnect();
+        }
+
+        const observer = new ResizeObserver(() => {
+            syncEventLayoutState(eventEl);
+        });
+
+        observer.observe(eventEl);
+        eventEl._planningResizeObserver = observer;
+    }
+
+    function detachEventLayoutObserver(eventEl) {
+        if (eventEl?._planningResizeObserver) {
+            eventEl._planningResizeObserver.disconnect();
+            delete eventEl._planningResizeObserver;
+        }
     }
 
     function buildCalendarEventCard(arg) {
@@ -286,9 +363,23 @@ document.addEventListener("DOMContentLoaded", () => {
         const isMonthView = viewType === "dayGridMonth";
         const isTimeGridView = viewType === "timeGridWeek" || viewType === "timeGridDay";
         const timeLabel = arg.timeText || (arg.event.allDay ? "Journee" : "");
-        const mainMeta = buildEventMetaMarkup([timeLabel, owner]);
+        const mainMeta = buildEventMetaMarkup([
+            {
+                value: timeLabel,
+                className: "planning-event-meta-chip planning-event-meta-time",
+            },
+            {
+                value: owner,
+                className: "planning-event-meta-chip planning-event-meta-owner",
+            },
+        ]);
         const secondaryMeta = !isMonthView && location
-            ? buildEventMetaMarkup([location])
+            ? buildEventMetaMarkup([
+                {
+                    value: location,
+                    className: "planning-event-meta-chip planning-event-meta-location",
+                },
+            ])
             : "";
         const cardClasses = [
             "planning-event-card",
@@ -299,7 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return `
             <div class="${cardClasses}">
                 <div class="planning-event-card-top">
-                    <span class="planning-inline-badge ${sourceBadgeClass(props.sourceKind)}">${escapeHTML(sourceLabel)}</span>
+                    <span class="planning-inline-badge ${sourceBadgeClass(props.sourceKind)}">${escapeHTML(getSourceBadgeLabel(props.sourceKind, sourceLabel))}</span>
                     ${buildEventStatusMarkup(props)}
                 </div>
                 <div class="planning-event-card-title">${escapeHTML(cleanTitle || displayTitle)}</div>
@@ -991,6 +1082,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 info.el.setAttribute("title", lines.join("\n"));
                 info.el.style.setProperty("--planning-event-accent", props.color || info.event.backgroundColor || "#2f6cab");
+                attachEventLayoutObserver(info.el);
+            },
+            eventWillUnmount: (info) => {
+                detachEventLayoutObserver(info.el);
             },
             eventContent: (arg) => {
                 return {

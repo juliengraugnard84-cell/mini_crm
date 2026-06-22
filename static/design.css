@@ -6019,6 +6019,19 @@ body.crm-body.planning-page .modal-backdrop.show {
     min-width: 0;
 }
 
+.crm-body.planning-page .planning-event-meta-time {
+    color: #4c6389;
+    font-weight: 800;
+}
+
+.crm-body.planning-page .planning-event-meta-owner {
+    color: #6d7b92;
+}
+
+.crm-body.planning-page .planning-event-meta-location {
+    color: #7b879c;
+}
+
 .crm-body.planning-page .planning-event-card-meta span + span::before {
     content: "";
     width: 4px;
@@ -6124,6 +6137,112 @@ body.crm-body.planning-page .modal-backdrop.show {
 .crm-body.planning-page .fc .planning-calendar-event--timeGridWeek .planning-event-card-meta,
 .crm-body.planning-page .fc .planning-calendar-event--timeGridDay .planning-event-card-meta {
     font-size: 12px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-compact .planning-event-card {
+    gap: 5px;
+    padding: 9px 11px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-compact .planning-event-card-title {
+    font-size: 13px;
+    line-height: 1.25;
+    -webkit-line-clamp: 2;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-compact .planning-inline-badge,
+.crm-body.planning-page .fc .planning-calendar-event.is-compact .planning-event-status {
+    padding: 2px 7px;
+    font-size: 9px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-compact .planning-event-card-meta {
+    gap: 8px;
+    font-size: 11px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-narrow .planning-event-card {
+    padding: 9px 10px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-narrow .planning-event-card-top {
+    justify-content: flex-start;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-narrow .planning-event-card-title {
+    font-size: 12px;
+    line-height: 1.22;
+    -webkit-line-clamp: 2;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-narrow .planning-event-card-meta {
+    gap: 6px;
+    font-size: 10px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-tight .planning-event-card {
+    padding: 8px 8px 9px;
+    gap: 4px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-tight .planning-event-card-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-tight .planning-inline-badge,
+.crm-body.planning-page .fc .planning-calendar-event.is-tight .planning-event-status {
+    font-size: 9px;
+    padding: 2px 6px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-tight .planning-event-card-title {
+    font-size: 11px;
+    line-height: 1.18;
+    -webkit-line-clamp: 3;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-tight .planning-event-card-meta {
+    display: grid;
+    gap: 3px;
+    font-size: 10px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-tight .planning-event-card-meta span + span::before {
+    display: none;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-micro .planning-event-card {
+    padding: 7px 8px;
+    gap: 3px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-micro .planning-event-status,
+.crm-body.planning-page .fc .planning-calendar-event.is-micro .planning-event-card-meta-secondary {
+    display: none;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-micro .planning-inline-badge {
+    padding: 2px 6px;
+    font-size: 9px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-micro .planning-event-card-title {
+    font-size: 11px;
+    line-height: 1.15;
+    -webkit-line-clamp: 2;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-micro .planning-event-card-meta {
+    gap: 4px;
+    font-size: 10px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event.is-micro .planning-event-card-meta span + span::before {
+    display: none;
 }
 
 .crm-body.planning-page .fc .planning-calendar-event--listWeek {
