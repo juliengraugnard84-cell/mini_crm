@@ -5950,3 +5950,212 @@ body.crm-body.planning-page .modal-backdrop.show {
         min-height: 620px;
     }
 }
+
+/* =========================================================
+   PLANNING CALENDAR EVENT CARDS
+========================================================= */
+
+.crm-body.planning-page .fc .fc-event.planning-calendar-event {
+    overflow: hidden;
+    border-radius: 18px;
+    border: 1px solid rgba(109, 126, 176, 0.16) !important;
+    background-color: rgba(255, 255, 255, 0.98) !important;
+    background-image:
+        radial-gradient(circle at top right, rgba(242, 178, 51, 0.12), transparent 34%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(244, 247, 252, 0.95)) !important;
+    box-shadow:
+        inset 4px 0 0 var(--planning-event-accent, #2f6cab),
+        0 16px 30px rgba(8, 19, 63, 0.12) !important;
+}
+
+.crm-body.planning-page .fc .fc-event.planning-calendar-event:hover {
+    box-shadow:
+        inset 4px 0 0 var(--planning-event-accent, #2f6cab),
+        0 18px 34px rgba(8, 19, 63, 0.16) !important;
+}
+
+.crm-body.planning-page .fc .fc-event.planning-calendar-event .fc-event-main {
+    padding: 0 !important;
+    height: 100%;
+}
+
+.crm-body.planning-page .planning-event-card {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 12px 14px;
+}
+
+.crm-body.planning-page .planning-event-card-top {
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
+.crm-body.planning-page .planning-event-card-title {
+    color: #152742;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.crm-body.planning-page .planning-event-card-meta {
+    color: #61738c;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 10px;
+}
+
+.crm-body.planning-page .planning-event-card-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.crm-body.planning-page .planning-event-card-meta span + span::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(97, 115, 140, 0.45);
+}
+
+.crm-body.planning-page .planning-event-card-meta-secondary {
+    color: #7b879c;
+    font-size: 11px;
+}
+
+.crm-body.planning-page .planning-event-card-meta-secondary span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.crm-body.planning-page .planning-event-status {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+}
+
+.crm-body.planning-page .planning-event-status-warning {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+}
+
+.crm-body.planning-page .planning-event-status-danger {
+    background: rgba(239, 68, 68, 0.14);
+    color: #b91c1c;
+}
+
+.crm-body.planning-page .planning-event-status-success {
+    background: rgba(16, 185, 129, 0.14);
+    color: #047857;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event-source-cotation {
+    --planning-event-accent: #f2b233;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event-source-update {
+    --planning-event-accent: #7b90c8;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event-source-manual {
+    --planning-event-accent: #244f86;
+}
+
+.crm-body.planning-page .fc .fc-daygrid-day-events {
+    margin-top: 6px;
+}
+
+.crm-body.planning-page .fc .fc-daygrid-event.planning-calendar-event {
+    margin: 6px 8px 0;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--dayGridMonth .planning-event-card {
+    padding: 10px 12px;
+    gap: 6px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--dayGridMonth .planning-inline-badge,
+.crm-body.planning-page .fc .planning-calendar-event--dayGridMonth .planning-event-status {
+    padding: 3px 7px;
+    font-size: 10px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--dayGridMonth .planning-event-card-title {
+    font-size: 13px;
+    -webkit-line-clamp: 2;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--dayGridMonth .planning-event-card-meta {
+    font-size: 11px;
+}
+
+.crm-body.planning-page .fc .fc-timegrid-event.planning-calendar-event {
+    min-height: 78px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--timeGridWeek,
+.crm-body.planning-page .fc .planning-calendar-event--timeGridDay {
+    border-radius: 20px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--timeGridWeek .planning-event-card,
+.crm-body.planning-page .fc .planning-calendar-event--timeGridDay .planning-event-card {
+    height: 100%;
+    padding: 12px 14px;
+    align-content: start;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--timeGridWeek .planning-event-card-title,
+.crm-body.planning-page .fc .planning-calendar-event--timeGridDay .planning-event-card-title {
+    font-size: 15px;
+    -webkit-line-clamp: 3;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--timeGridWeek .planning-event-card-meta,
+.crm-body.planning-page .fc .planning-calendar-event--timeGridDay .planning-event-card-meta {
+    font-size: 12px;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--listWeek {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.crm-body.planning-page .fc .planning-calendar-event--listWeek .planning-event-card {
+    padding: 6px 0 6px 12px;
+}
+
+.crm-body.planning-page .fc .fc-daygrid-more-link {
+    margin: 8px 10px 4px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(109, 126, 176, 0.12);
+    color: #24405f;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+@media (max-width: 768px) {
+    .crm-body.planning-page .fc .fc-daygrid-event.planning-calendar-event {
+        margin-left: 4px;
+        margin-right: 4px;
+    }
+
+    .crm-body.planning-page .fc .planning-calendar-event--timeGridWeek .planning-event-card-title,
+    .crm-body.planning-page .fc .planning-calendar-event--timeGridDay .planning-event-card-title {
+        font-size: 14px;
+        -webkit-line-clamp: 2;
+    }
+}

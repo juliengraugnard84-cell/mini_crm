@@ -210,6 +210,105 @@ document.addEventListener("DOMContentLoaded", () => {
         return `planning-badge-${sourceKind || "manual"}`;
     }
 
+    function simplifyEventTitle(rawTitle, sourceLabel, ownerLabel) {
+        let title = String(rawTitle || "").trim();
+        const owner = String(ownerLabel || "").trim();
+        const removablePrefixes = [
+            `${sourceLabel || ""} - `,
+            "Negociation - ",
+            "Négociation - ",
+            "Suivi client - ",
+            "Suivi - ",
+            "Agenda - ",
+            "Rendez-vous - ",
+        ].filter(Boolean);
+
+        removablePrefixes.forEach((prefix) => {
+            if (title.toLowerCase().startsWith(prefix.toLowerCase())) {
+                title = title.slice(prefix.length).trim();
+            }
+        });
+
+        if (owner) {
+            const ownerSuffix = ` - ${owner}`;
+            if (title.toLowerCase().endsWith(ownerSuffix.toLowerCase())) {
+                title = title.slice(0, -ownerSuffix.length).trim();
+            }
+        }
+
+        return title || String(rawTitle || "").trim();
+    }
+
+    function buildEventStatusMarkup(props) {
+        const status = String(props.status || "confirmed").toLowerCase();
+        const toneByStatus = {
+            tentative: "warning",
+            cancelled: "danger",
+            completed: "success",
+        };
+        const defaultLabelByStatus = {
+            tentative: "Tentatif",
+            cancelled: "Annule",
+            completed: "Termine",
+        };
+        const tone = toneByStatus[status];
+
+        if (!tone) {
+            return "";
+        }
+
+        const label = props.statusLabel || defaultLabelByStatus[status] || status;
+        return `<span class="planning-event-status planning-event-status-${tone}">${escapeHTML(label)}</span>`;
+    }
+
+    function buildEventMetaMarkup(items) {
+        const safeItems = items
+            .map((value) => String(value || "").trim())
+            .filter(Boolean);
+
+        if (!safeItems.length) {
+            return "";
+        }
+
+        return safeItems
+            .map((value) => `<span>${escapeHTML(value)}</span>`)
+            .join("");
+    }
+
+    function buildCalendarEventCard(arg) {
+        const props = arg.event.extendedProps || {};
+        const sourceLabel = props.sourceLabel || "Agenda";
+        const owner = props.ownerLabel || props.commercialName || "";
+        const displayTitle = props.titleFull || arg.event.title || "";
+        const cleanTitle = simplifyEventTitle(displayTitle, sourceLabel, owner);
+        const location = props.location || "";
+        const viewType = arg.view?.type || "";
+        const isMonthView = viewType === "dayGridMonth";
+        const isTimeGridView = viewType === "timeGridWeek" || viewType === "timeGridDay";
+        const timeLabel = arg.timeText || (arg.event.allDay ? "Journee" : "");
+        const mainMeta = buildEventMetaMarkup([timeLabel, owner]);
+        const secondaryMeta = !isMonthView && location
+            ? buildEventMetaMarkup([location])
+            : "";
+        const cardClasses = [
+            "planning-event-card",
+            isMonthView ? "planning-event-card-compact" : "planning-event-card-detailed",
+            isTimeGridView ? "planning-event-card-timed" : "",
+        ].filter(Boolean).join(" ");
+
+        return `
+            <div class="${cardClasses}">
+                <div class="planning-event-card-top">
+                    <span class="planning-inline-badge ${sourceBadgeClass(props.sourceKind)}">${escapeHTML(sourceLabel)}</span>
+                    ${buildEventStatusMarkup(props)}
+                </div>
+                <div class="planning-event-card-title">${escapeHTML(cleanTitle || displayTitle)}</div>
+                ${mainMeta ? `<div class="planning-event-card-meta">${mainMeta}</div>` : ""}
+                ${secondaryMeta ? `<div class="planning-event-card-meta planning-event-card-meta-secondary">${secondaryMeta}</div>` : ""}
+            </div>
+        `;
+    }
+
     function showFeedback(kind, message) {
         if (!nodes.feedback) {
             return;
@@ -808,9 +907,13 @@ document.addEventListener("DOMContentLoaded", () => {
             eventResizableFromStart: true,
             slotEventOverlap: false,
             dayMaxEvents: true,
+            dayMaxEventRows: 3,
+            eventMinHeight: 74,
+            eventShortHeight: 64,
             height: "auto",
             expandRows: true,
             stickyHeaderDates: true,
+            moreLinkText: "autres",
             scrollTime: "08:00:00",
             slotMinTime: "07:00:00",
             slotMaxTime: "21:00:00",
@@ -868,6 +971,14 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             eventDrop: persistEventMove,
             eventResize: persistEventMove,
+            eventClassNames: (arg) => {
+                const props = arg.event.extendedProps || {};
+                return [
+                    "planning-calendar-event",
+                    `planning-calendar-event--${arg.view?.type || "default"}`,
+                    `planning-calendar-event-source-${props.sourceKind || "manual"}`,
+                ];
+            },
             eventDidMount: (info) => {
                 const props = info.event.extendedProps || {};
                 const lines = [
@@ -879,30 +990,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 ].filter(Boolean);
 
                 info.el.setAttribute("title", lines.join("\n"));
+                info.el.style.setProperty("--planning-event-accent", props.color || info.event.backgroundColor || "#2f6cab");
             },
             eventContent: (arg) => {
-                const props = arg.event.extendedProps || {};
-                const sourceLabel = props.sourceLabel || "Agenda";
-                const owner = props.ownerLabel || props.commercialName || "";
-                const displayTitle = props.titleFull || arg.event.title || "";
-                const status = props.status === "tentative"
-                    ? `<span class="planning-event-status">${escapeHTML(props.statusLabel || "Tentatif")}</span>`
-                    : "";
-
                 return {
-                    html: `
-                        <div class="planning-event-card">
-                            <div class="planning-event-card-top">
-                                <span class="planning-inline-badge ${sourceBadgeClass(props.sourceKind)}">${escapeHTML(sourceLabel)}</span>
-                                ${status}
-                            </div>
-                            <div class="planning-event-card-title">${escapeHTML(displayTitle)}</div>
-                            <div class="planning-event-card-meta">
-                                <span>${escapeHTML(arg.timeText || (arg.event.allDay ? "Journee" : ""))}</span>
-                                ${owner ? `<span>${escapeHTML(owner)}</span>` : ""}
-                            </div>
-                        </div>
-                    `,
+                    html: buildCalendarEventCard(arg),
                 };
             },
         });
