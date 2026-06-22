@@ -5169,6 +5169,234 @@ def create_cotation(client_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
+@app.route(
+    "/clients/<int:client_id>/cotations/<int:cotation_id>/edit",
+    methods=["GET", "POST"],
+    endpoint="edit_cotation",
+)
+@login_required
+def edit_cotation(client_id, cotation_id):
+
+    if not can_access_client(client_id):
+        abort(403)
+
+    conn = get_db()
+    user = session.get("user") or {}
+    back_hint = (request.values.get("back") or "client").strip().lower()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                crm_clients.*,
+                users.username AS commercial
+            FROM crm_clients
+            LEFT JOIN users ON users.id = crm_clients.owner_id
+            WHERE crm_clients.id = %s
+            """,
+            (client_id,),
+        )
+        client = cur.fetchone()
+
+    if not client:
+        flash("Client introuvable.", "danger")
+        return redirect(url_for("clients"))
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                cotations.*,
+                crm_clients.name AS client_name,
+                users.username AS commercial_name
+            FROM cotations
+            LEFT JOIN crm_clients ON crm_clients.id = cotations.client_id
+            LEFT JOIN users ON users.id = cotations.created_by
+            WHERE cotations.id = %s
+              AND cotations.client_id = %s
+            """,
+            (cotation_id, client_id),
+        )
+        cotation = cur.fetchone()
+
+    if not cotation:
+        flash("Demande de cotation introuvable.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    if request.method == "POST":
+        date_negociation = parse_date_safe((request.form.get("date_negociation") or "").strip())
+        heure_negociation = parse_time_safe((request.form.get("heure_negociation") or "").strip())
+        energie_type = (request.form.get("energie_type") or "").strip()
+        pdl_pce = (request.form.get("pdl_pce") or "").strip()
+        date_echeance = parse_date_safe((request.form.get("date_echeance") or "").strip())
+        fournisseur_actuel = (request.form.get("fournisseur_actuel") or "").strip()
+        entreprise_nom = (request.form.get("entreprise_nom") or "").strip()
+        siret = (request.form.get("siret") or "").strip()
+        adresse_facturation = (request.form.get("adresse_facturation") or "").strip()
+        adresse_consommation = (request.form.get("adresse_consommation") or "").strip()
+        signataire_nom = (request.form.get("signataire_nom") or "").strip()
+        signataire_tel = (request.form.get("signataire_tel") or "").strip()
+        signataire_email = (request.form.get("signataire_email") or "").strip()
+        commentaire = (request.form.get("commentaire") or "").strip()
+        status = (request.form.get("status") or "").strip().lower()
+
+        type_compteur = (request.form.get("type_compteur") or "").strip()
+        signataire_mobile = (request.form.get("signataire_mobile") or "").strip()
+        site_nom = (request.form.get("site_nom") or "").strip()
+        fonction_signataire = (request.form.get("fonction_signataire") or "").strip()
+        code_naf = (request.form.get("code_naf") or "").strip()
+        date_remise_offre = parse_date_safe((request.form.get("date_remise_offre") or "").strip())
+
+        elec_debut_fourniture = parse_date_safe((request.form.get("elec_debut_fourniture") or "").strip())
+        elec_fin_fourniture = parse_date_safe((request.form.get("elec_fin_fourniture") or "").strip())
+        elec_nb_mois = parse_int_safe((request.form.get("elec_nb_mois") or "").strip())
+        elec_segment = (request.form.get("elec_segment") or "").strip()
+        formule_acheminement = (request.form.get("formule_acheminement") or "").strip()
+        elec_car = (request.form.get("elec_car") or "").strip()
+        puissance_souscrite = (request.form.get("puissance_souscrite") or "").strip()
+        elec_fournisseur_actuel = (request.form.get("elec_fournisseur_actuel") or "").strip()
+
+        pointe = (request.form.get("pointe") or "").strip()
+        hph = (request.form.get("hph") or "").strip()
+        hch = (request.form.get("hch") or "").strip()
+        hpr = (request.form.get("hpr") or "").strip()
+        hce = (request.form.get("hce") or "").strip()
+
+        gaz_debut_fourniture = parse_date_safe((request.form.get("gaz_debut_fourniture") or "").strip())
+        gaz_fin_fourniture = parse_date_safe((request.form.get("gaz_fin_fourniture") or "").strip())
+        gaz_nb_mois = parse_int_safe((request.form.get("gaz_nb_mois") or "").strip())
+        pce = (request.form.get("pce") or "").strip()
+        gaz_segment = (request.form.get("gaz_segment") or "").strip()
+        profil = (request.form.get("profil") or "").strip()
+        gaz_car = (request.form.get("gaz_car") or "").strip()
+        gaz_fournisseur_actuel = (request.form.get("gaz_fournisseur_actuel") or "").strip()
+
+        valid_statuses = {"nouvelle", "en_cours", "envoyee", "acceptee", "refusee"}
+        if status not in valid_statuses:
+            status = (cotation.get("status") or "en_cours").strip().lower()
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE cotations
+                    SET
+                        date_negociation = %s,
+                        heure_negociation = %s,
+                        energie_type = %s,
+                        pdl_pce = %s,
+                        date_echeance = %s,
+                        fournisseur_actuel = %s,
+                        entreprise_nom = %s,
+                        siret = %s,
+                        adresse_facturation = %s,
+                        adresse_consommation = %s,
+                        signataire_nom = %s,
+                        signataire_tel = %s,
+                        signataire_email = %s,
+                        commentaire = %s,
+                        status = %s,
+                        type_compteur = %s,
+                        signataire_mobile = %s,
+                        site_nom = %s,
+                        fonction_signataire = %s,
+                        code_naf = %s,
+                        date_remise_offre = %s,
+                        elec_debut_fourniture = %s,
+                        elec_fin_fourniture = %s,
+                        elec_nb_mois = %s,
+                        elec_segment = %s,
+                        formule_acheminement = %s,
+                        elec_car = %s,
+                        puissance_souscrite = %s,
+                        elec_fournisseur_actuel = %s,
+                        pointe = %s,
+                        hph = %s,
+                        hch = %s,
+                        hpr = %s,
+                        hce = %s,
+                        gaz_debut_fourniture = %s,
+                        gaz_fin_fourniture = %s,
+                        gaz_nb_mois = %s,
+                        pce = %s,
+                        gaz_segment = %s,
+                        profil = %s,
+                        gaz_car = %s,
+                        gaz_fournisseur_actuel = %s,
+                        is_read = %s
+                    WHERE id = %s
+                      AND client_id = %s
+                    """,
+                    (
+                        date_negociation,
+                        heure_negociation,
+                        energie_type or None,
+                        pdl_pce or None,
+                        date_echeance,
+                        fournisseur_actuel or None,
+                        entreprise_nom or None,
+                        siret or None,
+                        adresse_facturation or None,
+                        adresse_consommation or None,
+                        signataire_nom or None,
+                        signataire_tel or None,
+                        signataire_email or None,
+                        commentaire or None,
+                        status,
+                        type_compteur or None,
+                        signataire_mobile or None,
+                        site_nom or None,
+                        fonction_signataire or None,
+                        code_naf or None,
+                        date_remise_offre,
+                        elec_debut_fourniture,
+                        elec_fin_fourniture,
+                        elec_nb_mois,
+                        elec_segment or None,
+                        formule_acheminement or None,
+                        elec_car or None,
+                        puissance_souscrite or None,
+                        elec_fournisseur_actuel or None,
+                        pointe or None,
+                        hph or None,
+                        hch or None,
+                        hpr or None,
+                        hce or None,
+                        gaz_debut_fourniture,
+                        gaz_fin_fourniture,
+                        gaz_nb_mois,
+                        pce or None,
+                        gaz_segment or None,
+                        profil or None,
+                        gaz_car or None,
+                        gaz_fournisseur_actuel or None,
+                        0 if user.get("role") != "admin" else (1 if cotation.get("is_read") else 0),
+                        cotation_id,
+                        client_id,
+                    ),
+                )
+
+            conn.commit()
+            flash("Demande de cotation mise a jour avec succes.", "success")
+
+            if back_hint == "admin" and user.get("role") == "admin":
+                return redirect(url_for("admin_cotation_detail", cotation_id=cotation_id))
+            return redirect(url_for("client_detail", client_id=client_id))
+
+        except Exception as e:
+            conn.rollback()
+            logger.exception("Erreur modification cotation : %r", e)
+            flash("Erreur lors de la mise a jour de la cotation.", "danger")
+
+    return render_template(
+        "cotation_edit.html",
+        client=row_to_obj(client),
+        cotation=row_to_obj(cotation),
+        current_user=user,
+        back_hint=back_hint,
+    )
+
+
 # =========================
 # DOCUMENT PREVIEW
 # =========================

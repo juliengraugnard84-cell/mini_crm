@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+{% block title %}Modifier la cotation{% endblock %}
+
+{% set energie = (cotation.energie_type or "")|lower %}
+{% set status = (cotation.status or "en_cours")|lower %}
+
+{% block content %}
+
+<section class="crm-page-hero crm-page-hero--compact">
+    <div>
+        <span class="crm-page-kicker">Edition cotation</span>
+        <h1>Modifier la demande #{{ cotation.id }}</h1>
+        <p>Retouche les informations client, les donnees energie et le calendrier de negociation depuis une fiche unique.</p>
+    </div>
+
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">{{ client.name }}</span>
+        <span class="crm-hero-pill">{{ current_user.username if current_user else "Utilisateur" }}</span>
+        <span class="crm-hero-pill">Statut : {{ cotation.status or "en_cours" }}</span>
+    </div>
+</section>
+
+<div class="crm-page-header-actions mb-4">
+    {% if back_hint == "admin" and current_user and current_user.role == "admin" %}
+        <a href="{{ url_for('admin_cotation_detail', cotation_id=cotation.id) }}" class="btn btn-secondary">Retour a la demande admin</a>
+    {% else %}
+        <a href="{{ url_for('client_detail', client_id=client.id) }}" class="btn btn-secondary">Retour au dossier client</a>
+    {% endif %}
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Modifier la demande de cotation</strong>
+    </div>
+    <div class="card-body">
+
+        <form method="post"
+              action="{{ url_for('edit_cotation', client_id=client.id, cotation_id=cotation.id) }}"
+              class="crm-cotation-form"
+              data-cotation-form>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="back" value="{{ back_hint }}">
+
+            <div class="crm-cotation-form-toolbar">
+                <div>
+                    <h5 class="crm-cotation-form-title">Demande pre-remplie</h5>
+                    <p class="crm-cotation-form-copy">
+                        Les valeurs actuelles sont chargees automatiquement. Tu peux corriger la fiche
+                        client, les informations de site et les donnees de consommation dans le meme ecran.
+                    </p>
+                </div>
+                <div class="crm-cotation-form-tip" data-energy-status>
+                    Bloc actif : {{ energie or "selectionnez une energie" }}
+                </div>
+            </div>
+
+            <div class="crm-cotation-energy-empty" data-energy-empty{% if energie %} hidden{% endif %}>
+                Choisissez un type d'energie pour afficher les blocs de consommation correspondants.
+            </div>
+
+            <div class="row crm-cotation-form-grid">
+
+                <div class="col-lg-6 mb-4 crm-cotation-panel-wrap">
+                    <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--client">
+                        <h5 class="mb-3">Donnees client</h5>
+
+                        <div class="mb-2">
+                            <label class="form-label">Type d'energie</label>
+                            <select name="energie_type" class="form-select" data-energy-select>
+                                <option value="">Selectionner</option>
+                                <option value="electricite" {% if energie == "electricite" %}selected{% endif %}>Electricite</option>
+                                <option value="gaz" {% if energie == "gaz" %}selected{% endif %}>Gaz</option>
+                                <option value="elec_gaz" {% if energie == "elec_gaz" %}selected{% endif %}>Electricite & gaz</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Statut</label>
+                            <select name="status" class="form-select">
+                                <option value="nouvelle" {% if status == "nouvelle" %}selected{% endif %}>Nouvelle</option>
+                                <option value="en_cours" {% if status == "en_cours" %}selected{% endif %}>En cours</option>
+                                <option value="envoyee" {% if status == "envoyee" %}selected{% endif %}>Envoyee</option>
+                                <option value="acceptee" {% if status == "acceptee" %}selected{% endif %}>Acceptee</option>
+                                <option value="refusee" {% if status == "refusee" %}selected{% endif %}>Refusee</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Raison sociale</label>
+                            <input class="form-control" name="entreprise_nom" value="{{ cotation.entreprise_nom or client.name or '' }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Nom commercial du site</label>
+                            <input class="form-control" name="site_nom" value="{{ cotation.site_nom or '' }}" placeholder="Nom commercial du site">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">SIRET</label>
+                            <input class="form-control" name="siret" value="{{ cotation.siret or client.siret or '' }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Nom du signataire</label>
+                            <input class="form-control" name="signataire_nom" value="{{ cotation.signataire_nom or client.gerant_nom or '' }}" placeholder="Nom du signataire">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Fonction du signataire</label>
+                            <input class="form-control" name="fonction_signataire" value="{{ cotation.fonction_signataire or '' }}" placeholder="Fonction du signataire">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Telephone</label>
+                            <input class="form-control" name="signataire_tel" value="{{ cotation.signataire_tel or client.phone or '' }}" placeholder="Telephone">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Portable</label>
+                            <input class="form-control" name="signataire_mobile" value="{{ cotation.signataire_mobile or '' }}" placeholder="Numero de portable">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="signataire_email" value="{{ cotation.signataire_email or client.email or '' }}" placeholder="Email">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Code NAF</label>
+                            <input class="form-control" name="code_naf" value="{{ cotation.code_naf or '' }}" placeholder="Code NAF">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Adresse du compteur</label>
+                            <input class="form-control" name="adresse_consommation" value="{{ cotation.adresse_consommation or client.address or '' }}" placeholder="Adresse du compteur">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Adresse facturation</label>
+                            <input class="form-control" name="adresse_facturation" value="{{ cotation.adresse_facturation or client.address or '' }}" placeholder="Adresse facturation">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Date de remise de l'offre</label>
+                            <input type="date" class="form-control" name="date_remise_offre" value="{{ cotation.date_remise_offre if cotation.date_remise_offre else '' }}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-4 crm-cotation-panel-wrap" data-energy-section="electricite">
+                    <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--energy">
+                        <h5 class="mb-3">Donnees consommation electricite</h5>
+
+                        <div class="mb-2">
+                            <label class="form-label">Debut de fourniture souhaitee</label>
+                            <input type="date" class="form-control" name="elec_debut_fourniture" value="{{ cotation.elec_debut_fourniture if cotation.elec_debut_fourniture else '' }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Fin de fourniture souhaitee</label>
+                            <input type="date" class="form-control" name="elec_fin_fourniture" value="{{ cotation.elec_fin_fourniture if cotation.elec_fin_fourniture else '' }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Nombre de mois a fournir</label>
+                            <input class="form-control" name="elec_nb_mois" value="{{ cotation.elec_nb_mois or '' }}" placeholder="Nombre de mois de fourniture">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">PDL</label>
+                            <input class="form-control" name="pdl_pce" value="{{ cotation.pdl_pce or '' }}" placeholder="PDL">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Segment</label>
+                            <input class="form-control" name="elec_segment" value="{{ cotation.elec_segment or '' }}" placeholder="Segment">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Formule d'acheminement</label>
+                            <input class="form-control" name="formule_acheminement" value="{{ cotation.formule_acheminement or '' }}" placeholder="Formule d'acheminement">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">CAR</label>
+                            <input class="form-control" name="elec_car" value="{{ cotation.elec_car or '' }}" placeholder="CAR">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Puissance souscrite</label>
+                            <input class="form-control" name="puissance_souscrite" value="{{ cotation.puissance_souscrite or '' }}" placeholder="Puissance souscrite">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Fournisseur actuel</label>
+                            <input class="form-control" name="elec_fournisseur_actuel" value="{{ cotation.elec_fournisseur_actuel or cotation.fournisseur_actuel or '' }}" placeholder="Fournisseur actuel electricite">
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3">Puissance par poste</h6>
+
+                        <div class="mb-2">
+                            <label class="form-label">Pointe</label>
+                            <input class="form-control" name="pointe" value="{{ cotation.pointe or '' }}" placeholder="Pointe">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">HPH</label>
+                            <input class="form-control" name="hph" value="{{ cotation.hph or '' }}" placeholder="HPH">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">HCH</label>
+                            <input class="form-control" name="hch" value="{{ cotation.hch or '' }}" placeholder="HCH">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">HPR</label>
+                            <input class="form-control" name="hpr" value="{{ cotation.hpr or '' }}" placeholder="HPR">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">HCE</label>
+                            <input class="form-control" name="hce" value="{{ cotation.hce or '' }}" placeholder="HCE">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-4 crm-cotation-panel-wrap" data-energy-section="gaz">
+                    <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--energy">
+                        <h5 class="mb-3">Donnees consommation gaz</h5>
+
+                        <div class="mb-2">
+                            <label class="form-label">Debut de fourniture souhaitee</label>
+                            <input type="date" class="form-control" name="gaz_debut_fourniture" value="{{ cotation.gaz_debut_fourniture if cotation.gaz_debut_fourniture else '' }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Fin de fourniture souhaitee</label>
+                            <input type="date" class="form-control" name="gaz_fin_fourniture" value="{{ cotation.gaz_fin_fourniture if cotation.gaz_fin_fourniture else '' }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Nombre de mois a fournir</label>
+                            <input class="form-control" name="gaz_nb_mois" value="{{ cotation.gaz_nb_mois or '' }}" placeholder="Nombre de mois de fourniture">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">PCE</label>
+                            <input class="form-control" name="pce" value="{{ cotation.pce or '' }}" placeholder="PCE">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Segment</label>
+                            <input class="form-control" name="gaz_segment" value="{{ cotation.gaz_segment or '' }}" placeholder="Segment">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Profil</label>
+                            <input class="form-control" name="profil" value="{{ cotation.profil or '' }}" placeholder="Profil">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">CAR</label>
+                            <input class="form-control" name="gaz_car" value="{{ cotation.gaz_car or '' }}" placeholder="CAR">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Fournisseur actuel</label>
+                            <input class="form-control" name="gaz_fournisseur_actuel" value="{{ cotation.gaz_fournisseur_actuel or '' }}" placeholder="Fournisseur actuel gaz">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-4 crm-cotation-panel-wrap">
+                    <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--meta">
+                        <h5 class="mb-3">Informations complementaires</h5>
+
+                        <div class="mb-2">
+                            <label class="form-label">Date de negociation</label>
+                            <input type="date" class="form-control" name="date_negociation" value="{{ cotation.date_negociation if cotation.date_negociation else '' }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Heure de negociation</label>
+                            <input type="time" class="form-control" name="heure_negociation" value="{{ (cotation.heure_negociation|string)[:5] if cotation.heure_negociation else '' }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Type de compteur</label>
+                            <input class="form-control" name="type_compteur" value="{{ cotation.type_compteur or '' }}" placeholder="Type de compteur">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Date d'echeance</label>
+                            <input type="date" class="form-control" name="date_echeance" value="{{ cotation.date_echeance if cotation.date_echeance else '' }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Fournisseur actuel principal</label>
+                            <input class="form-control" name="fournisseur_actuel" value="{{ cotation.fournisseur_actuel or '' }}" placeholder="Fournisseur principal">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Commentaire</label>
+                            <textarea class="form-control" name="commentaire" rows="6" placeholder="Commentaire">{{ cotation.commentaire or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="crm-cotation-form-actions">
+                <div class="crm-cotation-form-actions-copy">
+                    <strong>Modifications pretes a etre enregistrees</strong>
+                    <span>Enregistrez pour mettre a jour la demande de cotation et conserver l'historique du dossier.</span>
+                </div>
+                <button class="btn btn-primary" type="submit">Enregistrer les modifications</button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.querySelector("[data-cotation-form]");
+    if (!form) {
+        return;
+    }
+
+    const energySelect = form.querySelector("[data-energy-select]");
+    const energySections = form.querySelectorAll("[data-energy-section]");
+    const emptyState = form.querySelector("[data-energy-empty]");
+    const status = form.querySelector("[data-energy-status]");
+
+    if (!energySelect || !energySections.length) {
+        return;
+    }
+
+    const energyLabels = {
+        electricite: "Electricite",
+        gaz: "Gaz",
+        elec_gaz: "Electricite & gaz",
+    };
+
+    const activeGroups = (value) => {
+        if (value === "electricite") {
+            return ["electricite"];
+        }
+        if (value === "gaz") {
+            return ["gaz"];
+        }
+        if (value === "elec_gaz") {
+            return ["electricite", "gaz"];
+        }
+        return [];
+    };
+
+    const syncEnergySections = () => {
+        const value = energySelect.value;
+        const groups = activeGroups(value);
+
+        energySections.forEach((section) => {
+            const shouldShow = groups.includes(section.dataset.energySection);
+            section.hidden = !shouldShow;
+            section.classList.toggle("is-hidden", !shouldShow);
+
+            section.querySelectorAll("input, select, textarea").forEach((field) => {
+                field.disabled = !shouldShow;
+            });
+        });
+
+        if (emptyState) {
+            emptyState.hidden = groups.length > 0;
+        }
+
+        if (status) {
+            status.textContent = value
+                ? `Bloc actif : ${energyLabels[value] || "Demande"}`
+                : "Selectionnez une energie pour filtrer automatiquement les blocs de consommation.";
+        }
+    };
+
+    energySelect.addEventListener("change", syncEnergySections);
+    syncEnergySections();
+});
+</script>
+{% endblock %}

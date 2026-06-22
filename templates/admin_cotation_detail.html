@@ -92,6 +92,11 @@
 
     <div class="crm-page-header-actions">
         {% if cotation.client_id %}
+            <a href="{{ url_for('edit_cotation', client_id=cotation.client_id, cotation_id=cotation.id, back='admin') }}" class="btn btn-warning" style="{{ square_button_style }}">
+                Modifier la demande
+            </a>
+        {% endif %}
+        {% if cotation.client_id %}
             <a href="{{ url_for('client_detail', client_id=cotation.client_id) }}" class="btn btn-primary" style="{{ square_button_style }}">
                 Ouvrir le dossier
             </a>
