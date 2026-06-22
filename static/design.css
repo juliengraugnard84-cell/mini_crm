@@ -4196,6 +4196,19 @@ textarea.form-control {
     color: #ffffff;
 }
 
+.chat-toggle {
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+}
+
+.chat-toggle.is-dragging {
+    cursor: grabbing;
+    transform: none !important;
+    transition: none;
+    box-shadow: 0 32px 60px rgba(8, 19, 63, 0.3);
+}
+
 .chat-toggle.has-unread {
     --chat-toggle-bg:
         radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 34%),

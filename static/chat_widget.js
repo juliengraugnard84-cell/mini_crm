@@ -30,6 +30,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const receiveAudio = document.getElementById("chat-sound-receive");
     const sendAudio = document.getElementById("chat-sound-send");
     const RECIPIENT_STORAGE_KEY = "mini_crm_chat_recipient";
+    const CHAT_POSITION_STORAGE_KEY = "mini_crm_chat_toggle_position";
+    const CHAT_EDGE_MARGIN = 16;
+    const CHAT_WIDGET_GAP = 14;
 
     if (!toggleBtn || !form || !input || !messagesBox || !recipientSelect) {
         return;
@@ -48,6 +51,16 @@ document.addEventListener("DOMContentLoaded", () => {
         lastMessageId: null,
         lastRenderedSignature: "",
         pollTimer: null,
+        drag: {
+            active: false,
+            moved: false,
+            pointerId: null,
+            startPointerX: 0,
+            startPointerY: 0,
+            startLeft: 0,
+            startTop: 0,
+            suppressClick: false,
+        },
     };
 
     function normalizeId(value) {
@@ -63,6 +76,186 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function isOpen() {
         return widget.classList.contains("open");
+    }
+
+    function getViewportBounds() {
+        return {
+            width: window.innerWidth,
+            height: window.innerHeight,
+        };
+    }
+
+    function clampTogglePosition(left, top) {
+        const bounds = getViewportBounds();
+        const maxLeft = Math.max(CHAT_EDGE_MARGIN, bounds.width - toggleBtn.offsetWidth - CHAT_EDGE_MARGIN);
+        const maxTop = Math.max(CHAT_EDGE_MARGIN, bounds.height - toggleBtn.offsetHeight - CHAT_EDGE_MARGIN);
+
+        return {
+            left: Math.min(Math.max(CHAT_EDGE_MARGIN, left), maxLeft),
+            top: Math.min(Math.max(CHAT_EDGE_MARGIN, top), maxTop),
+        };
+    }
+
+    function saveTogglePosition(left, top) {
+        try {
+            window.localStorage.setItem(
+                CHAT_POSITION_STORAGE_KEY,
+                JSON.stringify({ left, top })
+            );
+        } catch (_error) {
+            // ignore
+        }
+    }
+
+    function loadStoredTogglePosition() {
+        try {
+            const raw = window.localStorage.getItem(CHAT_POSITION_STORAGE_KEY);
+            if (!raw) {
+                return null;
+            }
+
+            const parsed = JSON.parse(raw);
+            if (!Number.isFinite(parsed?.left) || !Number.isFinite(parsed?.top)) {
+                return null;
+            }
+
+            return parsed;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function setTogglePosition(left, top, persist = true) {
+        const clamped = clampTogglePosition(left, top);
+
+        toggleBtn.style.left = `${clamped.left}px`;
+        toggleBtn.style.top = `${clamped.top}px`;
+        toggleBtn.style.right = "auto";
+        toggleBtn.style.bottom = "auto";
+
+        if (persist) {
+            saveTogglePosition(clamped.left, clamped.top);
+        }
+
+        positionWidget();
+    }
+
+    function positionWidget() {
+        const toggleRect = toggleBtn.getBoundingClientRect();
+        const widgetWidth = widget.offsetWidth || 380;
+        const widgetHeight = widget.offsetHeight || 520;
+        const bounds = getViewportBounds();
+
+        let left = toggleRect.right - widgetWidth;
+        left = Math.min(
+            Math.max(CHAT_EDGE_MARGIN, left),
+            Math.max(CHAT_EDGE_MARGIN, bounds.width - widgetWidth - CHAT_EDGE_MARGIN)
+        );
+
+        let top = toggleRect.top - widgetHeight - CHAT_WIDGET_GAP;
+
+        if (top < CHAT_EDGE_MARGIN) {
+            top = toggleRect.bottom + CHAT_WIDGET_GAP;
+        }
+
+        top = Math.min(
+            Math.max(CHAT_EDGE_MARGIN, top),
+            Math.max(CHAT_EDGE_MARGIN, bounds.height - widgetHeight - CHAT_EDGE_MARGIN)
+        );
+
+        widget.style.left = `${left}px`;
+        widget.style.top = `${top}px`;
+        widget.style.right = "auto";
+        widget.style.bottom = "auto";
+    }
+
+    function initializeTogglePosition() {
+        const stored = loadStoredTogglePosition();
+
+        if (stored) {
+            setTogglePosition(stored.left, stored.top, false);
+            return;
+        }
+
+        const rect = toggleBtn.getBoundingClientRect();
+        setTogglePosition(rect.left, rect.top, false);
+    }
+
+    function endToggleDrag() {
+        if (!state.drag.active) {
+            return;
+        }
+
+        state.drag.active = false;
+        toggleBtn.classList.remove("is-dragging");
+
+        if (state.drag.pointerId !== null) {
+            try {
+                toggleBtn.releasePointerCapture(state.drag.pointerId);
+            } catch (_error) {
+                // ignore
+            }
+        }
+
+        state.drag.pointerId = null;
+    }
+
+    function handleTogglePointerDown(event) {
+        if (event.button !== undefined && event.button !== 0) {
+            return;
+        }
+
+        const rect = toggleBtn.getBoundingClientRect();
+        state.drag.active = true;
+        state.drag.moved = false;
+        state.drag.pointerId = event.pointerId ?? null;
+        state.drag.startPointerX = event.clientX;
+        state.drag.startPointerY = event.clientY;
+        state.drag.startLeft = rect.left;
+        state.drag.startTop = rect.top;
+        toggleBtn.classList.add("is-dragging");
+
+        if (state.drag.pointerId !== null) {
+            try {
+                toggleBtn.setPointerCapture(state.drag.pointerId);
+            } catch (_error) {
+                // ignore
+            }
+        }
+    }
+
+    function handleTogglePointerMove(event) {
+        if (!state.drag.active) {
+            return;
+        }
+
+        const deltaX = event.clientX - state.drag.startPointerX;
+        const deltaY = event.clientY - state.drag.startPointerY;
+
+        if (!state.drag.moved && (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4)) {
+            state.drag.moved = true;
+            state.drag.suppressClick = true;
+        }
+
+        if (!state.drag.moved) {
+            return;
+        }
+
+        event.preventDefault();
+        setTogglePosition(
+            state.drag.startLeft + deltaX,
+            state.drag.startTop + deltaY
+        );
+    }
+
+    function handleTogglePointerUp() {
+        endToggleDrag();
+
+        if (state.drag.suppressClick) {
+            window.setTimeout(() => {
+                state.drag.suppressClick = false;
+            }, 0);
+        }
     }
 
     async function parseJSONResponse(response, fallbackMessage) {
@@ -904,6 +1097,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function openChat() {
+        positionWidget();
         widget.classList.add("open");
         widget.setAttribute("aria-hidden", "false");
         toggleBtn.setAttribute("aria-expanded", "true");
@@ -926,6 +1120,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     toggleBtn.addEventListener("click", () => {
+        if (state.drag.suppressClick) {
+            return;
+        }
+
         unlockAudio();
 
         if (isOpen()) {
@@ -934,6 +1132,11 @@ document.addEventListener("DOMContentLoaded", () => {
             openChat();
         }
     });
+
+    toggleBtn.addEventListener("pointerdown", handleTogglePointerDown);
+    toggleBtn.addEventListener("pointermove", handleTogglePointerMove);
+    toggleBtn.addEventListener("pointerup", handleTogglePointerUp);
+    toggleBtn.addEventListener("pointercancel", handleTogglePointerUp);
 
     if (closeBtn) {
         closeBtn.addEventListener("click", closeChat);
@@ -978,11 +1181,16 @@ document.addEventListener("DOMContentLoaded", () => {
         unlockAudio();
         loadMessages(false);
     });
+    window.addEventListener("resize", () => {
+        const rect = toggleBtn.getBoundingClientRect();
+        setTogglePosition(rect.left, rect.top, false);
+    });
 
     document.addEventListener("visibilitychange", () => {
         schedulePoll();
     });
 
+    initializeTogglePosition();
     autoResizeInput();
     updateContextBanner();
     updateFilePreview();

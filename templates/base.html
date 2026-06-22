@@ -7,7 +7,7 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='design.css') }}?v=9">
+    <link rel="stylesheet" href="{{ url_for('static', filename='design.css') }}?v=10">
 </head>
 
 <body class="crm-body role-{{ current_user.role if current_user and current_user.role else 'guest' }}{% if request.path.startswith('/admin/planning') or request.path.startswith('/planning') %} planning-page{% endif %}">
@@ -311,7 +311,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 {% if current_user and current_user.role in ["admin", "commercial"] %}
-<script src="{{ url_for('static', filename='chat_widget.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='chat_widget.js') }}?v=6"></script>
 {% endif %}
 <script src="{{ url_for('static', filename='file_dropzone.js') }}?v=3"></script>
 
