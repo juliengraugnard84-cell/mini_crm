@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <span class="hero-kicker">Application separee du CRM</span>
+        <h3>Un poste d'appel simple pour travailler avec tes propres fichiers</h3>
+        <p>
+            Tu peux deja enregistrer des contacts, lancer des appels, garder un historique,
+            stocker des documents et preparer les postes telephoniques de toute l'equipe.
+        </p>
+    </div>
+    <div class="hero-card">
+        <strong>{% if freepbx.enabled %}FreePBX pret{% else %}Telephonie a finaliser{% endif %}</strong>
+        <p>
+            {% if freepbx.enabled %}
+                Le composeur peut se connecter a ton serveur FreePBX pour de vrais appels navigateur.
+            {% else %}
+                Renseigne FreePBX dans l'onglet dedie, puis charge l'extension de chaque agent dans son navigateur.
+            {% endif %}
+        </p>
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Agents actifs</span>
+        <strong>{{ stats.agents }}</strong>
+    </article>
+    <article class="stat-card">
+        <span>Contacts</span>
+        <strong>{{ stats.contacts }}</strong>
+    </article>
+    <article class="stat-card">
+        <span>Appels</span>
+        <strong>{{ stats.calls }}</strong>
+    </article>
+    <article class="stat-card">
+        <span>Appels en cours</span>
+        <strong>{{ stats.active_calls }}</strong>
+    </article>
+    <article class="stat-card">
+        <span>Fichiers</span>
+        <strong>{{ stats.documents }}</strong>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Appels recents</h3>
+            <a class="text-link" href="{{ url_for('calls') }}">Voir tout</a>
+        </div>
+        {% if recent_calls %}
+            <div class="list-stack">
+                {% for call in recent_calls %}
+                    <div class="list-card">
+                        <div>
+                            <strong>{{ call.contact_name or call.dialed_number }}</strong>
+                            <p>{{ call_directions[call.direction] }} - {{ call_statuses[call.status] }}</p>
+                            {% if call.agent_name %}
+                                <small>Agent : {{ call.agent_name }}{% if call.agent_extension %} - Ext {{ call.agent_extension }}{% endif %}</small>
+                            {% endif %}
+                        </div>
+                        <div class="list-meta">
+                            <span>{{ format_dt(call.started_at) }}</span>
+                            <span>{{ format_duration(call.duration_seconds) }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty">Aucun appel pour le moment.</p>
+        {% endif %}
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Equipe</h3>
+            <a class="text-link" href="{{ url_for('agents') }}">Gerer</a>
+        </div>
+        {% if team_agents %}
+            <div class="list-stack">
+                {% for agent in team_agents %}
+                    <div class="list-card">
+                        <div>
+                            <strong>{{ agent.name }}</strong>
+                            <p>{{ agent.role or "Agent d'appel" }}</p>
+                            <small>
+                                {% if agent.extension %}Ext {{ agent.extension }}{% else %}Extension a renseigner{% endif %}
+                                - {{ agent.total_calls }} appel{% if agent.total_calls != 1 %}s{% endif %}
+                            </small>
+                        </div>
+                        <div class="list-meta">
+                            <span>{% if agent.active_calls %}{{ agent.active_calls }} en cours{% else %}Libre{% endif %}</span>
+                            <span>{% if agent.last_call_at %}{{ format_dt(agent.last_call_at) }}{% else %}Pas encore d'appel{% endif %}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty">Ajoute un premier agent pour passer en mode equipe.</p>
+        {% endif %}
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h3>Derniers fichiers</h3>
+        <a class="text-link" href="{{ url_for('documents') }}">Bibliotheque</a>
+    </div>
+    {% if recent_documents %}
+        <div class="list-stack">
+            {% for document in recent_documents %}
+                <div class="list-card">
+                    <div>
+                        <strong>{{ document.title }}</strong>
+                        <p>{{ document.contact_name or "Sans contact" }}</p>
+                    </div>
+                    <div class="list-meta">
+                        <span>{{ format_dt(document.created_at) }}</span>
+                        <a class="text-link" href="{{ url_for('download_document', document_id=document.id) }}">Telecharger</a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="empty">Aucun fichier ajoute.</p>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h3>Contacts rapides</h3>
+        <a class="text-link" href="{{ url_for('contacts') }}">Ouvrir les contacts</a>
+    </div>
+    {% if contacts %}
+        <div class="contact-grid">
+            {% for contact in contacts %}
+                <a class="contact-tile" href="{{ url_for('contact_detail', contact_id=contact.id) }}">
+                    <strong>{{ contact.name }}</strong>
+                    <span>{{ contact.company or "Entreprise libre" }}</span>
+                    <small>{{ contact.phone }}</small>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="empty">Ajoute un premier contact pour commencer.</p>
+    {% endif %}
+</section>
+{% endblock %}

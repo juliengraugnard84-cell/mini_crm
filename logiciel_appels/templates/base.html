@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title or "Logiciel d'appels" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-kicker">Standalone</span>
+                <h1>CallFlow</h1>
+                <p>Contacts, appels et fichiers, separes du CRM.</p>
+            </div>
+
+            <nav class="nav">
+                <a href="{{ url_for('dashboard') }}" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a>
+                <a href="{{ url_for('agents') }}" class="{% if request.path.startswith('/agents') %}active{% endif %}">Equipe</a>
+                <a href="{{ url_for('contacts') }}" class="{% if request.path.startswith('/contacts') %}active{% endif %}">Contacts</a>
+                <a href="{{ url_for('calls') }}" class="{% if request.path.startswith('/calls') %}active{% endif %}">Appels</a>
+                <a href="{{ url_for('documents') }}" class="{% if request.path.startswith('/documents') %}active{% endif %}">Fichiers</a>
+                <a href="{{ url_for('dialer') }}" class="{% if request.path.startswith('/dialer') %}active{% endif %}">Composeur</a>
+                <a href="{{ url_for('freepbx_setup') }}" class="{% if request.path.startswith('/freepbx') %}active{% endif %}">FreePBX</a>
+                <a href="{{ url_for('readiness') }}" class="{% if request.path.startswith('/readiness') %}active{% endif %}">Tests</a>
+            </nav>
+
+            <div class="sidebar-note">
+                <strong>Mode actuel</strong>
+                <span>
+                    {% if microsip_ready %}
+                        MicroSIP detecte pour les appels depuis ce PC.
+                    {% elif freepbx_ready %}
+                        FreePBX pret pour les appels reels.
+                    {% else %}
+                        Base autonome prete pour MicroSIP ou FreePBX.
+                    {% endif %}
+                </span>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="topbar">
+                <div>
+                    <span class="eyebrow">Logiciel d'appel</span>
+                    <h2>{{ page_title or "Dashboard" }}</h2>
+                </div>
+                <div class="topbar-badge">Stockage local independant</div>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-stack">
+                        {% for category, message in messages %}
+                            <div class="flash flash-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

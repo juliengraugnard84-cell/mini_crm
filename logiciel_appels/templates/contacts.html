@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="layout-two">
+    <article class="panel sticky-panel">
+        <div class="panel-head">
+            <h3>Nouveau contact</h3>
+        </div>
+        <form method="post" class="form-stack">
+            <label>
+                <span>Nom</span>
+                <input type="text" name="name" required>
+            </label>
+            <label>
+                <span>Entreprise</span>
+                <input type="text" name="company">
+            </label>
+            <label>
+                <span>Telephone</span>
+                <input type="text" name="phone" required>
+            </label>
+            <label>
+                <span>Email</span>
+                <input type="email" name="email">
+            </label>
+            <label>
+                <span>Notes</span>
+                <textarea name="notes" rows="5"></textarea>
+            </label>
+            <button class="btn-primary" type="submit">Ajouter le contact</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head panel-head-wrap">
+            <div>
+                <h3>Base de contacts</h3>
+                <p class="panel-copy">Recherche, suivi et acces direct au composeur.</p>
+            </div>
+            <form method="get" class="search-inline">
+                <input type="text" name="q" value="{{ query }}" placeholder="Rechercher un nom, numero, email...">
+                <button class="btn-secondary" type="submit">Chercher</button>
+            </form>
+        </div>
+
+        <div id="microsip-status-card" class="integration-status-card" data-tone="{% if microsip.enabled %}success{% else %}warning{% endif %}">
+            <strong id="microsip-status-title">{% if microsip.enabled %}MicroSIP detecte sur ce PC{% else %}MicroSIP non detecte{% endif %}</strong>
+            <p id="microsip-status-copy">
+                {% if microsip.enabled %}
+                    Un clic sur "Appeler MicroSIP" lancera le numero dans le softphone installe localement.
+                {% else %}
+                    Installe MicroSIP ou renseigne son chemin dans le fichier .env pour appeler en un clic.
+                {% endif %}
+            </p>
+        </div>
+
+        {% if contacts %}
+            <div class="list-stack">
+                {% for contact in contacts %}
+                    <div class="contact-row">
+                        <div>
+                            <strong>{{ contact.name }}</strong>
+                            <p>{{ contact.company or "Sans entreprise" }}</p>
+                            <small>{{ contact.phone }}{% if contact.email %} - {{ contact.email }}{% endif %}</small>
+                        </div>
+                        <div class="row-actions">
+                            <a class="btn-secondary" href="{{ url_for('contact_detail', contact_id=contact.id) }}">Fiche</a>
+                            <button
+                                class="btn-primary"
+                                type="button"
+                                data-microsip-dial
+                                data-contact-id="{{ contact.id }}"
+                                data-number="{{ contact.phone }}"
+                                data-label="{{ contact.name }}"
+                            >
+                                Appeler MicroSIP
+                            </button>
+                            <form method="post" action="{{ url_for('calls') }}">
+                                <input type="hidden" name="contact_id" value="{{ contact.id }}">
+                                <input type="hidden" name="dialed_number" value="{{ contact.phone }}">
+                                <button class="btn-secondary" type="submit">Journal manuel</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty">Aucun contact trouve.</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.CALLFLOW_MICROSIP = {
+    enabled: {{ microsip.enabled | tojson }},
+    displayPath: {{ (microsip.executable_path or microsip.display_path) | tojson }},
+    dialUrl: {{ url_for('api_microsip_dial') | tojson }},
+    hangupUrl: {{ url_for('api_microsip_hangup') | tojson }},
+    directoryUrl: {{ url_for('api_microsip_directory', _external=True) | tojson }},
+};
+</script>
+<script type="module" src="{{ url_for('static', filename='microsip_bridge.js') }}"></script>
+{% endblock %}

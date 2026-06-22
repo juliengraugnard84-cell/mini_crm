@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="layout-two dialer-layout">
+    <article class="panel">
+        <div class="panel-head-wrap">
+            <div>
+                <h3>Composeur</h3>
+                <p class="panel-copy">Le mot de passe SIP reste stocke localement dans ce navigateur.</p>
+            </div>
+            <div class="row-actions">
+                <a class="btn-secondary" href="{{ url_for('freepbx_setup') }}">Configurer FreePBX</a>
+                <a class="btn-secondary" href="{{ url_for('readiness') }}">Tester le poste</a>
+            </div>
+        </div>
+
+        <div class="integration-live-card">
+            <div>
+                <strong>Appels reels via FreePBX</strong>
+                <p>
+                    {% if freepbx.enabled %}
+                        Les valeurs serveur par defaut sont pretes. Charge ensuite l'extension de l'agent.
+                    {% else %}
+                        Tu peux renseigner le profil manuellement, ou definir les valeurs par defaut dans le fichier .env.
+                    {% endif %}
+                </p>
+            </div>
+            <div class="profile-summary compact-summary">
+                <span>Serveur</span>
+                <strong>{{ freepbx.sip_domain or "A definir" }}</strong>
+                <small>{{ freepbx.masked_wss_url }}</small>
+            </div>
+        </div>
+
+        <div id="microsip-status-card" class="integration-status-card" data-tone="{% if microsip.enabled %}success{% else %}warning{% endif %}">
+            <strong id="microsip-status-title">{% if microsip.enabled %}MicroSIP detecte sur ce PC{% else %}MicroSIP non detecte{% endif %}</strong>
+            <p id="microsip-status-copy">
+                {% if microsip.enabled %}
+                    Tu peux deja appeler depuis ce poste avec le softphone local, sans passer par le navigateur.
+                {% else %}
+                    Installe MicroSIP ou renseigne son chemin dans le fichier .env pour l'utiliser depuis CallFlow.
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="profile-summary">
+            <span>MicroSIP local</span>
+            <strong>{{ microsip.executable_path or "Chemin a detecter" }}</strong>
+            <small>Annuaire MicroSIP : {{ url_for('api_microsip_directory', _external=True) }}</small>
+        </div>
+
+        <div id="freepbx-status-card" class="integration-status-card" data-tone="{% if freepbx.enabled %}info{% else %}warning{% endif %}">
+            <strong id="freepbx-status-title">{% if freepbx.enabled %}FreePBX pret a connecter{% else %}Profil FreePBX a renseigner{% endif %}</strong>
+            <p id="freepbx-status-copy">
+                {% if freepbx.enabled %}
+                    Chargement du profil agent local...
+                {% else %}
+                    Ajoute au minimum l'URL WSS, le domaine SIP, l'extension et le mot de passe agent.
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="profile-summary" id="freepbx-profile-summary">
+            <span>Profil agent</span>
+            <strong>Aucun profil charge</strong>
+            <small>Configure ton extension FreePBX dans l'onglet dedie.</small>
+        </div>
+
+        {% if agents %}
+            <div class="subpanel">
+                <h4>Equipe disponible sur ce serveur</h4>
+                <div class="mini-team-list">
+                    {% for agent in agents %}
+                        <div class="mini-team-item">
+                            <strong>{{ agent.name }}</strong>
+                            <small>{{ agent.role or "Agent d'appel" }}{% if agent.extension %} - Ext {{ agent.extension }}{% endif %}</small>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="incoming-call-card" id="incoming-call-card" hidden>
+            <strong>Appel entrant</strong>
+            <p id="incoming-call-copy">Une communication attend ta reponse.</p>
+            <div class="row-actions">
+                <button class="btn-primary" type="button" id="answer-call-button">Repondre</button>
+                <button class="btn-secondary" type="button" id="reject-call-button">Refuser</button>
+            </div>
+        </div>
+
+        <form method="post" action="{{ url_for('calls') }}" id="dialer-form" class="form-stack" data-freepbx-dialer>
+            <label>
+                <span>Contact rapide</span>
+                <select id="dialer-contact" name="contact_id">
+                    <option value="">Choisir un contact</option>
+                    {% for contact in contacts %}
+                        <option value="{{ contact.id }}" data-phone="{{ contact.phone }}">{{ contact.name }} - {{ contact.phone }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Destination</span>
+                <input type="text" id="dialed_number" name="dialed_number" placeholder="100, 0033123456789 ou sip:commercial@pbx.local" required>
+            </label>
+            <p class="form-hint">Tu peux appeler une extension interne, un numero externe ou une adresse SIP.</p>
+            <input type="hidden" name="direction" value="outgoing">
+
+            <div class="dialer-grid">
+                {% for key in ["1","2","3","4","5","6","7","8","9","*","0","#"] %}
+                    <button type="button" class="dial-key" data-key="{{ key }}">{{ key }}</button>
+                {% endfor %}
+            </div>
+
+            <div class="row-actions dialer-actions">
+                <button class="btn-primary" type="button" id="microsip-call-button">Appeler avec MicroSIP</button>
+                <button class="btn-secondary" type="button" id="microsip-hangup-button">Raccrocher MicroSIP</button>
+                <button class="btn-secondary" type="button" id="freepbx-connect-button">Connecter FreePBX</button>
+                <button class="btn-primary" type="button" id="freepbx-call-button">Appeler avec FreePBX</button>
+                <button class="btn-secondary" type="button" id="freepbx-hangup-button" disabled>Raccrocher</button>
+                <button class="btn-secondary" type="submit">Journal manuel</button>
+                <button class="btn-secondary" type="button" id="clear-number">Effacer</button>
+                <a class="btn-secondary" id="tel-link" href="#">tel:</a>
+            </div>
+        </form>
+
+        <audio id="remote-audio" autoplay></audio>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Checklist FreePBX WebRTC</h3>
+        </div>
+        <div class="checklist">
+            <div class="check-item">
+                <strong>1. HTTPS et WebSocket securise</strong>
+                <p>Le PBX doit exposer une URL <code>wss://.../ws</code> accessible par le navigateur.</p>
+            </div>
+            <div class="check-item">
+                <strong>2. Transport PJSIP WSS</strong>
+                <p>Active le transport WebSocket securise et verifie que l'extension peut s'y enregistrer.</p>
+            </div>
+            <div class="check-item">
+                <strong>3. Endpoint, AOR et auth</strong>
+                <p>Chaque agent doit avoir une extension FreePBX avec identifiants SIP valides.</p>
+            </div>
+            <div class="check-item">
+                <strong>4. Certificat fiable</strong>
+                <p>Un certificat TLS reconnu evite les blocages micro et WebRTC dans le navigateur.</p>
+            </div>
+            <div class="check-item">
+                <strong>5. Reglage poste agent</strong>
+                <p>Le prefixe de sortie reste optionnel si ton plan de numerotation FreePBX appelle deja directement vers l'exterieur.</p>
+            </div>
+        </div>
+
+        <div class="subpanel">
+            <h4>Valeurs serveur detectees</h4>
+            <div class="config-grid">
+                <div class="config-row">
+                    <strong>FREEPBX_WSS_URL</strong>
+                    <span>{{ freepbx.masked_wss_url }}</span>
+                </div>
+                <div class="config-row">
+                    <strong>FREEPBX_SIP_DOMAIN</strong>
+                    <span>{{ freepbx.masked_domain }}</span>
+                </div>
+                <div class="config-row">
+                    <strong>Extension par defaut</strong>
+                    <span>{{ freepbx.default_extension or "-" }}</span>
+                </div>
+                <div class="config-row">
+                    <strong>Prefixe de sortie</strong>
+                    <span>{{ freepbx.outbound_prefix or "-" }}</span>
+                </div>
+            </div>
+            {% if freepbx.localhost_warning %}
+                <div class="inline-warning">
+                    L'URL WSS pointe vers localhost. Les autres postes de l'equipe ne pourront pas s'y connecter.
+                </div>
+            {% endif %}
+        </div>
+    </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.CALLFLOW_FREEPBX = {
+    configUrl: {{ url_for('api_freepbx_config') | tojson }},
+    callStartUrl: {{ url_for('api_calls_start') | tojson }},
+    callSyncUrl: "/api/calls/__CALL_ID__/sync",
+    agents: {{ team_agents_json | tojson }},
+};
+window.CALLFLOW_MICROSIP = {
+    enabled: {{ microsip.enabled | tojson }},
+    displayPath: {{ (microsip.executable_path or microsip.display_path) | tojson }},
+    dialUrl: {{ url_for('api_microsip_dial') | tojson }},
+    hangupUrl: {{ url_for('api_microsip_hangup') | tojson }},
+    directoryUrl: {{ url_for('api_microsip_directory', _external=True) | tojson }},
+};
+</script>
+<script type="module" src="{{ url_for('static', filename='microsip_bridge.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='freepbx_dialer.js') }}"></script>
+{% endblock %}

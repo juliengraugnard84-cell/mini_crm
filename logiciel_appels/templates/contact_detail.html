@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero hero-compact">
+    <div>
+        <span class="hero-kicker">Fiche contact</span>
+        <h3>{{ contact.name }}</h3>
+        <p>{{ contact.company or "Entreprise non renseignee" }} - {{ contact.phone }}{% if contact.email %} - {{ contact.email }}{% endif %}</p>
+    </div>
+    <form method="post" action="{{ url_for('calls') }}" class="hero-actions">
+        <input type="hidden" name="contact_id" value="{{ contact.id }}">
+        <input type="hidden" name="dialed_number" value="{{ contact.phone }}">
+        <button
+            class="btn-primary"
+            type="button"
+            data-microsip-dial
+            data-contact-id="{{ contact.id }}"
+            data-number="{{ contact.phone }}"
+            data-label="{{ contact.name }}"
+        >
+            Appeler avec MicroSIP
+        </button>
+        <button class="btn-secondary" type="submit">Journal manuel</button>
+        <a class="btn-secondary" href="tel:{{ contact.phone }}">Lancer tel:</a>
+    </form>
+</section>
+
+<section id="microsip-status-card" class="integration-status-card" data-tone="{% if microsip.enabled %}success{% else %}warning{% endif %}">
+    <strong id="microsip-status-title">{% if microsip.enabled %}MicroSIP pret sur ce poste{% else %}MicroSIP a finaliser{% endif %}</strong>
+    <p id="microsip-status-copy">
+        {% if microsip.enabled %}
+            L'appel partira depuis l'application locale installee sur ce PC.
+        {% else %}
+            Installe MicroSIP ou renseigne son chemin dans le fichier .env pour activer l'appel en un clic.
+        {% endif %}
+    </p>
+</section>
+
+<section class="layout-two">
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Modifier le contact</h3>
+        </div>
+        <form method="post" action="{{ url_for('edit_contact', contact_id=contact.id) }}" class="form-stack">
+            <label>
+                <span>Nom</span>
+                <input type="text" name="name" value="{{ contact.name }}" required>
+            </label>
+            <label>
+                <span>Entreprise</span>
+                <input type="text" name="company" value="{{ contact.company or '' }}">
+            </label>
+            <label>
+                <span>Telephone</span>
+                <input type="text" name="phone" value="{{ contact.phone }}" required>
+            </label>
+            <label>
+                <span>Email</span>
+                <input type="email" name="email" value="{{ contact.email or '' }}">
+            </label>
+            <label>
+                <span>Notes</span>
+                <textarea name="notes" rows="6">{{ contact.notes or '' }}</textarea>
+            </label>
+            <button class="btn-primary" type="submit">Enregistrer</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Ajouter un document</h3>
+        </div>
+        <form method="post" action="{{ url_for('contact_upload_document', contact_id=contact.id) }}" enctype="multipart/form-data" class="form-stack">
+            <label>
+                <span>Titre</span>
+                <input type="text" name="title" placeholder="Ex: devis, contrat, note vocale">
+            </label>
+            <label>
+                <span>Fichier</span>
+                <input type="file" name="file" required>
+            </label>
+            <button class="btn-primary" type="submit">Ajouter le document</button>
+        </form>
+
+        <div class="subpanel">
+            <h4>Documents lies</h4>
+            {% if documents %}
+                <div class="list-stack">
+                    {% for document in documents %}
+                        <div class="list-card">
+                            <div>
+                                <strong>{{ document.title }}</strong>
+                                <p>{{ document.original_name }}</p>
+                            </div>
+                            <div class="row-actions">
+                                <a class="text-link" href="{{ url_for('download_document', document_id=document.id) }}">Telecharger</a>
+                                <form method="post" action="{{ url_for('delete_document', document_id=document.id) }}">
+                                    <button class="text-button danger" type="submit">Supprimer</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="empty">Aucun document sur ce contact.</p>
+            {% endif %}
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h3>Historique des appels</h3>
+    </div>
+    {% if calls %}
+        <div class="list-stack">
+            {% for call in calls %}
+                <div class="call-card {% if call.status == 'in_progress' %}call-card-active{% endif %}">
+                    <div>
+                        <strong>
+                            {{ call_directions[call.direction] }} - {{ call_statuses[call.status] }}
+                            {% if call.provider %}- {{ call_providers.get(call.provider, call.provider) }}{% endif %}
+                        </strong>
+                        <p>{{ format_dt(call.started_at) }}{% if call.ended_at %} -> {{ format_dt(call.ended_at) }}{% endif %}</p>
+                        {% if call.agent_name %}
+                            <small>Agent : {{ call.agent_name }}{% if call.agent_extension %} - Ext {{ call.agent_extension }}{% endif %}</small>
+                        {% endif %}
+                        <small>{{ call.summary or "Aucun compte-rendu pour le moment." }}</small>
+                        {% if call.provider_status %}
+                            <div class="call-provider-status">{{ call.provider_status }}</div>
+                        {% endif %}
+                    </div>
+                    {% if call.status == 'in_progress' %}
+                        <form method="post" action="{{ url_for('end_call', call_id=call.id) }}" class="inline-end-call">
+                            <input type="hidden" name="next" value="contact">
+                            <select name="status">
+                                <option value="completed">Termine</option>
+                                <option value="missed">Manque</option>
+                                <option value="no_answer">Sans reponse</option>
+                            </select>
+                            <input type="text" name="summary" placeholder="Resume de l'appel">
+                            <button class="btn-primary" type="submit">Cloturer</button>
+                        </form>
+                    {% else %}
+                        <span class="duration-pill">{{ format_duration(call.duration_seconds) }}</span>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="empty">Aucun appel associe a ce contact.</p>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.CALLFLOW_MICROSIP = {
+    enabled: {{ microsip.enabled | tojson }},
+    displayPath: {{ (microsip.executable_path or microsip.display_path) | tojson }},
+    dialUrl: {{ url_for('api_microsip_dial') | tojson }},
+    hangupUrl: {{ url_for('api_microsip_hangup') | tojson }},
+    directoryUrl: {{ url_for('api_microsip_directory', _external=True) | tojson }},
+};
+</script>
+<script type="module" src="{{ url_for('static', filename='microsip_bridge.js') }}"></script>
+{% endblock %}

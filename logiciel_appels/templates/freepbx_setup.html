@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <span class="hero-kicker">Configuration voix</span>
+        <h3>FreePBX pour les appels reels</h3>
+        <p>
+            Chaque agent charge ici son extension SIP dans le navigateur, sans dependre du CRM.
+            Le serveur CallFlow ne stocke pas le mot de passe telephonie.
+        </p>
+    </div>
+    <div class="hero-card">
+        <strong>Etat serveur</strong>
+        <p>
+            {% if freepbx.enabled %}
+                Valeurs par defaut disponibles pour l'equipe.
+            {% else %}
+                Variables manquantes : {{ freepbx.missing|join(', ') if freepbx.missing else 'aucune' }}.
+            {% endif %}
+        </p>
+    </div>
+</section>
+
+<section class="panel-grid">
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Valeurs serveur detectees</h3>
+        </div>
+        <div class="config-grid">
+            <div class="config-row">
+                <strong>FREEPBX_WSS_URL</strong>
+                <span>{{ freepbx.masked_wss_url }}</span>
+            </div>
+            <div class="config-row">
+                <strong>FREEPBX_SIP_DOMAIN</strong>
+                <span>{{ freepbx.masked_domain }}</span>
+            </div>
+            <div class="config-row">
+                <strong>FREEPBX_DISPLAY_NAME</strong>
+                <span>{{ freepbx.display_name }}</span>
+            </div>
+            <div class="config-row">
+                <strong>FREEPBX_DEFAULT_EXTENSION</strong>
+                <span>{{ freepbx.default_extension or "-" }}</span>
+            </div>
+            <div class="config-row">
+                <strong>FREEPBX_DEFAULT_AUTH_USER</strong>
+                <span>{{ freepbx.default_auth_user or "-" }}</span>
+            </div>
+            <div class="config-row">
+                <strong>FREEPBX_OUTBOUND_PREFIX</strong>
+                <span>{{ freepbx.outbound_prefix or "-" }}</span>
+            </div>
+        </div>
+
+        {% if freepbx.localhost_warning %}
+            <div class="inline-warning">
+                L'URL WSS pointe vers localhost. C'est pratique pour un test local, mais pas pour les autres postes de l'equipe.
+            </div>
+        {% endif %}
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Profil agent local</h3>
+        </div>
+
+        <div id="profile-status-card" class="integration-status-card" data-tone="{% if freepbx.enabled %}info{% else %}warning{% endif %}">
+            <strong id="profile-status-title">Chargement du profil</strong>
+            <p id="profile-status-copy">Preparation des valeurs FreePBX pour ce navigateur.</p>
+        </div>
+
+        <form class="form-stack" data-freepbx-profile>
+            <label>
+                <span>Agent de l'equipe</span>
+                <select id="agent_template_id">
+                    <option value="">Choisir un agent ou remplir a la main</option>
+                    {% for agent in agents %}
+                        <option value="{{ agent.id }}">{{ agent.name }}{% if agent.extension %} - Ext {{ agent.extension }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>URL WSS</span>
+                <input type="url" id="wss_url" placeholder="wss://pbx.example.com:8089/ws" autocomplete="off">
+            </label>
+            <label>
+                <span>Domaine SIP</span>
+                <input type="text" id="sip_domain" placeholder="pbx.example.com" autocomplete="off">
+            </label>
+            <label>
+                <span>Extension</span>
+                <input type="text" id="extension" placeholder="100" autocomplete="username">
+            </label>
+            <label>
+                <span>Utilisateur d'authentification</span>
+                <input type="text" id="auth_user" placeholder="Laisse vide pour reutiliser l'extension" autocomplete="username">
+            </label>
+            <label>
+                <span>Mot de passe SIP</span>
+                <input type="password" id="password" placeholder="Mot de passe de l'extension" autocomplete="current-password">
+            </label>
+            <label>
+                <span>Nom affiche</span>
+                <input type="text" id="display_name" placeholder="Equipe commerciale" autocomplete="off">
+            </label>
+            <label>
+                <span>Prefixe de sortie</span>
+                <input type="text" id="outbound_prefix" placeholder="0 ou 9 si ton plan d'appel en a besoin" autocomplete="off">
+            </label>
+
+            <p class="form-hint">Ces informations restent dans ce navigateur. Rien n'est ecrit dans la base CallFlow.</p>
+            <p class="form-hint">Quand tu choisis un agent, CallFlow pre-remplit l'extension et garde le mot de passe uniquement sur ce PC.</p>
+
+            <div class="row-actions config-actions">
+                <button class="btn-primary" type="button" id="save-profile-button">Enregistrer le profil</button>
+                <button class="btn-secondary" type="button" id="clear-profile-button">Effacer ce navigateur</button>
+                <a class="btn-secondary" href="{{ url_for('dialer') }}">Ouvrir le composeur</a>
+                <a class="btn-secondary" href="{{ url_for('readiness') }}">Tester ce poste</a>
+            </div>
+        </form>
+
+        <div class="profile-summary" id="profile-summary-card">
+            <span>Resume</span>
+            <strong>Profil incomplet</strong>
+            <small>Ajoute ton extension pour preparer les appels navigateur.</small>
+        </div>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Checklist WebRTC</h3>
+        </div>
+        <div class="checklist">
+            <div class="check-item">
+                <strong>1. HTTPS / WSS actif</strong>
+                <p>Le navigateur doit joindre FreePBX ou Asterisk via une adresse securisee en <code>wss://</code>.</p>
+            </div>
+            <div class="check-item">
+                <strong>2. Endpoint <code>/ws</code></strong>
+                <p>Le serveur HTTP d'Asterisk doit exposer le chemin WebSocket attendu par le client WebRTC.</p>
+            </div>
+            <div class="check-item">
+                <strong>3. Transport PJSIP WSS</strong>
+                <p>Le transport WebSocket et l'extension doivent etre compatibles WebRTC.</p>
+            </div>
+            <div class="check-item">
+                <strong>4. Endpoint, AOR et auth</strong>
+                <p>Chaque agent a besoin d'une extension avec identifiants SIP valides et un mot de passe connu.</p>
+            </div>
+            <div class="check-item">
+                <strong>5. Certificat de confiance</strong>
+                <p>Un certificat fiable evite les avertissements navigateur et les echecs d'enregistrement.</p>
+            </div>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head panel-head-wrap">
+            <div>
+                <h3>Postes equipe et exemple .env</h3>
+                <p class="panel-copy">Les mots de passe SIP ne sont jamais affiches ici.</p>
+            </div>
+        </div>
+        {% if agents %}
+            <div class="list-stack agent-template-stack">
+                {% for agent in agents %}
+                    <div class="list-card">
+                        <div>
+                            <strong>{{ agent.name }}</strong>
+                            <p>{{ agent.role or "Agent d'appel" }}</p>
+                            <small>
+                                {% if agent.extension %}Ext {{ agent.extension }}{% else %}Extension a renseigner{% endif %}
+                                {% if agent.auth_user %} - Auth {{ agent.auth_user }}{% endif %}
+                            </small>
+                        </div>
+                        <div class="list-meta">
+                            <span>{% if agent.outbound_prefix %}Prefixe {{ agent.outbound_prefix }}{% else %}Sans prefixe{% endif %}</span>
+                            <span>{% if agent.email %}{{ agent.email }}{% else %}Email libre{% endif %}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty">Ajoute des agents dans l'onglet Equipe pour precharger les postes.</p>
+        {% endif %}
+
+        <div class="subpanel">
+            <h4>Exemple de <code>logiciel_appels/.env</code></h4>
+            <pre class="code-block">FREEPBX_WSS_URL=wss://pbx.example.com:8089/ws
+FREEPBX_SIP_DOMAIN=pbx.example.com
+FREEPBX_DISPLAY_NAME=Equipe CallFlow
+FREEPBX_DEFAULT_EXTENSION=100
+FREEPBX_DEFAULT_AUTH_USER=
+FREEPBX_OUTBOUND_PREFIX=
+SIPJS_SDK_IMPORT_URL=https://cdn.jsdelivr.net/npm/sip.js@0.21.2/+esm</pre>
+        </div>
+    </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.CALLFLOW_FREEPBX_PROFILE = {
+    configUrl: {{ url_for('api_freepbx_config') | tojson }},
+    agents: {{ team_agents_json | tojson }},
+};
+</script>
+<script type="module" src="{{ url_for('static', filename='freepbx_profile.js') }}"></script>
+{% endblock %}

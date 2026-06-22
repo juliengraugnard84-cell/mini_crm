@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="layout-two">
+    <article class="panel sticky-panel">
+        <div class="panel-head">
+            <h3>Ajouter un fichier</h3>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="form-stack">
+            <label>
+                <span>Titre</span>
+                <input type="text" name="title" placeholder="Nom visible dans l'application">
+            </label>
+            <label>
+                <span>Associer a un contact</span>
+                <select name="contact_id">
+                    <option value="">Aucun contact</option>
+                    {% for contact in contacts %}
+                        <option value="{{ contact.id }}">{{ contact.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Fichier</span>
+                <input type="file" name="file" required>
+            </label>
+            <button class="btn-primary" type="submit">Importer</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Bibliotheque de fichiers</h3>
+        </div>
+        {% if documents %}
+            <div class="list-stack">
+                {% for document in documents %}
+                    <div class="list-card">
+                        <div>
+                            <strong>{{ document.title }}</strong>
+                            <p>{{ document.original_name }}</p>
+                            <small>{{ document.contact_name or "Sans contact" }} - {{ format_dt(document.created_at) }}</small>
+                        </div>
+                        <div class="row-actions">
+                            <a class="btn-secondary" href="{{ url_for('download_document', document_id=document.id) }}">Telecharger</a>
+                            <form method="post" action="{{ url_for('delete_document', document_id=document.id) }}">
+                                <button class="text-button danger" type="submit">Supprimer</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty">Aucun fichier dans la bibliotheque.</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}

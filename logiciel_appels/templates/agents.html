@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <span class="hero-kicker">Mode equipe</span>
+        <h3>Organise les postes d'appel de tes collaborateurs</h3>
+        <p>
+            Chaque agent peut avoir son extension FreePBX, son login SIP et son prefixe de sortie.
+            Les mots de passe restent ensuite sur le PC de l'agent.
+        </p>
+    </div>
+    <div class="hero-card">
+        <strong>Ce que gere cette page</strong>
+        <p>Annuaire d'agents, extensions de l'equipe et suivi des appels par collaborateur.</p>
+    </div>
+</section>
+
+<section class="layout-two">
+    <article class="panel sticky-panel">
+        <div class="panel-head">
+            <h3>Ajouter un agent</h3>
+        </div>
+        <form method="post" class="form-stack">
+            <label>
+                <span>Nom</span>
+                <input type="text" name="name" required>
+            </label>
+            <label>
+                <span>Role</span>
+                <input type="text" name="role" placeholder="Commercial, support, ADV...">
+            </label>
+            <label>
+                <span>Email</span>
+                <input type="email" name="email">
+            </label>
+            <label>
+                <span>Extension FreePBX</span>
+                <input type="text" name="extension" placeholder="101">
+            </label>
+            <label>
+                <span>Utilisateur SIP</span>
+                <input type="text" name="auth_user" placeholder="Laisse vide si identique a l'extension">
+            </label>
+            <label>
+                <span>Prefixe de sortie</span>
+                <input type="text" name="outbound_prefix" placeholder="0 ou 9 selon ton plan d'appel">
+            </label>
+            <label>
+                <span>Notes</span>
+                <textarea name="notes" rows="5" placeholder="Poste open space, superviseur, horaires..."></textarea>
+            </label>
+            <label class="checkline">
+                <input type="checkbox" name="is_active" checked>
+                <span>Agent actif dans l'equipe</span>
+            </label>
+            <button class="btn-primary" type="submit">Ajouter l'agent</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head panel-head-wrap">
+            <div>
+                <h3>Annuaire equipe</h3>
+                <p class="panel-copy">Chaque fiche peut etre modifiee ici et servira de base pour les postes PC.</p>
+            </div>
+            <a class="btn-secondary" href="{{ url_for('freepbx_setup') }}">Configurer un poste</a>
+        </div>
+
+        {% if agents %}
+            <div class="agent-summary-grid">
+                {% for agent in agents %}
+                    <article class="agent-card">
+                        <div class="agent-card-head">
+                            <div>
+                                <strong>{{ agent.name }}</strong>
+                                <p>{{ agent.role or "Agent d'appel" }}</p>
+                            </div>
+                            <span class="agent-badge {% if agent.is_active %}agent-badge-active{% else %}agent-badge-muted{% endif %}">
+                                {% if agent.is_active %}Actif{% else %}Inactif{% endif %}
+                            </span>
+                        </div>
+
+                        <div class="agent-metrics">
+                            <span>{% if agent.extension %}Ext {{ agent.extension }}{% else %}Sans extension{% endif %}</span>
+                            <span>{{ agent.total_calls }} appel{% if agent.total_calls != 1 %}s{% endif %}</span>
+                            <span>{% if agent.active_calls %}{{ agent.active_calls }} en cours{% else %}Libre{% endif %}</span>
+                            <span>{% if agent.last_call_at %}Dernier appel {{ format_dt(agent.last_call_at) }}{% else %}Pas encore d'appel{% endif %}</span>
+                        </div>
+
+                        <form method="post" action="{{ url_for('edit_agent', agent_id=agent.id) }}" class="form-stack">
+                            <div class="agent-form-grid">
+                                <label>
+                                    <span>Nom</span>
+                                    <input type="text" name="name" value="{{ agent.name }}" required>
+                                </label>
+                                <label>
+                                    <span>Role</span>
+                                    <input type="text" name="role" value="{{ agent.role or '' }}">
+                                </label>
+                                <label>
+                                    <span>Email</span>
+                                    <input type="email" name="email" value="{{ agent.email or '' }}">
+                                </label>
+                                <label>
+                                    <span>Extension</span>
+                                    <input type="text" name="extension" value="{{ agent.extension or '' }}">
+                                </label>
+                                <label>
+                                    <span>Utilisateur SIP</span>
+                                    <input type="text" name="auth_user" value="{{ agent.auth_user or '' }}">
+                                </label>
+                                <label>
+                                    <span>Prefixe de sortie</span>
+                                    <input type="text" name="outbound_prefix" value="{{ agent.outbound_prefix or '' }}">
+                                </label>
+                            </div>
+                            <label>
+                                <span>Notes</span>
+                                <textarea name="notes" rows="3">{{ agent.notes or '' }}</textarea>
+                            </label>
+                            <div class="row-actions">
+                                <label class="checkline">
+                                    <input type="checkbox" name="is_active" {% if agent.is_active %}checked{% endif %}>
+                                    <span>Agent actif</span>
+                                </label>
+                                <button class="btn-primary" type="submit">Enregistrer</button>
+                            </div>
+                        </form>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty">Aucun agent pour le moment. Ajoute ton premier poste equipe a gauche.</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}

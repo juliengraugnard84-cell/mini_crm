@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="layout-two">
+    <article class="panel sticky-panel">
+        <div class="panel-head">
+            <h3>Demarrer un appel</h3>
+        </div>
+        <form method="post" class="form-stack">
+            <label>
+                <span>Contact</span>
+                <select name="contact_id">
+                    <option value="">Aucun contact</option>
+                    {% for contact in contacts %}
+                        <option value="{{ contact.id }}">{{ contact.name }} - {{ contact.phone }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Agent</span>
+                <select name="agent_id">
+                    <option value="">Aucun agent</option>
+                    {% for agent in agents %}
+                        <option value="{{ agent.id }}">{{ agent.name }}{% if agent.extension %} - Ext {{ agent.extension }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Numero</span>
+                <input type="text" name="dialed_number" placeholder="+33...">
+            </label>
+            <label>
+                <span>Type</span>
+                <select name="direction">
+                    <option value="outgoing">Sortant</option>
+                    <option value="incoming">Entrant</option>
+                </select>
+            </label>
+            <button class="btn-primary" type="submit">Lancer</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head panel-head-wrap">
+            <div>
+                <h3>Journal d'appels</h3>
+                <p class="panel-copy">Filtre les appels par agent pour suivre l'activite de l'equipe.</p>
+            </div>
+            <form method="get" class="search-inline">
+                <select name="agent">
+                    <option value="">Toute l'equipe</option>
+                    {% for agent in agents %}
+                        <option value="{{ agent.id }}" {% if selected_agent_id == agent.id %}selected{% endif %}>
+                            {{ agent.name }}{% if agent.extension %} - Ext {{ agent.extension }}{% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+                <button class="btn-secondary" type="submit">Filtrer</button>
+            </form>
+        </div>
+        {% if calls %}
+            <div class="list-stack">
+                {% for call in calls %}
+                    <div class="call-card {% if call.status == 'in_progress' %}call-card-active{% endif %}">
+                        <div>
+                            <strong>{{ call.contact_name or call.dialed_number }}</strong>
+                            <p>
+                                {{ call_directions[call.direction] }} - {{ call_statuses[call.status] }}
+                                {% if call.provider %}- {{ call_providers.get(call.provider, call.provider) }}{% endif %}
+                            </p>
+                            {% if call.agent_name %}
+                                <small>Agent : {{ call.agent_name }}{% if call.agent_extension %} - Ext {{ call.agent_extension }}{% endif %}</small>
+                            {% endif %}
+                            <small>{{ format_dt(call.started_at) }}{% if call.ended_at %} -> {{ format_dt(call.ended_at) }}{% endif %}</small>
+                            {% if call.summary %}
+                                <div class="call-summary">{{ call.summary }}</div>
+                            {% endif %}
+                            {% if call.provider_status %}
+                                <div class="call-provider-status">{{ call.provider_status }}</div>
+                            {% endif %}
+                        </div>
+
+                        {% if call.status == 'in_progress' %}
+                            <form method="post" action="{{ url_for('end_call', call_id=call.id) }}" class="inline-end-call">
+                                <select name="status">
+                                    <option value="completed">Termine</option>
+                                    <option value="missed">Manque</option>
+                                    <option value="no_answer">Sans reponse</option>
+                                </select>
+                                <input type="text" name="summary" placeholder="Resume de l'appel">
+                                <button class="btn-primary" type="submit">Cloturer</button>
+                            </form>
+                        {% else %}
+                            <div class="duration-pill">{{ format_duration(call.duration_seconds) }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty">Aucun appel enregistre.</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}

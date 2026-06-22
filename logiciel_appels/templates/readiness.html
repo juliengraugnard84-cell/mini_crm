@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <span class="hero-kicker">Preparation poste</span>
+        <h3>Verifie le PC, le casque et le lien vers FreePBX avant le premier appel</h3>
+        <p>
+            Cette page controle ce qu'on peut tester depuis CallFlow: micro navigateur,
+            son casque, profil agent et acces WebSocket vers le PBX.
+        </p>
+    </div>
+    <div class="hero-card">
+        <strong>{% if freepbx.enabled %}PBX detecte{% else %}PBX a completer{% endif %}</strong>
+        <p>
+            {% if freepbx.enabled %}
+                Le serveur de base est renseigne. Il reste a verifier l'audio local, les extensions et le trunk SIP externe.
+            {% else %}
+                Renseigne d'abord les valeurs FreePBX dans le fichier .env ou dans le profil local de l'agent.
+            {% endif %}
+        </p>
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Agents actifs</span>
+        <strong>{{ team_stats.active_agents }}</strong>
+    </article>
+    <article class="stat-card">
+        <span>Agents avec extension</span>
+        <strong>{{ team_stats.ready_agents }}</strong>
+    </article>
+    <article class="stat-card">
+        <span>Serveur WSS</span>
+        <strong>{% if freepbx.wss_url %}Oui{% else %}Non{% endif %}</strong>
+    </article>
+    <article class="stat-card">
+        <span>Domaine SIP</span>
+        <strong>{% if freepbx.sip_domain %}Oui{% else %}Non{% endif %}</strong>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel">
+        <div class="panel-head panel-head-wrap">
+            <div>
+                <h3>Diagnostics navigateur</h3>
+                <p class="panel-copy">Ces tests valident ce PC avant un appel reel.</p>
+            </div>
+            <div class="row-actions">
+                <a class="btn-secondary" href="{{ url_for('freepbx_setup') }}">Profil agent</a>
+                <a class="btn-secondary" href="{{ url_for('dialer') }}">Composeur</a>
+            </div>
+        </div>
+
+        <div class="diagnostic-grid">
+            <div class="diagnostic-item" id="browser-support-status" data-tone="info">
+                <strong>Navigateur WebRTC</strong>
+                <p>Verification en cours...</p>
+            </div>
+            <div class="diagnostic-item" id="profile-readiness-status" data-tone="info">
+                <strong>Profil agent local</strong>
+                <p>Lecture du profil stocke sur ce navigateur...</p>
+            </div>
+            <div class="diagnostic-item" id="microphone-status" data-tone="warning">
+                <strong>Microphone</strong>
+                <p>Le test micro n'a pas encore ete lance.</p>
+            </div>
+            <div class="diagnostic-item" id="speaker-status" data-tone="warning">
+                <strong>Casque / haut-parleur</strong>
+                <p>Lance un son de test pour verifier l'ecoute.</p>
+            </div>
+            <div class="diagnostic-item" id="wss-status" data-tone="warning">
+                <strong>Transport WSS FreePBX</strong>
+                <p>Teste l'acces a l'URL WebSocket du PBX.</p>
+            </div>
+        </div>
+
+        <div class="row-actions config-actions">
+            <button class="btn-primary" type="button" id="test-microphone-button">Tester le micro</button>
+            <button class="btn-secondary" type="button" id="test-speaker-button">Jouer un son de test</button>
+            <button class="btn-secondary" type="button" id="test-wss-button">Tester le WSS</button>
+        </div>
+
+        <div class="meter-panel">
+            <div class="meter-head">
+                <strong>Niveau micro</strong>
+                <span id="meter-label">En attente d'autorisation micro.</span>
+            </div>
+            <div class="meter-shell" aria-hidden="true">
+                <div class="meter-bar" id="microphone-meter-bar"></div>
+            </div>
+        </div>
+
+        <div class="profile-summary" id="readiness-profile-card">
+            <span>Profil charge</span>
+            <strong>Aucun profil local</strong>
+            <small>Choisis un agent dans l'onglet FreePBX puis enregistre son profil sur ce PC.</small>
+        </div>
+
+        <div class="subpanel">
+            <h4>Peripheriques audio detectes</h4>
+            <div class="device-list" id="device-list">
+                <p class="empty">Le navigateur affichera les micros et sorties une fois les autorisations donnees.</p>
+            </div>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h3>Ordre exact de mise en service</h3>
+        </div>
+        <div class="checklist">
+            <div class="check-item">
+                <strong>1. Nom DNS + certificat</strong>
+                <p>Ton PBX doit avoir un nom stable comme <code>pbx.tondomaine.fr</code> avec un certificat TLS valide.</p>
+            </div>
+            <div class="check-item">
+                <strong>2. Serveur WebSocket Asterisk</strong>
+                <p>Le HTTPS Asterisk doit etre actif sur le port 8089 et l'URI <code>/ws</code> doit repondre.</p>
+            </div>
+            <div class="check-item">
+                <strong>3. Extensions PJSIP WebRTC</strong>
+                <p>Cree une extension par agent dans FreePBX, avec mot de passe fort et compatibilite WebRTC.</p>
+            </div>
+            <div class="check-item">
+                <strong>4. Trunk SIP operateur</strong>
+                <p>Sans trunk SIP, les appels externes mobiles et fixes ne pourront pas sortir du PBX.</p>
+            </div>
+            <div class="check-item">
+                <strong>5. Route sortante</strong>
+                <p>Associe la numerotation externe au trunk, puis decide si le prefixe se gere dans FreePBX ou dans CallFlow.</p>
+            </div>
+            <div class="check-item">
+                <strong>6. Test interne puis externe</strong>
+                <p>Teste d'abord une extension a extension, puis un mobile, puis un appel entrant depuis l'exterieur.</p>
+            </div>
+        </div>
+
+        <div class="subpanel">
+            <h4>Commandes utiles cote Asterisk</h4>
+            <pre class="code-block">http show status
+pjsip show endpoints
+pjsip show registrations
+core show channels</pre>
+        </div>
+
+        <div class="subpanel">
+            <h4>Valeurs cote CallFlow</h4>
+            <div class="config-grid">
+                <div class="config-row">
+                    <strong>URL WSS</strong>
+                    <span>{{ freepbx.masked_wss_url }}</span>
+                </div>
+                <div class="config-row">
+                    <strong>Domaine SIP</strong>
+                    <span>{{ freepbx.masked_domain }}</span>
+                </div>
+                <div class="config-row">
+                    <strong>Display name</strong>
+                    <span>{{ freepbx.display_name }}</span>
+                </div>
+                <div class="config-row">
+                    <strong>Extensions equipe</strong>
+                    <span>{{ team_stats.ready_agents }} / {{ team_stats.active_agents }}</span>
+                </div>
+            </div>
+            {% if freepbx.localhost_warning %}
+                <div class="inline-warning">
+                    L'URL WSS pointe vers localhost. Cela ne conviendra pas pour des postes d'equipe sur d'autres PC.
+                </div>
+            {% endif %}
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-head panel-head-wrap">
+        <div>
+            <h3>Equipe prete a appeler</h3>
+            <p class="panel-copy">Chaque agent doit avoir au minimum une extension avant la premiere mise en service navigateur.</p>
+        </div>
+        <a class="btn-secondary" href="{{ url_for('agents') }}">Gerer l'equipe</a>
+    </div>
+    {% if agents %}
+        <div class="agent-ready-grid">
+            {% for agent in agents %}
+                <div class="agent-ready-card">
+                    <strong>{{ agent.name }}</strong>
+                    <p>{{ agent.role or "Agent d'appel" }}</p>
+                    <small>
+                        {% if agent.extension %}Ext {{ agent.extension }}{% else %}Extension manquante{% endif %}
+                        {% if agent.auth_user %} - Auth {{ agent.auth_user }}{% endif %}
+                        {% if agent.outbound_prefix %} - Prefixe {{ agent.outbound_prefix }}{% endif %}
+                    </small>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="empty">Ajoute tes agents dans l'onglet Equipe avant de distribuer les postes.</p>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.CALLFLOW_READINESS = {
+    configUrl: {{ url_for('api_freepbx_config') | tojson }},
+};
+</script>
+<script type="module" src="{{ url_for('static', filename='readiness.js') }}"></script>
+{% endblock %}
