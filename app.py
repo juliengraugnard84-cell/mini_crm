@@ -162,6 +162,8 @@ app.secret_key = app.config["SECRET_KEY"]
 # Sécurité cookies session (prod-friendly)
 app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
 app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+app.config.setdefault("PERMANENT_SESSION_LIFETIME", timedelta(days=365))
+app.config.setdefault("SESSION_REFRESH_EACH_REQUEST", True)
 
 # Active SECURE si explicitement demandé, sinon détection d'env minimale
 is_production = (
@@ -2123,6 +2125,9 @@ def csrf_protect():
     - Supporte token en form OU header
     """
 
+    if session.get("user") and not session.permanent:
+        session.permanent = True
+
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
 
@@ -2259,6 +2264,8 @@ def login():
             "username": user["username"],
             "role": user["role"],
         }
+        session["csrf_token"] = secrets.token_hex(32)
+        session.permanent = True
 
         flash("Connexion réussie.", "success")
         return redirect(url_for("dashboard"))
