@@ -2224,6 +2224,9 @@ def inject_globals():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if session.get("user"):
+        return redirect(url_for("dashboard"))
+
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
         password = (request.form.get("password") or "").strip()
