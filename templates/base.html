@@ -18,14 +18,14 @@
         <div class="sidebar-header">
             <a href="{{ url_for('dashboard') }}" class="brand-lockup" aria-label="Retour au tableau de bord">
                 <img
-                    src="{{ url_for('static', filename='branding/synergygroup-logo.png') }}"
-                    alt="Synergygroup"
+                    src="{{ url_for('static', filename='branding/aleo-conseils-logo.png') }}"
+                    alt="Aleo Conseils"
                     class="brand-logo">
             </a>
 
             <div class="brand-meta">
                 <span class="brand-kicker">Plateforme CRM</span>
-                <strong>{{ current_user.username if current_user and current_user.username else "Equipe Synergygroup" }}</strong>
+                <strong>{{ current_user.username if current_user and current_user.username else "Equipe Aleo Conseils" }}</strong>
                 <small>{{ current_user.role|capitalize if current_user and current_user.role else "Connexion securisee" }}</small>
             </div>
         </div>
@@ -124,7 +124,7 @@
     <div class="main-content">
         <div class="topbar">
             <div class="topbar-copy">
-                <span class="topbar-kicker">Synergygroup CRM</span>
+                <span class="topbar-kicker">Aleo Conseils CRM</span>
                 <strong class="topbar-title">{{ self.title()|striptags|trim or "Mini CRM" }}</strong>
             </div>
 
@@ -149,7 +149,7 @@
         </main>
 
         <div class="footer">
-            &copy; {{ current_year if current_year is defined else "" }} Synergygroup CRM
+            &copy; {{ current_year if current_year is defined else "" }} Aleo Conseils CRM
         </div>
     </div>
 </div>
