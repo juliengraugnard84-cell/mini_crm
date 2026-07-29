@@ -1418,6 +1418,112 @@ main.content {
     border-color: rgba(16, 33, 43, 0.08);
 }
 
+.crm-cotation-section--delivery {
+    display: grid;
+    gap: 18px;
+}
+
+.crm-cotation-delivery-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+}
+
+.crm-cotation-site-mode-switch {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.crm-cotation-site-mode-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(16, 33, 43, 0.1);
+    background: rgba(8, 19, 63, 0.04);
+    color: #10212b;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.crm-cotation-site-mode-option input {
+    margin: 0;
+}
+
+.crm-cotation-site-mode-copy {
+    margin-bottom: 18px;
+    padding: 13px 15px;
+    border-radius: 16px;
+    background: rgba(242, 178, 51, 0.12);
+    color: #7c5104;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.crm-cotation-delivery-list {
+    display: grid;
+    gap: 16px;
+}
+
+.crm-cotation-delivery-card {
+    padding: 18px;
+    border-radius: 20px;
+    border: 1px solid rgba(16, 33, 43, 0.08);
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.crm-cotation-delivery-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.crm-cotation-delivery-card-head strong {
+    color: #10212b;
+    font-size: 15px;
+}
+
+.crm-cotation-delivery-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: center;
+    margin-top: 18px;
+    color: #5f7084;
+    font-size: 13px;
+}
+
+.crm-cotation-point-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.crm-cotation-point-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: rgba(8, 19, 63, 0.08);
+    color: #10212b;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.crm-cotation-delivery-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .crm-cotation-form-actions {
     display: flex;
     justify-content: space-between;
@@ -1452,6 +1558,12 @@ main.content {
 
     .crm-cotation-form-tip {
         max-width: none;
+    }
+
+    .crm-cotation-delivery-head,
+    .crm-cotation-delivery-actions {
+        flex-direction: column;
+        align-items: stretch;
     }
 }
 

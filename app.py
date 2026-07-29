@@ -508,6 +508,29 @@ def init_db():
             _try_add_column(conn, "cotations", "profil TEXT")
             _try_add_column(conn, "cotations", "gaz_car TEXT")
             _try_add_column(conn, "cotations", "gaz_fournisseur_actuel TEXT")
+            _try_run_ddl(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS cotation_delivery_points (
+                    id SERIAL PRIMARY KEY,
+                    cotation_id INTEGER NOT NULL REFERENCES cotations(id) ON DELETE CASCADE,
+                    site_label TEXT,
+                    energy_type TEXT,
+                    reference_code TEXT,
+                    address TEXT,
+                    supplier TEXT,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+            _try_run_ddl(
+                conn,
+                """
+                CREATE INDEX IF NOT EXISTS idx_cotation_delivery_points_cotation_id
+                ON cotation_delivery_points (cotation_id, sort_order, id)
+                """,
+            )
 
             # 🔥 FIX CRITIQUE — CALENDAR EVENTS
             _try_add_column(conn, "calendar_events", "end_time TIME")
@@ -2956,6 +2979,8 @@ def admin_cotations():
         """)
         rows = cur.fetchall()
 
+    rows = enrich_cotations_with_delivery_points(conn, rows)
+
     return render_template(
         "admin_cotations.html",
         cotations=[row_to_obj(r) for r in rows],
@@ -2992,6 +3017,7 @@ def admin_cotation_detail(cotation_id):
     conn.commit()
     cotation = dict(cotation)
     cotation["is_read"] = 1
+    cotation = enrich_cotation_with_delivery_points(conn, cotation)
 
     return render_template(
         "admin_cotation_detail.html",
@@ -4417,6 +4443,327 @@ def parse_amount_safe(val):
         return None
 
 
+def normalize_cotation_site_mode(value, points_count=0):
+    if points_count and points_count > 1:
+        return "multi"
+    return "multi" if (value or "").strip().lower() == "multi" else "mono"
+
+
+def normalize_delivery_point_energy(value, fallback_energy=None):
+    normalized = (value or "").strip().lower()
+    if normalized in {"electricite", "gaz"}:
+        return normalized
+
+    fallback = (fallback_energy or "").strip().lower()
+    if fallback == "gaz":
+        return "gaz"
+    return "electricite"
+
+
+def ensure_cotation_delivery_points_schema(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cotation_delivery_points (
+                id SERIAL PRIMARY KEY,
+                cotation_id INTEGER NOT NULL REFERENCES cotations(id) ON DELETE CASCADE,
+                site_label TEXT,
+                energy_type TEXT,
+                reference_code TEXT,
+                address TEXT,
+                supplier TEXT,
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_cotation_delivery_points_cotation_id
+            ON cotation_delivery_points (cotation_id, sort_order, id)
+            """
+        )
+
+
+def build_legacy_cotation_delivery_points(cotation):
+    if not cotation:
+        return []
+
+    source = dict(cotation) if not isinstance(cotation, dict) else dict(cotation)
+    site_label = (source.get("site_nom") or "").strip()
+    address = (source.get("adresse_consommation") or "").strip()
+    points = []
+
+    pdl_pce = (source.get("pdl_pce") or "").strip()
+    if pdl_pce:
+        points.append({
+            "site_label": site_label,
+            "energy_type": "electricite",
+            "reference_code": pdl_pce,
+            "address": address,
+            "supplier": (source.get("elec_fournisseur_actuel") or source.get("fournisseur_actuel") or "").strip(),
+            "sort_order": len(points),
+        })
+
+    pce = (source.get("pce") or "").strip()
+    if pce and pce != pdl_pce:
+        points.append({
+            "site_label": site_label,
+            "energy_type": "gaz",
+            "reference_code": pce,
+            "address": address,
+            "supplier": (source.get("gaz_fournisseur_actuel") or source.get("fournisseur_actuel") or "").strip(),
+            "sort_order": len(points),
+        })
+
+    if points:
+        return points
+
+    if site_label or address:
+        return [{
+            "site_label": site_label,
+            "energy_type": normalize_delivery_point_energy(source.get("energie_type")),
+            "reference_code": "",
+            "address": address,
+            "supplier": (
+                source.get("fournisseur_actuel")
+                or source.get("elec_fournisseur_actuel")
+                or source.get("gaz_fournisseur_actuel")
+                or ""
+            ).strip(),
+            "sort_order": 0,
+        }]
+
+    return []
+
+
+def extract_cotation_delivery_points_from_form(
+    form,
+    cotation_energy_type="",
+    fallback_site_label="",
+    fallback_address="",
+):
+    point_site_labels = form.getlist("point_site_label")
+    point_energy_types = form.getlist("point_energy_type")
+    point_references = form.getlist("point_reference")
+    point_addresses = form.getlist("point_address")
+    point_suppliers = form.getlist("point_supplier")
+
+    total = max(
+        len(point_site_labels),
+        len(point_energy_types),
+        len(point_references),
+        len(point_addresses),
+        len(point_suppliers),
+    )
+
+    fallback_energy = normalize_delivery_point_energy(cotation_energy_type)
+
+    if total == 0:
+        legacy_pdl = (form.get("pdl_pce") or "").strip()
+        legacy_pce = (form.get("pce") or "").strip()
+        legacy_points = []
+
+        if legacy_pdl:
+            legacy_points.append({
+                "site_label": (fallback_site_label or "").strip(),
+                "energy_type": "electricite",
+                "reference_code": legacy_pdl,
+                "address": (fallback_address or "").strip(),
+                "supplier": (form.get("elec_fournisseur_actuel") or form.get("fournisseur_actuel") or "").strip(),
+                "sort_order": len(legacy_points),
+            })
+
+        if legacy_pce:
+            legacy_points.append({
+                "site_label": (fallback_site_label or "").strip(),
+                "energy_type": "gaz",
+                "reference_code": legacy_pce,
+                "address": (fallback_address or "").strip(),
+                "supplier": (form.get("gaz_fournisseur_actuel") or form.get("fournisseur_actuel") or "").strip(),
+                "sort_order": len(legacy_points),
+            })
+
+        return legacy_points
+
+    points = []
+
+    for index in range(total):
+        site_label = (point_site_labels[index] if index < len(point_site_labels) else "").strip()
+        energy_type = normalize_delivery_point_energy(
+            point_energy_types[index] if index < len(point_energy_types) else "",
+            fallback_energy,
+        )
+        reference_code = (point_references[index] if index < len(point_references) else "").strip()
+        address = (point_addresses[index] if index < len(point_addresses) else "").strip()
+        supplier = (point_suppliers[index] if index < len(point_suppliers) else "").strip()
+
+        if not any([site_label, reference_code, address, supplier]):
+            continue
+
+        if not site_label and index == 0:
+            site_label = (fallback_site_label or "").strip()
+        if not address and index == 0:
+            address = (fallback_address or "").strip()
+
+        points.append({
+            "site_label": site_label,
+            "energy_type": energy_type,
+            "reference_code": reference_code,
+            "address": address,
+            "supplier": supplier,
+            "sort_order": len(points),
+        })
+
+    return points
+
+
+def derive_cotation_delivery_point_fields(points):
+    first_electric = next(
+        (
+            point for point in points
+            if point.get("energy_type") == "electricite" and point.get("reference_code")
+        ),
+        None,
+    )
+    first_gas = next(
+        (
+            point for point in points
+            if point.get("energy_type") == "gaz" and point.get("reference_code")
+        ),
+        None,
+    )
+    first_point = points[0] if points else {}
+
+    return {
+        "pdl_pce": (first_electric or {}).get("reference_code") or "",
+        "pce": (first_gas or {}).get("reference_code") or "",
+        "site_nom": first_point.get("site_label") or "",
+        "adresse_consommation": first_point.get("address") or "",
+        "fournisseur_actuel": first_point.get("supplier") or "",
+    }
+
+
+def save_cotation_delivery_points(conn, cotation_id, points):
+    ensure_cotation_delivery_points_schema(conn)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM cotation_delivery_points WHERE cotation_id = %s",
+            (cotation_id,),
+        )
+
+        if not points:
+            return
+
+        cur.executemany(
+            """
+            INSERT INTO cotation_delivery_points (
+                cotation_id,
+                site_label,
+                energy_type,
+                reference_code,
+                address,
+                supplier,
+                sort_order
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                (
+                    cotation_id,
+                    point.get("site_label") or None,
+                    point.get("energy_type") or None,
+                    point.get("reference_code") or None,
+                    point.get("address") or None,
+                    point.get("supplier") or None,
+                    point.get("sort_order") or index,
+                )
+                for index, point in enumerate(points)
+            ],
+        )
+
+
+def format_cotation_delivery_points_summary(points):
+    if not points:
+        return "-"
+
+    labels = []
+    for point in points[:4]:
+        point_type = "PDL" if point.get("energy_type") == "electricite" else "PCE"
+        descriptor = point.get("reference_code") or point.get("site_label") or "Point"
+        if point.get("site_label") and point.get("reference_code"):
+            descriptor = f"{point.get('reference_code')} ({point.get('site_label')})"
+        labels.append(f"{point_type} {descriptor}")
+
+    if len(points) > 4:
+        labels.append(f"+{len(points) - 4} autre(s)")
+
+    return " | ".join(labels)
+
+
+def enrich_cotations_with_delivery_points(conn, cotations):
+    if not cotations:
+        return []
+
+    ensure_cotation_delivery_points_schema(conn)
+
+    cotation_rows = []
+    cotation_ids = []
+    for cotation in cotations:
+        row = dict(cotation) if not isinstance(cotation, dict) else dict(cotation)
+        cotation_rows.append(row)
+        if row.get("id"):
+            cotation_ids.append(row["id"])
+
+    points_by_cotation = {}
+
+    if cotation_ids:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM cotation_delivery_points
+                WHERE cotation_id = ANY(%s)
+                ORDER BY cotation_id ASC, sort_order ASC, id ASC
+                """,
+                (cotation_ids,),
+            )
+            for row in cur.fetchall():
+                point = dict(row)
+                points_by_cotation.setdefault(point["cotation_id"], []).append(point)
+
+    enriched = []
+    for row in cotation_rows:
+        points = points_by_cotation.get(row.get("id")) or build_legacy_cotation_delivery_points(row)
+        derived = derive_cotation_delivery_point_fields(points)
+
+        if not row.get("pdl_pce"):
+            row["pdl_pce"] = derived["pdl_pce"] or None
+        if not row.get("pce"):
+            row["pce"] = derived["pce"] or None
+        if not row.get("site_nom"):
+            row["site_nom"] = derived["site_nom"] or None
+        if not row.get("adresse_consommation"):
+            row["adresse_consommation"] = derived["adresse_consommation"] or None
+
+        row["delivery_points"] = points
+        row["delivery_points_count"] = len(points)
+        row["site_mode"] = normalize_cotation_site_mode(
+            row.get("site_mode"),
+            len(points),
+        )
+        row["delivery_points_summary"] = format_cotation_delivery_points_summary(points)
+        enriched.append(row)
+
+    return enriched
+
+
+def enrich_cotation_with_delivery_points(conn, cotation):
+    enriched = enrich_cotations_with_delivery_points(conn, [cotation])
+    return enriched[0] if enriched else None
+
+
 # =========================
 # FORMAT DATE FR
 # =========================
@@ -4676,6 +5023,7 @@ def client_detail(client_id):
             ORDER BY date_creation DESC, id DESC
         """, (client_id,))
         cotations = cur.fetchall()
+    cotations = enrich_cotations_with_delivery_points(conn, cotations)
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -5029,8 +5377,30 @@ def create_cotation(client_id):
     profil = (request.form.get("profil") or "").strip()
     gaz_car = (request.form.get("gaz_car") or "").strip()
     gaz_fournisseur_actuel = (request.form.get("gaz_fournisseur_actuel") or "").strip()
+    site_mode = normalize_cotation_site_mode(request.form.get("site_mode"))
+    delivery_points = extract_cotation_delivery_points_from_form(
+        request.form,
+        cotation_energy_type=energie_type,
+        fallback_site_label=site_nom,
+        fallback_address=adresse_consommation,
+    )
+    derived_delivery_fields = derive_cotation_delivery_point_fields(delivery_points)
+
+    if derived_delivery_fields["pdl_pce"]:
+        pdl_pce = derived_delivery_fields["pdl_pce"]
+    if derived_delivery_fields["pce"]:
+        pce = derived_delivery_fields["pce"]
+    if derived_delivery_fields["site_nom"] and not site_nom:
+        site_nom = derived_delivery_fields["site_nom"]
+    if derived_delivery_fields["adresse_consommation"] and not adresse_consommation:
+        adresse_consommation = derived_delivery_fields["adresse_consommation"]
+    if derived_delivery_fields["fournisseur_actuel"] and not fournisseur_actuel:
+        fournisseur_actuel = derived_delivery_fields["fournisseur_actuel"]
+
+    site_mode = normalize_cotation_site_mode(site_mode, len(delivery_points))
 
     try:
+        ensure_cotation_delivery_points_schema(conn)
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO cotations (
@@ -5136,6 +5506,8 @@ def create_cotation(client_id):
             ))
             cotation_id = cur.fetchone()[0]
 
+        save_cotation_delivery_points(conn, cotation_id, delivery_points)
+
         conn.commit()
         flash("Cotation créée.", "success")
 
@@ -5157,9 +5529,10 @@ def create_cotation(client_id):
                     f"Energie : {energie_type or '-'}\n"
                     f"Date de negociation : {format_date_safe(date_negociation)}\n"
                     f"Heure de negociation : {heure_display}\n"
+                    f"Mode site : {site_mode}\n"
                     f"Signataire : {signataire_nom or '-'}\n"
                     f"Email signataire : {signataire_email or '-'}\n"
-                    f"PDL / PCE : {pdl_pce or pce or '-'}\n"
+                    f"Points de livraison : {format_cotation_delivery_points_summary(delivery_points)}\n"
                     f"Commentaire : {commentaire or '-'}\n\n"
                     f"Ouvrir la demande : {cotation_link}\n"
                 ),
@@ -5233,6 +5606,8 @@ def edit_cotation(client_id, cotation_id):
         flash("Demande de cotation introuvable.", "danger")
         return redirect(url_for("client_detail", client_id=client_id))
 
+    cotation = enrich_cotation_with_delivery_points(conn, cotation)
+
     if request.method == "POST":
         date_negociation = parse_date_safe((request.form.get("date_negociation") or "").strip())
         heure_negociation = parse_time_safe((request.form.get("heure_negociation") or "").strip())
@@ -5280,12 +5655,34 @@ def edit_cotation(client_id, cotation_id):
         profil = (request.form.get("profil") or "").strip()
         gaz_car = (request.form.get("gaz_car") or "").strip()
         gaz_fournisseur_actuel = (request.form.get("gaz_fournisseur_actuel") or "").strip()
+        site_mode = normalize_cotation_site_mode(request.form.get("site_mode"))
+        delivery_points = extract_cotation_delivery_points_from_form(
+            request.form,
+            cotation_energy_type=energie_type,
+            fallback_site_label=site_nom,
+            fallback_address=adresse_consommation,
+        )
+        derived_delivery_fields = derive_cotation_delivery_point_fields(delivery_points)
+
+        if derived_delivery_fields["pdl_pce"]:
+            pdl_pce = derived_delivery_fields["pdl_pce"]
+        if derived_delivery_fields["pce"]:
+            pce = derived_delivery_fields["pce"]
+        if derived_delivery_fields["site_nom"] and not site_nom:
+            site_nom = derived_delivery_fields["site_nom"]
+        if derived_delivery_fields["adresse_consommation"] and not adresse_consommation:
+            adresse_consommation = derived_delivery_fields["adresse_consommation"]
+        if derived_delivery_fields["fournisseur_actuel"] and not fournisseur_actuel:
+            fournisseur_actuel = derived_delivery_fields["fournisseur_actuel"]
+
+        site_mode = normalize_cotation_site_mode(site_mode, len(delivery_points))
 
         valid_statuses = {"nouvelle", "en_cours", "envoyee", "acceptee", "refusee"}
         if status not in valid_statuses:
             status = (cotation.get("status") or "en_cours").strip().lower()
 
         try:
+            ensure_cotation_delivery_points_schema(conn)
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -5386,6 +5783,7 @@ def edit_cotation(client_id, cotation_id):
                     ),
                 )
 
+            save_cotation_delivery_points(conn, cotation_id, delivery_points)
             conn.commit()
             flash("Demande de cotation mise a jour avec succes.", "success")
 

@@ -3,6 +3,17 @@
 
 {% set energie = (cotation.energie_type or "")|lower %}
 {% set status = (cotation.status or "en_cours")|lower %}
+{% set delivery_points = cotation.delivery_points if cotation.delivery_points else [] %}
+{% if not delivery_points %}
+    {% set delivery_points = [{
+        "site_label": cotation.site_nom or "",
+        "energy_type": "gaz" if energie == "gaz" else "electricite",
+        "reference_code": cotation.pce if energie == "gaz" else (cotation.pdl_pce or cotation.pce or ""),
+        "address": cotation.adresse_consommation or client.address or "",
+        "supplier": cotation.fournisseur_actuel or cotation.elec_fournisseur_actuel or cotation.gaz_fournisseur_actuel or "",
+    }] %}
+{% endif %}
+{% set site_mode_value = "multi" if delivery_points|length > 1 else "mono" %}
 
 {% block content %}
 
@@ -147,6 +158,171 @@
                     </div>
                 </div>
 
+                <div class="col-12 mb-4 crm-cotation-panel-wrap">
+                    <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--delivery"
+                         data-delivery-points-root>
+                        <div class="crm-cotation-delivery-head">
+                            <div>
+                                <h5 class="mb-2">Points de livraison</h5>
+                                <p class="mb-0 text-muted">
+                                    Passez du mono-site au multi-site et completez chaque point de livraison
+                                    avec sa reference, son energie, son adresse et son fournisseur actuel.
+                                </p>
+                            </div>
+
+                            <div class="crm-cotation-site-mode-switch">
+                                <label class="crm-cotation-site-mode-option">
+                                    <input type="radio"
+                                           name="site_mode"
+                                           value="mono"
+                                           {% if site_mode_value == "mono" %}checked{% endif %}
+                                           data-site-mode-toggle>
+                                    <span>Mono-site</span>
+                                </label>
+                                <label class="crm-cotation-site-mode-option">
+                                    <input type="radio"
+                                           name="site_mode"
+                                           value="multi"
+                                           {% if site_mode_value == "multi" %}checked{% endif %}
+                                           data-site-mode-toggle>
+                                    <span>Multi-site</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="crm-cotation-site-mode-copy" data-site-mode-copy>
+                            {% if site_mode_value == "multi" %}
+                                Mode multi-site actif : vous pouvez ajouter plusieurs points de livraison.
+                            {% else %}
+                                Mode mono-site actif : une seule fiche point de livraison est ouverte.
+                            {% endif %}
+                        </div>
+
+                        <div class="crm-cotation-delivery-list" data-delivery-points-list>
+                            {% for point in delivery_points %}
+                            <div class="crm-cotation-delivery-card" data-delivery-point-item{% if site_mode_value == "mono" and loop.index > 1 %} hidden{% endif %}>
+                                <div class="crm-cotation-delivery-card-head">
+                                    <strong data-delivery-point-title>Point de livraison {{ loop.index }}</strong>
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            data-remove-delivery-point
+                                            {% if delivery_points|length == 1 or site_mode_value == "mono" %}hidden{% endif %}>
+                                        Retirer
+                                    </button>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Nom du site</label>
+                                        <input class="form-control"
+                                               name="point_site_label"
+                                               value="{{ point.site_label or '' }}"
+                                               placeholder="Ex : Siege, depot, agence">
+                                    </div>
+
+                                    <div class="col-md-3" data-point-energy-wrap>
+                                        <label class="form-label">Energie du point</label>
+                                        <select class="form-select" name="point_energy_type" data-point-energy>
+                                            <option value="electricite" {% if point.energy_type != "gaz" %}selected{% endif %}>Electricite</option>
+                                            <option value="gaz" {% if point.energy_type == "gaz" %}selected{% endif %}>Gaz</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-5">
+                                        <label class="form-label" data-point-reference-label>
+                                            {% if point.energy_type == "gaz" %}PCE{% else %}PDL{% endif %}
+                                        </label>
+                                        <input class="form-control"
+                                               name="point_reference"
+                                               value="{{ point.reference_code or '' }}"
+                                               placeholder="Reference PDL ou PCE">
+                                    </div>
+
+                                    <div class="col-md-8">
+                                        <label class="form-label">Adresse du point</label>
+                                        <input class="form-control"
+                                               name="point_address"
+                                               value="{{ point.address or cotation.adresse_consommation or client.address or '' }}"
+                                               placeholder="Adresse du point de livraison">
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">Fournisseur actuel</label>
+                                        <input class="form-control"
+                                               name="point_supplier"
+                                               value="{{ point.supplier or '' }}"
+                                               placeholder="Fournisseur actuel du point">
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="crm-cotation-delivery-actions">
+                            <button type="button"
+                                    class="btn btn-outline-primary"
+                                    data-add-delivery-point
+                                    {% if site_mode_value != "multi" %}hidden{% endif %}>
+                                Ajouter PDL/PCE
+                            </button>
+                            <span>
+                                Chaque clic ajoute une nouvelle fiche descriptive du point de livraison.
+                            </span>
+                        </div>
+
+                        <template data-delivery-point-template>
+                            <div class="crm-cotation-delivery-card" data-delivery-point-item>
+                                <div class="crm-cotation-delivery-card-head">
+                                    <strong data-delivery-point-title>Point de livraison</strong>
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            data-remove-delivery-point>
+                                        Retirer
+                                    </button>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Nom du site</label>
+                                        <input class="form-control"
+                                               name="point_site_label"
+                                               placeholder="Ex : Siege, depot, agence">
+                                    </div>
+
+                                    <div class="col-md-3" data-point-energy-wrap>
+                                        <label class="form-label">Energie du point</label>
+                                        <select class="form-select" name="point_energy_type" data-point-energy>
+                                            <option value="electricite" selected>Electricite</option>
+                                            <option value="gaz">Gaz</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-5">
+                                        <label class="form-label" data-point-reference-label>PDL</label>
+                                        <input class="form-control"
+                                               name="point_reference"
+                                               placeholder="Reference PDL ou PCE">
+                                    </div>
+
+                                    <div class="col-md-8">
+                                        <label class="form-label">Adresse du point</label>
+                                        <input class="form-control"
+                                               name="point_address"
+                                               placeholder="Adresse du point de livraison">
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">Fournisseur actuel</label>
+                                        <input class="form-control"
+                                               name="point_supplier"
+                                               placeholder="Fournisseur actuel du point">
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
                 <div class="col-lg-6 mb-4 crm-cotation-panel-wrap" data-energy-section="electricite">
                     <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--energy">
                         <h5 class="mb-3">Donnees consommation electricite</h5>
@@ -164,11 +340,6 @@
                         <div class="mb-2">
                             <label class="form-label">Nombre de mois a fournir</label>
                             <input class="form-control" name="elec_nb_mois" value="{{ cotation.elec_nb_mois or '' }}" placeholder="Nombre de mois de fourniture">
-                        </div>
-
-                        <div class="mb-2">
-                            <label class="form-label">PDL</label>
-                            <input class="form-control" name="pdl_pce" value="{{ cotation.pdl_pce or '' }}" placeholder="PDL">
                         </div>
 
                         <div class="mb-2">
@@ -247,11 +418,6 @@
                         </div>
 
                         <div class="mb-2">
-                            <label class="form-label">PCE</label>
-                            <input class="form-control" name="pce" value="{{ cotation.pce or '' }}" placeholder="PCE">
-                        </div>
-
-                        <div class="mb-2">
                             <label class="form-label">Segment</label>
                             <input class="form-control" name="gaz_segment" value="{{ cotation.gaz_segment or '' }}" placeholder="Segment">
                         </div>
@@ -326,68 +492,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-    const form = document.querySelector("[data-cotation-form]");
-    if (!form) {
-        return;
-    }
-
-    const energySelect = form.querySelector("[data-energy-select]");
-    const energySections = form.querySelectorAll("[data-energy-section]");
-    const emptyState = form.querySelector("[data-energy-empty]");
-    const status = form.querySelector("[data-energy-status]");
-
-    if (!energySelect || !energySections.length) {
-        return;
-    }
-
-    const energyLabels = {
-        electricite: "Electricite",
-        gaz: "Gaz",
-        elec_gaz: "Electricite & gaz",
-    };
-
-    const activeGroups = (value) => {
-        if (value === "electricite") {
-            return ["electricite"];
-        }
-        if (value === "gaz") {
-            return ["gaz"];
-        }
-        if (value === "elec_gaz") {
-            return ["electricite", "gaz"];
-        }
-        return [];
-    };
-
-    const syncEnergySections = () => {
-        const value = energySelect.value;
-        const groups = activeGroups(value);
-
-        energySections.forEach((section) => {
-            const shouldShow = groups.includes(section.dataset.energySection);
-            section.hidden = !shouldShow;
-            section.classList.toggle("is-hidden", !shouldShow);
-
-            section.querySelectorAll("input, select, textarea").forEach((field) => {
-                field.disabled = !shouldShow;
-            });
-        });
-
-        if (emptyState) {
-            emptyState.hidden = groups.length > 0;
-        }
-
-        if (status) {
-            status.textContent = value
-                ? `Bloc actif : ${energyLabels[value] || "Demande"}`
-                : "Selectionnez une energie pour filtrer automatiquement les blocs de consommation.";
-        }
-    };
-
-    energySelect.addEventListener("change", syncEnergySections);
-    syncEnergySections();
-});
-</script>
+<script src="{{ url_for('static', filename='cotation_form.js') }}?v=1"></script>
 {% endblock %}

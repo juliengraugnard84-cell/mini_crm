@@ -429,6 +429,38 @@
         </article>
         {% endif %}
 
+        {% if cotation.delivery_points %}
+        <article class="card crm-cotation-panel" style="{{ square_panel_style }}">
+            <div class="crm-cotation-card-head">
+                <h2>Points de livraison</h2>
+                <p class="crm-soft-note">
+                    {% if cotation.site_mode == "multi" %}
+                        Organisation multi-site avec {{ cotation.delivery_points_count }} point(s) rattache(s) a la demande.
+                    {% else %}
+                        Organisation mono-site rattachee a la demande.
+                    {% endif %}
+                </p>
+            </div>
+
+            <div class="crm-cotation-delivery-grid">
+                {% for point in cotation.delivery_points %}
+                <div class="crm-info-card">
+                    <span class="crm-info-label">
+                        Point {{ loop.index }} · {{ "PDL" if point.energy_type == "electricite" else "PCE" }}
+                    </span>
+                    <div class="crm-info-value">{{ point.reference_code or "-" }}</div>
+                    <div class="crm-soft-note">
+                        {% if point.site_label %}<strong>{{ point.site_label }}</strong>{% endif %}
+                        {% if point.site_label and point.address %}<br>{% endif %}
+                        {{ point.address or "Adresse non renseignee" }}
+                        {% if point.supplier %}<br>Fournisseur : {{ point.supplier }}{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+        {% endif %}
+
         <article class="card crm-cotation-panel" style="{{ square_panel_style }}">
             <div class="crm-cotation-card-head">
                 <h2>Commentaire du commercial</h2>
