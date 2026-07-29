@@ -9,6 +9,7 @@ function initCotationForm(form) {
     const emptyState = form.querySelector("[data-energy-empty]");
     const status = form.querySelector("[data-energy-status]");
     const deliveryRoot = form.querySelector("[data-delivery-points-root]");
+    const meterTypeSelect = form.querySelector("[data-meter-type-select]");
 
     const energyLabels = {
         electricite: "Electricite",
@@ -27,6 +28,27 @@ function initCotationForm(form) {
             return ["electricite", "gaz"];
         }
         return [];
+    };
+
+    const syncMeterTypeOptions = () => {
+        if (!meterTypeSelect || !energySelect) {
+            return;
+        }
+
+        const groups = activeGroups(energySelect.value);
+        Array.from(meterTypeSelect.options).forEach((option) => {
+            const optionEnergy = option.dataset.meterEnergy;
+            if (!optionEnergy) {
+                return;
+            }
+
+            const available = groups.includes(optionEnergy);
+            option.hidden = !available;
+            option.disabled = !available;
+            if (!available && option.selected) {
+                meterTypeSelect.value = "";
+            }
+        });
     };
 
     const syncEnergySections = () => {
@@ -58,6 +80,7 @@ function initCotationForm(form) {
         }
 
         syncDeliveryPointEnergy();
+        syncMeterTypeOptions();
     };
 
     let getSiteMode = () => "mono";

@@ -246,6 +246,14 @@
                     <span class="crm-info-label">Date echeance</span>
                     <div class="crm-info-value">{{ format_date(cotation.date_echeance) if cotation.date_echeance else "-" }}</div>
                 </div>
+                <div class="crm-info-card" style="{{ square_field_style }}">
+                    <span class="crm-info-label">Duree souhaitee</span>
+                    <div class="crm-info-value">{{ cotation.duree_souhaitee_mois ~ ' mois' if cotation.duree_souhaitee_mois else "-" }}</div>
+                </div>
+                <div class="crm-info-card" style="{{ square_field_style }}">
+                    <span class="crm-info-label">Marge souhaitee</span>
+                    <div class="crm-info-value">{{ cotation.marge_souhaitee ~ ' EUR' if cotation.marge_souhaitee else "-" }}</div>
+                </div>
             </div>
         </article>
 

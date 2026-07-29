@@ -312,7 +312,9 @@ def init_db():
                     created_by INTEGER,
                     is_read INTEGER DEFAULT 0,
                     status TEXT DEFAULT 'nouvelle',
-                    date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    duree_souhaitee_mois INTEGER,
+                    marge_souhaitee TEXT
                 )
             """)
 
@@ -473,6 +475,8 @@ def init_db():
 
             # BASE COTATION
             _try_add_column(conn, "cotations", "type_compteur TEXT")
+            _try_add_column(conn, "cotations", "duree_souhaitee_mois INTEGER")
+            _try_add_column(conn, "cotations", "marge_souhaitee TEXT")
             _try_add_column(conn, "cotations", "heure_negociation TIME")
             _try_add_column(conn, "cotations", "signataire_mobile TEXT")
 
@@ -5348,6 +5352,8 @@ def create_cotation(client_id):
 
     # Champs étendus
     type_compteur = (request.form.get("type_compteur") or "").strip()
+    duree_souhaitee_mois = parse_int_safe((request.form.get("duree_souhaitee_mois") or "").strip())
+    marge_souhaitee = (request.form.get("marge_souhaitee") or "").strip()
     signataire_mobile = (request.form.get("signataire_mobile") or "").strip()
     site_nom = (request.form.get("site_nom") or "").strip()
     fonction_signataire = (request.form.get("fonction_signataire") or "").strip()
@@ -5449,14 +5455,16 @@ def create_cotation(client_id):
                     gaz_segment,
                     profil,
                     gaz_car,
-                    gaz_fournisseur_actuel
+                    gaz_fournisseur_actuel,
+                    duree_souhaitee_mois,
+                    marge_souhaitee
                 )
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, 0, 'en_cours', NOW(), %s, %s,
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s
                 )
                 RETURNING id
             """, (
@@ -5503,6 +5511,8 @@ def create_cotation(client_id):
                 profil or None,
                 gaz_car or None,
                 gaz_fournisseur_actuel or None,
+                duree_souhaitee_mois,
+                marge_souhaitee or None,
             ))
             cotation_id = cur.fetchone()[0]
 
@@ -5626,6 +5636,8 @@ def edit_cotation(client_id, cotation_id):
         status = (request.form.get("status") or "").strip().lower()
 
         type_compteur = (request.form.get("type_compteur") or "").strip()
+        duree_souhaitee_mois = parse_int_safe((request.form.get("duree_souhaitee_mois") or "").strip())
+        marge_souhaitee = (request.form.get("marge_souhaitee") or "").strip()
         signataire_mobile = (request.form.get("signataire_mobile") or "").strip()
         site_nom = (request.form.get("site_nom") or "").strip()
         fonction_signataire = (request.form.get("fonction_signataire") or "").strip()
@@ -5730,6 +5742,8 @@ def edit_cotation(client_id, cotation_id):
                         profil = %s,
                         gaz_car = %s,
                         gaz_fournisseur_actuel = %s,
+                        duree_souhaitee_mois = %s,
+                        marge_souhaitee = %s,
                         is_read = %s
                     WHERE id = %s
                       AND client_id = %s
@@ -5777,6 +5791,8 @@ def edit_cotation(client_id, cotation_id):
                         profil or None,
                         gaz_car or None,
                         gaz_fournisseur_actuel or None,
+                        duree_souhaitee_mois,
+                        marge_souhaitee or None,
                         0 if user.get("role") != "admin" else (1 if cotation.get("is_read") else 0),
                         cotation_id,
                         client_id,

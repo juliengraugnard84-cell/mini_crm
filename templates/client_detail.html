@@ -653,11 +653,6 @@ and 'update_client_status' in available_endpoints %}
                                 </div>
 
                                 <div class="mb-2">
-                                    <label class="form-label">Puissance souscrite</label>
-                                    <input class="form-control" name="puissance_souscrite" placeholder="Puissance souscrite">
-                                </div>
-
-                                <div class="mb-2">
                                     <label class="form-label">Fournisseur actuel</label>
                                     <input class="form-control" name="elec_fournisseur_actuel" placeholder="Fournisseur actuel électricité">
                                 </div>
@@ -752,12 +747,35 @@ and 'update_client_status' in available_endpoints %}
 
                                 <div class="mb-2">
                                     <label class="form-label">Type de compteur</label>
-                                    <input class="form-control" name="type_compteur" placeholder="Type de compteur">
+                                    <select class="form-select" name="type_compteur" data-meter-type-select>
+                                        <option value="">Sélectionner</option>
+                                        <option value="C5" data-meter-energy="electricite">C5</option>
+                                        <option value="C4" data-meter-energy="electricite">C4</option>
+                                        <option value="C2" data-meter-energy="electricite">C2</option>
+                                        <option value="T1" data-meter-energy="gaz">T1</option>
+                                        <option value="T2" data-meter-energy="gaz">T2</option>
+                                        <option value="T3" data-meter-energy="gaz">T3</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Puissance</label>
+                                    <input class="form-control" name="puissance_souscrite" placeholder="Puissance" inputmode="decimal">
                                 </div>
 
                                 <div class="mb-2">
                                     <label class="form-label">Date d’échéance</label>
                                     <input type="date" class="form-control" name="date_echeance">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Durée souhaitée (en mois)</label>
+                                    <input type="number" min="1" step="1" class="form-control" name="duree_souhaitee_mois" placeholder="Ex. 24">
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Marge souhaitée (en €)</label>
+                                    <input type="number" min="0" step="0.01" class="form-control" name="marge_souhaitee" placeholder="Ex. 2,50">
                                 </div>
 
                                 <div class="mb-2">
