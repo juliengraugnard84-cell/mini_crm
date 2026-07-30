@@ -4476,11 +4476,32 @@ def ensure_cotation_delivery_points_schema(conn):
                 reference_code TEXT,
                 address TEXT,
                 supplier TEXT,
+                date_negociation DATE,
+                heure_negociation TIME,
+                type_compteur TEXT,
+                puissance_souscrite TEXT,
+                date_echeance DATE,
+                duree_souhaitee_mois INTEGER,
+                marge_souhaitee TEXT,
+                commentaire TEXT,
                 sort_order INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+        for column_sql in (
+            "date_negociation DATE",
+            "heure_negociation TIME",
+            "type_compteur TEXT",
+            "puissance_souscrite TEXT",
+            "date_echeance DATE",
+            "duree_souhaitee_mois INTEGER",
+            "marge_souhaitee TEXT",
+            "commentaire TEXT",
+        ):
+            cur.execute(
+                f"ALTER TABLE cotation_delivery_points ADD COLUMN IF NOT EXISTS {column_sql}"
+            )
         cur.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_cotation_delivery_points_cotation_id
@@ -4496,6 +4517,16 @@ def build_legacy_cotation_delivery_points(cotation):
     source = dict(cotation) if not isinstance(cotation, dict) else dict(cotation)
     site_label = (source.get("site_nom") or "").strip()
     address = (source.get("adresse_consommation") or "").strip()
+    legacy_meter_information = {
+        "date_negociation": source.get("date_negociation"),
+        "heure_negociation": source.get("heure_negociation"),
+        "type_compteur": (source.get("type_compteur") or "").strip(),
+        "puissance_souscrite": (source.get("puissance_souscrite") or "").strip(),
+        "date_echeance": source.get("date_echeance"),
+        "duree_souhaitee_mois": source.get("duree_souhaitee_mois"),
+        "marge_souhaitee": (source.get("marge_souhaitee") or "").strip(),
+        "commentaire": (source.get("commentaire") or "").strip(),
+    }
     points = []
 
     pdl_pce = (source.get("pdl_pce") or "").strip()
@@ -4506,6 +4537,7 @@ def build_legacy_cotation_delivery_points(cotation):
             "reference_code": pdl_pce,
             "address": address,
             "supplier": (source.get("elec_fournisseur_actuel") or source.get("fournisseur_actuel") or "").strip(),
+            **legacy_meter_information,
             "sort_order": len(points),
         })
 
@@ -4517,6 +4549,7 @@ def build_legacy_cotation_delivery_points(cotation):
             "reference_code": pce,
             "address": address,
             "supplier": (source.get("gaz_fournisseur_actuel") or source.get("fournisseur_actuel") or "").strip(),
+            **legacy_meter_information,
             "sort_order": len(points),
         })
 
@@ -4535,6 +4568,7 @@ def build_legacy_cotation_delivery_points(cotation):
                 or source.get("gaz_fournisseur_actuel")
                 or ""
             ).strip(),
+            **legacy_meter_information,
             "sort_order": 0,
         }]
 
@@ -4552,6 +4586,14 @@ def extract_cotation_delivery_points_from_form(
     point_references = form.getlist("point_reference")
     point_addresses = form.getlist("point_address")
     point_suppliers = form.getlist("point_supplier")
+    point_dates_negociation = form.getlist("point_date_negociation")
+    point_heures_negociation = form.getlist("point_heure_negociation")
+    point_types_compteur = form.getlist("point_type_compteur")
+    point_puissances_souscrites = form.getlist("point_puissance_souscrite")
+    point_dates_echeance = form.getlist("point_date_echeance")
+    point_durees_souhaitees = form.getlist("point_duree_souhaitee_mois")
+    point_marges_souhaitees = form.getlist("point_marge_souhaitee")
+    point_commentaires = form.getlist("point_commentaire")
 
     total = max(
         len(point_site_labels),
@@ -4559,6 +4601,14 @@ def extract_cotation_delivery_points_from_form(
         len(point_references),
         len(point_addresses),
         len(point_suppliers),
+        len(point_dates_negociation),
+        len(point_heures_negociation),
+        len(point_types_compteur),
+        len(point_puissances_souscrites),
+        len(point_dates_echeance),
+        len(point_durees_souhaitees),
+        len(point_marges_souhaitees),
+        len(point_commentaires),
     )
 
     fallback_energy = normalize_delivery_point_energy(cotation_energy_type)
@@ -4601,8 +4651,18 @@ def extract_cotation_delivery_points_from_form(
         reference_code = (point_references[index] if index < len(point_references) else "").strip()
         address = (point_addresses[index] if index < len(point_addresses) else "").strip()
         supplier = (point_suppliers[index] if index < len(point_suppliers) else "").strip()
+        date_negociation = parse_date_safe(point_dates_negociation[index] if index < len(point_dates_negociation) else "")
+        heure_negociation = parse_time_safe(point_heures_negociation[index] if index < len(point_heures_negociation) else "")
+        type_compteur = (point_types_compteur[index] if index < len(point_types_compteur) else "").strip()
+        puissance_souscrite = (point_puissances_souscrites[index] if index < len(point_puissances_souscrites) else "").strip()
+        date_echeance = parse_date_safe(point_dates_echeance[index] if index < len(point_dates_echeance) else "")
+        duree_souhaitee_mois = parse_int_safe(point_durees_souhaitees[index] if index < len(point_durees_souhaitees) else "")
+        marge_souhaitee = (point_marges_souhaitees[index] if index < len(point_marges_souhaitees) else "").strip()
+        commentaire = (point_commentaires[index] if index < len(point_commentaires) else "").strip()
 
-        if not any([site_label, reference_code, address, supplier]):
+        if not any([site_label, reference_code, address, supplier, date_negociation, heure_negociation,
+                    type_compteur, puissance_souscrite, date_echeance, duree_souhaitee_mois,
+                    marge_souhaitee, commentaire]):
             continue
 
         if not site_label and index == 0:
@@ -4616,6 +4676,14 @@ def extract_cotation_delivery_points_from_form(
             "reference_code": reference_code,
             "address": address,
             "supplier": supplier,
+            "date_negociation": date_negociation,
+            "heure_negociation": heure_negociation,
+            "type_compteur": type_compteur,
+            "puissance_souscrite": puissance_souscrite,
+            "date_echeance": date_echeance,
+            "duree_souhaitee_mois": duree_souhaitee_mois,
+            "marge_souhaitee": marge_souhaitee,
+            "commentaire": commentaire,
             "sort_order": len(points),
         })
 
@@ -4669,9 +4737,17 @@ def save_cotation_delivery_points(conn, cotation_id, points):
                 reference_code,
                 address,
                 supplier,
+                date_negociation,
+                heure_negociation,
+                type_compteur,
+                puissance_souscrite,
+                date_echeance,
+                duree_souhaitee_mois,
+                marge_souhaitee,
+                commentaire,
                 sort_order
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             [
                 (
@@ -4681,6 +4757,14 @@ def save_cotation_delivery_points(conn, cotation_id, points):
                     point.get("reference_code") or None,
                     point.get("address") or None,
                     point.get("supplier") or None,
+                    point.get("date_negociation"),
+                    point.get("heure_negociation"),
+                    point.get("type_compteur") or None,
+                    point.get("puissance_souscrite") or None,
+                    point.get("date_echeance"),
+                    point.get("duree_souhaitee_mois"),
+                    point.get("marge_souhaitee") or None,
+                    point.get("commentaire") or None,
                     point.get("sort_order") or index,
                 )
                 for index, point in enumerate(points)

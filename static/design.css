@@ -1491,6 +1491,17 @@ main.content {
     font-size: 15px;
 }
 
+.crm-cotation-point-extra {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.crm-cotation-point-extra h6 {
+    margin-bottom: 1rem;
+    color: var(--crm-navy, #21314d);
+}
+
 .crm-cotation-delivery-actions {
     display: flex;
     justify-content: space-between;

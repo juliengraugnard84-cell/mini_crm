@@ -10,6 +10,7 @@ function initCotationForm(form) {
     const status = form.querySelector("[data-energy-status]");
     const deliveryRoot = form.querySelector("[data-delivery-points-root]");
     const meterTypeSelect = form.querySelector("[data-meter-type-select]");
+    const globalComplementaryPanels = Array.from(form.querySelectorAll("[data-global-complementary-information]"));
 
     const energyLabels = {
         electricite: "Electricite",
@@ -130,6 +131,27 @@ function initCotationForm(form) {
             label.textContent = energyField.value === "gaz" ? "PCE" : "PDL";
         };
 
+        const syncPointMeterTypeOptions = (card) => {
+            const energyField = card.querySelector("[data-point-energy]");
+            const meterTypeField = card.querySelector("[data-point-meter-type]");
+            if (!energyField || !meterTypeField) {
+                return;
+            }
+
+            Array.from(meterTypeField.options).forEach((option) => {
+                const optionEnergy = option.dataset.meterEnergy;
+                if (!optionEnergy) {
+                    return;
+                }
+                const available = optionEnergy === energyField.value;
+                option.hidden = !available;
+                option.disabled = !available;
+                if (!available && option.selected) {
+                    meterTypeField.value = "";
+                }
+            });
+        };
+
         const refreshPointCards = () => {
             ensureAtLeastOneCard();
             const mode = getSiteMode();
@@ -147,6 +169,16 @@ function initCotationForm(form) {
                 card.hidden = !visible;
                 setCardFieldsDisabled(card, !visible);
                 syncPointReferenceLabel(card);
+                syncPointMeterTypeOptions(card);
+
+                const extraInformation = card.querySelector("[data-point-extra-information]");
+                if (extraInformation) {
+                    const showExtraInformation = mode === "multi" && visible;
+                    extraInformation.hidden = !showExtraInformation;
+                    extraInformation.querySelectorAll("input, select, textarea").forEach((field) => {
+                        field.disabled = !showExtraInformation;
+                    });
+                }
 
                 if (removeButton) {
                     removeButton.hidden = cards.length <= 1 || mode !== "multi";
@@ -162,6 +194,14 @@ function initCotationForm(form) {
                     ? "Mode multi-site actif : vous pouvez ajouter plusieurs points de livraison."
                     : "Mode mono-site actif : une seule fiche point de livraison est ouverte.";
             }
+
+            globalComplementaryPanels.forEach((panel) => {
+                const usePerMeterInformation = mode === "multi";
+                panel.hidden = usePerMeterInformation;
+                panel.querySelectorAll("input, select, textarea").forEach((field) => {
+                    field.disabled = usePerMeterInformation;
+                });
+            });
 
             syncDeliveryPointEnergy();
         };
@@ -220,6 +260,7 @@ function initCotationForm(form) {
                 const card = event.target.closest("[data-delivery-point-item]");
                 if (card) {
                     syncPointReferenceLabel(card);
+                    syncPointMeterTypeOptions(card);
                 }
             }
         });

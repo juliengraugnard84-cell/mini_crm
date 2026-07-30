@@ -254,6 +254,20 @@
                                                placeholder="Fournisseur actuel du point">
                                     </div>
                                 </div>
+
+                                <div class="crm-cotation-point-extra" data-point-extra-information hidden>
+                                    <h6>Informations complémentaires du compteur</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-4"><label class="form-label">Date de négociation</label><input type="date" class="form-control" name="point_date_negociation" value="{{ point.date_negociation if point.date_negociation else '' }}"></div>
+                                        <div class="col-md-4"><label class="form-label">Heure de négociation</label><input type="time" class="form-control" name="point_heure_negociation" value="{{ (point.heure_negociation|string)[:5] if point.heure_negociation else '' }}"></div>
+                                        <div class="col-md-4"><label class="form-label">Type de compteur</label><select class="form-select" name="point_type_compteur" data-point-meter-type><option value="">Sélectionner</option><option value="C5" data-meter-energy="electricite" {% if point.type_compteur == 'C5' %}selected{% endif %}>C5</option><option value="C4" data-meter-energy="electricite" {% if point.type_compteur == 'C4' %}selected{% endif %}>C4</option><option value="C2" data-meter-energy="electricite" {% if point.type_compteur == 'C2' %}selected{% endif %}>C2</option><option value="T1" data-meter-energy="gaz" {% if point.type_compteur == 'T1' %}selected{% endif %}>T1</option><option value="T2" data-meter-energy="gaz" {% if point.type_compteur == 'T2' %}selected{% endif %}>T2</option><option value="T3" data-meter-energy="gaz" {% if point.type_compteur == 'T3' %}selected{% endif %}>T3</option></select></div>
+                                        <div class="col-md-4"><label class="form-label">Puissance</label><input class="form-control" name="point_puissance_souscrite" value="{{ point.puissance_souscrite or '' }}" placeholder="Puissance" inputmode="decimal"></div>
+                                        <div class="col-md-4"><label class="form-label">Date d’échéance</label><input type="date" class="form-control" name="point_date_echeance" value="{{ point.date_echeance if point.date_echeance else '' }}"></div>
+                                        <div class="col-md-4"><label class="form-label">Durée souhaitée (en mois)</label><input type="number" min="1" step="1" class="form-control" name="point_duree_souhaitee_mois" value="{{ point.duree_souhaitee_mois or '' }}" placeholder="Ex. 24"></div>
+                                        <div class="col-md-4"><label class="form-label">Marge souhaitée (en €)</label><input type="number" min="0" step="0.01" class="form-control" name="point_marge_souhaitee" value="{{ point.marge_souhaitee or '' }}" placeholder="Ex. 2,50"></div>
+                                        <div class="col-md-8"><label class="form-label">Commentaire</label><textarea class="form-control" name="point_commentaire" rows="3" placeholder="Commentaire">{{ point.commentaire or '' }}</textarea></div>
+                                    </div>
+                                </div>
                             </div>
                             {% endfor %}
                         </div>
@@ -316,6 +330,20 @@
                                         <input class="form-control"
                                                name="point_supplier"
                                                placeholder="Fournisseur actuel du point">
+                                    </div>
+                                </div>
+
+                                <div class="crm-cotation-point-extra" data-point-extra-information hidden>
+                                    <h6>Informations complémentaires du compteur</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-4"><label class="form-label">Date de négociation</label><input type="date" class="form-control" name="point_date_negociation"></div>
+                                        <div class="col-md-4"><label class="form-label">Heure de négociation</label><input type="time" class="form-control" name="point_heure_negociation"></div>
+                                        <div class="col-md-4"><label class="form-label">Type de compteur</label><select class="form-select" name="point_type_compteur" data-point-meter-type><option value="">Sélectionner</option><option value="C5" data-meter-energy="electricite">C5</option><option value="C4" data-meter-energy="electricite">C4</option><option value="C2" data-meter-energy="electricite">C2</option><option value="T1" data-meter-energy="gaz">T1</option><option value="T2" data-meter-energy="gaz">T2</option><option value="T3" data-meter-energy="gaz">T3</option></select></div>
+                                        <div class="col-md-4"><label class="form-label">Puissance</label><input class="form-control" name="point_puissance_souscrite" placeholder="Puissance" inputmode="decimal"></div>
+                                        <div class="col-md-4"><label class="form-label">Date d’échéance</label><input type="date" class="form-control" name="point_date_echeance"></div>
+                                        <div class="col-md-4"><label class="form-label">Durée souhaitée (en mois)</label><input type="number" min="1" step="1" class="form-control" name="point_duree_souhaitee_mois" placeholder="Ex. 24"></div>
+                                        <div class="col-md-4"><label class="form-label">Marge souhaitée (en €)</label><input type="number" min="0" step="0.01" class="form-control" name="point_marge_souhaitee" placeholder="Ex. 2,50"></div>
+                                        <div class="col-md-8"><label class="form-label">Commentaire</label><textarea class="form-control" name="point_commentaire" rows="3" placeholder="Commentaire"></textarea></div>
                                     </div>
                                 </div>
                             </div>
@@ -434,7 +462,7 @@
                     </div>
                 </div>
 
-                <div class="col-lg-6 mb-4 crm-cotation-panel-wrap">
+                <div class="col-lg-6 mb-4 crm-cotation-panel-wrap" data-global-complementary-information>
                     <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--meta">
                         <h5 class="mb-3">Informations complementaires</h5>
 

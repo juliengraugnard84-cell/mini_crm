@@ -550,6 +550,20 @@ and 'update_client_status' in available_endpoints %}
                                                        placeholder="Fournisseur actuel du point">
                                             </div>
                                         </div>
+
+                                        <div class="crm-cotation-point-extra" data-point-extra-information hidden>
+                                            <h6>Informations complémentaires du compteur</h6>
+                                            <div class="row g-3">
+                                                <div class="col-md-4"><label class="form-label">Date de négociation</label><input type="date" class="form-control" name="point_date_negociation"></div>
+                                                <div class="col-md-4"><label class="form-label">Heure de négociation</label><input type="time" class="form-control" name="point_heure_negociation"></div>
+                                                <div class="col-md-4"><label class="form-label">Type de compteur</label><select class="form-select" name="point_type_compteur" data-point-meter-type><option value="">Sélectionner</option><option value="C5" data-meter-energy="electricite">C5</option><option value="C4" data-meter-energy="electricite">C4</option><option value="C2" data-meter-energy="electricite">C2</option><option value="T1" data-meter-energy="gaz">T1</option><option value="T2" data-meter-energy="gaz">T2</option><option value="T3" data-meter-energy="gaz">T3</option></select></div>
+                                                <div class="col-md-4"><label class="form-label">Puissance</label><input class="form-control" name="point_puissance_souscrite" placeholder="Puissance" inputmode="decimal"></div>
+                                                <div class="col-md-4"><label class="form-label">Date d’échéance</label><input type="date" class="form-control" name="point_date_echeance"></div>
+                                                <div class="col-md-4"><label class="form-label">Durée souhaitée (en mois)</label><input type="number" min="1" step="1" class="form-control" name="point_duree_souhaitee_mois" placeholder="Ex. 24"></div>
+                                                <div class="col-md-4"><label class="form-label">Marge souhaitée (en €)</label><input type="number" min="0" step="0.01" class="form-control" name="point_marge_souhaitee" placeholder="Ex. 2,50"></div>
+                                                <div class="col-md-8"><label class="form-label">Commentaire</label><textarea class="form-control" name="point_commentaire" rows="3" placeholder="Commentaire"></textarea></div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -611,6 +625,20 @@ and 'update_client_status' in available_endpoints %}
                                                 <input class="form-control"
                                                        name="point_supplier"
                                                        placeholder="Fournisseur actuel du point">
+                                            </div>
+                                        </div>
+
+                                        <div class="crm-cotation-point-extra" data-point-extra-information hidden>
+                                            <h6>Informations complémentaires du compteur</h6>
+                                            <div class="row g-3">
+                                                <div class="col-md-4"><label class="form-label">Date de négociation</label><input type="date" class="form-control" name="point_date_negociation"></div>
+                                                <div class="col-md-4"><label class="form-label">Heure de négociation</label><input type="time" class="form-control" name="point_heure_negociation"></div>
+                                                <div class="col-md-4"><label class="form-label">Type de compteur</label><select class="form-select" name="point_type_compteur" data-point-meter-type><option value="">Sélectionner</option><option value="C5" data-meter-energy="electricite">C5</option><option value="C4" data-meter-energy="electricite">C4</option><option value="C2" data-meter-energy="electricite">C2</option><option value="T1" data-meter-energy="gaz">T1</option><option value="T2" data-meter-energy="gaz">T2</option><option value="T3" data-meter-energy="gaz">T3</option></select></div>
+                                                <div class="col-md-4"><label class="form-label">Puissance</label><input class="form-control" name="point_puissance_souscrite" placeholder="Puissance" inputmode="decimal"></div>
+                                                <div class="col-md-4"><label class="form-label">Date d’échéance</label><input type="date" class="form-control" name="point_date_echeance"></div>
+                                                <div class="col-md-4"><label class="form-label">Durée souhaitée (en mois)</label><input type="number" min="1" step="1" class="form-control" name="point_duree_souhaitee_mois" placeholder="Ex. 24"></div>
+                                                <div class="col-md-4"><label class="form-label">Marge souhaitée (en €)</label><input type="number" min="0" step="0.01" class="form-control" name="point_marge_souhaitee" placeholder="Ex. 2,50"></div>
+                                                <div class="col-md-8"><label class="form-label">Commentaire</label><textarea class="form-control" name="point_commentaire" rows="3" placeholder="Commentaire"></textarea></div>
                                             </div>
                                         </div>
                                     </div>
@@ -731,7 +759,7 @@ and 'update_client_status' in available_endpoints %}
                         </div>
 
                         <!-- ================= INFOS MÉTIER EXISTANTES / COMPAT ================= -->
-                        <div class="col-lg-6 mb-4 crm-cotation-panel-wrap">
+                        <div class="col-lg-6 mb-4 crm-cotation-panel-wrap" data-global-complementary-information>
                             <div class="border rounded p-3 h-100 crm-cotation-section crm-cotation-section--meta">
                                 <h5 class="mb-3">Informations complémentaires</h5>
 

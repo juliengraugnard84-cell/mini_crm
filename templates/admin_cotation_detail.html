@@ -462,6 +462,17 @@
                         {% if point.site_label and point.address %}<br>{% endif %}
                         {{ point.address or "Adresse non renseignee" }}
                         {% if point.supplier %}<br>Fournisseur : {{ point.supplier }}{% endif %}
+                        {% if point.date_negociation or point.heure_negociation or point.type_compteur or point.puissance_souscrite or point.date_echeance or point.duree_souhaitee_mois or point.marge_souhaitee or point.commentaire %}
+                            <br><br><strong>Informations complémentaires</strong>
+                            {% if point.date_negociation %}<br>Négociation : {{ point.date_negociation.strftime("%d/%m/%Y") }}{% endif %}
+                            {% if point.heure_negociation %} {{ (point.heure_negociation|string)[:5] }}{% endif %}
+                            {% if point.type_compteur %}<br>Type de compteur : {{ point.type_compteur }}{% endif %}
+                            {% if point.puissance_souscrite %}<br>Puissance : {{ point.puissance_souscrite }}{% endif %}
+                            {% if point.date_echeance %}<br>Échéance : {{ point.date_echeance.strftime("%d/%m/%Y") }}{% endif %}
+                            {% if point.duree_souhaitee_mois %}<br>Durée : {{ point.duree_souhaitee_mois }} mois{% endif %}
+                            {% if point.marge_souhaitee %}<br>Marge : {{ point.marge_souhaitee }} €{% endif %}
+                            {% if point.commentaire %}<br>Commentaire : {{ point.commentaire }}{% endif %}
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
