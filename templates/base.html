@@ -76,6 +76,11 @@
                     Agenda des negociations
                 </a>
             {% elif current_user and current_user.role == "commercial" %}
+                <a href="{{ url_for('my_hot_followups') }}"
+                   class="{% if request.path.startswith('/mes-dossiers-chauds') %}active{% endif %}">
+                    Mes dossiers chauds
+                </a>
+
                 <a href="{{ url_for('planning') }}"
                    class="{% if request.path.startswith('/planning') %}active{% endif %}">
                     Agenda des negociations

@@ -5318,6 +5318,40 @@ def create_hot_followup(client_id):
     return redirect(url_for("client_detail", client_id=client_id))
 
 
+@app.route("/mes-dossiers-chauds", endpoint="my_hot_followups")
+@login_required
+def my_hot_followups():
+    user = session.get("user") or {}
+    if user.get("role") != "commercial":
+        abort(403)
+
+    conn = get_db()
+    ensure_hot_followups_schema()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                f.id,
+                f.follow_up_date,
+                f.follow_up_time,
+                f.notes,
+                c.id AS client_id,
+                c.name AS client_name,
+                c.status AS client_status
+            FROM client_hot_followups f
+            JOIN crm_clients c ON c.id = f.client_id
+            WHERE f.commercial_id = %s
+            ORDER BY f.follow_up_date ASC, f.follow_up_time ASC NULLS LAST, f.id DESC
+        """, (user.get("id"),))
+        followups = [row_to_obj(row) for row in cur.fetchall()]
+
+    return render_template(
+        "my_hot_followups.html",
+        followups=followups,
+        current_user=user,
+        today=date.today(),
+    )
+
+
 @app.route("/clients/<int:client_id>/edit", methods=["POST"], endpoint="edit_client")
 @login_required
 def edit_client(client_id):
