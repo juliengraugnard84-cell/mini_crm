@@ -1653,6 +1653,37 @@ def ensure_planning_schema():
         raise
 
 
+def ensure_hot_followups_schema():
+    """Stocke les dossiers chauds et leurs relances planifiees."""
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS client_hot_followups (
+                    id SERIAL PRIMARY KEY,
+                    client_id INTEGER NOT NULL REFERENCES crm_clients(id) ON DELETE CASCADE,
+                    commercial_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    follow_up_date DATE NOT NULL,
+                    follow_up_time TIME,
+                    notes TEXT,
+                    calendar_event_id INTEGER,
+                    created_by INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        _try_run_ddl(
+            conn,
+            """
+            CREATE INDEX IF NOT EXISTS idx_client_hot_followups_commercial_date
+            ON client_hot_followups (commercial_id, follow_up_date, follow_up_time)
+            """,
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
 def list_planning_users():
     conn = get_db()
     users = []
@@ -3060,6 +3091,7 @@ def delete_cotation_admin(cotation_id):
 @admin_required
 def admin_dossiers():
     conn = get_db()
+    ensure_hot_followups_schema()
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -3093,6 +3125,22 @@ def admin_dossiers():
         """)
         rows = cur.fetchall()
 
+        cur.execute("""
+            SELECT
+                f.id,
+                f.follow_up_date,
+                f.follow_up_time,
+                f.notes,
+                c.id AS client_id,
+                c.name AS client_name,
+                u.username AS commercial
+            FROM client_hot_followups f
+            JOIN crm_clients c ON c.id = f.client_id
+            JOIN users u ON u.id = f.commercial_id
+            ORDER BY u.username ASC, f.follow_up_date ASC, f.follow_up_time ASC NULLS LAST, f.id ASC
+        """)
+        hot_followups = cur.fetchall()
+
     stats = []
 
     for r in rows:
@@ -3108,9 +3156,15 @@ def admin_dossiers():
 
         stats.append(obj)
 
+    hot_followups_by_commercial = {}
+    for followup in hot_followups:
+        row = row_to_obj(followup)
+        hot_followups_by_commercial.setdefault(row.commercial, []).append(row)
+
     return render_template(
         "admin_dossiers.html",
         stats=stats,
+        hot_followups_by_commercial=hot_followups_by_commercial,
     )
 
 
@@ -5102,6 +5156,17 @@ def client_detail(client_id):
         return redirect(url_for("clients"))
 
     documents = list_client_documents(client_id)
+    ensure_hot_followups_schema()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT f.*, u.username AS commercial_name
+            FROM client_hot_followups f
+            JOIN users u ON u.id = f.commercial_id
+            WHERE f.client_id = %s
+            ORDER BY f.follow_up_date ASC, f.follow_up_time ASC NULLS LAST, f.id DESC
+        """, (client_id,))
+        hot_followups = cur.fetchall()
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -5176,6 +5241,7 @@ def client_detail(client_id):
         cotations=[row_to_obj(c) for c in cotations],
         timeline=[row_to_obj(t) for t in timeline],
         updates=[row_to_obj(u) for u in updates],
+        hot_followups=[row_to_obj(followup) for followup in hot_followups],
         current_user=user,
         commercial_users=commercial_users,
         available_endpoints=[rule.endpoint for rule in app.url_map.iter_rules()],
@@ -5185,6 +5251,73 @@ def client_detail(client_id):
 # =========================
 # CLIENT — MODIFICATION
 # =========================
+@app.route("/clients/<int:client_id>/hot-followups", methods=["POST"], endpoint="create_hot_followup")
+@login_required
+def create_hot_followup(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+
+    follow_up_date = parse_date_safe((request.form.get("follow_up_date") or "").strip())
+    follow_up_time = parse_time_safe((request.form.get("follow_up_time") or "").strip())
+    notes = (request.form.get("follow_up_notes") or "").strip()
+    if not follow_up_date:
+        flash("Choisissez la date de relance du dossier chaud.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    conn = get_db()
+    user = session.get("user") or {}
+    ensure_hot_followups_schema()
+    ensure_planning_schema()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT c.name, c.owner_id, u.username AS commercial_name
+            FROM crm_clients c
+            LEFT JOIN users u ON u.id = c.owner_id
+            WHERE c.id = %s
+        """, (client_id,))
+        client = cur.fetchone()
+
+    if not client or not client.get("owner_id"):
+        flash("Attribuez d'abord ce dossier a un commercial.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    try:
+        title = f"Relance - {client['name']} - {client['commercial_name'] or 'Commercial'}"
+        description = notes or f"Relance du dossier chaud : {client['name']}"
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO calendar_events (
+                    title, description, event_date, end_date, event_time, end_time,
+                    all_day, category, status, visibility, color, created_by, assigned_to
+                )
+                VALUES (%s, %s, %s, %s, %s, NULL, %s, 'relance', 'confirmed', 'assigned', %s, %s, %s)
+                RETURNING id
+            """, (
+                title, description, follow_up_date, follow_up_date, follow_up_time,
+                not bool(follow_up_time), PLANNING_EVENT_CATEGORIES["relance"]["color"],
+                user.get("id"), client["owner_id"],
+            ))
+            calendar_event_id = cur.fetchone()["id"]
+            cur.execute("""
+                INSERT INTO client_hot_followups (
+                    client_id, commercial_id, follow_up_date, follow_up_time,
+                    notes, calendar_event_id, created_by
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                client_id, client["owner_id"], follow_up_date, follow_up_time,
+                notes or None, calendar_event_id, user.get("id"),
+            ))
+        conn.commit()
+        flash("Dossier chaud ajoute : la relance est visible dans l'agenda du commercial.", "success")
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Erreur creation relance dossier chaud : %r", e)
+        flash("Impossible d'ajouter la relance a l'agenda.", "danger")
+
+    return redirect(url_for("client_detail", client_id=client_id))
+
+
 @app.route("/clients/<int:client_id>/edit", methods=["POST"], endpoint="edit_client")
 @login_required
 def edit_client(client_id):

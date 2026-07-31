@@ -101,6 +101,35 @@ and 'update_client_status' in available_endpoints %}
 </div>
 {% endif %}
 
+{% if current_user and (current_user.role == "admin" or current_user.id == client.owner_id) %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Dossier chaud et relances</strong>
+        <span class="badge text-bg-danger">À suivre</span>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small">Ajoutez une relance : elle sera automatiquement placée dans l'agenda du commercial.</p>
+        <form method="post" action="{{ url_for('create_hot_followup', client_id=client.id) }}" class="row g-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="col-md-4"><input type="date" name="follow_up_date" class="form-control" required aria-label="Date de relance"></div>
+            <div class="col-md-3"><input type="time" name="follow_up_time" class="form-control" aria-label="Heure de relance"></div>
+            <div class="col-md-5"><input type="text" name="follow_up_notes" class="form-control" placeholder="Objet ou consigne de relance"></div>
+            <div class="col-12"><button type="submit" class="btn btn-danger btn-sm">Ajouter à mes dossiers chauds</button></div>
+        </form>
+        {% if hot_followups %}
+        <ul class="list-group list-group-flush mt-3">
+            {% for followup in hot_followups %}
+            <li class="list-group-item px-0">
+                <strong>{{ format_date(followup.follow_up_date) }}</strong>{% if followup.follow_up_time %} · {{ (followup.follow_up_time|string)[:5] }}{% endif %}
+                {% if followup.notes %}<br><span class="text-muted">{{ followup.notes }}</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <!-- ================= FICHE ENTREPRISE ================= -->
 
 <div class="card mb-4">

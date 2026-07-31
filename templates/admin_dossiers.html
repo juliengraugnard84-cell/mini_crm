@@ -83,4 +83,43 @@
     </table>
 </div>
 
+<section class="mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="h4 mb-1">Dossiers chauds et relances</h2>
+            <p class="text-muted mb-0">Les relances planifiées sont regroupées par commercial et visibles dans l'agenda.</p>
+        </div>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('admin_planning') }}">Ouvrir l'agenda</a>
+    </div>
+
+    <div class="row g-3">
+        {% for s in stats %}
+        {% set followups = hot_followups_by_commercial.get(s.commercial, []) %}
+        <div class="col-12 col-lg-6">
+            <article class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>{{ s.commercial }}</strong>
+                    <span class="badge text-bg-danger">{{ followups|length }} relance{{ 's' if followups|length != 1 else '' }}</span>
+                </div>
+                <div class="card-body">
+                    {% if followups %}
+                    <ul class="list-group list-group-flush">
+                        {% for followup in followups %}
+                        <li class="list-group-item px-0">
+                            <a href="{{ url_for('client_detail', client_id=followup.client_id) }}" class="fw-semibold text-decoration-none">{{ followup.client_name }}</a>
+                            <span class="float-end text-danger">{{ format_date(followup.follow_up_date) }}{% if followup.follow_up_time %} · {{ (followup.follow_up_time|string)[:5] }}{% endif %}</span>
+                            {% if followup.notes %}<small class="d-block text-muted mt-1">{{ followup.notes }}</small>{% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <span class="text-muted">Aucun dossier chaud programmé.</span>
+                    {% endif %}
+                </div>
+            </article>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
 {% endblock %}
