@@ -107,7 +107,7 @@
                         {% for followup in followups %}
                         <li class="list-group-item px-0">
                             <a href="{{ url_for('client_detail', client_id=followup.client_id) }}" class="fw-semibold text-decoration-none">{{ followup.client_name }}</a>
-                            <span class="float-end text-danger">{{ format_date(followup.follow_up_date) }}{% if followup.follow_up_time %} · {{ (followup.follow_up_time|string)[:5] }}{% endif %}</span>
+                            <span class="float-end {% if followup.follow_up_date %}text-danger{% else %}text-muted{% endif %}">{% if followup.follow_up_date %}{{ format_date(followup.follow_up_date) }}{% if followup.follow_up_time %} · {{ (followup.follow_up_time|string)[:5] }}{% endif %}{% else %}Relance à programmer{% endif %}</span>
                             {% if followup.notes %}<small class="d-block text-muted mt-1">{{ followup.notes }}</small>{% endif %}
                         </li>
                         {% endfor %}

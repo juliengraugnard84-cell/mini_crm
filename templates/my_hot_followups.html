@@ -19,7 +19,7 @@
         {% if followups %}
         <div class="list-group list-group-flush">
             {% for followup in followups %}
-            <article class="list-group-item py-3 {% if followup.follow_up_date < today %}border-start border-4 border-danger{% elif followup.follow_up_date == today %}border-start border-4 border-warning{% endif %}">
+            <article class="list-group-item py-3 {% if followup.follow_up_date and followup.follow_up_date < today %}border-start border-4 border-danger{% elif followup.follow_up_date == today %}border-start border-4 border-warning{% endif %}">
                 <div class="d-flex justify-content-between align-items-start gap-3">
                     <div>
                         <a href="{{ url_for('client_detail', client_id=followup.client_id) }}" class="fw-semibold text-decoration-none fs-5">{{ followup.client_name }}</a>
@@ -27,9 +27,13 @@
                         {% if followup.notes %}<p class="mb-0 mt-2">{{ followup.notes }}</p>{% endif %}
                     </div>
                     <div class="text-end flex-shrink-0">
+                        {% if followup.follow_up_date %}
                         <strong class="{% if followup.follow_up_date < today %}text-danger{% elif followup.follow_up_date == today %}text-warning-emphasis{% endif %}">{{ format_date(followup.follow_up_date) }}</strong>
                         {% if followup.follow_up_time %}<div class="text-muted">{{ (followup.follow_up_time|string)[:5] }}</div>{% endif %}
                         {% if followup.follow_up_date < today %}<small class="text-danger">En retard</small>{% elif followup.follow_up_date == today %}<small class="text-warning-emphasis">Aujourd'hui</small>{% endif %}
+                        {% else %}
+                        <small class="text-muted">Relance à programmer</small>
+                        {% endif %}
                     </div>
                 </div>
             </article>

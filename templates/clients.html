@@ -109,6 +109,19 @@
                         <input type="text" name="siret" class="form-control">
                     </div>
 
+                    <div class="col-12">
+                        <label class="form-label d-block">Type de dossier *</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="dossier_category" id="dossier-pipeline" value="pipeline" checked>
+                            <label class="form-check-label" for="dossier-pipeline">Dossier en cours de traitement</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="dossier_category" id="dossier-hot" value="hot">
+                            <label class="form-check-label" for="dossier-hot">Dossier chaud</label>
+                        </div>
+                        <small class="form-text text-muted">Un dossier chaud est suivi dans « Mes dossiers chauds » et ne figure pas dans le pipeline de traitement.</small>
+                    </div>
+
                     {% if current_user and current_user.role == "admin" %}
                     <div class="col-md-6">
                         <label class="form-label">Commercial *</label>

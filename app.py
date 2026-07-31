@@ -1657,6 +1657,7 @@ def ensure_hot_followups_schema():
     """Stocke les dossiers chauds et leurs relances planifiees."""
     conn = get_db()
     try:
+        _try_add_column(conn, "crm_clients", "dossier_category TEXT DEFAULT 'pipeline'")
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS client_hot_followups (
@@ -1670,6 +1671,12 @@ def ensure_hot_followups_schema():
                     created_by INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
+            """)
+            cur.execute("""
+                UPDATE crm_clients
+                SET dossier_category = 'hot'
+                WHERE id IN (SELECT DISTINCT client_id FROM client_hot_followups)
+                  AND COALESCE(dossier_category, 'pipeline') <> 'hot'
             """)
         _try_run_ddl(
             conn,
@@ -3102,19 +3109,23 @@ def admin_dossiers():
                 COUNT(*) FILTER (
                     WHERE
                         c.id IS NOT NULL
+                        AND COALESCE(c.dossier_category, 'pipeline') <> 'hot'
                         AND LOWER(COALESCE(c.status,'')) IN ('en_cours','nouveau','')
                 ) AS en_cours,
 
                 COUNT(*) FILTER (
-                    WHERE LOWER(COALESCE(c.status,''))='en_attente'
+                    WHERE COALESCE(c.dossier_category, 'pipeline') <> 'hot'
+                      AND LOWER(COALESCE(c.status,''))='en_attente'
                 ) AS en_attente,
 
                 COUNT(*) FILTER (
-                    WHERE LOWER(COALESCE(c.status,''))='gagne'
+                    WHERE COALESCE(c.dossier_category, 'pipeline') <> 'hot'
+                      AND LOWER(COALESCE(c.status,''))='gagne'
                 ) AS gagnes,
 
                 COUNT(*) FILTER (
-                    WHERE LOWER(COALESCE(c.status,''))='perdu'
+                    WHERE COALESCE(c.dossier_category, 'pipeline') <> 'hot'
+                      AND LOWER(COALESCE(c.status,''))='perdu'
                 ) AS perdus
 
             FROM users u
@@ -3127,17 +3138,24 @@ def admin_dossiers():
 
         cur.execute("""
             SELECT
-                f.id,
+                f.id AS followup_id,
                 f.follow_up_date,
                 f.follow_up_time,
                 f.notes,
                 c.id AS client_id,
                 c.name AS client_name,
                 u.username AS commercial
-            FROM client_hot_followups f
-            JOIN crm_clients c ON c.id = f.client_id
-            JOIN users u ON u.id = f.commercial_id
-            ORDER BY u.username ASC, f.follow_up_date ASC, f.follow_up_time ASC NULLS LAST, f.id ASC
+            FROM crm_clients c
+            JOIN users u ON u.id = c.owner_id
+            LEFT JOIN LATERAL (
+                SELECT id, follow_up_date, follow_up_time, notes
+                FROM client_hot_followups
+                WHERE client_id = c.id
+                ORDER BY follow_up_date ASC, follow_up_time ASC NULLS LAST, id DESC
+                LIMIT 1
+            ) f ON TRUE
+            WHERE COALESCE(c.dossier_category, 'pipeline') = 'hot'
+            ORDER BY u.username ASC, f.follow_up_date ASC NULLS LAST, f.follow_up_time ASC NULLS LAST, c.created_at DESC
         """)
         hot_followups = cur.fetchall()
 
@@ -3183,6 +3201,7 @@ def admin_dossiers_detail(commercial):
         return redirect(url_for("admin_dossiers"))
 
     conn = get_db()
+    ensure_hot_followups_schema()
 
     # 🔒 Vérifie que le commercial existe
     with conn.cursor() as cur:
@@ -3206,6 +3225,7 @@ def admin_dossiers_detail(commercial):
             SELECT id, name, status, created_at
             FROM crm_clients
             WHERE owner_id = %s
+              AND COALESCE(dossier_category, 'pipeline') <> 'hot'
             ORDER BY
                 CASE LOWER(COALESCE(status,''))
                     WHEN 'en_cours' THEN 1
@@ -4928,6 +4948,7 @@ def format_datetime_fr(value, with_time=True):
 def clients():
 
     conn = get_db()
+    ensure_hot_followups_schema()
     q = (request.args.get("q") or "").strip()
 
     user = session.get("user") or {}
@@ -4996,6 +5017,8 @@ def clients():
     en_cours, en_attente, gagnes, perdus = [], [], [], []
 
     for r in rows:
+        if (r.get("dossier_category") or "pipeline").strip().lower() == "hot":
+            continue
         st = (r.get("status") or "").strip().lower()
 
         if st in ("", "nouveau", "en_cours"):
@@ -5030,6 +5053,7 @@ def clients():
 def create_client():
 
     conn = get_db()
+    ensure_hot_followups_schema()
     user = session.get("user") or {}
 
     role = user.get("role")
@@ -5045,6 +5069,7 @@ def create_client():
     notes = (request.form.get("notes") or "").strip()
     siret = (request.form.get("siret") or "").strip()
     gerant_nom = (request.form.get("gerant_nom") or "").strip()
+    dossier_category = (request.form.get("dossier_category") or "pipeline").strip().lower()
 
     if not name:
         flash("Le nom du client est obligatoire.", "danger")
@@ -5052,6 +5077,8 @@ def create_client():
 
     if status not in ("en_cours", "en_attente", "gagne", "perdu", "nouveau"):
         status = "en_cours"
+    if dossier_category not in {"pipeline", "hot"}:
+        dossier_category = "pipeline"
 
     owner_id = None
 
@@ -5100,9 +5127,10 @@ def create_client():
                     notes,
                     owner_id,
                     siret,
-                    gerant_nom
+                    gerant_nom,
+                    dossier_category
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 name,
@@ -5115,6 +5143,7 @@ def create_client():
                 owner_id,
                 siret or None,
                 gerant_nom or None,
+                dossier_category,
             ))
             new_client_id = cur.fetchone()["id"]
 
@@ -5298,6 +5327,10 @@ def create_hot_followup(client_id):
                 user.get("id"), client["owner_id"],
             ))
             calendar_event_id = cur.fetchone()["id"]
+            cur.execute(
+                "UPDATE crm_clients SET dossier_category = 'hot' WHERE id = %s",
+                (client_id,),
+            )
             cur.execute("""
                 INSERT INTO client_hot_followups (
                     client_id, commercial_id, follow_up_date, follow_up_time,
@@ -5330,17 +5363,24 @@ def my_hot_followups():
     with conn.cursor() as cur:
         cur.execute("""
             SELECT
-                f.id,
+                f.id AS followup_id,
                 f.follow_up_date,
                 f.follow_up_time,
                 f.notes,
                 c.id AS client_id,
                 c.name AS client_name,
                 c.status AS client_status
-            FROM client_hot_followups f
-            JOIN crm_clients c ON c.id = f.client_id
-            WHERE f.commercial_id = %s
-            ORDER BY f.follow_up_date ASC, f.follow_up_time ASC NULLS LAST, f.id DESC
+            FROM crm_clients c
+            LEFT JOIN LATERAL (
+                SELECT id, follow_up_date, follow_up_time, notes
+                FROM client_hot_followups
+                WHERE client_id = c.id
+                ORDER BY follow_up_date ASC, follow_up_time ASC NULLS LAST, id DESC
+                LIMIT 1
+            ) f ON TRUE
+            WHERE c.owner_id = %s
+              AND COALESCE(c.dossier_category, 'pipeline') = 'hot'
+            ORDER BY f.follow_up_date ASC NULLS LAST, f.follow_up_time ASC NULLS LAST, c.created_at DESC
         """, (user.get("id"),))
         followups = [row_to_obj(row) for row in cur.fetchall()]
 
