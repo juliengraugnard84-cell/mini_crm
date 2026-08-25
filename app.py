@@ -4538,6 +4538,48 @@ def normalize_delivery_point_energy(value, fallback_energy=None):
     return "electricite"
 
 
+def ensure_cotation_schema(conn):
+    """Met à niveau les colonnes nécessaires aux formulaires de cotation."""
+    columns = (
+        "type_compteur TEXT",
+        "duree_souhaitee_mois INTEGER",
+        "marge_souhaitee TEXT",
+        "heure_negociation TIME",
+        "signataire_mobile TEXT",
+        "site_nom TEXT",
+        "fonction_signataire TEXT",
+        "code_naf TEXT",
+        "date_remise_offre DATE",
+        "elec_debut_fourniture DATE",
+        "elec_fin_fourniture DATE",
+        "elec_nb_mois INTEGER",
+        "elec_segment TEXT",
+        "formule_acheminement TEXT",
+        "elec_car TEXT",
+        "puissance_souscrite TEXT",
+        "elec_fournisseur_actuel TEXT",
+        "pointe TEXT",
+        "hph TEXT",
+        "hch TEXT",
+        "hpr TEXT",
+        "hce TEXT",
+        "gaz_debut_fourniture DATE",
+        "gaz_fin_fourniture DATE",
+        "gaz_nb_mois INTEGER",
+        "pce TEXT",
+        "gaz_segment TEXT",
+        "profil TEXT",
+        "gaz_car TEXT",
+        "gaz_fournisseur_actuel TEXT",
+    )
+
+    with conn.cursor() as cur:
+        for column_sql in columns:
+            cur.execute(
+                f"ALTER TABLE cotations ADD COLUMN IF NOT EXISTS {column_sql}"
+            )
+
+
 def ensure_cotation_delivery_points_schema(conn):
     with conn.cursor() as cur:
         cur.execute(
@@ -5697,6 +5739,7 @@ def create_cotation(client_id):
     site_mode = normalize_cotation_site_mode(site_mode, len(delivery_points))
 
     try:
+        ensure_cotation_schema(conn)
         ensure_cotation_delivery_points_schema(conn)
         with conn.cursor() as cur:
             cur.execute("""
