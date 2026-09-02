@@ -585,7 +585,7 @@ and 'update_client_status' in available_endpoints %}
                                             <div class="row g-3">
                                                 <div class="col-md-4"><label class="form-label">Date de négociation</label><input type="date" class="form-control" name="point_date_negociation"></div>
                                                 <div class="col-md-4"><label class="form-label">Heure de négociation</label><input type="time" class="form-control" name="point_heure_negociation"></div>
-                                                <div class="col-md-4"><label class="form-label">Type de compteur</label><select class="form-select" name="point_type_compteur" data-point-meter-type><option value="">Sélectionner</option><option value="C5" data-meter-energy="electricite">C5</option><option value="C4" data-meter-energy="electricite">C4</option><option value="C2" data-meter-energy="electricite">C2</option><option value="T1" data-meter-energy="gaz">T1</option><option value="T2" data-meter-energy="gaz">T2</option><option value="T3" data-meter-energy="gaz">T3</option></select></div>
+                                                <div class="col-md-4"><label class="form-label">Type de compteur</label><select class="form-select" name="point_type_compteur" data-point-meter-type><option value="">Sélectionner</option><option value="C5" data-meter-energy="electricite">C5</option><option value="C4" data-meter-energy="electricite">C4</option><option value="C2" data-meter-energy="electricite">C2</option><option value="T1" data-meter-energy="gaz">T1</option><option value="T2" data-meter-energy="gaz">T2</option><option value="T3" data-meter-energy="gaz">T3</option><option value="T4" data-meter-energy="gaz">T4</option></select></div>
                                                 <div class="col-md-4"><label class="form-label">Puissance</label><input class="form-control" name="point_puissance_souscrite" placeholder="Puissance" inputmode="decimal"></div>
                                                 <div class="col-md-4"><label class="form-label">Date d’échéance</label><input type="date" class="form-control" name="point_date_echeance"></div>
                                                 <div class="col-md-4"><label class="form-label">Durée souhaitée (en mois)</label><input type="number" min="1" step="1" class="form-control" name="point_duree_souhaitee_mois" placeholder="Ex. 24"></div>
@@ -662,7 +662,7 @@ and 'update_client_status' in available_endpoints %}
                                             <div class="row g-3">
                                                 <div class="col-md-4"><label class="form-label">Date de négociation</label><input type="date" class="form-control" name="point_date_negociation"></div>
                                                 <div class="col-md-4"><label class="form-label">Heure de négociation</label><input type="time" class="form-control" name="point_heure_negociation"></div>
-                                                <div class="col-md-4"><label class="form-label">Type de compteur</label><select class="form-select" name="point_type_compteur" data-point-meter-type><option value="">Sélectionner</option><option value="C5" data-meter-energy="electricite">C5</option><option value="C4" data-meter-energy="electricite">C4</option><option value="C2" data-meter-energy="electricite">C2</option><option value="T1" data-meter-energy="gaz">T1</option><option value="T2" data-meter-energy="gaz">T2</option><option value="T3" data-meter-energy="gaz">T3</option></select></div>
+                                                <div class="col-md-4"><label class="form-label">Type de compteur</label><select class="form-select" name="point_type_compteur" data-point-meter-type><option value="">Sélectionner</option><option value="C5" data-meter-energy="electricite">C5</option><option value="C4" data-meter-energy="electricite">C4</option><option value="C2" data-meter-energy="electricite">C2</option><option value="T1" data-meter-energy="gaz">T1</option><option value="T2" data-meter-energy="gaz">T2</option><option value="T3" data-meter-energy="gaz">T3</option><option value="T4" data-meter-energy="gaz">T4</option></select></div>
                                                 <div class="col-md-4"><label class="form-label">Puissance</label><input class="form-control" name="point_puissance_souscrite" placeholder="Puissance" inputmode="decimal"></div>
                                                 <div class="col-md-4"><label class="form-label">Date d’échéance</label><input type="date" class="form-control" name="point_date_echeance"></div>
                                                 <div class="col-md-4"><label class="form-label">Durée souhaitée (en mois)</label><input type="number" min="1" step="1" class="form-control" name="point_duree_souhaitee_mois" placeholder="Ex. 24"></div>
@@ -811,7 +811,7 @@ and 'update_client_status' in available_endpoints %}
                                         <option value="C2" data-meter-energy="electricite">C2</option>
                                         <option value="T1" data-meter-energy="gaz">T1</option>
                                         <option value="T2" data-meter-energy="gaz">T2</option>
-                                        <option value="T3" data-meter-energy="gaz">T3</option>
+                                        <option value="T3" data-meter-energy="gaz">T3</option><option value="T4" data-meter-energy="gaz">T4</option>
                                     </select>
                                 </div>
 
@@ -1300,5 +1300,5 @@ and 'update_client_status' in available_endpoints %}
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='cotation_form.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='cotation_form.js') }}?v=2"></script>
 {% endblock %}

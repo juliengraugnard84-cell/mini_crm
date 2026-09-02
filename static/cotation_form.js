@@ -277,7 +277,10 @@ function initCotationForm(form) {
                     return;
                 }
 
-                const lockedEnergy = mode === "electricite" || mode === "gaz";
+                // En multi-site, chaque PDL/PCE conserve son propre type
+                // d'energie, independamment du filtre global de la demande.
+                const lockedEnergy = getSiteMode() !== "multi"
+                    && (mode === "electricite" || mode === "gaz");
                 wrapper.hidden = lockedEnergy;
 
                 if (lockedEnergy) {
@@ -287,6 +290,7 @@ function initCotationForm(form) {
                 }
 
                 syncPointReferenceLabel(card);
+                syncPointMeterTypeOptions(card);
             });
         };
 
