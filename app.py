@@ -1143,15 +1143,32 @@ def format_date_safe(value):
 
     if hasattr(value, "strftime"):
         try:
-            return value.strftime("%Y-%m-%d")
+            return value.strftime("%d/%m/%y")
         except Exception:
             return "—"
 
     try:
-        return str(value)[:10]
+        return date.fromisoformat(str(value)[:10]).strftime("%d/%m/%y")
     except Exception:
         return "—"
 
+
+
+def format_date_input(value):
+    """Return an ISO date compatible with HTML date inputs."""
+    if not value:
+        return ""
+
+    if hasattr(value, "strftime"):
+        try:
+            return value.strftime("%Y-%m-%d")
+        except Exception:
+            return ""
+
+    try:
+        return date.fromisoformat(str(value)[:10]).isoformat()
+    except Exception:
+        return ""
 
 # =========================================================
 # Helpers documents — utilisés par bloc 11
@@ -2270,6 +2287,7 @@ def inject_globals():
         csrf_token=session.get("csrf_token"),
         format_date=format_date_safe,
 
+        format_date_input=format_date_input,
         # ✅ AJOUT CRITIQUE (timeline FR)
         format_datetime_fr=format_datetime_fr,
 
