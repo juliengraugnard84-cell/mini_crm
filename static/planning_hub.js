@@ -725,16 +725,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const baseStart = selection?.start || new Date();
         const baseEnd = selection?.end || addDays(baseStart, 0);
-        const allDay = Boolean(selection?.allDay);
-        const dateFields = extractEventDateFields(baseStart, baseEnd, allDay);
+        const selectionIsAllDay = Boolean(selection?.allDay);
+        const dateFields = extractEventDateFields(baseStart, baseEnd, selectionIsAllDay);
 
         nodes.modalKicker.textContent = "Nouveau rendez-vous";
         nodes.modalTitle.textContent = "Creer un bloc agenda";
         nodes.startDate.value = dateFields.startDate || formatDateInput(new Date());
         nodes.endDate.value = dateFields.endDate || nodes.startDate.value;
-        nodes.startTime.value = allDay ? "" : (dateFields.startTime || "09:00");
-        nodes.endTime.value = allDay ? "" : (dateFields.endTime || "10:00");
-        nodes.allDay.checked = allDay;
+        nodes.startTime.value = dateFields.startTime || "09:00";
+        nodes.endTime.value = dateFields.endTime || "10:00";
+        nodes.allDay.checked = false;
 
         syncAllDayFields();
         syncVisibilityFields();
