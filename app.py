@@ -3289,7 +3289,302 @@ def admin_dossiers_detail(commercial):
         perdus=perdus,
     )
 ############################################################
+
+############################################################
+# ADMIN - STATISTIQUES COMMERCIAUX
+############################################################
+
+def build_commercial_statistics(conn, commercial_id=None):
+    """Calcule les statistiques annuelles et cumulees des commerciaux."""
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT id, username
+            FROM users
+            WHERE role = 'commercial'
+            ORDER BY LOWER(username) ASC
+        """)
+        users = cur.fetchall()
+
+        if commercial_id is not None:
+            users = [user for user in users if user["id"] == commercial_id]
+
+
+        cur.execute("""
+            SELECT owner_id, created_at, status
+            FROM crm_clients
+            WHERE owner_id IS NOT NULL
+              AND COALESCE(dossier_category, 'pipeline') <> 'hot'
+        """)
+        dossiers = cur.fetchall()
+
+        cur.execute("""
+            SELECT commercial, date, montant
+            FROM revenus
+            WHERE commercial IS NOT NULL
+        """)
+        revenus = cur.fetchall()
+
+    def empty_bucket():
+        return {
+            "dossiers": 0,
+            "gagnes": 0,
+            "ca": 0.0,
+            "taux_gain": 0.0,
+            "ca_moyen": 0.0,
+        }
+
+    commercial_by_name = {}
+    statistics_by_id = {}
+
+    for user in users:
+        commercial_id = user["id"]
+        username = user["username"]
+        commercial_by_name[username.strip().lower()] = commercial_id
+        statistics_by_id[commercial_id] = {
+            "commercial": username,
+            "career": empty_bucket(),
+            "years": {},
+        }
+
+    def bucket_for(commercial_id, year):
+        years = statistics_by_id[commercial_id]["years"]
+        if year not in years:
+            years[year] = empty_bucket()
+        return years[year]
+
+    for dossier in dossiers:
+        commercial_id = dossier.get("owner_id")
+        created_at = dossier.get("created_at")
+        year = getattr(created_at, "year", None)
+
+        if commercial_id not in statistics_by_id or not year:
+            continue
+
+        annual = bucket_for(commercial_id, year)
+        career = statistics_by_id[commercial_id]["career"]
+        annual["dossiers"] += 1
+        career["dossiers"] += 1
+
+        if (dossier.get("status") or "").strip().lower() == "gagne":
+            annual["gagnes"] += 1
+            career["gagnes"] += 1
+
+    for revenu in revenus:
+        commercial_name = (revenu.get("commercial") or "").strip().lower()
+        commercial_id = commercial_by_name.get(commercial_name)
+        revenue_date = revenu.get("date")
+        year = getattr(revenue_date, "year", None)
+
+        if not commercial_id or not year:
+            continue
+
+        try:
+            amount = float(revenu.get("montant") or 0)
+        except (TypeError, ValueError):
+            amount = 0.0
+
+        bucket_for(commercial_id, year)["ca"] += amount
+        statistics_by_id[commercial_id]["career"]["ca"] += amount
+
+    commercial_statistics = []
+    for user in users:
+        stat = statistics_by_id[user["id"]]
+        buckets = [stat["career"], *stat["years"].values()]
+
+        for bucket in buckets:
+            dossiers_count = bucket["dossiers"]
+            bucket["taux_gain"] = (bucket["gagnes"] / dossiers_count * 100) if dossiers_count else 0.0
+            bucket["ca_moyen"] = (bucket["ca"] / dossiers_count) if dossiers_count else 0.0
+
+        annual_stats = [
+            {"year": year, **bucket}
+            for year, bucket in sorted(stat["years"].items(), reverse=True)
+        ]
+        commercial_statistics.append({
+            "commercial": stat["commercial"],
+            "commercial_id": user["id"],
+            "career": stat["career"],
+            "years": annual_stats,
+        })
+
+    return commercial_statistics
+
 # 10 TER. ADMIN — PLANNING (COTATIONS & MISES À JOUR)
+
+@app.route("/admin/statistiques-commerciaux")
+@admin_required
+def admin_commercial_statistics():
+    return render_template(
+        "admin_commercial_statistics.html",
+        commercial_statistics=build_commercial_statistics(get_db()),
+        personal_view=False,
+        individual_view=False,
+    )
+
+
+@app.route("/admin/statistiques-commerciaux/<int:commercial_id>")
+@admin_required
+def admin_commercial_statistics_detail(commercial_id):
+    statistics = build_commercial_statistics(get_db(), commercial_id)
+    if not statistics:
+        flash("Commercial introuvable.", "danger")
+        return redirect(url_for("admin_commercial_statistics"))
+
+    return render_template(
+        "admin_commercial_statistics.html",
+        commercial_statistics=statistics,
+        personal_view=False,
+        individual_view=True,
+    )
+
+
+@app.route("/mes-statistiques")
+@login_required
+def my_commercial_statistics():
+    user = session.get("user") or {}
+    if user.get("role") == "admin":
+        return redirect(url_for("admin_commercial_statistics"))
+
+    statistics = build_commercial_statistics(get_db(), user.get("id"))
+    if not statistics:
+        flash("Vos statistiques ne sont pas encore disponibles.", "info")
+
+    return render_template(
+        "admin_commercial_statistics.html",
+        commercial_statistics=statistics,
+        personal_view=True,
+        individual_view=True,
+    )
+
+
+@app.route("/admin/statistiques-commerciaux/<int:commercial_id>/pdf")
+@admin_required
+def export_commercial_statistics_pdf(commercial_id):
+    statistics = build_commercial_statistics(get_db(), commercial_id)
+    if not statistics:
+        flash("Commercial introuvable.", "danger")
+        return redirect(url_for("admin_commercial_statistics"))
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from xml.sax.saxutils import escape
+    except ImportError:
+        flash("L'export PDF necessite la dependance reportlab.", "danger")
+        return redirect(url_for("admin_commercial_statistics_detail", commercial_id=commercial_id))
+
+    stat = statistics[0]
+    buffer = io.BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=1.5 * cm,
+        leftMargin=1.5 * cm,
+        topMargin=1.5 * cm,
+        bottomMargin=1.5 * cm,
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "CommercialStatisticsTitle",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=20,
+        leading=25,
+        textColor=colors.HexColor("#08133f"),
+        spaceAfter=8,
+    )
+    subtitle_style = ParagraphStyle(
+        "CommercialStatisticsSubtitle",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor("#52657d"),
+        spaceAfter=14,
+    )
+    centered_style = ParagraphStyle(
+        "CommercialStatisticsCentered",
+        parent=styles["Normal"],
+        alignment=TA_CENTER,
+        fontSize=9,
+        leading=12,
+    )
+
+    def amount(value):
+        return f"{float(value or 0):,.0f}".replace(",", " ") + " EUR"
+
+    career = stat["career"]
+    summary_rows = [
+        ["Dossiers entres", "Taux de gain", "CA total", "CA moyen / dossier"],
+        [
+            str(career["dossiers"]),
+            f"{career['taux_gain']:.1f} %",
+            amount(career["ca"]),
+            amount(career["ca_moyen"]),
+        ],
+    ]
+    annual_rows = [["Annee", "Dossiers", "Gagnes", "Taux de gain", "CA", "CA moyen / dossier"]]
+    for annual in stat["years"]:
+        annual_rows.append([
+            str(annual["year"]),
+            str(annual["dossiers"]),
+            str(annual["gagnes"]),
+            f"{annual['taux_gain']:.1f} %",
+            amount(annual["ca"]),
+            amount(annual["ca_moyen"]),
+        ])
+    if len(annual_rows) == 1:
+        annual_rows.append(["Aucune donnee", "-", "-", "-", "-", "-"])
+
+    summary_table = Table(summary_rows, colWidths=[4.3 * cm] * 4)
+    summary_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#08133f")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#eef3fb")),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+    ]))
+    annual_table = Table(annual_rows, repeatRows=1, colWidths=[2.0 * cm, 2.2 * cm, 2.1 * cm, 2.8 * cm, 3.3 * cm, 4.0 * cm])
+    annual_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2f6cab")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#cbd5e1")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    ]))
+
+    story = [
+        Paragraph("Aleo Conseils - Statistiques commerciales", title_style),
+        Paragraph(f"Commercial : <b>{escape(stat['commercial'])}</b><br/>Export genere le {date.today().strftime('%d/%m/%Y')}", subtitle_style),
+        Paragraph("Bilan de carriere", styles["Heading2"]),
+        summary_table,
+        Spacer(1, 0.55 * cm),
+        Paragraph("Detail par annee", styles["Heading2"]),
+        annual_table,
+        Spacer(1, 0.45 * cm),
+        Paragraph("Taux de gain = dossiers actuellement marques comme gagnes / dossiers entres. CA moyen = CA comptabilise / dossiers entres.", centered_style),
+    ]
+    document.build(story)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"statistiques-commercial-{commercial_id}.pdf",
+    )
+
 ############################################################
 
 def render_planning_hub():

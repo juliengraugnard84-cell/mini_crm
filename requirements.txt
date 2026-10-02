@@ -9,6 +9,7 @@ gunicorn==21.2.0
 boto3
 botocore
 requests
+reportlab
 python-dotenv
 psycopg2-binary
 

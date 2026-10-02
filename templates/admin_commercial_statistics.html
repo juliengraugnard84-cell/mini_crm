@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Statistiques commerciales{% endblock %}
+
+{% block content %}
+<section class="crm-page-hero crm-page-hero--compact">
+    <div>
+        {% if personal_view %}
+        <span class="crm-page-kicker">Mon pilotage commercial</span>
+        <h1>Mes statistiques</h1>
+        <p>Retrouvez vos resultats annuels et votre bilan de carriere.</p>
+        {% elif individual_view %}
+        <span class="crm-page-kicker">Pilotage commercial</span>
+        <h1>Statistiques individuelles</h1>
+        <p>Consultez le detail annuel et le bilan de carriere de ce commercial.</p>
+        {% else %}
+        <span class="crm-page-kicker">Pilotage commercial</span>
+        <h1>Statistiques par commercial</h1>
+        <p>Retrouvez les resultats annuels et le bilan de carriere de chaque commercial.</p>
+        {% endif %}
+    </div>
+    <div class="crm-hero-pillbox">
+        <span class="crm-hero-pill">{{ commercial_statistics|length }} commercial{{ 'aux' if commercial_statistics|length != 1 else '' }}</span>
+        {% if not personal_view %}
+        <a class="btn btn-light btn-sm" href="{{ url_for('admin_dossiers') }}">Suivi des dossiers</a>
+        {% else %}
+        <span class="crm-hero-pill">Vue personnelle</span>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card mb-4">
+    <div class="card-body">
+        <p class="mb-0 text-muted">
+            Les dossiers correspondent au pipeline CRM, hors dossiers chauds. Le taux de gain est calcule sur les dossiers actuellement marques comme gagnes. Le CA moyen correspond au CA comptabilise divise par le nombre de dossiers entres.
+        </p>
+    </div>
+</section>
+
+{% for stat in commercial_statistics %}
+<section class="card mb-4 shadow-sm">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <span class="text-muted text-uppercase small fw-semibold">Bilan de carriere</span>
+            <h2 class="h4 mb-0">{{ stat.commercial }}</h2>
+        </div>
+        {% if not personal_view %}
+        <div class="d-flex flex-wrap gap-2">
+            {% if not individual_view %}
+            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('admin_commercial_statistics_detail', commercial_id=stat.commercial_id) }}">Voir les statistiques</a>
+            {% endif %}
+            <a class="btn btn-dark btn-sm" href="{{ url_for('export_commercial_statistics_pdf', commercial_id=stat.commercial_id) }}">Exporter en PDF</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_dossiers_detail', commercial=stat.commercial) }}">Voir les dossiers</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card-body">
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">
+                <div class="border rounded-4 p-3 h-100 bg-light">
+                    <span class="d-block text-muted small">Dossiers entres</span>
+                    <strong class="fs-4">{{ stat.career.dossiers }}</strong>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="border rounded-4 p-3 h-100 bg-light">
+                    <span class="d-block text-muted small">Taux de gain</span>
+                    <strong class="fs-4 text-success">{{ '%.1f'|format(stat.career.taux_gain)|replace('.', ',') }} %</strong>
+                    <small class="d-block text-muted">{{ stat.career.gagnes }} gagne{{ 's' if stat.career.gagnes != 1 else '' }}</small>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="border rounded-4 p-3 h-100 bg-light">
+                    <span class="d-block text-muted small">CA total</span>
+                    <strong class="fs-4">{{ '{:,.0f}'.format(stat.career.ca)|replace(',', ' ') }} EUR</strong>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="border rounded-4 p-3 h-100 bg-light">
+                    <span class="d-block text-muted small">CA moyen / dossier</span>
+                    <strong class="fs-4">{{ '{:,.0f}'.format(stat.career.ca_moyen)|replace(',', ' ') }} EUR</strong>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="h6 text-uppercase text-muted fw-semibold mb-3">Detail par annee</h3>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Annee</th>
+                        <th class="text-end">Dossiers entres</th>
+                        <th class="text-end">Dossiers gagnes</th>
+                        <th class="text-end">Taux de gain</th>
+                        <th class="text-end">CA</th>
+                        <th class="text-end">CA moyen / dossier</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for year in stat.years %}
+                    <tr>
+                        <td><strong>{{ year.year }}</strong></td>
+                        <td class="text-end">{{ year.dossiers }}</td>
+                        <td class="text-end">{{ year.gagnes }}</td>
+                        <td class="text-end text-success fw-semibold">{{ '%.1f'|format(year.taux_gain)|replace('.', ',') }} %</td>
+                        <td class="text-end">{{ '{:,.0f}'.format(year.ca)|replace(',', ' ') }} EUR</td>
+                        <td class="text-end">{{ '{:,.0f}'.format(year.ca_moyen)|replace(',', ' ') }} EUR</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">Aucune donnee historique pour ce commercial.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% else %}
+<section class="card">
+    <div class="card-body text-center text-muted py-5">Aucun commercial actif trouve.</div>
+</section>
+{% endfor %}
+{% endblock %}

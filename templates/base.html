@@ -53,6 +53,13 @@
                 Chiffre d'affaires
             </a>
 
+            {% if current_user and current_user.role == "commercial" %}
+                <a href="{{ url_for('my_commercial_statistics') }}"
+                   class="{% if request.path.startswith('/mes-statistiques') %}active{% endif %}">
+                    Mes statistiques
+                </a>
+            {% endif %}
+
             {% if current_user
                   and current_user.role in ["admin", "commercial"]
                   and available_endpoints
@@ -109,7 +116,12 @@
                     Suivi des dossiers commerciaux
                 </a>
 
+                <a href="{{ url_for('admin_commercial_statistics') }}"
+                   class="{% if request.path.startswith('/admin/statistiques-commerciaux') %}active{% endif %}">
+                    Statistiques commerciaux
+                </a>
                 <a href="{{ url_for('documents') }}"
+
                    class="{% if request.path.startswith('/documents') %}active{% endif %}">
                     Documents
                 </a>
