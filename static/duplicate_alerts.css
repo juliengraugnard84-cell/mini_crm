@@ -1,0 +1,21 @@
+.duplicate-dialog {
+    border: 3px solid #dc3545;
+    border-radius: 16px;
+    padding: 24px;
+    width: min(620px, calc(100vw - 32px));
+    max-height: 85vh;
+    overflow: auto;
+    color: #172033;
+    background: #fff;
+    box-shadow: 0 16px 64px #0005;
+}
+.duplicate-dialog::backdrop { background: #08133fa6; }
+.duplicate-dialog h2 { color: #b42318; font-size: 1.5rem; }
+.duplicate-dialog-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+.duplicate-blocked-message { padding: 18px; background: #fff0f0; color: #b42318; font-size: 1.2rem; font-weight: 700; border-radius: 8px; }
+.duplicate-dossier { border-left: 4px solid #dc3545; padding: 12px; margin: 12px 0; background: #fff5f5; }
+.duplicate-live-alerts { position: fixed; right: 20px; top: 20px; width: min(420px, calc(100vw - 40px)); max-height: 80vh; overflow: auto; z-index: 1090; }
+.duplicate-live-card { background: #fff; color: #172033; border: 2px solid #dc3545; border-radius: 12px; box-shadow: 0 8px 32px #0003; padding: 18px; margin-bottom: 12px; }
+.duplicate-live-card h3 { color: #b42318; font-size: 1.1rem; }
+.duplicate-live-card button { float: right; }
+#duplicate-alert-nav.has-duplicate-alerts { background: #b42318; color: white; }

@@ -67,6 +67,105 @@ class DuplicateTests(unittest.TestCase):
         crm.app.jinja_env.get_template('base.html')
         crm.app.jinja_env.get_template('duplicate_alerts.html')
 
+    def api_client(self, role='commercial'):
+        client = crm.app.test_client()
+        with client.session_transaction() as session:
+            session['user'] = {'id': 1, 'username': 'Alice', 'role': role}
+            session['csrf_token'] = 'test-token'
+        return client
+
+    def test_prevalidation_blocks_commercial_without_exposing_details(self):
+        client = self.api_client()
+        result = dict(id=5, blocked=True, dossiers=[{'owner_name': 'Secret'}])
+        with patch.object(crm, 'get_db', return_value=MagicMock()), \
+             patch.object(crm, 'record_dossier_duplicates', return_value=result):
+            response = client.post('/api/dossiers/check-duplicates', data={
+                'csrf_token': 'test-token', 'duplicate_kind': 'create', 'name': 'ABC'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['dossiers'], [])
+        self.assertTrue(response.json['blocked'])
+        self.assertEqual(response.json['message'], "dossier bloqué, voir avec l'administrateur")
+
+    def test_prevalidation_requires_csrf(self):
+        response = self.api_client().post('/api/dossiers/check-duplicates', data={'duplicate_kind': 'create'})
+        self.assertEqual(response.status_code, 403)
+
+    def test_prevalidation_checks_dossier_access(self):
+        with patch.object(crm, 'get_db', return_value=MagicMock()), \
+             patch.object(crm, 'can_access_client', return_value=False):
+            response = self.api_client().post('/api/dossiers/check-duplicates', data={
+                'csrf_token': 'test-token', 'duplicate_kind': 'edit', 'duplicate_client_id': 8})
+        self.assertEqual(response.status_code, 403)
+
+    def test_feed_denies_commercial(self):
+        self.assertEqual(self.api_client().get('/api/admin/duplicate-alerts').status_code, 403)
+
+    def test_feed_returns_full_admin_alert_with_cursor(self):
+        conn = MagicMock()
+        cur = conn.cursor.return_value.__enter__.return_value
+        cur.fetchone.return_value = [1]
+        cur.fetchall.return_value = [dict(id=8, actor_name='Alice', attempted_name='ABC',
+                                         details=[dict(id=2, owner_name='Bob', reasons=['SIRET'])])]
+        with patch.object(crm, 'get_db', return_value=conn), \
+             patch.object(crm, 'ensure_duplicate_alerts_schema'):
+            response = self.api_client('admin').get('/api/admin/duplicate-alerts?after=7')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['cursor'], 8)
+        self.assertEqual(response.json['alerts'][0]['actor_name'], 'Alice')
+        self.assertEqual(response.json['alerts'][0]['dossiers'][0]['owner_name'], 'Bob')
+        self.assertEqual(response.headers['Cache-Control'], 'no-store')
+
+    def test_creation_is_blocked_without_javascript(self):
+        conn = MagicMock()
+        with patch.object(crm, 'get_db', return_value=conn), \
+             patch.object(crm, 'ensure_hot_followups_schema'), \
+             patch.object(crm, 'record_dossier_duplicates', return_value=dict(blocked=True)):
+            response = self.api_client().post('/clients/create', data={
+                'csrf_token': 'test-token', 'name': 'ABC', 'siret': '123'})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith('/clients'))
+        conn.cursor.assert_not_called()
+
+    def test_prevalidation_no_duplicate_allows_submission(self):
+        with patch.object(crm, 'get_db', return_value=MagicMock()), \
+             patch.object(crm, 'record_dossier_duplicates', return_value=None):
+            response = self.api_client().post('/api/dossiers/check-duplicates', data={
+                'csrf_token': 'test-token', 'duplicate_kind': 'create', 'name': 'New'})
+        self.assertFalse(response.json['blocked'])
+        self.assertEqual(response.json['dossiers'], [])
+
+    def test_admin_prevalidation_keeps_dossier_details_and_override(self):
+        match = dict(id=2, name='ABC', siret='123', status='gagne', owner_name='Bob',
+                     owner_id=2, reasons=['SIRET'])
+        with patch.object(crm, 'get_db', return_value=MagicMock()), \
+             patch.object(crm, 'record_dossier_duplicates', return_value=dict(
+                 blocked=False, dossiers=[match])):
+            response = self.api_client('admin').post('/api/dossiers/check-duplicates', data={
+                'csrf_token': 'test-token', 'duplicate_kind': 'create', 'name': 'ABC'})
+        self.assertFalse(response.json['blocked'])
+        self.assertEqual(response.json['dossiers'][0]['owner_name'], 'Bob')
+
+    def test_prevalidation_and_submission_do_not_duplicate_notification(self):
+        conn = MagicMock()
+        cur = conn.cursor.return_value.__enter__.return_value
+        dossier = dict(id=2, name='ABC', siret='123', owner_id=2, status='gagne', owner_name='Bob')
+        cur.fetchall.side_effect = [[dossier], [], [dossier], []]
+        cur.fetchone.return_value = [12]
+        with crm.app.test_request_context('/clients/create'):
+            crm.session['user'] = {'id': 1, 'username': 'Alice', 'role': 'commercial'}
+            with patch.object(crm, 'ensure_cotation_schema'), \
+                 patch.object(crm, 'ensure_cotation_delivery_points_schema'), \
+                 patch.object(crm, 'ensure_duplicate_alerts_schema'):
+                preview = crm.record_dossier_duplicates(conn, 'ABC', '123', status='en_cours', flash_warning=False)
+                saved = crm.record_dossier_duplicates(conn, 'ABC', '123', status='en_cours')
+                self.assertTrue(preview['blocked'])
+                self.assertTrue(saved['blocked'])
+                self.assertEqual(crm.session['_flashes'][-1][1], "dossier bloqué, voir avec l'administrateur")
+        inserts = [call for call in cur.execute.call_args_list
+                   if 'INSERT INTO dossier_duplicate_alerts' in call.args[0]]
+        self.assertEqual(len(inserts), 1)
+        self.assertEqual(conn.commit.call_count, 2)
+
     def test_commercial_cannot_read_another_attempt(self):
         conn = MagicMock()
         conn.cursor.return_value.__enter__.return_value.fetchone.return_value = {

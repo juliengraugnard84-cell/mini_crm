@@ -13,6 +13,7 @@ import unicodedata
 import secrets
 import logging
 import json
+import hashlib
 from markupsafe import Markup, escape
 from duplicate_detection import ACTIVE_STATUSES, match_reasons
 from datetime import date, timedelta
@@ -5423,8 +5424,8 @@ def ensure_duplicate_alerts_schema(conn):
 
 
 def record_dossier_duplicates(conn, name, siret, client_id=None,
-                              references=None, status=None):
-    """Warn without blocking entry; save the full report for administrators."""
+                              references=None, status=None, flash_warning=True):
+    """Record attempts, block commercial duplicates and warn administrators."""
     if status is not None and status not in ACTIVE_STATUSES:
         return
     if status is None and client_id is not None:
@@ -5475,15 +5476,121 @@ def record_dossier_duplicates(conn, name, siret, client_id=None,
         if not matches:
             return
         user = session['user']
-        cur.execute("""
-            INSERT INTO dossier_duplicate_alerts
-                (actor_id, actor_name, attempted_name, source_client_id, details)
-            VALUES (%s, %s, %s, %s, %s::jsonb) RETURNING id
-        """, (user['id'], user.get('username') or 'Inconnu', name,
-              client_id, json.dumps(matches)))
-        alert_id = cur.fetchone()[0]
-    flash(Markup('Doublon détecté : <a href="{}">voir la fiche du dossier existant et son commercial</a>.').format(
-        escape(url_for('dossier_duplicate_alert', alert_id=alert_id))), 'warning')
+        signature = hashlib.sha256(json.dumps(
+            [user['id'], name, client_id, matches], sort_keys=True
+        ).encode()).hexdigest()
+        recent = session.get('recent_duplicate_alert') or {}
+        now = datetime.now().timestamp()
+        reuse = recent.get('signature') == signature and now - recent.get('timestamp', 0) < 120
+        if reuse:
+            cur.execute('SELECT id FROM dossier_duplicate_alerts WHERE id = %s AND actor_id = %s',
+                        (recent['id'], user['id']))
+            reuse = bool(cur.fetchone())
+        if reuse:
+            alert_id = recent['id']
+        else:
+            cur.execute("""
+                INSERT INTO dossier_duplicate_alerts
+                    (actor_id, actor_name, attempted_name, source_client_id, details)
+                VALUES (%s, %s, %s, %s, %s::jsonb) RETURNING id
+            """, (user['id'], user.get('username') or 'Inconnu', name,
+                  client_id, json.dumps(matches)))
+            alert_id = cur.fetchone()[0]
+            session['recent_duplicate_alert'] = dict(
+                signature=signature, timestamp=now, id=alert_id)
+    if flash_warning:
+        if user.get('role') == 'commercial':
+            flash("dossier bloqué, voir avec l'administrateur", 'danger')
+        else:
+            flash(Markup('Doublon détecté : <a href="{}">voir la fiche du dossier existant et son commercial</a>.').format(
+                escape(url_for('dossier_duplicate_alert', alert_id=alert_id))), 'warning')
+    blocked = user.get('role') == 'commercial'
+    if blocked:
+        # Persist the attempt even though the commercial's dossier is not saved.
+        conn.commit()
+    return dict(id=alert_id, dossiers=matches, blocked=blocked)
+
+
+@app.route('/api/dossiers/check-duplicates', methods=['POST'])
+@login_required
+def check_dossier_duplicates():
+    user = session['user']
+    if user.get('role') not in {'admin', 'commercial'}:
+        abort(403)
+    conn = get_db()
+    kind = request.form.get('duplicate_kind')
+    if kind not in {'create', 'edit', 'cotation', 'status'}:
+        abort(400)
+    client_id = None
+    source = None
+    if kind != 'create':
+        client_id = request.form.get('duplicate_client_id', type=int)
+        if not client_id or not can_access_client(client_id):
+            abort(403)
+        with conn.cursor() as cur:
+            cur.execute('SELECT name, siret, status FROM crm_clients WHERE id = %s', (client_id,))
+            source = cur.fetchone()
+        if not source:
+            abort(404)
+    name = (request.form.get('entreprise_nom') if kind == 'cotation' else request.form.get('name')) or ''
+    name = name.strip() or (source['name'] if source else '')
+    siret = (request.form.get('siret') or '').strip()
+    status = None if kind == 'cotation' else (
+        request.form.get('status') or (source['status'] if source else 'en_cours') or 'en_cours'
+    ).strip().lower()
+    if kind in {'create', 'edit'} and status not in ACTIVE_STATUSES | {'perdu'}:
+        status = (source['status'] or 'en_cours') if source else 'en_cours'
+    if kind == 'status':
+        name, siret = source['name'], source['siret']
+    references = None
+    if kind == 'cotation':
+        points = extract_cotation_delivery_points_from_form(request.form)
+        references = [p.get('reference_code') for p in points]
+        references.extend([request.form.get('pdl_pce'), request.form.get('pce')])
+    try:
+        result = record_dossier_duplicates(conn, name, siret, client_id=client_id,
+                                           references=references, status=status, flash_warning=False)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        session.pop('recent_duplicate_alert', None)
+        logger.exception('Erreur de contrôle des doublons')
+        return jsonify(error='Le contrôle des doublons est momentanément indisponible.'), 503
+    dossiers = []
+    blocked = bool((result or {}).get('blocked'))
+    for dossier in ([] if blocked else (result or {}).get('dossiers', [])):
+        item = {key: dossier[key] for key in ('id', 'name', 'siret', 'status', 'owner_name', 'reasons')}
+        if user.get('role') == 'admin' or dossier['owner_id'] == user['id']:
+            item['url'] = url_for('client_detail', client_id=dossier['id'])
+        dossiers.append(item)
+    response = jsonify(dossiers=dossiers, blocked=blocked,
+                       message="dossier bloqué, voir avec l'administrateur" if blocked else '')
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@app.route('/api/admin/duplicate-alerts')
+@login_required
+def duplicate_alerts_feed():
+    if session['user'].get('role') != 'admin':
+        abort(403)
+    after = max(0, request.args.get('after', default=0, type=int))
+    conn = get_db()
+    ensure_duplicate_alerts_schema(conn)
+    with conn.cursor() as cur:
+        cur.execute('SELECT COUNT(*) FROM dossier_duplicate_alerts WHERE is_read = FALSE')
+        count = cur.fetchone()[0]
+        cur.execute('''SELECT * FROM dossier_duplicate_alerts
+                       WHERE id > %s AND is_read = FALSE ORDER BY id ASC LIMIT 20''', (after,))
+        rows = cur.fetchall()
+    alerts = [dict(id=row['id'], actor_name=row['actor_name'], attempted_name=row['attempted_name'],
+                   dossiers=row['details'], url=url_for('dossier_duplicate_alert', alert_id=row['id']))
+              for row in rows]
+    conn.commit()
+    response = jsonify(alerts=alerts, unread=count,
+                       cursor=alerts[-1]['id'] if alerts else after)
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @app.route('/alertes-doublons/<int:alert_id>')
@@ -5498,9 +5605,11 @@ def dossier_duplicate_alert(alert_id):
     if not alert or (user.get('role') != 'admin' and alert['actor_id'] != user['id']):
         abort(404)
     # The commercial receives only the limited dossier summary.
-    safe_alert = dict(details=alert['details'])
+    safe_alert = dict(details=[])
     if user.get('role') == 'admin':
         safe_alert = dict(alert)
+        with conn.cursor() as cur:
+            cur.execute('UPDATE dossier_duplicate_alerts SET is_read = TRUE WHERE id = %s', (alert_id,))
     conn.commit()
     return render_template('duplicate_alerts.html', alerts=[safe_alert])
 
@@ -5600,7 +5709,9 @@ def create_client():
             owner_id = current_user_id
             commercial = current_username
 
-        record_dossier_duplicates(conn, name, siret, status=status)
+        duplicate = record_dossier_duplicates(conn, name, siret, status=status)
+        if duplicate and duplicate['blocked']:
+            return redirect(url_for('clients'))
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO crm_clients (
@@ -5919,7 +6030,9 @@ def edit_client(client_id):
         status = (existing_client.get("status") or "en_cours").strip().lower()
 
     try:
-        record_dossier_duplicates(conn, name, siret, client_id=client_id, status=status)
+        duplicate = record_dossier_duplicates(conn, name, siret, client_id=client_id, status=status)
+        if duplicate and duplicate['blocked']:
+            return redirect(url_for('client_detail', client_id=client_id))
         owner_id = None
 
         if role == "admin":
@@ -6039,8 +6152,10 @@ def update_client_status(client_id):
             cur.execute('SELECT name, siret FROM crm_clients WHERE id = %s', (client_id,))
             source = cur.fetchone()
         if source:
-            record_dossier_duplicates(conn, source['name'], source['siret'],
-                                      client_id=client_id, status=status)
+            duplicate = record_dossier_duplicates(conn, source['name'], source['siret'],
+                                                 client_id=client_id, status=status)
+            if duplicate and duplicate['blocked']:
+                return redirect(url_for('client_detail', client_id=client_id))
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE crm_clients
@@ -6192,10 +6307,12 @@ def create_cotation(client_id):
     try:
         ensure_cotation_schema(conn)
         ensure_cotation_delivery_points_schema(conn)
-        record_dossier_duplicates(
+        duplicate = record_dossier_duplicates(
             conn, entreprise_nom or client_name, siret, client_id=client_id,
             references=[pdl_pce, pce] + [p.get('reference_code') for p in delivery_points],
         )
+        if duplicate and duplicate['blocked']:
+            return redirect(url_for('client_detail', client_id=client_id))
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO cotations (
@@ -6484,10 +6601,12 @@ def edit_cotation(client_id, cotation_id):
 
         try:
             ensure_cotation_delivery_points_schema(conn)
-            record_dossier_duplicates(
+            duplicate = record_dossier_duplicates(
                 conn, entreprise_nom or client['name'], siret, client_id=client_id,
                 references=[pdl_pce, pce] + [p.get('reference_code') for p in delivery_points],
             )
+            if duplicate and duplicate['blocked']:
+                return redirect(url_for('edit_cotation', client_id=client_id, cotation_id=cotation_id))
             with conn.cursor() as cur:
                 cur.execute(
                     """

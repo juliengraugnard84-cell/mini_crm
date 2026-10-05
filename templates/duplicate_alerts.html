@@ -2,7 +2,11 @@
 {% block title %}Alertes de doublons{% endblock %}
 {% block content %}
 <h1>Alertes de doublons</h1>
-<p>Un dossier gagné, en cours ou en attente possède déjà une des références saisies. Les dossiers perdus sont exclus. Cette alerte n’empêche pas l’enregistrement.</p>
+{% if current_user.role == 'admin' %}
+<p>Un dossier gagné, en cours ou en attente possède déjà une des références saisies. Les dossiers perdus sont exclus. La saisie est bloquée pour les commerciaux.</p>
+{% else %}
+<div class="alert alert-danger" role="alert">dossier bloqué, voir avec l'administrateur</div>
+{% endif %}
 {% for alert in alerts %}
 <section class="card p-3 mb-3">
   {% if current_user.role == 'admin' %}
