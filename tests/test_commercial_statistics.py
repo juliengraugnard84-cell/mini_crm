@@ -72,6 +72,9 @@ class CommercialStatisticsTests(unittest.TestCase):
         self.assertIn('100,25 EUR', html)
         self.assertIn('06/02/2026', html)
         self.assertIn('Lost dossier', html)
+        self.assertIn('<summary class="h5 mb-0">Dossiers signés / gagnés', html)
+        self.assertIn('<summary class="h5 mb-0">Dossiers perdus', html)
+        self.assertNotIn('<details open', html)
 
 
 if __name__ == '__main__':

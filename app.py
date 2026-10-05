@@ -3556,7 +3556,7 @@ def export_commercial_statistics_pdf(commercial_id):
     )
 
     def amount(value):
-        return f"{float(value or 0):,.0f}".replace(",", " ") + " EUR"
+        return f"{float(value or 0):,.2f}".replace(",", " ").replace(".", ",") + " EUR"
 
     career = stat["career"]
     summary_rows = [
@@ -3617,7 +3617,84 @@ def export_commercial_statistics_pdf(commercial_id):
         Spacer(1, 0.45 * cm),
         Paragraph("Taux de gain = dossiers actuellement marques comme gagnes / dossiers entres. CA moyen = CA comptabilise / dossiers entres.", centered_style),
     ]
-    document.build(story)
+    cell_style = ParagraphStyle('StatisticsDetailCell', parent=styles['Normal'],
+                                fontSize=8.5, leading=12, wordWrap='CJK')
+    dossier_heading = ParagraphStyle('StatisticsDossierHeading', parent=styles['Heading3'], keepWithNext=True)
+    dossier_meta = ParagraphStyle('StatisticsDossierMeta', parent=cell_style, keepWithNext=True, spaceAfter=4)
+    header_style = ParagraphStyle('StatisticsDetailHeader', parent=cell_style,
+                                  fontName='Helvetica-Bold', textColor=colors.white)
+
+    def detail_table(headers, rows, widths, title=None, metadata=None):
+        cells = [[Paragraph(escape(str(text)), header_style) for text in headers]]
+        if title:
+            cells.insert(0, [Paragraph('<b>' + escape(title) + '</b><br/>' + escape(metadata or ''), cell_style)]
+                         + [''] * (len(headers) - 1))
+        cells.extend([[Paragraph(escape(str(text)), cell_style) for text in row] for row in rows])
+        header_row = 1 if title else 0
+        table = Table(cells, colWidths=widths, repeatRows=header_row + 1, splitInRow=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, header_row), (-1, header_row), colors.HexColor('#2f6cab')),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ROWBACKGROUNDS', (0, header_row + 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#cbd5e1')),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        if title:
+            table.setStyle(TableStyle([('SPAN', (0, 0), (-1, 0)),
+                                      ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#eef3fb'))]))
+        return table
+
+    def entry_date(value):
+        return value.strftime('%d/%m/%Y') if value else '-'
+
+    signed = stat.get('signed_dossiers', [])
+    lost = stat.get('lost_dossiers', [])
+    story.extend([
+        Spacer(1, 0.65 * cm),
+        Paragraph(f'Dossiers signés / gagnés - {len(signed)}', styles['Heading2']),
+        Paragraph('CA enregistré sur ces dossiers : <b>' + amount(stat.get('signed_ca', 0)) + '</b>', styles['Normal']),
+    ])
+    if not signed:
+        story.append(Paragraph('Aucun dossier signé / gagné.', styles['Normal']))
+    for dossier in signed:
+        title = f"N°{dossier['id']} - {dossier['name']}"
+        metadata = f"SIRET : {dossier.get('siret') or '-'} | Date d'entrée : {entry_date(dossier.get('created_at'))} | CA : {amount(dossier['ca'])}"
+        revenues = dossier.get('revenues', [])
+        if revenues:
+            story.append(detail_table(['Date', 'Détail du chiffre d’affaires', 'Montant'],
+                [[entry_date(revenue['date']), revenue['dossier'], amount(revenue['montant'])]
+                 for revenue in revenues], [2.5 * cm, document.width - 6 * cm, 3.5 * cm], title, metadata))
+        else:
+            story.extend([Paragraph(escape(title), dossier_heading), Paragraph(escape(metadata), dossier_meta)])
+            story.append(Paragraph('Aucun revenu enregistré.', cell_style))
+        story.append(Spacer(1, 0.25 * cm))
+    other = stat.get('other_revenues', [])
+    if other:
+        story.extend([
+            Paragraph('CA hors dossiers gagnés détaillés', styles['Heading3']),
+            detail_table(['Date', 'Dossier / libellé', 'Montant'],
+                [[entry_date(revenue['date']), revenue['dossier'], amount(revenue['montant'])]
+                 for revenue in other], [2.5 * cm, document.width - 6 * cm, 3.5 * cm]),
+        ])
+    story.extend([Spacer(1, 0.45 * cm),
+                  Paragraph(f'Dossiers perdus - {len(lost)}', styles['Heading2'])])
+    if lost:
+        story.append(detail_table(['Dossier', 'SIRET', "Date d'entrée"],
+            [[f"N°{dossier['id']} - {dossier['name']}", dossier.get('siret') or '-',
+              entry_date(dossier.get('created_at'))] for dossier in lost],
+            [document.width - 7 * cm, 4.5 * cm, 2.5 * cm]))
+    else:
+        story.append(Paragraph('Aucun dossier perdu.', styles['Normal']))
+
+    def page_footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica', 8)
+        canvas.setFillColor(colors.HexColor('#52657d'))
+        canvas.drawRightString(A4[0] - 1.5 * cm, 0.75 * cm, f'Page {doc.page}')
+        canvas.restoreState()
+
+    document.build(story, onFirstPage=page_footer, onLaterPages=page_footer)
     buffer.seek(0)
     return send_file(
         buffer,

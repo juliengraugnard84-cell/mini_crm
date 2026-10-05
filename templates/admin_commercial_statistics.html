@@ -116,7 +116,8 @@
             </table>
         </div>
         <div class="mt-4">
-            <h3 class="h5">Dossiers signés / gagnés — {{ stat.signed_dossiers|length }}</h3>
+            <details class="border rounded p-3 mb-3">
+            <summary class="h5 mb-0">Dossiers signés / gagnés — {{ stat.signed_dossiers|length }}</summary>
             <p class="text-muted">CA enregistré sur ces dossiers : <strong>{{ '{:,.2f}'.format(stat.signed_ca)|replace(',', ' ')|replace('.', ',') }} EUR</strong>. Le détail reprend les lignes de chiffre d’affaires attribuées à ce commercial.</p>
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
@@ -139,13 +140,15 @@
                     </tbody>
                 </table>
             </div>
+            </details>
             {% if stat.other_revenues %}
             <details class="mb-4"><summary>CA hors dossiers gagnés détaillés : {{ '{:,.2f}'.format(stat.career.ca - stat.signed_ca)|replace(',', ' ')|replace('.', ',') }} EUR</summary>
                 <p class="text-muted mt-2">Revenus sur d’autres statuts ou non rattachés à un dossier gagné identifiable. Ils restent inclus dans le CA total du commercial.</p>
                 <ul>{% for revenu in stat.other_revenues %}<li>{{ revenu.date.strftime('%d/%m/%Y') }} — {{ revenu.dossier }} : {{ '{:,.2f}'.format(revenu.montant)|replace(',', ' ')|replace('.', ',') }} EUR</li>{% endfor %}</ul>
             </details>
             {% endif %}
-            <h3 class="h5">Dossiers perdus — {{ stat.lost_dossiers|length }}</h3>
+            <details class="border rounded p-3">
+            <summary class="h5 mb-0">Dossiers perdus — {{ stat.lost_dossiers|length }}</summary>
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead><tr><th>Dossier</th><th>SIRET</th><th>Date d’entrée</th><th>Statut</th></tr></thead>
@@ -156,6 +159,7 @@
                     </tbody>
                 </table>
             </div>
+            </details>
         </div>
     </div>
 </section>
