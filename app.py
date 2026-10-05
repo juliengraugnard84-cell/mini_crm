@@ -3316,7 +3316,7 @@ def build_commercial_statistics(conn, commercial_id=None):
 
 
         cur.execute("""
-            SELECT owner_id, created_at, status
+            SELECT id, name, siret, owner_id, created_at, status
             FROM crm_clients
             WHERE owner_id IS NOT NULL
               AND COALESCE(dossier_category, 'pipeline') <> 'hot'
@@ -3324,7 +3324,7 @@ def build_commercial_statistics(conn, commercial_id=None):
         dossiers = cur.fetchall()
 
         cur.execute("""
-            SELECT commercial, date, montant
+            SELECT id, client_id, dossier, commercial, date, montant
             FROM revenus
             WHERE commercial IS NOT NULL
         """)
@@ -3350,7 +3350,26 @@ def build_commercial_statistics(conn, commercial_id=None):
             "commercial": username,
             "career": empty_bucket(),
             "years": {},
+            "signed_dossiers": [],
+            "lost_dossiers": [],
+            "other_revenues": [],
         }
+
+    signed_by_id = {}
+    names_by_commercial = {}
+    for dossier in dossiers:
+        owner_id = dossier.get('owner_id')
+        if owner_id not in statistics_by_id:
+            continue
+        item = dict(dossier, revenues=[], ca=0.0)
+        status = (dossier.get('status') or '').strip().lower()
+        key = (owner_id, (dossier.get('name') or '').strip().casefold())
+        names_by_commercial.setdefault(key, []).append(item)
+        if status == 'gagne':
+            statistics_by_id[owner_id]['signed_dossiers'].append(item)
+            signed_by_id[dossier['id']] = item
+        elif status == 'perdu':
+            statistics_by_id[owner_id]['lost_dossiers'].append(item)
 
     def bucket_for(commercial_id, year):
         years = statistics_by_id[commercial_id]["years"]
@@ -3391,6 +3410,19 @@ def build_commercial_statistics(conn, commercial_id=None):
 
         bucket_for(commercial_id, year)["ca"] += amount
         statistics_by_id[commercial_id]["career"]["ca"] += amount
+        entry = dict(id=revenu['id'], date=revenue_date,
+                     dossier=revenu.get('dossier') or 'Revenu', montant=amount)
+        signed = signed_by_id.get(revenu.get('client_id'))
+        if revenu.get('client_id') is None:
+            # Legacy text-only revenues are linked only when the name is unambiguous.
+            candidates = names_by_commercial.get(
+                (commercial_id, (revenu.get('dossier') or '').strip().casefold()), [])
+            signed = candidates[0] if len(candidates) == 1 and candidates[0]['id'] in signed_by_id else None
+        if signed and signed['owner_id'] == commercial_id:
+            signed['revenues'].append(entry)
+            signed['ca'] += amount
+        else:
+            statistics_by_id[commercial_id]['other_revenues'].append(entry)
 
     commercial_statistics = []
     for user in users:
@@ -3411,6 +3443,10 @@ def build_commercial_statistics(conn, commercial_id=None):
             "commercial_id": user["id"],
             "career": stat["career"],
             "years": annual_stats,
+            "signed_dossiers": sorted(stat['signed_dossiers'], key=lambda dossier: dossier['id'], reverse=True),
+            "lost_dossiers": sorted(stat['lost_dossiers'], key=lambda dossier: dossier['id'], reverse=True),
+            "signed_ca": sum(dossier['ca'] for dossier in stat['signed_dossiers']),
+            "other_revenues": stat['other_revenues'],
         })
 
     return commercial_statistics

@@ -115,6 +115,48 @@
                 </tbody>
             </table>
         </div>
+        <div class="mt-4">
+            <h3 class="h5">Dossiers signés / gagnés — {{ stat.signed_dossiers|length }}</h3>
+            <p class="text-muted">CA enregistré sur ces dossiers : <strong>{{ '{:,.2f}'.format(stat.signed_ca)|replace(',', ' ')|replace('.', ',') }} EUR</strong>. Le détail reprend les lignes de chiffre d’affaires attribuées à ce commercial.</p>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead><tr><th>Dossier</th><th>SIRET</th><th>Date d’entrée</th><th class="text-end">CA enregistré</th><th>Détail du CA</th></tr></thead>
+                    <tbody>
+                    {% for dossier in stat.signed_dossiers %}
+                    <tr>
+                        <td><a href="{{ url_for('client_detail', client_id=dossier.id) }}">N°{{ dossier.id }} — {{ dossier.name }}</a><br><span class="badge bg-success">Gagné</span></td>
+                        <td>{{ dossier.siret or '—' }}</td>
+                        <td>{{ dossier.created_at.strftime('%d/%m/%Y') if dossier.created_at else '—' }}</td>
+                        <td class="text-end fw-semibold">{{ '{:,.2f}'.format(dossier.ca)|replace(',', ' ')|replace('.', ',') }} EUR</td>
+                        <td>{% if dossier.revenues %}
+                            <details><summary>{{ dossier.revenues|length }} ligne(s) de CA</summary>
+                            <ul class="mb-0 mt-2">{% for revenu in dossier.revenues %}<li>{{ revenu.date.strftime('%d/%m/%Y') }} — {{ revenu.dossier }} : <strong>{{ '{:,.2f}'.format(revenu.montant)|replace(',', ' ')|replace('.', ',') }} EUR</strong></li>{% endfor %}</ul>
+                            </details>
+                            {% else %}<span class="text-muted">Aucun revenu enregistré</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}<tr><td colspan="5" class="text-muted text-center">Aucun dossier signé / gagné.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if stat.other_revenues %}
+            <details class="mb-4"><summary>CA hors dossiers gagnés détaillés : {{ '{:,.2f}'.format(stat.career.ca - stat.signed_ca)|replace(',', ' ')|replace('.', ',') }} EUR</summary>
+                <p class="text-muted mt-2">Revenus sur d’autres statuts ou non rattachés à un dossier gagné identifiable. Ils restent inclus dans le CA total du commercial.</p>
+                <ul>{% for revenu in stat.other_revenues %}<li>{{ revenu.date.strftime('%d/%m/%Y') }} — {{ revenu.dossier }} : {{ '{:,.2f}'.format(revenu.montant)|replace(',', ' ')|replace('.', ',') }} EUR</li>{% endfor %}</ul>
+            </details>
+            {% endif %}
+            <h3 class="h5">Dossiers perdus — {{ stat.lost_dossiers|length }}</h3>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead><tr><th>Dossier</th><th>SIRET</th><th>Date d’entrée</th><th>Statut</th></tr></thead>
+                    <tbody>
+                    {% for dossier in stat.lost_dossiers %}
+                    <tr><td><a href="{{ url_for('client_detail', client_id=dossier.id) }}">N°{{ dossier.id }} — {{ dossier.name }}</a></td><td>{{ dossier.siret or '—' }}</td><td>{{ dossier.created_at.strftime('%d/%m/%Y') if dossier.created_at else '—' }}</td><td><span class="badge bg-danger">Perdu</span></td></tr>
+                    {% else %}<tr><td colspan="4" class="text-muted text-center">Aucun dossier perdu.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </section>
 {% else %}
