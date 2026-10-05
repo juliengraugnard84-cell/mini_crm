@@ -11,6 +11,13 @@
     'perdu': 'Perdu'
 }.get(client_status, 'En cours') %}
 
+{% if client_group %}
+<div class="alert alert-info d-flex justify-content-between align-items-center gap-2">
+    <strong>Groupe : {{ client_group.common_name }}</strong>
+    <a href="{{ url_for('client_group_detail', group_id=client_group.id) }}" class="btn btn-outline-primary btn-sm">Voir les dossiers gaz et électricité du groupe</a>
+</div>
+{% endif %}
+
 <section class="crm-page-hero">
     <div>
         <span class="crm-page-kicker">Fiche client</span>

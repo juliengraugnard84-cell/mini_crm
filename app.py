@@ -15,7 +15,8 @@ import logging
 import json
 import hashlib
 from markupsafe import Markup, escape
-from duplicate_detection import ACTIVE_STATUSES, match_reasons
+from duplicate_detection import ACTIVE_STATUSES, match_reasons, is_blocking_match, normalize_name, normalize_reference
+from client_groups import ensure_client_groups_schema, attach_client_group, load_group_summaries
 from datetime import date, timedelta
 from email.message import EmailMessage
 from types import SimpleNamespace
@@ -5308,6 +5309,10 @@ def clients():
 
     conn = get_db()
     ensure_hot_followups_schema()
+    ensure_client_groups_schema(conn)
+    ensure_cotation_schema(conn)
+    ensure_cotation_delivery_points_schema(conn)
+    conn.commit()
     q = (request.args.get("q") or "").strip()
 
     user = session.get("user") or {}
@@ -5334,12 +5339,13 @@ def clients():
                     FROM crm_clients
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE
-                        crm_clients.name ILIKE %s
+                        (crm_clients.name ILIKE %s OR crm_clients.client_group_id IN
+                            (SELECT id FROM crm_client_groups WHERE common_name ILIKE %s))
                         OR COALESCE(crm_clients.email, '') ILIKE %s
                         OR COALESCE(crm_clients.phone, '') ILIKE %s
                         OR COALESCE(crm_clients.siret, '') ILIKE %s
                     ORDER BY crm_clients.created_at DESC, crm_clients.id DESC
-                """, (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
+                """, (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
             else:
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
@@ -5355,13 +5361,14 @@ def clients():
                     LEFT JOIN users ON users.id = crm_clients.owner_id
                     WHERE crm_clients.owner_id = %s
                       AND (
-                          crm_clients.name ILIKE %s
+                          (crm_clients.name ILIKE %s OR crm_clients.client_group_id IN
+                              (SELECT id FROM crm_client_groups WHERE common_name ILIKE %s))
                           OR COALESCE(crm_clients.email, '') ILIKE %s
                           OR COALESCE(crm_clients.phone, '') ILIKE %s
                           OR COALESCE(crm_clients.siret, '') ILIKE %s
                       )
                     ORDER BY crm_clients.created_at DESC, crm_clients.id DESC
-                """, (user_id, f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
+                """, (user_id, f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
             else:
                 cur.execute("""
                     SELECT crm_clients.*, users.username AS commercial
@@ -5391,8 +5398,22 @@ def clients():
         else:
             en_cours.append(r)
 
+    group_rows = rows
+    if q and rows:
+        # Search selects groups, but their counters include all accessible dossiers.
+        with conn.cursor() as cur:
+            query = '''SELECT c.*, u.username AS commercial FROM crm_clients c
+                       LEFT JOIN users u ON u.id = c.owner_id
+                       WHERE c.client_group_id = ANY(%s)'''
+            params = [list({row['client_group_id'] for row in rows})]
+            if role != 'admin':
+                query += ' AND c.owner_id = %s'
+                params.append(user_id)
+            cur.execute(query + ' ORDER BY c.id', tuple(params))
+            group_rows = cur.fetchall()
     return render_template(
         "clients.html",
+        client_groups=load_group_summaries(conn, group_rows),
         clients_en_cours=[row_to_obj(r) for r in en_cours],
         clients_en_attente=[row_to_obj(r) for r in en_attente],
         clients_gagnes=[row_to_obj(r) for r in gagnes],
@@ -5402,6 +5423,54 @@ def clients():
         current_user=session.get("user"),
         available_endpoints=[rule.endpoint for rule in app.url_map.iter_rules()],
     )
+
+
+@app.route('/clients/groupes/<int:group_id>')
+@login_required
+def client_group_detail(group_id):
+    user = session['user']
+    conn = get_db()
+    ensure_client_groups_schema(conn)
+    ensure_cotation_schema(conn)
+    ensure_cotation_delivery_points_schema(conn)
+    with conn.cursor() as cur:
+        query = '''SELECT c.*, u.username AS commercial FROM crm_clients c
+                   LEFT JOIN users u ON u.id = c.owner_id WHERE c.client_group_id = %s'''
+        params = [group_id]
+        if user.get('role') != 'admin':
+            query += ' AND c.owner_id = %s'
+            params.append(user['id'])
+        cur.execute(query + ' ORDER BY c.id', tuple(params))
+        rows = cur.fetchall()
+    if not rows:
+        abort(404)
+    groups = load_group_summaries(conn, rows)
+    conn.commit()
+    return render_template('client_group_detail.html', group=groups[0])
+
+
+@app.route('/clients/groupes/<int:group_id>/nom', methods=['POST'])
+@login_required
+def rename_client_group(group_id):
+    if session['user'].get('role') != 'admin':
+        abort(403)
+    name = (request.form.get('common_name') or '').strip()
+    if not name or not normalize_name(name) or len(name) > 160:
+        abort(400)
+    conn = get_db()
+    ensure_client_groups_schema(conn)
+    with conn.cursor() as cur:
+        cur.execute('SELECT id FROM crm_client_groups WHERE group_key = %s AND id <> %s',
+                    ('name:' + normalize_name(name), group_id))
+        if cur.fetchone():
+            flash('Un groupe porte déjà ce nom. Choisissez un nom distinct.', 'warning')
+            return redirect(url_for('client_group_detail', group_id=group_id))
+        cur.execute('UPDATE crm_client_groups SET common_name = %s, group_key = %s WHERE id = %s RETURNING id',
+                    (name, 'name:' + normalize_name(name), group_id))
+        if not cur.fetchone():
+            abort(404)
+    conn.commit()
+    return redirect(url_for('client_group_detail', group_id=group_id))
 
 
 # =========================
@@ -5421,6 +5490,10 @@ def ensure_duplicate_alerts_schema(conn):
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        for column in ('attempt_key TEXT', 'attempted_siret TEXT', 'attempted_references JSONB',
+                       'is_validated BOOLEAN NOT NULL DEFAULT FALSE', 'validated_by INTEGER',
+                       'validated_at TIMESTAMP', 'authorization_used BOOLEAN NOT NULL DEFAULT FALSE'):
+            cur.execute('ALTER TABLE dossier_duplicate_alerts ADD COLUMN IF NOT EXISTS ' + column)
 
 
 def record_dossier_duplicates(conn, name, siret, client_id=None,
@@ -5477,8 +5550,20 @@ def record_dossier_duplicates(conn, name, siret, client_id=None,
             return
         user = session['user']
         signature = hashlib.sha256(json.dumps(
-            [user['id'], name, client_id, matches], sort_keys=True
+            [user['id'], normalize_name(name), normalize_reference(siret), client_id,
+             sorted({normalize_reference(r) for r in candidate['references']} - {''}),
+             sorted(d['id'] for d in matches)], sort_keys=True
         ).encode()).hexdigest()
+        cur.execute('''SELECT id FROM dossier_duplicate_alerts
+                       WHERE actor_id = %s AND attempt_key = %s AND is_validated = TRUE
+                         AND authorization_used = FALSE LIMIT 1 FOR UPDATE''',
+                    (user['id'], signature))
+        approved_alert = cur.fetchone()
+        if approved_alert:
+            if flash_warning:
+                cur.execute('UPDATE dossier_duplicate_alerts SET authorization_used = TRUE WHERE id = %s',
+                            (approved_alert[0],))
+            return
         recent = session.get('recent_duplicate_alert') or {}
         now = datetime.now().timestamp()
         reuse = recent.get('signature') == signature and now - recent.get('timestamp', 0) < 120
@@ -5491,20 +5576,24 @@ def record_dossier_duplicates(conn, name, siret, client_id=None,
         else:
             cur.execute("""
                 INSERT INTO dossier_duplicate_alerts
-                    (actor_id, actor_name, attempted_name, source_client_id, details)
-                VALUES (%s, %s, %s, %s, %s::jsonb) RETURNING id
+                    (actor_id, actor_name, attempted_name, source_client_id, details,
+                     attempt_key, attempted_siret, attempted_references)
+                VALUES (%s, %s, %s, %s, %s::jsonb, %s, %s, %s::jsonb) RETURNING id
             """, (user['id'], user.get('username') or 'Inconnu', name,
-                  client_id, json.dumps(matches)))
+                  client_id, json.dumps(matches), signature, siret,
+                  json.dumps(candidate['references'])))
             alert_id = cur.fetchone()[0]
             session['recent_duplicate_alert'] = dict(
                 signature=signature, timestamp=now, id=alert_id)
+    full_match = any(is_blocking_match(dossier['reasons']) for dossier in matches)
+    blocked = user.get('role') == 'commercial' and full_match
     if flash_warning:
         if user.get('role') == 'commercial':
-            flash("dossier bloqué, voir avec l'administrateur", 'danger')
+            flash("dossier bloqué, voir avec l'administrateur" if blocked else "dossier déjà en cours",
+                  'danger' if blocked else 'warning')
         else:
             flash(Markup('Doublon détecté : <a href="{}">voir la fiche du dossier existant et son commercial</a>.').format(
                 escape(url_for('dossier_duplicate_alert', alert_id=alert_id))), 'warning')
-    blocked = user.get('role') == 'commercial'
     if blocked:
         # Persist the attempt even though the commercial's dossier is not saved.
         conn.commit()
@@ -5558,13 +5647,15 @@ def check_dossier_duplicates():
         return jsonify(error='Le contrôle des doublons est momentanément indisponible.'), 503
     dossiers = []
     blocked = bool((result or {}).get('blocked'))
-    for dossier in ([] if blocked else (result or {}).get('dossiers', [])):
+    for dossier in ([] if user.get('role') == 'commercial' else (result or {}).get('dossiers', [])):
         item = {key: dossier[key] for key in ('id', 'name', 'siret', 'status', 'owner_name', 'reasons')}
         if user.get('role') == 'admin' or dossier['owner_id'] == user['id']:
             item['url'] = url_for('client_detail', client_id=dossier['id'])
         dossiers.append(item)
-    response = jsonify(dossiers=dossiers, blocked=blocked,
-                       message="dossier bloqué, voir avec l'administrateur" if blocked else '')
+    warning = bool(result)
+    response = jsonify(dossiers=dossiers, blocked=blocked, warning=warning,
+                       message=("dossier bloqué, voir avec l'administrateur" if blocked
+                                else "dossier déjà en cours" if warning else ''))
     response.headers['Cache-Control'] = 'no-store'
     return response
 
@@ -5578,13 +5669,14 @@ def duplicate_alerts_feed():
     conn = get_db()
     ensure_duplicate_alerts_schema(conn)
     with conn.cursor() as cur:
-        cur.execute('SELECT COUNT(*) FROM dossier_duplicate_alerts WHERE is_read = FALSE')
+        cur.execute('SELECT COUNT(*) FROM dossier_duplicate_alerts WHERE is_read = FALSE AND is_validated = FALSE')
         count = cur.fetchone()[0]
         cur.execute('''SELECT * FROM dossier_duplicate_alerts
-                       WHERE id > %s AND is_read = FALSE ORDER BY id ASC LIMIT 20''', (after,))
+                       WHERE id > %s AND is_read = FALSE AND is_validated = FALSE ORDER BY id ASC LIMIT 20''', (after,))
         rows = cur.fetchall()
     alerts = [dict(id=row['id'], actor_name=row['actor_name'], attempted_name=row['attempted_name'],
-                   dossiers=row['details'], url=url_for('dossier_duplicate_alert', alert_id=row['id']))
+                   dossiers=row['details'], url=url_for('dossier_duplicate_alert', alert_id=row['id']),
+                   validate_url=url_for('validate_duplicate_alert', alert_id=row['id']))
               for row in rows]
     conn.commit()
     response = jsonify(alerts=alerts, unread=count,
@@ -5605,7 +5697,10 @@ def dossier_duplicate_alert(alert_id):
     if not alert or (user.get('role') != 'admin' and alert['actor_id'] != user['id']):
         abort(404)
     # The commercial receives only the limited dossier summary.
-    safe_alert = dict(details=[])
+    safe_alert = dict(details=[], message=("dossier bloqué, voir avec l'administrateur"
+        if any(is_blocking_match(d['reasons']) for d in alert['details']) else "dossier déjà en cours"))
+    if alert.get('is_validated'):
+        safe_alert['message'] = 'Alerte levée par l’administrateur. Vous pouvez valider à nouveau cette saisie.'
     if user.get('role') == 'admin':
         safe_alert = dict(alert)
         with conn.cursor() as cur:
@@ -5629,6 +5724,27 @@ def admin_duplicate_alerts():
     return render_template('duplicate_alerts.html', alerts=alerts)
 
 
+@app.route('/admin/alertes-doublons/<int:alert_id>/valider', methods=['POST'])
+@login_required
+def validate_duplicate_alert(alert_id):
+    if session['user'].get('role') != 'admin':
+        abort(403)
+    conn = get_db()
+    ensure_duplicate_alerts_schema(conn)
+    with conn.cursor() as cur:
+        cur.execute('''UPDATE dossier_duplicate_alerts
+                       SET is_validated = TRUE, is_read = TRUE,
+                           validated_by = %s, validated_at = CURRENT_TIMESTAMP
+                       WHERE id = %s RETURNING id''', (session['user']['id'], alert_id))
+        if not cur.fetchone():
+            abort(404)
+    conn.commit()
+    if request.headers.get('Accept') == 'application/json':
+        return jsonify(validated=True)
+    flash('Alerte levée. Le commercial peut valider à nouveau cette saisie.', 'success')
+    return redirect(url_for('dossier_duplicate_alert', alert_id=alert_id))
+
+
 @app.context_processor
 def inject_duplicate_alert_count():
     if (session.get('user') or {}).get('role') != 'admin':
@@ -5636,7 +5752,7 @@ def inject_duplicate_alert_count():
     conn = get_db()
     ensure_duplicate_alerts_schema(conn)
     with conn.cursor() as cur:
-        cur.execute('SELECT COUNT(*) FROM dossier_duplicate_alerts WHERE is_read = FALSE')
+        cur.execute('SELECT COUNT(*) FROM dossier_duplicate_alerts WHERE is_read = FALSE AND is_validated = FALSE')
         count = cur.fetchone()[0]
     conn.commit()
     return dict(unread_duplicate_alerts=count)
@@ -5712,6 +5828,7 @@ def create_client():
         duplicate = record_dossier_duplicates(conn, name, siret, status=status)
         if duplicate and duplicate['blocked']:
             return redirect(url_for('clients'))
+        ensure_client_groups_schema(conn)
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO crm_clients (
@@ -5744,6 +5861,8 @@ def create_client():
             ))
             new_client_id = cur.fetchone()["id"]
 
+        attach_client_group(conn, new_client_id, name, siret,
+                            common_name=(request.form.get('common_name') or '').strip()[:160])
         conn.commit()
         flash("Client créé avec succès.", "success")
         return redirect(url_for("client_detail", client_id=new_client_id))
@@ -5767,6 +5886,8 @@ def client_detail(client_id):
 
     conn = get_db()
     user = session.get("user") or {}
+    ensure_client_groups_schema(conn)
+    conn.commit()
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -5781,6 +5902,9 @@ def client_detail(client_id):
         flash("Client introuvable.", "danger")
         return redirect(url_for("clients"))
 
+    with conn.cursor() as cur:
+        cur.execute('SELECT * FROM crm_client_groups WHERE id = %s', (client['client_group_id'],))
+        client_group = cur.fetchone()
     documents = list_client_documents(client_id)
     ensure_hot_followups_schema()
 
@@ -5863,6 +5987,7 @@ def client_detail(client_id):
     return render_template(
         "client_detail.html",
         client=row_to_obj(client),
+        client_group=client_group,
         documents=documents,
         cotations=[row_to_obj(c) for c in cotations],
         timeline=[row_to_obj(t) for t in timeline],
@@ -6119,6 +6244,8 @@ def edit_client(client_id):
                     client_id,
                 ))
 
+        ensure_client_groups_schema(conn)
+        attach_client_group(conn, client_id, name, siret, preserve_current=True)
         conn.commit()
         flash("Client mis à jour avec succès.", "success")
 

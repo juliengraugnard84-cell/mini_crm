@@ -79,7 +79,7 @@
             });
             if (!response.ok || response.redirected) throw new Error('Check unavailable');
             const result = await response.json();
-            if (!result.blocked && !result.dossiers.length) {
+            if (!result.warning && !result.blocked && !result.dossiers.length) {
                 approved.add(form);
                 form.requestSubmit(submitter || undefined);
                 return;
@@ -88,10 +88,12 @@
             pendingSubmitter = submitter;
             content.replaceChildren();
             continueButton.hidden = result.blocked;
+            continueButton.textContent = 'Enregistrer le dossier';
+            dialog.classList.toggle('duplicate-dialog-warning', !result.blocked);
             if (result.blocked) {
                 text(content, 'p', "dossier bloqué, voir avec l'administrateur", 'duplicate-blocked-message');
             } else {
-                text(content, 'p', 'Un dossier possède déjà les références saisies.');
+                text(content, 'p', 'dossier déjà en cours', 'duplicate-warning-message');
                 result.dossiers.forEach(dossier => dossierCard(content, dossier));
             }
             if (!dialog.open) dialog.showModal();
@@ -130,11 +132,33 @@
                 dismiss.type = 'button';
                 dismiss.setAttribute('aria-label', 'Masquer cette notification');
                 dismiss.addEventListener('click', () => card.remove());
-                text(card, 'h3', '⚠ Doublon détecté');
+                const fullMatch = alert.dossiers.some(dossier => dossier.reasons.includes('Raison sociale')
+                    && dossier.reasons.includes('SIRET') && dossier.reasons.some(reason => reason.startsWith('PDL/PCE : ')));
+                card.classList.toggle('duplicate-live-warning', !fullMatch);
+                text(card, 'h3', fullMatch ? '⚠ Doublon : trois critères identiques' : '⚠ dossier déjà en cours');
                 text(card, 'p', `Tentative par ${alert.actor_name} — ${alert.attempted_name || 'Dossier'}`);
                 alert.dossiers.forEach(dossier => dossierCard(card, dossier));
                 const link = text(card, 'a', 'Voir l’alerte complète');
                 link.href = alert.url;
+                const validate = text(card, 'button', 'Valider', 'btn btn-success mt-2');
+                validate.type = 'button';
+                validate.style.float = 'none';
+                validate.addEventListener('click', async () => {
+                    validate.disabled = true;
+                    try {
+                        const response = await fetch(alert.validate_url, {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: {'X-CSRF-Token': config.csrfToken, 'Accept': 'application/json'},
+                            signal: AbortSignal.timeout(10000)
+                        });
+                        if (!response.ok || response.redirected) throw new Error('Validation failed');
+                        card.remove();
+                        poll();
+                    } catch (_) {
+                        validate.disabled = false;
+                        text(card, 'p', 'Validation impossible pour le moment. Réessayez.');
+                    }
+                });
                 // Keep a bounded notification stack; all attempts remain in history.
                 while (container.children.length > 5) container.firstElementChild.remove();
             }

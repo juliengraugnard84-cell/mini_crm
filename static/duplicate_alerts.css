@@ -19,3 +19,6 @@
 .duplicate-live-card h3 { color: #b42318; font-size: 1.1rem; }
 .duplicate-live-card button { float: right; }
 #duplicate-alert-nav.has-duplicate-alerts { background: #b42318; color: white; }
+.duplicate-dialog-warning, .duplicate-live-warning { border-color: #d89a24; }
+.duplicate-dialog-warning h2, .duplicate-live-warning h3 { color: #8a5700; }
+.duplicate-warning-message { padding: 18px; background: #fff5d6; color: #8a5700; font-size: 1.2rem; font-weight: 700; border-radius: 8px; }

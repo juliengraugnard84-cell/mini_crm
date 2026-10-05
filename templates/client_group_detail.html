@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}{{ group.name }} — Dossiers du groupe{% endblock %}
+{% macro dossier_table(items, energy) %}
+{% if items %}
+<div class="table-responsive">
+<table class="table align-middle">
+    <thead><tr><th>Dossier</th><th>SIRET</th><th>Site / adresse</th><th>{{ 'PDL' if energy == 'electricite' else 'PCE' if energy == 'gaz' else 'Références' }}</th><th>Responsable</th><th>Commercial</th><th>Statut</th></tr></thead>
+    <tbody>
+    {% for client in items %}
+    <tr>
+        <td><a href="{{ url_for('client_detail', client_id=client.id) }}">N°{{ client.id }} — {{ client.name }}</a></td>
+        <td>{{ client.siret or '—' }}</td>
+        <td>{% if energy and client.points[energy] %}{% for point in client.points[energy] %}<div>{{ point.site }}{% if point.address %}<br><small>{{ point.address }}</small>{% endif %}</div>{% endfor %}{% else %}{{ client.address or '—' }}{% endif %}</td>
+        <td>{% if energy %}{% for point in client.points[energy] %}<div>{{ point.reference or 'À renseigner' }}</div>{% else %}À renseigner{% endfor %}{% else %}À renseigner{% endif %}</td>
+        <td>{{ client.gerant_nom or '—' }}</td>
+        <td>{{ client.commercial or 'Non assigné' }}</td>
+        <td>{{ {'gagne': 'Gagné', 'perdu': 'Perdu', 'en_attente': 'En attente'}.get(client.status, 'En cours') }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}<p class="text-muted">Aucun dossier dans cette catégorie.</p>{% endif %}
+{% endmacro %}
+{% block content %}
+<a href="{{ url_for('clients') }}" class="btn btn-secondary mb-3">Retour aux clients</a>
+<section class="crm-page-hero crm-page-hero--compact">
+    <div><span class="crm-page-kicker">Groupe client</span><h1>{{ group.name }}</h1><p>{{ group.total }} dossier(s) en mémoire · {{ group.sirets|length }} SIRET distinct(s)</p></div>
+    <div class="crm-hero-pillbox"><span class="crm-hero-pill">Commercial(aux) : {{ group.commercials|join(', ') or 'Non assigné' }}</span></div>
+</section>
+{% if current_user.role != 'admin' %}<p class="text-muted">Vous voyez uniquement vos dossiers accessibles. L’administrateur dispose de la vue complète du groupe.</p>{% endif %}
+<p class="text-muted">Un dossier comprenant les deux énergies apparaît dans chaque catégorie et compte une seule fois dans le total.</p>
+{% if current_user.role == 'admin' %}
+<form method="post" action="{{ url_for('rename_client_group', group_id=group.id) }}" class="card p-3 mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="group-common-name" class="form-label">Nom commun du groupe</label>
+    <div class="d-flex gap-2"><input id="group-common-name" name="common_name" value="{{ group.name }}" maxlength="160" required class="form-control"><button class="btn btn-primary" type="submit">Enregistrer le nom</button></div>
+</form>
+{% endif %}
+<section class="card p-3 mb-4"><h2 class="h4">Électricité — {{ group.electricite|length }} dossier(s)</h2>{{ dossier_table(group.electricite, 'electricite') }}</section>
+<section class="card p-3 mb-4"><h2 class="h4">Gaz — {{ group.gaz|length }} dossier(s)</h2>{{ dossier_table(group.gaz, 'gaz') }}</section>
+{% if group.sans_energie %}<section class="card p-3 mb-4"><h2 class="h4">Énergie à renseigner — {{ group.sans_energie|length }} dossier(s)</h2>{{ dossier_table(group.sans_energie, none) }}</section>{% endif %}
+{% endblock %}

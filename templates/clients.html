@@ -85,6 +85,12 @@
                     </div>
 
                     <div class="col-md-6">
+                        <label class="form-label">Nom commun du groupe</label>
+                        <input type="text" name="common_name" class="form-control" maxlength="160" placeholder="Foncia, Cythia…">
+                        <small class="form-text text-muted">Les dossiers d’un même SIRET sont rattachés au même groupe. Ce nom permet aussi de réunir plusieurs établissements.</small>
+                    </div>
+
+                    <div class="col-md-6">
                         <label class="form-label">Nom du gerant</label>
                         <input type="text" name="gerant_nom" class="form-control">
                     </div>
@@ -156,6 +162,28 @@
     </div>
 </div>
 
+<section class="crm-panel mb-4">
+    <div class="crm-panel-heading">
+        <div><span class="crm-panel-kicker">Fiches regroupées</span><h2>Groupes clients</h2></div>
+        <span>{{ client_groups|length }} groupe(s)</span>
+    </div>
+    {% if current_user.role != 'admin' %}<p class="text-muted">Les compteurs et les dossiers affichés correspondent à vos dossiers accessibles.</p>{% endif %}
+    <div class="row g-3">
+        {% for group in client_groups %}
+        <div class="col-md-6 col-xl-4">
+            <a class="card h-100 p-3 text-decoration-none" href="{{ url_for('client_group_detail', group_id=group.id) }}">
+                <div class="d-flex justify-content-between gap-2"><strong class="h4">{{ group.name }}</strong><span class="badge bg-primary align-self-start">{{ group.total }} dossier(s)</span></div>
+                <p class="mb-2">Électricité : {{ group.electricite|length }} · Gaz : {{ group.gaz|length }}</p>
+                {% if group.sans_energie %}<p class="text-muted mb-2">Énergie à renseigner : {{ group.sans_energie|length }}</p>{% endif %}
+                <p class="mb-0">Commercial(aux) : {{ group.commercials|join(', ') or 'Non assigné' }}</p>
+            </a>
+        </div>
+        {% else %}<p>Aucun groupe client.</p>{% endfor %}
+    </div>
+</section>
+
+<details class="mb-4">
+<summary class="mb-3">Afficher le pipeline des dossiers individuels</summary>
 <section class="crm-panel">
     <div class="crm-panel-heading">
         <div>
@@ -183,5 +211,6 @@
         {{ render_client_column('Perdus', clients_perdus, 'crm-board-column--lost', 'Aucun dossier perdu.') }}
     </div>
 </section>
+</details>
 
 {% endblock %}

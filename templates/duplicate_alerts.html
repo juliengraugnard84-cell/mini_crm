@@ -3,9 +3,9 @@
 {% block content %}
 <h1>Alertes de doublons</h1>
 {% if current_user.role == 'admin' %}
-<p>Un dossier gagné, en cours ou en attente possède déjà une des références saisies. Les dossiers perdus sont exclus. La saisie est bloquée pour les commerciaux.</p>
+<p>Un nom complété ou une référence déjà utilisée déclenche une alerte. Les trois critères identiques sur le même dossier bloquent la saisie commerciale. L’administrateur peut lever l’alerte pour cette saisie en cliquant sur Valider. Les dossiers perdus sont exclus.</p>
 {% else %}
-<div class="alert alert-danger" role="alert">dossier bloqué, voir avec l'administrateur</div>
+<div class="alert alert-warning" role="alert">{{ alerts[0].message if alerts else 'dossier déjà en cours' }}</div>
 {% endif %}
 {% for alert in alerts %}
 <section class="card p-3 mb-3">
@@ -14,6 +14,15 @@
   <p>{{ alert.created_at }} — Dossier saisi : {{ alert.attempted_name or '—' }}
     {% if alert.source_client_id %} · <a href="{{ url_for('client_detail', client_id=alert.source_client_id) }}">Dossier saisi n°{{ alert.source_client_id }}</a>{% endif %}
   </p>
+  <p>SIRET saisi : {{ alert.attempted_siret or '—' }} · PDL/PCE saisis : {{ (alert.attempted_references or [])|reject('none')|join(' ; ') }}</p>
+  {% if alert.is_validated %}
+  <p class="text-success">Alerte levée le {{ alert.validated_at }}.</p>
+  {% else %}
+  <form method="post" action="{{ url_for('validate_duplicate_alert', alert_id=alert.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="btn btn-success">Valider</button>
+  </form>
+  {% endif %}
   {% endif %}
   {% for dossier in alert.details %}
   <div class="border rounded p-3 mb-2">
