@@ -1,6 +1,12 @@
 """Non-destructive client grouping with independent energy dossiers and ownership."""
 from duplicate_detection import normalize_name, normalize_reference, name_words
 
+GROUPED_STATUSES = {'gagne', 'perdu'}
+
+
+def is_groupable(status):
+    return (status or '').strip().lower() in GROUPED_STATUSES
+
 
 def suggested_common_name(name):
     words = name_words(name)
@@ -9,14 +15,24 @@ def suggested_common_name(name):
     return (name or '').strip()
 
 
-def attach_client_group(conn, client_id, name, siret, common_name='', preserve_current=False):
+def attach_client_group(conn, client_id, name, siret, common_name='', preserve_current=False, status=None):
     """Same SIRET always reuses its group; a shared label can group several SIRETs."""
     reference = normalize_reference(siret)
     with conn.cursor() as cur:
+        if status is None:
+            cur.execute('SELECT status FROM crm_clients WHERE id = %s', (client_id,))
+            source = cur.fetchone()
+            status = source['status'] if source else None
+        if not is_groupable(status):
+            cur.execute('''UPDATE crm_clients SET group_name_hint = COALESCE(NULLIF(%s, ''),
+                           (SELECT common_name FROM crm_client_groups WHERE id = client_group_id), group_name_hint),
+                           client_group_id = NULL WHERE id = %s''', ((common_name or '').strip(), client_id))
+            return None
         if reference:
             cur.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', ('client-group:' + reference,))
             cur.execute('''SELECT client_group_id FROM crm_clients
                            WHERE id <> %s AND client_group_id IS NOT NULL
+                             AND LOWER(TRIM(COALESCE(status, ''))) IN ('gagne', 'perdu')
                              AND upper(regexp_replace(COALESCE(siret, ''), '[[:space:]./-]', '', 'g')) = %s
                            ORDER BY id LIMIT 1''', (client_id, reference))
             existing = cur.fetchone()
@@ -24,6 +40,16 @@ def attach_client_group(conn, client_id, name, siret, common_name='', preserve_c
                 group_id = existing['client_group_id']
                 cur.execute('UPDATE crm_clients SET client_group_id = %s WHERE id = %s', (group_id, client_id))
                 return group_id
+        # A completed dossier can also join the same legal name with a different SIRET.
+        cur.execute('''SELECT name, client_group_id FROM crm_clients
+                       WHERE id <> %s AND client_group_id IS NOT NULL
+                         AND LOWER(TRIM(COALESCE(status, ''))) IN ('gagne', 'perdu') ORDER BY id''', (client_id,))
+        same_name = next((row for row in cur.fetchall()
+                          if normalize_name(row['name']) == normalize_name(name)), None)
+        if same_name:
+            group_id = same_name['client_group_id']
+            cur.execute('UPDATE crm_clients SET client_group_id = %s WHERE id = %s', (group_id, client_id))
+            return group_id
         if preserve_current:
             cur.execute('SELECT client_group_id FROM crm_clients WHERE id = %s', (client_id,))
             current = cur.fetchone()
@@ -55,17 +81,29 @@ def ensure_client_groups_schema(conn):
         cur.execute('''ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS
                        client_group_id INTEGER REFERENCES crm_client_groups(id)''')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_crm_clients_group ON crm_clients(client_group_id)')
-        cur.execute('SELECT id, name, siret FROM crm_clients WHERE client_group_id IS NULL ORDER BY id')
+        cur.execute('ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS group_name_hint TEXT')
+        # Retain the chosen label when a dossier returns to the live pipeline.
+        cur.execute('''UPDATE crm_clients SET group_name_hint = COALESCE(
+                       (SELECT common_name FROM crm_client_groups WHERE id = client_group_id), group_name_hint),
+                       client_group_id = NULL WHERE client_group_id IS NOT NULL
+                       AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('gagne', 'perdu')''')
+        cur.execute('''SELECT id, name, siret, status, group_name_hint FROM crm_clients
+                       WHERE client_group_id IS NULL
+                         AND LOWER(TRIM(COALESCE(status, ''))) IN ('gagne', 'perdu') ORDER BY id''')
         missing = cur.fetchall()
     for client in missing:
-        attach_client_group(conn, client['id'], client['name'], client['siret'])
+        attach_client_group(conn, client['id'], client['name'], client['siret'],
+                            common_name=client['group_name_hint'] or '', status=client['status'])
 
 
 def build_group_summaries(clients, quotations, points):
     """Count unique dossiers per energy, not repeated quotation requests."""
     groups, client_map, quote_map = {}, {}, {}
     for source in clients:
+        if not is_groupable(source.get('status')) or not source.get('client_group_id'):
+            continue
         client = dict(source)
+        client['status'] = client['status'].strip().lower()
         client['energies'] = set()
         client['points'] = {'electricite': [], 'gaz': []}
         client_map[client['id']] = client
@@ -118,6 +156,8 @@ def build_group_summaries(clients, quotations, points):
         group['commercials'] = sorted(group['commercials'], key=str.casefold)
         group['sirets'] = sorted(group['sirets'])
         group['total'] = len(group['dossiers'])
+        group['gagnes'] = [c for c in group['dossiers'] if c['status'] == 'gagne']
+        group['perdus'] = [c for c in group['dossiers'] if c['status'] == 'perdu']
         group['electricite'] = [c for c in group['dossiers'] if 'electricite' in c['energies']]
         group['gaz'] = [c for c in group['dossiers'] if 'gaz' in c['energies']]
         group['sans_energie'] = [c for c in group['dossiers'] if not c['energies']]
@@ -125,6 +165,7 @@ def build_group_summaries(clients, quotations, points):
 
 
 def load_group_summaries(conn, clients):
+    clients = [client for client in clients if is_groupable(client.get('status')) and client.get('client_group_id')]
     if not clients:
         return []
     ids = [client['id'] for client in clients]

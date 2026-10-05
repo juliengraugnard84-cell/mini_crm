@@ -16,7 +16,7 @@ import json
 import hashlib
 from markupsafe import Markup, escape
 from duplicate_detection import ACTIVE_STATUSES, match_reasons, is_blocking_match, normalize_name, normalize_reference
-from client_groups import ensure_client_groups_schema, attach_client_group, load_group_summaries
+from client_groups import ensure_client_groups_schema, attach_client_group, load_group_summaries, is_groupable
 from datetime import date, timedelta
 from email.message import EmailMessage
 from types import SimpleNamespace
@@ -5398,14 +5398,15 @@ def clients():
         else:
             en_cours.append(r)
 
-    group_rows = rows
-    if q and rows:
+    group_rows = [row for row in rows if is_groupable(row.get('status')) and row.get('client_group_id')]
+    if q and group_rows:
         # Search selects groups, but their counters include all accessible dossiers.
         with conn.cursor() as cur:
             query = '''SELECT c.*, u.username AS commercial FROM crm_clients c
                        LEFT JOIN users u ON u.id = c.owner_id
-                       WHERE c.client_group_id = ANY(%s)'''
-            params = [list({row['client_group_id'] for row in rows})]
+                       WHERE c.client_group_id = ANY(%s)
+                         AND LOWER(TRIM(COALESCE(c.status, ''))) IN ('gagne', 'perdu')'''
+            params = [list({row['client_group_id'] for row in group_rows})]
             if role != 'admin':
                 query += ' AND c.owner_id = %s'
                 params.append(user_id)
@@ -5435,7 +5436,8 @@ def client_group_detail(group_id):
     ensure_cotation_delivery_points_schema(conn)
     with conn.cursor() as cur:
         query = '''SELECT c.*, u.username AS commercial FROM crm_clients c
-                   LEFT JOIN users u ON u.id = c.owner_id WHERE c.client_group_id = %s'''
+                   LEFT JOIN users u ON u.id = c.owner_id WHERE c.client_group_id = %s
+                     AND LOWER(TRIM(COALESCE(c.status, ''))) IN ('gagne', 'perdu')'''
         params = [group_id]
         if user.get('role') != 'admin':
             query += ' AND c.owner_id = %s'
@@ -5862,7 +5864,7 @@ def create_client():
             new_client_id = cur.fetchone()["id"]
 
         attach_client_group(conn, new_client_id, name, siret,
-                            common_name=(request.form.get('common_name') or '').strip()[:160])
+                            common_name=(request.form.get('common_name') or '').strip()[:160], status=status)
         conn.commit()
         flash("Client créé avec succès.", "success")
         return redirect(url_for("client_detail", client_id=new_client_id))
@@ -6245,7 +6247,7 @@ def edit_client(client_id):
                 ))
 
         ensure_client_groups_schema(conn)
-        attach_client_group(conn, client_id, name, siret, preserve_current=True)
+        attach_client_group(conn, client_id, name, siret, preserve_current=True, status=status)
         conn.commit()
         flash("Client mis à jour avec succès.", "success")
 
@@ -6290,6 +6292,9 @@ def update_client_status(client_id):
                 WHERE id = %s
             """, (status, client_id))
 
+        if source:
+            ensure_client_groups_schema(conn)
+            attach_client_group(conn, client_id, source['name'], source['siret'], preserve_current=True, status=status)
         conn.commit()
 
     except Exception as e:

@@ -25,11 +25,12 @@
 {% block content %}
 <a href="{{ url_for('clients') }}" class="btn btn-secondary mb-3">Retour aux clients</a>
 <section class="crm-page-hero crm-page-hero--compact">
-    <div><span class="crm-page-kicker">Groupe client</span><h1>{{ group.name }}</h1><p>{{ group.total }} dossier(s) en mémoire · {{ group.sirets|length }} SIRET distinct(s)</p></div>
+    <div><span class="crm-page-kicker">Groupe client — dossiers clôturés</span><h1>{{ group.name }}</h1><p>{{ group.total }} dossier(s) en mémoire · {{ group.sirets|length }} SIRET distinct(s)</p><p><span class="badge bg-success">Gagnés : {{ group.gagnes|length }}</span> <span class="badge bg-danger">Perdus : {{ group.perdus|length }}</span></p></div>
     <div class="crm-hero-pillbox"><span class="crm-hero-pill">Commercial(aux) : {{ group.commercials|join(', ') or 'Non assigné' }}</span></div>
 </section>
 {% if current_user.role != 'admin' %}<p class="text-muted">Vous voyez uniquement vos dossiers accessibles. L’administrateur dispose de la vue complète du groupe.</p>{% endif %}
 <p class="text-muted">Un dossier comprenant les deux énergies apparaît dans chaque catégorie et compte une seule fois dans le total.</p>
+<p class="text-muted">Seuls les dossiers gagnés ou perdus sont regroupés. Un dossier remis en cours ou en attente retourne au pipeline individuel.</p>
 {% if current_user.role == 'admin' %}
 <form method="post" action="{{ url_for('rename_client_group', group_id=group.id) }}" class="card p-3 mb-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -37,7 +38,15 @@
     <div class="d-flex gap-2"><input id="group-common-name" name="common_name" value="{{ group.name }}" maxlength="160" required class="form-control"><button class="btn btn-primary" type="submit">Enregistrer le nom</button></div>
 </form>
 {% endif %}
-<section class="card p-3 mb-4"><h2 class="h4">Électricité — {{ group.electricite|length }} dossier(s)</h2>{{ dossier_table(group.electricite, 'electricite') }}</section>
-<section class="card p-3 mb-4"><h2 class="h4">Gaz — {{ group.gaz|length }} dossier(s)</h2>{{ dossier_table(group.gaz, 'gaz') }}</section>
-{% if group.sans_energie %}<section class="card p-3 mb-4"><h2 class="h4">Énergie à renseigner — {{ group.sans_energie|length }} dossier(s)</h2>{{ dossier_table(group.sans_energie, none) }}</section>{% endif %}
+{% for status, label, items in [('gagne', 'Gagnés', group.gagnes), ('perdu', 'Perdus', group.perdus)] %}
+<section class="card p-3 mb-4">
+<h2 class="h4">{{ label }} — {{ items|length }} dossier(s)</h2>
+{% set electricite = group.electricite|selectattr('status', 'equalto', status)|list %}
+{% set gaz = group.gaz|selectattr('status', 'equalto', status)|list %}
+{% set sans_energie = group.sans_energie|selectattr('status', 'equalto', status)|list %}
+<h3 class="h5">Électricité — {{ electricite|length }} dossier(s)</h3>{{ dossier_table(electricite, 'electricite') }}
+<h3 class="h5">Gaz — {{ gaz|length }} dossier(s)</h3>{{ dossier_table(gaz, 'gaz') }}
+{% if sans_energie %}<h3 class="h5">Énergie à renseigner — {{ sans_energie|length }} dossier(s)</h3>{{ dossier_table(sans_energie, none) }}{% endif %}
+</section>
+{% endfor %}
 {% endblock %}
