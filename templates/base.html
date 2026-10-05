@@ -116,6 +116,11 @@
                     Suivi des dossiers commerciaux
                 </a>
 
+                <a href="{{ url_for('admin_duplicate_alerts') }}">
+                    Alertes de doublons
+                    {% if unread_duplicate_alerts %}<span class="nav-alert-badge danger">{{ unread_duplicate_alerts }}</span>{% endif %}
+                </a>
+
                 <a href="{{ url_for('admin_commercial_statistics') }}"
                    class="{% if request.path.startswith('/admin/statistiques-commerciaux') %}active{% endif %}">
                     Statistiques commerciaux

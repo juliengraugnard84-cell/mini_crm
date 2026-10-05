@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Alertes de doublons{% endblock %}
+{% block content %}
+<h1>Alertes de doublons</h1>
+<p>Un dossier gagné, en cours ou en attente possède déjà une des références saisies. Les dossiers perdus sont exclus. Cette alerte n’empêche pas l’enregistrement.</p>
+{% for alert in alerts %}
+<section class="card p-3 mb-3">
+  {% if current_user.role == 'admin' %}
+  <h2 class="h5">Tentative par {{ alert.actor_name }}</h2>
+  <p>{{ alert.created_at }} — Dossier saisi : {{ alert.attempted_name or '—' }}
+    {% if alert.source_client_id %} · <a href="{{ url_for('client_detail', client_id=alert.source_client_id) }}">Dossier saisi n°{{ alert.source_client_id }}</a>{% endif %}
+  </p>
+  {% endif %}
+  {% for dossier in alert.details %}
+  <div class="border rounded p-3 mb-2">
+    <strong>Dossier n°{{ dossier.id }} — {{ dossier.name }}</strong>
+    <p class="mb-1">Commercial responsable : {{ dossier.owner_name }}</p>
+    <p class="mb-1">SIRET : {{ dossier.siret or '—' }} · Statut : {{ dossier.status or 'en_cours' }}</p>
+    <p class="mb-1">Correspondances : {{ dossier.reasons|join(' ; ') }}</p>
+    {% if current_user.role == 'admin' or dossier.owner_id == current_user.id %}
+    <a href="{{ url_for('client_detail', client_id=dossier.id) }}">Ouvrir le dossier</a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% else %}
+<p>Aucune alerte de doublon.</p>
+{% endfor %}
+{% endblock %}

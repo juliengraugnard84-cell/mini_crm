@@ -12,6 +12,9 @@ import ssl
 import unicodedata
 import secrets
 import logging
+import json
+from markupsafe import Markup, escape
+from duplicate_detection import ACTIVE_STATUSES, match_reasons
 from datetime import date, timedelta
 from email.message import EmailMessage
 from types import SimpleNamespace
@@ -5403,6 +5406,133 @@ def clients():
 # =========================
 # CLIENT — CREATION
 # =========================
+def ensure_duplicate_alerts_schema(conn):
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS dossier_duplicate_alerts (
+                id SERIAL PRIMARY KEY,
+                actor_id INTEGER NOT NULL,
+                actor_name TEXT NOT NULL,
+                attempted_name TEXT,
+                source_client_id INTEGER,
+                details JSONB NOT NULL,
+                is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+
+def record_dossier_duplicates(conn, name, siret, client_id=None,
+                              references=None, status=None):
+    """Warn without blocking entry; save the full report for administrators."""
+    if status is not None and status not in ACTIVE_STATUSES:
+        return
+    if status is None and client_id is not None:
+        with conn.cursor() as cur:
+            cur.execute('SELECT status FROM crm_clients WHERE id = %s', (client_id,))
+            source = cur.fetchone()
+        if not source or (source['status'] or '').strip().lower() not in ACTIVE_STATUSES:
+            return
+    ensure_cotation_schema(conn)
+    ensure_cotation_delivery_points_schema(conn)
+    ensure_duplicate_alerts_schema(conn)
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT c.id, c.name, c.siret, c.owner_id, c.status,
+                   COALESCE(u.username, c.commercial, 'Non assigné') AS owner_name
+            FROM crm_clients c LEFT JOIN users u ON u.id = c.owner_id
+            WHERE LOWER(TRIM(COALESCE(c.status, ''))) IN
+                  ('', 'nouveau', 'en_cours', 'en_attente', 'gagne')
+        """)
+        dossiers = {r['id']: dict(r) for r in cur.fetchall()}
+        for row in dossiers.values():
+            row.update(names=[row['name']], sirets=[row['siret']], references=[])
+        cur.execute("""
+            SELECT q.client_id, q.entreprise_nom, q.siret, q.pdl_pce, q.pce,
+                   p.reference_code
+            FROM cotations q JOIN crm_clients c ON c.id = q.client_id
+            LEFT JOIN cotation_delivery_points p ON p.cotation_id = q.id
+            WHERE LOWER(TRIM(COALESCE(c.status, ''))) IN
+                  ('', 'nouveau', 'en_cours', 'en_attente', 'gagne')
+        """)
+        for q in cur.fetchall():
+            row = dossiers[q['client_id']]
+            row['names'].append(q['entreprise_nom'])
+            row['sirets'].append(q['siret'])
+            row['references'].extend([q['pdl_pce'], q['pce'], q['reference_code']])
+        candidate = dict(names=[name], sirets=[siret], references=references or [])
+        if references is None and client_id in dossiers:
+            candidate['references'] = dossiers[client_id]['references']
+        matches = []
+        for row in dossiers.values():
+            if row['id'] == client_id:
+                continue
+            reasons = match_reasons(candidate, row)
+            if reasons:
+                matches.append(dict(id=row['id'], name=row['name'], siret=row['siret'],
+                                    owner_name=row['owner_name'], owner_id=row['owner_id'],
+                                    status=row['status'], reasons=reasons))
+        if not matches:
+            return
+        user = session['user']
+        cur.execute("""
+            INSERT INTO dossier_duplicate_alerts
+                (actor_id, actor_name, attempted_name, source_client_id, details)
+            VALUES (%s, %s, %s, %s, %s::jsonb) RETURNING id
+        """, (user['id'], user.get('username') or 'Inconnu', name,
+              client_id, json.dumps(matches)))
+        alert_id = cur.fetchone()[0]
+    flash(Markup('Doublon détecté : <a href="{}">voir la fiche du dossier existant et son commercial</a>.').format(
+        escape(url_for('dossier_duplicate_alert', alert_id=alert_id))), 'warning')
+
+
+@app.route('/alertes-doublons/<int:alert_id>')
+@login_required
+def dossier_duplicate_alert(alert_id):
+    conn = get_db()
+    ensure_duplicate_alerts_schema(conn)
+    user = session['user']
+    with conn.cursor() as cur:
+        cur.execute('SELECT * FROM dossier_duplicate_alerts WHERE id = %s', (alert_id,))
+        alert = cur.fetchone()
+    if not alert or (user.get('role') != 'admin' and alert['actor_id'] != user['id']):
+        abort(404)
+    # The commercial receives only the limited dossier summary.
+    safe_alert = dict(details=alert['details'])
+    if user.get('role') == 'admin':
+        safe_alert = dict(alert)
+    conn.commit()
+    return render_template('duplicate_alerts.html', alerts=[safe_alert])
+
+
+@app.route('/admin/alertes-doublons')
+@admin_required
+def admin_duplicate_alerts():
+    conn = get_db()
+    ensure_duplicate_alerts_schema(conn)
+    with conn.cursor() as cur:
+        cur.execute('SELECT * FROM dossier_duplicate_alerts ORDER BY created_at DESC, id DESC LIMIT 200')
+        alerts = [dict(row) for row in cur.fetchall()]
+        if alerts:
+            cur.execute('UPDATE dossier_duplicate_alerts SET is_read = TRUE WHERE id = ANY(%s)',
+                        ([row['id'] for row in alerts],))
+    conn.commit()
+    return render_template('duplicate_alerts.html', alerts=alerts)
+
+
+@app.context_processor
+def inject_duplicate_alert_count():
+    if (session.get('user') or {}).get('role') != 'admin':
+        return dict(unread_duplicate_alerts=0)
+    conn = get_db()
+    ensure_duplicate_alerts_schema(conn)
+    with conn.cursor() as cur:
+        cur.execute('SELECT COUNT(*) FROM dossier_duplicate_alerts WHERE is_read = FALSE')
+        count = cur.fetchone()[0]
+    conn.commit()
+    return dict(unread_duplicate_alerts=count)
+
+
 @app.route("/clients/create", methods=["POST"], endpoint="create_client")
 @login_required
 def create_client():
@@ -5470,6 +5600,7 @@ def create_client():
             owner_id = current_user_id
             commercial = current_username
 
+        record_dossier_duplicates(conn, name, siret, status=status)
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO crm_clients (
@@ -5788,6 +5919,7 @@ def edit_client(client_id):
         status = (existing_client.get("status") or "en_cours").strip().lower()
 
     try:
+        record_dossier_duplicates(conn, name, siret, client_id=client_id, status=status)
         owner_id = None
 
         if role == "admin":
@@ -5903,6 +6035,12 @@ def update_client_status(client_id):
         return redirect(request.referrer or url_for("clients"))
 
     try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT name, siret FROM crm_clients WHERE id = %s', (client_id,))
+            source = cur.fetchone()
+        if source:
+            record_dossier_duplicates(conn, source['name'], source['siret'],
+                                      client_id=client_id, status=status)
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE crm_clients
@@ -6054,6 +6192,10 @@ def create_cotation(client_id):
     try:
         ensure_cotation_schema(conn)
         ensure_cotation_delivery_points_schema(conn)
+        record_dossier_duplicates(
+            conn, entreprise_nom or client_name, siret, client_id=client_id,
+            references=[pdl_pce, pce] + [p.get('reference_code') for p in delivery_points],
+        )
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO cotations (
@@ -6342,6 +6484,10 @@ def edit_cotation(client_id, cotation_id):
 
         try:
             ensure_cotation_delivery_points_schema(conn)
+            record_dossier_duplicates(
+                conn, entreprise_nom or client['name'], siret, client_id=client_id,
+                references=[pdl_pce, pce] + [p.get('reference_code') for p in delivery_points],
+            )
             with conn.cursor() as cur:
                 cur.execute(
                     """
