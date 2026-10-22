@@ -43,7 +43,8 @@ function initCotationForm(form) {
                 return;
             }
 
-            const available = groups.includes(optionEnergy);
+            // Do not empty the dropdown before the energy has been selected.
+            const available = groups.length === 0 || groups.includes(optionEnergy);
             option.hidden = !available;
             option.disabled = !available;
             if (!available && option.selected) {
@@ -143,7 +144,7 @@ function initCotationForm(form) {
                 if (!optionEnergy) {
                     return;
                 }
-                const available = optionEnergy === energyField.value;
+                const available = !energyField.value || optionEnergy === energyField.value;
                 option.hidden = !available;
                 option.disabled = !available;
                 if (!available && option.selected) {

@@ -3176,6 +3176,12 @@ body.crm-body {
     box-shadow: 0 0 0 4px rgba(241, 193, 175, 0.2);
 }
 
+/* Keep the native dropdown affordance despite the shared gradient background. */
+[data-cotation-form] [data-meter-type-select],
+[data-cotation-form] [data-point-meter-type] {
+    appearance: auto;
+}
+
 textarea.form-control {
     min-height: 132px;
 }
