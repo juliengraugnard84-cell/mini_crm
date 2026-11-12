@@ -9,6 +9,19 @@ from document_sync import FileBridge, sync_files, normalize_render_url
 
 
 def register_sync_ui(crm, config, state, backup, run_pg):
+    @crm.app.route('/local/synchronisation/historique')
+    @crm.admin_required
+    def local_sync_orphans():
+        conn = crm.get_db()
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('crm_sync_orphans')")
+            if cur.fetchone()[0]:
+                cur.execute('SELECT entity,payload,reason FROM crm_sync_orphans ORDER BY archived_at,entity')
+                records = [dict(entity=table, payload=payload, reason=reason) for table, payload, reason in cur.fetchall()]
+            else:
+                records = []
+        return crm.render_template('local_sync_orphans.html', records=records)
+
     @crm.app.route('/local/synchronisation', methods=['GET', 'POST'])
     @crm.admin_required
     def local_sync():

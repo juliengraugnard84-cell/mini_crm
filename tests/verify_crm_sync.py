@@ -33,7 +33,7 @@ try:
                 cur.execute("INSERT INTO revenus(client_id,commercial,montant,date) VALUES(1,'Commercial local',123.45,'2026-11-12')")
             else:
                 cur.execute("INSERT INTO users(id,username,role) VALUES(7,'Julien','commercial')")
-                cur.execute("INSERT INTO crm_clients(id,name,siret,owner_id,status) VALUES(50,'Render test','222',7,'gagne')")
+                cur.execute("INSERT INTO crm_clients(id,name,siret,owner_id,status) VALUES(50,'Render test','222',999,'gagne')")
         conn.commit()
     local, remote = connections
     result = sync_databases(local, remote, 'verification', {'Commercial local': 'Julien'})
@@ -45,6 +45,10 @@ try:
         cur.execute('SELECT p.reference_code,c.name FROM cotation_delivery_points p JOIN cotations q ON q.id=p.cotation_id JOIN crm_clients c ON c.id=q.client_id')
         assert cur.fetchone() == ('001234', 'Local test')
     remote.commit()
+    with local.cursor() as cur:
+        cur.execute("SELECT u.username FROM crm_clients c JOIN users u ON u.id=c.owner_id WHERE c.name='Render test'")
+        assert cur.fetchone()[0] == 'Ancien compte Render n°999'
+    local.commit()
     retry = sync_databases(local, remote, 'verification', {'Commercial local': 'Julien'})
     assert retry == {'envoyes': 0, 'recus': 0}, retry
     with local.cursor() as cur:
@@ -63,6 +67,19 @@ try:
     with local.cursor() as cur:
         cur.execute("SELECT notes FROM crm_clients WHERE name='Local test'")
         assert cur.fetchone()[0] == 'modified on Render'
+    local.commit()
+    with remote.cursor() as cur:
+        cur.execute("INSERT INTO cotations(client_id,created_by,entreprise_nom,heure_negociation) VALUES(NULL,7,'Historical orphan','12:00') RETURNING id")
+        orphan_id = cur.fetchone()[0]
+        # Simulate a pre-constraint legacy orphan without weakening real CRM tables.
+        cur.execute('ALTER TABLE cotations DROP CONSTRAINT cotations_client_id_fkey')
+        cur.execute('UPDATE cotations SET client_id=9999 WHERE id=%s', (orphan_id,))
+    remote.commit()
+    archived = sync_databases(local, remote, 'verification', {'Commercial local': 'Julien'})
+    assert archived['archives_a_rapprocher'] == 1
+    with local.cursor() as cur:
+        cur.execute("SELECT payload->>'entreprise_nom' FROM crm_sync_orphans")
+        assert cur.fetchone()[0] == 'Historical orphan'
     local.commit()
     print('Integration passed: two-way dossiers, remapped IDs/users, CA cents, cotation time, PDL, idempotent retry, conflict resolution.')
 finally:

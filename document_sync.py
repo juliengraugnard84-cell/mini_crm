@@ -132,7 +132,7 @@ def register_document_sync(crm):
         crm.abort(400)
 
 
-def sync_files(conn, root, bridge):
+def sync_files(conn, root, bridge, progress=None):
     root = Path(root)
     maps = {}
     for entity in ENTITIES:
@@ -171,9 +171,13 @@ def sync_files(conn, root, bridge):
             path.write_bytes(content)
             local[key] = path
             received += 1
+        if progress:
+            progress(dict(documents_envoyes=sent, documents_recus=received))
     for key, path in local.items():
         if key not in remote_hashes:
             entity, uid, digest = key
             bridge.call(dict(action='put', entity=entity, uuid=uid, name=path.name), path.read_bytes())
             sent += 1
+            if progress:
+                progress(dict(documents_envoyes=sent, documents_recus=received))
     return dict(documents_envoyes=sent, documents_recus=received)

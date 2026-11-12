@@ -30,6 +30,8 @@ Chaque dossier, cotation, point de livraison et ligne de CA possède un identifi
 
 Si un même enregistrement a été modifié différemment des deux côtés, choisir la version à conserver sur la page, puis relancer. Aucune suppression n'est propagée automatiquement.
 
+Les références à des commerciaux supprimés sur Render sont conservées dans des comptes locaux « Ancien compte Render n°… », sans changer leur attribution historique. Les anciennes cotations ou suivis dont la fiche source a disparu sont copiés intégralement dans **Historique à rapprocher**, accessible depuis le panneau de synchronisation. Ils ne sont ni supprimés de Render, ni attribués à une fiche inventée. Le compteur du rapport indique ces éléments séparément des dossiers actifs.
+
 Les pièces jointes des dossiers CRM et CSPE sont transférées entre le disque local et le stockage S3 du CRM hébergé, par HTTPS signé. Leur contenu est comparé pour éviter les doublons. Les ressources partagées, documents globaux et pièces jointes du chat ne sont pas des pièces jointes de dossier et ne font pas partie de cette synchronisation.
 
 Une sauvegarde de chaque base précède les transferts. Si la phase documentaire échoue après les données, le panneau affiche **documents à reprendre** : relancer complète les fichiers sans dupliquer les dossiers ni le CA. Les copies locales et distantes sont conservées.

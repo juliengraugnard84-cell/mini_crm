@@ -6,6 +6,7 @@
 <div class="alert alert-info">Render doit être réactivé et la version hébergée du CRM mise à jour avec la passerelle de documents. Les sauvegardes des deux bases sont créées avant chaque transfert.</div>
 {% if message %}<div class="alert alert-warning" role="status">{{ message }}</div>{% endif %}
 {% if last_sync %}<p>Dernière synchronisation : {{ last_sync.date }} — Documents : {{ last_sync.result.documents }}</p>{% endif %}
+{% if last_sync and last_sync.result.archives_a_rapprocher %}<p class="alert alert-warning">{{ last_sync.result.archives_a_rapprocher }} élément(s) historique(s) sans fiche source conservé(s) dans <a href="{{ url_for('local_sync_orphans') }}">l’historique à rapprocher</a>.</p>{% endif %}
 {% if result %}<p>{{ result.envoyes }} enregistrement(s) envoyé(s), {{ result.recus }} reçu(s). Documents : {{ result.documents_envoyes|default(0) }} envoyé(s), {{ result.documents_recus|default(0) }} reçu(s) — {{ result.documents }}.</p>{% endif %}
 <form method="post" class="card p-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

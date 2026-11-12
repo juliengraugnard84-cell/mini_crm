@@ -117,6 +117,36 @@ def read_rows(conn, tables):
     return result
 
 
+def archive_unlinked(local, sites, target):
+    """Keep legacy orphan records verbatim, without deleting or fabricating parents."""
+    with local.cursor() as cur:
+        cur.execute('''CREATE TABLE IF NOT EXISTS crm_sync_orphans (
+            target TEXT NOT NULL, entity TEXT NOT NULL, sync_uuid UUID NOT NULL,
+            payload JSONB NOT NULL, reason TEXT NOT NULL,
+            archived_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(target,entity,sync_uuid))''')
+        for site in sites:
+            changed = True
+            while changed:
+                changed = False
+                present = {table: {row['id'] for row in records.values()} for table, records in site.items()}
+                for table, records in site.items():
+                    for uid, row in list(records.items()):
+                        missing = [f'{parent} n°{row[col]}' for col, parent in REFS.items()
+                                   if row.get(col) is not None and row[col] not in present.get(parent, set())]
+                        if not missing:
+                            continue
+                        payload = {key: json_value(value) for key, value in row.items()}
+                        cur.execute('''INSERT INTO crm_sync_orphans(target,entity,sync_uuid,payload,reason)
+                            VALUES(%s,%s,%s,%s,%s) ON CONFLICT(target,entity,sync_uuid) DO UPDATE
+                            SET payload=EXCLUDED.payload,reason=EXCLUDED.reason''',
+                            (target, table, uid, Json(payload), 'Référence source absente : ' + ', '.join(missing)))
+                        del records[uid]
+                        changed = True
+        cur.execute('SELECT COUNT(*) FROM crm_sync_orphans WHERE target=%s', (target,))
+        return cur.fetchone()[0]
+
+
 def sync_databases(local, remote, target, aliases=None, choices=None):
     """Caller backs up both databases first. UUIDs make retries idempotent."""
     aliases, choices = aliases or {}, choices or {}
@@ -152,6 +182,24 @@ def sync_databases(local, remote, target, aliases=None, choices=None):
                         cur.execute(sql.SQL('UPDATE {} SET {}=%s WHERE {}=%s').format(
                             sql.Identifier(table), sql.Identifier(column), sql.Identifier(column)), (new_name, old_name))
         rows = [read_rows(local, tables), read_rows(remote, tables)]
+        # Legacy Render rows may reference deleted users. Preserve that identity in
+        # local archival accounts; never silently reassign it to a current salesperson.
+        historical_ids = {row[col] for table in tables for row in rows[1][table].values()
+                          for col in USER_REFS & set(row)
+                          if row[col] is not None and row[col] not in user_data[1][0]}
+        for ident in sorted(historical_ids):
+            name = 'Ancien compte Render n°' + str(ident)
+            user_data[1][0][ident] = name
+            user_data[1][1][name.casefold()] = ident
+            local_id = user_data[0][1].get(name.casefold())
+            if local_id is None:
+                with local.cursor() as cur:
+                    cur.execute("INSERT INTO users(username,password_hash,role) VALUES(%s,%s,'commercial') RETURNING id",
+                                (name, generate_password_hash(secrets.token_urlsafe(32))))
+                    local_id = cur.fetchone()[0]
+                user_data[0][0][local_id] = name
+                user_data[0][1][name.casefold()] = local_id
+        archived = archive_unlinked(local, rows, target)
         # Match an independently created dossier only when its name AND SIRET are unambiguous.
         # Differences still become explicit conflicts, not silent overwrites.
         remote_keys = {}
@@ -223,6 +271,8 @@ def sync_databases(local, remote, target, aliases=None, choices=None):
         if conflicts:
             raise SyncConflict(conflicts)
         counts = {'envoyes': 0, 'recus': 0}
+        if archived:
+            counts['archives_a_rapprocher'] = archived
         for table, uid, data in plan:
             for site, conn in enumerate((local, remote)):
                 if data == payloads[site][table].get(uid):

@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block title %}Historique à rapprocher{% endblock %}
+{% block content %}
+<h1>Historique à rapprocher — {{ records|length }} élément(s)</h1>
+<p>Ces éléments ont été retrouvés sans fiche source valide. Ils sont conservés intégralement ici et dans les sauvegardes. Aucune donnée Render n’a été supprimée. Ils ne sont pas attribués arbitrairement à un autre dossier.</p>
+<a class="btn btn-secondary mb-3" href="{{ url_for('local_sync') }}">Retour à la synchronisation</a>
+{% for record in records %}
+<details class="card p-3 mb-3"><summary>{{ record.entity }} n°{{ record.payload.id }} — {{ record.payload.entreprise_nom or record.payload.name or record.payload.dossier or 'Historique' }}</summary><p>{{ record.reason }}</p><pre class="text-wrap">{{ record.payload|tojson(indent=2) }}</pre></details>
+{% else %}<p>Aucun élément en attente de rapprochement.</p>{% endfor %}
+{% endblock %}
