@@ -157,6 +157,13 @@
             </div>
         </div>
 
+        {% if local_crm_active %}
+        <div class="alert alert-info m-3" role="status">
+            <strong>Version locale</strong> — Les dossiers sont enregistrés sur cet ordinateur. Synchronisez avec Render après réactivation du service.
+            {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('local_backup') }}" class="btn btn-sm btn-primary ms-2">Télécharger une sauvegarde</a>{% endif %}
+            {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('local_sync') }}" class="btn btn-sm btn-outline-primary ms-2">Synchroniser avec Render</a>{% endif %}
+        </div>
+        {% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-container">

@@ -5,6 +5,7 @@
 # ============================
 
 import os
+import sys
 import re
 import socket
 import smtplib
@@ -1039,7 +1040,7 @@ def list_client_documents(client_id: int):
     - scan ciblé
     """
 
-    if not s3:
+    if not LOCAL_MODE and not s3:
         return []
 
     docs = []
@@ -1047,7 +1048,8 @@ def list_client_documents(client_id: int):
     try:
         base_prefix = "clients/"
 
-        items = s3_list_all_objects(AWS_BUCKET, prefix=base_prefix)
+        items = (list_local_storage_objects(base_prefix) if LOCAL_MODE
+                 else s3_list_all_objects(AWS_BUCKET, prefix=base_prefix))
 
         for item in items:
             key = item.get("Key")
@@ -4648,7 +4650,7 @@ def upload_client_document(client_id):
     if not can_access_client(client_id):
         abort(403)
 
-    if LOCAL_MODE or not s3:
+    if not LOCAL_MODE and not s3:
         flash("Upload indisponible en mode local.", "warning")
         return redirect(url_for("client_detail", client_id=client_id))
 
@@ -4704,12 +4706,14 @@ def upload_client_document(client_id):
                 extra_suffix=pdl,
             )
             filename = f"{base_name}{ext}"
-            key = _s3_make_non_overwriting_key(
-                AWS_BUCKET,
-                f"{prefix}{filename}"
-            )
-
-            s3_upload_fileobj(fichier, AWS_BUCKET, key)
+            if LOCAL_MODE:
+                key = _local_make_non_overwriting_key(f"{prefix}{filename}")
+                path = local_storage_path(key)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                fichier.save(path)
+            else:
+                key = _s3_make_non_overwriting_key(AWS_BUCKET, f"{prefix}{filename}")
+                s3_upload_fileobj(fichier, AWS_BUCKET, key)
 
             success_count += 1
 
@@ -8653,6 +8657,9 @@ def debug_routes():
 ############################################################
 # 16. RUN (LOCAL / PROD SAFE)
 ############################################################
+
+from document_sync import register_document_sync
+register_document_sync(sys.modules[__name__])
 
 if __name__ == "__main__":
     """
