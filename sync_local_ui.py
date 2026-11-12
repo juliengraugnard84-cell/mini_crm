@@ -5,7 +5,7 @@ from datetime import datetime
 from urllib.parse import urlparse, unquote
 import psycopg2
 from crm_sync import prepare, sync_databases, SyncConflict
-from document_sync import FileBridge, sync_files
+from document_sync import FileBridge, sync_files, normalize_render_url
 
 
 def register_sync_ui(crm, config, state, backup, run_pg):
@@ -17,6 +17,11 @@ def register_sync_ui(crm, config, state, backup, run_pg):
         saved = json.loads(settings.read_text(encoding='utf-8')) if settings.exists() else {}
         remote_url = (crm.request.form.get('render_url') or saved.get('render_url') or '').strip()
         selected = (crm.request.form.get('commercial_local') or saved.get('commercial_local') or '').strip()
+        if remote_url:
+            try:
+                remote_url = normalize_render_url(remote_url)
+            except ValueError:
+                pass  # The submit handler will report invalid URLs without breaking the page.
         remote = None
         if crm.request.method == 'POST':
             try:

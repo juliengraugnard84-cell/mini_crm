@@ -8,10 +8,23 @@ import time
 
 import app as crm
 from crm_sync import choose, json_value
-from document_sync import signature, sync_files
+from document_sync import signature, sync_files, normalize_render_url, FileBridge
 
 
 class SyncRulesTests(unittest.TestCase):
+    def test_pasted_crm_page_is_normalized_to_site_origin(self):
+        for value in ['https://example.onrender.com', 'https://example.onrender.com/',
+                      'https://example.onrender.com/dashboard',
+                      'https://example.onrender.com/clients/42?back=client#documents']:
+            self.assertEqual(normalize_render_url(value), 'https://example.onrender.com')
+            self.assertEqual(FileBridge(value, 'postgresql://u:secret@db/name').url,
+                             'https://example.onrender.com/api/local-sync/documents')
+
+    def test_invalid_or_credential_bearing_crm_urls_are_rejected(self):
+        for value in ['', 'http://example.onrender.com', 'https://u:secret@example.onrender.com']:
+            with self.assertRaises(ValueError):
+                normalize_render_url(value)
+
     def test_first_transfer_copies_only_missing_rows(self):
         self.assertEqual(choose({'montant': 12.5}, None, None), {'montant': 12.5})
         self.assertEqual(choose(None, {'montant': 12.5}, None), {'montant': 12.5})

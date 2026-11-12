@@ -5,7 +5,7 @@ import io
 import json
 from pathlib import Path
 import time
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunsplit
 import requests
 from psycopg2 import sql
 from werkzeug.utils import secure_filename
@@ -19,12 +19,17 @@ def signature(password, stamp, method, action_args, body):
     return hmac.new(key, message.encode(), hashlib.sha256).hexdigest()
 
 
+def normalize_render_url(value):
+    parsed = urlparse((value or '').strip())
+    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError('Renseigner l’adresse HTTPS du CRM hébergé sur Render.')
+    # Users often paste the page they are on, e.g. /dashboard or /clients/42.
+    return urlunsplit((parsed.scheme, parsed.netloc, '', '', ''))
+
+
 class FileBridge:
     def __init__(self, base_url, database_url):
-        parsed = urlparse(base_url)
-        if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError('Renseigner l’adresse HTTPS du CRM hébergé sur Render.')
-        self.url = base_url.rstrip('/') + '/api/local-sync/documents'
+        self.url = normalize_render_url(base_url) + '/api/local-sync/documents'
         from urllib.parse import unquote
         self.password = unquote(urlparse(database_url).password or '')
         if not self.password:
@@ -39,6 +44,10 @@ class FileBridge:
         response = requests.request(method, self.url, params=params, data=body, headers=headers,
                                     timeout=(8, 90), allow_redirects=False)
         if response.status_code != 200:
+            if response.status_code == 403:
+                raise RuntimeError('Render refuse l’authentification de synchronisation. Vérifier que le fichier de connexion correspond à la même base que le CRM hébergé.')
+            if response.status_code == 404:
+                raise RuntimeError('Passerelle introuvable sur cette adresse. Vérifier l’adresse du CRM et le déploiement de la mise à jour sur Render.')
             raise RuntimeError('Passerelle de documents Render indisponible. Déployer la version du CRM avec synchronisation avant de réessayer.')
         return response
 
