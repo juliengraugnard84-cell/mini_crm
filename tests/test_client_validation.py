@@ -29,7 +29,7 @@ class ClientValidationTests(unittest.TestCase):
 
     def post(self, amount='1 250,50', **extra):
         return self.client.post('/clients/42/validation', data=dict(
-            csrf_token='test', montant=amount, date='2026-11-19', revenue_source='ade', **extra))
+            csrf_token='test', montant=amount, date='2026-11-19', revenue_source='ade', signed_on='2026-11-17', energy_type='gaz', **extra))
 
     def inserts(self):
         return [c for c in self.cur.execute.call_args_list if 'INSERT INTO revenus' in c.args[0]]
@@ -39,7 +39,7 @@ class ClientValidationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn('/chiffre-affaire?year=2026', response.location)
         self.assertEqual(self.inserts()[0].args[1],
-                         (date(2026, 11, 19), 'Alice', 'Dossier test', 42, Decimal('812.82'), 'ade', 'ade', Decimal('1250.50'), 'ade', Decimal('35'), None, 'Alice'))
+                         (date(2026, 11, 19), 'Alice', 'Dossier test', 42, Decimal('812.82'), 'ade', 'ade', Decimal('1250.50'), 'ade', Decimal('35'), None, date(2026, 11, 17), 'gaz', 'Alice'))
         self.conn.commit.assert_called_once()
 
     def test_existing_ca_prevents_duplicate_submission(self):

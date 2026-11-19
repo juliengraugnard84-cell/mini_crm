@@ -34,7 +34,7 @@ try:
     ensure_commissions_schema(conn)
     with conn.cursor() as cur:
         cur.execute('UPDATE users SET commission_rate=30, direct_commission_rate=20 WHERE id=1')
-        insert_revenue(cur, date(2026, 11, 19), 'Alice', 'Test', 1, Decimal('1000'), 'ade', 'Fournisseur test')
+        insert_revenue(cur, date(2026, 11, 19), 'Alice', 'Test', 1, Decimal('1000'), 'ade', 'Fournisseur test', date(2026, 11, 17), 'gaz')
         cur.execute('UPDATE users SET commission_rate=40 WHERE id=1')
         cur.execute('SELECT * FROM revenus')
         revenue = cur.fetchone()
@@ -72,6 +72,12 @@ try:
             with patch.object(crm, 'can_access_client', return_value=True):
                 html, status = crm.validate_client_revenue(1)
                 assert status == 200 and 'data-ade' not in html
+    with crm.app.test_request_context('/commissions/releves?mode=billing&month=2027-01'):
+        crm.session['user'] = dict(id=1, role='commercial', username='Alice')
+        with patch.object(crm, 'get_db', return_value=conn), patch.object(crm, 'render_template', side_effect=render):
+            html = crm.commission_statements()
+            assert '195.00 EUR' in html and '17/11/2026' in html and '01/01/2027' in html
+            assert 'Fournisseur test' in html and 'Gaz' in html and 'Bob' not in html
     print('OK: migration, snapshot preservation, commission totals and templates on local PostgreSQL')
 finally:
     conn.rollback()

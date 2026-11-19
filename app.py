@@ -16,7 +16,8 @@ import logging
 import json
 import hashlib
 from decimal import Decimal, InvalidOperation
-from commissions import ensure_commissions_schema, parse_rate, insert_revenue, commission_values, revenue_breakdown
+from commissions import ensure_commissions_schema, parse_rate, insert_revenue, commission_values, revenue_breakdown, contract_details
+from commission_statements import build_statement, statement_notes, pdf_statement, xlsx_statement
 from markupsafe import Markup, escape
 from duplicate_detection import ACTIVE_STATUSES, match_reasons, is_blocking_match, normalize_name, normalize_reference
 from client_groups import ensure_client_groups_schema, attach_client_group, load_group_summaries, is_groupable
@@ -2643,6 +2644,8 @@ def chiffre_affaire():
                 r.commission_rate,
                 r.revenue_source,
                 r.supplier_name,
+                r.signed_on,
+                r.energy_type,
                 r.dossier,
                 r.aleo_rate,
                 c.name AS client_name
@@ -2802,6 +2805,43 @@ def commission_settings():
     return render_template('commission_settings.html', commercials=commercials)
 
 
+@app.route('/commissions/releves')
+@login_required
+def commission_statements():
+    user = session.get('user') or {}
+    if user.get('role') not in ('admin', 'commercial'):
+        abort(403)
+    mode = request.args.get('mode', 'monthly')
+    month = request.args.get('month', date.today().strftime('%Y-%m'))
+    export = request.args.get('format', '')
+    if export not in ('', 'pdf', 'xlsx'):
+        abort(400)
+    commercial = (request.args.get('commercial') or '').strip() if user['role'] == 'admin' else user.get('username')
+    if user['role'] == 'commercial' and not commercial:
+        abort(403)
+    try:
+        build_statement([], mode, month, '')
+    except ValueError as error:
+        return str(error), 400
+    conn = get_db()
+    ensure_commissions_schema(conn)
+    with conn.cursor() as cur:
+        cur.execute('''SELECT r.*, COALESCE(c.name, r.dossier) AS client_name
+                       FROM revenus r LEFT JOIN crm_clients c ON c.id = r.client_id
+                       ''' + ('WHERE r.commercial = %s ' if commercial else '') + 'ORDER BY r.commercial, r.id',
+                    (commercial,) if commercial else ())
+        rows = cur.fetchall()
+    statement = build_statement(rows, mode, month, commercial or 'Tous les commerciaux')
+    if export:
+        stream = pdf_statement(statement) if export == 'pdf' else xlsx_statement(statement)
+        mimetype = 'application/pdf' if export == 'pdf' else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        response = send_file(stream, as_attachment=True, download_name=f'releve-commissions-{mode}-{month}.{export}', mimetype=mimetype)
+        response.headers['Cache-Control'] = 'private, no-store'
+        return response
+    return render_template('commission_statements.html', statement=statement, notes=statement_notes(statement),
+                           commercial=commercial or '')
+
+
 @app.route('/commissions')
 @login_required
 def commissions():
@@ -2875,6 +2915,7 @@ def add_revenu():
 
     try:
         montant, _, _ = revenue_breakdown(montant, revenue_source)
+        signed_on, energy_type = contract_details(request.form)
     except ValueError as error:
         flash(str(error), "danger")
         return redirect(url_for("chiffre_affaire"))
@@ -2890,7 +2931,7 @@ def add_revenu():
 
         with conn.cursor() as cur:
             insert_revenue(cur, date_revenu, commercial, dossier,
-                           client_id if client_id else None, montant, revenue_source, supplier_name)
+                           client_id if client_id else None, montant, revenue_source, supplier_name, signed_on, energy_type)
 
         conn.commit()
         flash("Revenu ajouté avec succès.", "success")
@@ -2914,15 +2955,24 @@ def update_revenue_supplier(revenu_id):
     if len(supplier_name) > 160:
         flash('Le nom du fournisseur ne doit pas dépasser 160 caractères.', 'danger')
         return redirect(url_for('chiffre_affaire'))
+    try:
+        signed_on, energy_type = contract_details(request.form, required=False)
+    except ValueError as error:
+        flash(str(error), 'danger')
+        return redirect(url_for('chiffre_affaire'))
     conn = get_db()
     ensure_commissions_schema(conn)
     try:
         with conn.cursor() as cur:
-            cur.execute('UPDATE revenus SET supplier_name = %s WHERE id = %s RETURNING id',
-                        (supplier_name or None, revenu_id))
+            if 'signed_on' in request.form or 'energy_type' in request.form:
+                cur.execute('UPDATE revenus SET supplier_name = %s, signed_on = %s, energy_type = %s WHERE id = %s RETURNING id',
+                            (supplier_name or None, signed_on, energy_type, revenu_id))
+            else:
+                cur.execute('UPDATE revenus SET supplier_name = %s WHERE id = %s RETURNING id',
+                            (supplier_name or None, revenu_id))
             updated = cur.fetchone()
         conn.commit()
-        flash('Fournisseur enregistré.' if updated else 'Revenu introuvable.', 'success' if updated else 'warning')
+        flash('Informations du contrat enregistrées.' if updated else 'Revenu introuvable.', 'success' if updated else 'warning')
     except Exception:
         conn.rollback()
         logger.exception('Erreur mise à jour du fournisseur du revenu %s', revenu_id)
@@ -6584,6 +6634,7 @@ def validate_client_revenue(client_id):
             if not error:
                 try:
                     revenue_breakdown(amount, revenue_source)
+                    signed_on, energy_type = contract_details(request.form)
                 except ValueError as exc:
                     error = str(exc)
             try:
@@ -6594,7 +6645,8 @@ def validate_client_revenue(client_id):
                 error = "Attribuez un commercial au dossier avant de valider son chiffre d'affaires."
             if not error:
                 try:
-                    insert_revenue(cur, parsed_date, client["commercial"], client["name"], client_id, amount, revenue_source, supplier_name or None)
+                    insert_revenue(cur, parsed_date, client["commercial"], client["name"], client_id, amount, revenue_source,
+                                   supplier_name or None, signed_on, energy_type)
                     conn.commit()
                 except Exception:
                     conn.rollback()

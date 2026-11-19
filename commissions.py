@@ -1,5 +1,6 @@
 """Commission configuration and immutable rate snapshots on revenue entries."""
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from datetime import date
 
 SOURCE_RATES = {'ade': Decimal('35'), 'direct': Decimal('50')}
 
@@ -26,6 +27,8 @@ def ensure_commissions_schema(conn):
         cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS revenue_source TEXT')
         cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS supplier_rate NUMERIC(5,2)')
         cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS supplier_name TEXT')
+        cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS signed_on DATE')
+        cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS energy_type TEXT')
     conn.commit()
 
 
@@ -39,19 +42,36 @@ def parse_rate(value):
         raise ValueError('Le taux doit être compris entre 0 et 100, avec au maximum deux décimales.')
 
 
-def insert_revenue(cur, revenue_date, commercial, dossier, client_id, amount, source, supplier_name=None):
+def contract_details(form, required=True):
+    raw_date = (form.get('signed_on') or '').strip()
+    energy = (form.get('energy_type') or '').strip()
+    try:
+        signed_on = date.fromisoformat(raw_date) if raw_date else None
+    except ValueError:
+        raise ValueError('La date de signature est invalide.')
+    if signed_on and signed_on.year > 9998:
+        raise ValueError('La date de signature est invalide.')
+    if energy not in ('', 'electricite', 'gaz', 'electricite_gaz'):
+        raise ValueError("Choisissez une énergie valide.")
+    if required and (not signed_on or not energy):
+        raise ValueError("Renseignez la date de signature et l'énergie du contrat.")
+    return signed_on, energy or None
+
+
+def insert_revenue(cur, revenue_date, commercial, dossier, client_id, amount, source, supplier_name=None,
+                   signed_on=None, energy_type=None):
     initial, retained, net = revenue_breakdown(amount, source)
     # A single statement snapshots the configured rate alongside the CA.
     cur.execute('''
         INSERT INTO revenus (date, commercial, dossier, client_id, montant, commission_rate, aleo_rate,
-                             initial_amount, revenue_source, supplier_rate, supplier_name)
+                             initial_amount, revenue_source, supplier_rate, supplier_name, signed_on, energy_type)
         SELECT %s, %s, %s, %s, %s,
                CASE WHEN %s = 'ade' THEN u.commission_rate ELSE u.direct_commission_rate END,
                100 - CASE WHEN %s = 'ade' THEN u.commission_rate ELSE u.direct_commission_rate END,
-               %s, %s, %s, %s
+               %s, %s, %s, %s, %s, %s
         FROM (SELECT 1) seed
         LEFT JOIN users u ON u.username = %s
-    ''', (revenue_date, commercial, dossier, client_id, net, source, source, initial, source, SOURCE_RATES[source], supplier_name, commercial))
+    ''', (revenue_date, commercial, dossier, client_id, net, source, source, initial, source, SOURCE_RATES[source], supplier_name, signed_on, energy_type, commercial))
 
 
 def commission_values(row):

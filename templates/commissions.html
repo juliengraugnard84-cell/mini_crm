@@ -3,6 +3,7 @@
 {% block content %}
 <div class="page-header mb-4">
     <h1>{{ 'Commissions et part Aléo' if current_user.role == 'admin' else 'Mes commissions' }}</h1>
+    <a href="{{ url_for('commission_statements') }}" class="btn btn-outline-primary">Relevés PDF / Excel</a>
     <p class="text-muted">Montants calculés à partir des CA enregistrés et des taux conservés à la date de saisie.</p>
     {% if current_user.role == 'admin' %}<a class="btn btn-primary" href="{{ url_for('commission_settings') }}">Configurer les taux</a>{% endif %}
 </div>

@@ -5,6 +5,7 @@
 
 <div class="page-header mb-4">
     <h1>Chiffre d'affaires</h1>
+    <a href="{{ url_for('commission_statements') }}" class="btn btn-primary">Relevés PDF / Excel</a>
     <p class="text-muted">Pour les nouvelles validations : CA net après retenue ADE ou fournisseur, avant commission du commercial. Les anciens revenus sont conservés tels quels.</p>
     <a href="{{ url_for('commissions') }}" class="btn btn-outline-primary">Voir les commissions</a>
     {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('commission_settings') }}" class="btn btn-outline-secondary">Configurer les commissions</a>{% endif %}
@@ -199,9 +200,17 @@
                     <td>{{ {'ade': 'ADE', 'direct': 'Fournisseur en direct'}.get(r.revenue_source, 'Non renseigné') }}</td>
                     <td>
                         {% if current_user.role == 'admin' %}
-                        <form method="post" action="{{ url_for('update_revenue_supplier', revenu_id=r.id) }}" class="d-flex gap-2">
+                        <form method="post" action="{{ url_for('update_revenue_supplier', revenu_id=r.id) }}" class="d-flex flex-column gap-2">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <input class="form-control form-control-sm" name="supplier_name" maxlength="160" value="{{ r.supplier_name or '' }}" placeholder="Fournisseur" aria-label="Fournisseur du dossier {{ r.client_name or r.dossier or r.id }}">
+                            <label class="small" for="signed-{{ r.id }}">Date de signature</label>
+                            <input id="signed-{{ r.id }}" class="form-control form-control-sm" type="date" name="signed_on" value="{{ r.signed_on.isoformat() if r.signed_on else '' }}">
+                            <select class="form-select form-select-sm" name="energy_type" aria-label="Énergie signée">
+                                <option value="">Énergie à renseigner</option>
+                                {% for value, label in [('electricite', 'Électricité'), ('gaz', 'Gaz'), ('electricite_gaz', 'Électricité et gaz')] %}
+                                <option value="{{ value }}" {% if r.energy_type == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
                             <button class="btn btn-sm btn-outline-primary">Enregistrer</button>
                         </form>
                         {% else %}{{ r.supplier_name or 'Non renseigné' }}{% endif %}
