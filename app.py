@@ -15,6 +15,8 @@ import secrets
 import logging
 import json
 import hashlib
+from decimal import Decimal, InvalidOperation
+from commissions import ensure_commissions_schema, parse_rate, insert_revenue, commission_values, revenue_breakdown
 from markupsafe import Markup, escape
 from duplicate_detection import ACTIVE_STATUSES, match_reasons, is_blocking_match, normalize_name, normalize_reference
 from client_groups import ensure_client_groups_schema, attach_client_group, load_group_summaries, is_groupable
@@ -2595,6 +2597,7 @@ def dashboard():
 def chiffre_affaire():
 
     conn = get_db()
+    ensure_commissions_schema(conn)
     user = session.get("user") or {}
     role = user.get("role")
     username = user.get("username")
@@ -2637,6 +2640,8 @@ def chiffre_affaire():
                 r.dossier,
                 r.client_id,
                 r.montant,
+                r.commission_rate,
+                r.aleo_rate,
                 c.name AS client_name
             FROM revenus r
             LEFT JOIN crm_clients c ON c.id=r.client_id
@@ -2646,6 +2651,13 @@ def chiffre_affaire():
 
         rows = cur.fetchall()
 
+    for row in rows:
+        values = commission_values(row)
+        row['commission_amount'] = values[0] if values else None
+        row['aleo_amount'] = values[1] if values else None
+        if role != 'admin':
+            for key in ('commission_rate', 'aleo_rate', 'aleo_amount'):
+                row.pop(key, None)
     revenus = [row_to_obj(r) for r in rows]
 
     stats = defaultdict(lambda: defaultdict(float))
@@ -2753,6 +2765,86 @@ def chiffre_affaire():
     )
 
 
+@app.route('/admin/commissions', methods=['GET', 'POST'])
+@admin_required
+def commission_settings():
+    conn = get_db()
+    ensure_commissions_schema(conn)
+    if request.method == 'POST':
+        try:
+            commercial_id = int(request.form.get('commercial_id', ''))
+            rate = parse_rate(request.form.get('commission_rate', ''))
+            direct_rate = parse_rate(request.form.get('direct_commission_rate', ''))
+        except ValueError as error:
+            flash(str(error) if 'taux' in str(error) else 'Commercial invalide.', 'danger')
+            return redirect(url_for('commission_settings'))
+        try:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE users SET commission_rate = %s, direct_commission_rate = %s WHERE id = %s AND role = 'commercial' RETURNING id",
+                            (rate, direct_rate, commercial_id))
+                updated = cur.fetchone()
+            conn.commit()
+            flash('Taux enregistré pour les prochains CA.' if updated else 'Commercial introuvable.',
+                  'success' if updated else 'danger')
+        except Exception:
+            conn.rollback()
+            logger.exception('Erreur configuration commissions')
+            flash("Impossible d'enregistrer le taux. Réessayez.", 'danger')
+        return redirect(url_for('commission_settings'))
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, username, commission_rate, direct_commission_rate FROM users WHERE role = 'commercial' ORDER BY username")
+        commercials = cur.fetchall()
+    return render_template('commission_settings.html', commercials=commercials)
+
+
+@app.route('/commissions')
+@login_required
+def commissions():
+    user = session.get('user') or {}
+    if user.get('role') not in ('admin', 'commercial'):
+        abort(403)
+    conn = get_db()
+    ensure_commissions_schema(conn)
+    try:
+        year = int(request.args.get('year', date.today().year))
+        if not 1 <= year <= 9999:
+            raise ValueError()
+    except ValueError:
+        year = date.today().year
+    commercial = (request.args.get('commercial') or '').strip()
+    where = ['EXTRACT(YEAR FROM r.date) = %s']
+    params = [year]
+    if user.get('role') == 'commercial':
+        commercial = user.get('username')
+    if commercial:
+        where.append('r.commercial = %s')
+        params.append(commercial)
+    with conn.cursor() as cur:
+        cur.execute('''SELECT r.*, COALESCE(c.name, r.dossier) AS client_name
+                       FROM revenus r LEFT JOIN crm_clients c ON c.id = r.client_id
+                       WHERE ''' + ' AND '.join(where) + ' ORDER BY r.date DESC, r.id DESC', tuple(params))
+        rows = cur.fetchall()
+    total_ca = Decimal('0')
+    total_commercial = Decimal('0')
+    total_aleo = Decimal('0')
+    pending = 0
+    for row in rows:
+        total_ca += Decimal(str(row['montant']))
+        values = commission_values(row)
+        row['commission_amount'], row['aleo_amount'] = values if values else (None, None)
+        if values:
+            total_commercial += values[0]
+            total_aleo += values[1]
+        else:
+            pending += 1
+        if user.get('role') != 'admin':
+            for key in ('commission_rate', 'aleo_rate', 'supplier_rate', 'initial_amount', 'aleo_amount'):
+                row.pop(key, None)
+    return render_template('commissions.html', revenues=rows, year=year, commercial=commercial,
+                           total_ca=total_ca, total_commercial=total_commercial,
+                           total_aleo=total_aleo, pending=pending)
+
+
 # =========================================================
 # AJOUT REVENU
 # =========================================================
@@ -2761,6 +2853,7 @@ def chiffre_affaire():
 def add_revenu():
 
     conn = get_db()
+    ensure_commissions_schema(conn)
     user = session.get("user") or {}
 
     role = user.get("role")
@@ -2771,11 +2864,12 @@ def add_revenu():
     dossier = (request.form.get("dossier") or "").strip()
     client_id = request.form.get("client_id")
     montant = (request.form.get("montant") or "").strip()
+    revenue_source = request.form.get('revenue_source', '')
 
     try:
-        montant = float(montant)
-    except Exception:
-        flash("Montant invalide.", "danger")
+        montant, _, _ = revenue_breakdown(montant, revenue_source)
+    except ValueError as error:
+        flash(str(error), "danger")
         return redirect(url_for("chiffre_affaire"))
 
     if role == "commercial":
@@ -2788,22 +2882,8 @@ def add_revenu():
     try:
 
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO revenus (
-                    date,
-                    commercial,
-                    dossier,
-                    client_id,
-                    montant
-                )
-                VALUES (%s,%s,%s,%s,%s)
-            """, (
-                date_revenu,
-                commercial,
-                dossier,
-                client_id if client_id else None,
-                montant
-            ))
+            insert_revenue(cur, date_revenu, commercial, dossier,
+                           client_id if client_id else None, montant, revenue_source)
 
         conn.commit()
         flash("Revenu ajouté avec succès.", "success")
@@ -5984,7 +6064,8 @@ def create_client():
                             common_name=(request.form.get('common_name') or '').strip()[:160], status=status)
         conn.commit()
         flash("Client créé avec succès.", "success")
-        return redirect(url_for("client_detail", client_id=new_client_id))
+        return redirect(url_for("validate_client_revenue" if status == "gagne" else "client_detail",
+                                client_id=new_client_id))
 
     except Exception as e:
         conn.rollback()
@@ -6367,6 +6448,8 @@ def edit_client(client_id):
         attach_client_group(conn, client_id, name, siret, preserve_current=True, status=status)
         conn.commit()
         flash("Client mis à jour avec succès.", "success")
+        if status == "gagne" and existing_client.get("status") != "gagne":
+            return redirect(url_for("validate_client_revenue", client_id=client_id))
 
     except Exception as e:
         conn.rollback()
@@ -6418,8 +6501,88 @@ def update_client_status(client_id):
         conn.rollback()
         logger.exception("Erreur update status : %r", e)
         flash("Erreur lors de la mise à jour.", "danger")
+        return redirect(url_for("client_detail", client_id=client_id))
+
+    if status == "gagne":
+        return redirect(url_for("validate_client_revenue", client_id=client_id))
 
     return redirect(request.referrer or url_for("clients"))
+
+
+@app.route("/clients/<int:client_id>/validation", methods=["GET", "POST"])
+@login_required
+def validate_client_revenue(client_id):
+    if not can_access_client(client_id):
+        abort(403)
+    conn = get_db()
+    ensure_commissions_schema(conn)
+    # Serialize submissions for this dossier, including double-clicks and retries.
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT c.id, c.name, c.status, c.owner_id,
+                   COALESCE(u.username, c.commercial) AS commercial, u.commission_rate, u.direct_commission_rate
+            FROM crm_clients c LEFT JOIN users u ON u.id = c.owner_id
+            WHERE c.id = %s FOR UPDATE OF c
+        """, (client_id,))
+        client = cur.fetchone()
+        if not client:
+            conn.rollback()
+            abort(404)
+        user = session.get("user") or {}
+        if user.get("role") != "admin" and client["owner_id"] != user.get("id"):
+            conn.rollback()
+            abort(403)
+        if (client["status"] or "").strip().lower() != "gagne":
+            conn.rollback()
+            flash("Passez le dossier en gagné avant de valider son chiffre d'affaires.", "warning")
+            return redirect(url_for("client_detail", client_id=client_id))
+        cur.execute("SELECT id, date, montant FROM revenus WHERE client_id = %s ORDER BY date, id",
+                    (client_id,))
+        revenues = cur.fetchall()
+        error = None
+        amount_text = request.form.get("montant", "").strip()
+        revenue_date = request.form.get("date", date.today().isoformat()).strip()
+        revenue_source = request.form.get('revenue_source', '')
+        if request.method == "POST" and not revenues:
+            try:
+                amount = Decimal(amount_text.replace("\u202f", "").replace("\u00a0", "").replace(" ", "").replace(",", "."))
+                if not amount.is_finite() or amount <= 0 or amount > Decimal("999999999999.99") or amount != amount.quantize(Decimal("0.01")):
+                    raise ValueError()
+            except (InvalidOperation, ValueError):
+                error = "Saisissez un montant positif avec au maximum deux décimales."
+            if not error:
+                try:
+                    revenue_breakdown(amount, revenue_source)
+                except ValueError as exc:
+                    error = str(exc)
+            try:
+                parsed_date = date.fromisoformat(revenue_date)
+            except ValueError:
+                error = "Saisissez une date valide."
+            if not client["commercial"]:
+                error = "Attribuez un commercial au dossier avant de valider son chiffre d'affaires."
+            if not error:
+                try:
+                    insert_revenue(cur, parsed_date, client["commercial"], client["name"], client_id, amount, revenue_source)
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    logger.exception("Erreur validation CA du dossier %s", client_id)
+                    error = "L'enregistrement a échoué. Vous pouvez réessayer."
+                else:
+                    flash("Dossier validé : le CA après retenue fournisseur a été ajouté au chiffre d'affaires.", "success")
+                    return redirect(url_for("chiffre_affaire", year=parsed_date.year))
+        elif request.method == "POST":
+            conn.rollback()
+            flash("Ce dossier possède déjà du chiffre d'affaires. Aucun montant ajouté.", "info")
+            return redirect(url_for("validate_client_revenue", client_id=client_id))
+    conn.rollback()  # Release the row lock before displaying the form.
+    if user.get('role') != 'admin':
+        client.pop('commission_rate', None)
+        client.pop('direct_commission_rate', None)
+    return render_template("client_validation.html", client=client, revenues=revenues,
+                           amount_text=amount_text, revenue_date=revenue_date, revenue_source=revenue_source,
+                           error=error), (400 if error else 200)
 
 
 # =========================

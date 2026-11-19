@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Validation du dossier{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width: 680px">
+    <div class="page-header mb-4">
+        <span class="badge text-bg-success mb-2">Dossier gagné</span>
+        <h1>Valider le chiffre d'affaires</h1>
+        <p class="text-muted">Le montant sera automatiquement intégré à la section CA.</p>
+    </div>
+    <div class="card"><div class="card-body p-4">
+        <h2 class="h5">{{ client.name }}</h2>
+        <p>Commercial : <strong>{{ client.commercial or 'Non attribué' }}</strong></p>
+        {% if revenues %}
+        <div class="alert alert-success">Du chiffre d'affaires est déjà enregistré pour ce dossier. Aucun ajout n'est nécessaire.</div>
+        <ul>{% for revenue in revenues %}<li>{{ revenue.date.strftime('%d/%m/%Y') if revenue.date else 'Sans date' }} : {{ '%.2f'|format(revenue.montant) }} €</li>{% endfor %}</ul>
+        <a class="btn btn-primary" href="{{ url_for('chiffre_affaire') }}">Voir le CA</a>
+        {% else %}
+        {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+        <form method="post" action="{{ url_for('validate_client_revenue', client_id=client.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="mb-3">
+                <label class="form-label" for="revenue-amount">Somme initiale avant retenue fournisseur (€)</label>
+                <input id="revenue-amount" class="form-control form-control-lg" type="text" inputmode="decimal" name="montant" value="{{ amount_text }}" placeholder="Ex. : 1 250,00" required autofocus>
+            </div>
+            {% include 'revenue_source_field.html' %}
+            {% if current_user and current_user.role == 'admin' %}
+            <div id="revenue-preview" class="alert alert-info" aria-live="polite" data-retention-ade="35" data-retention-direct="50" data-ade="{{ client.commission_rate if client.commission_rate is defined and client.commission_rate is not none else '' }}" data-direct="{{ client.direct_commission_rate if client.direct_commission_rate is defined and client.direct_commission_rate is not none else '' }}">Saisissez la somme initiale et choisissez l'origine pour voir le calcul.</div>
+            {% endif %}
+            <div class="mb-4">
+                <label class="form-label" for="revenue-date">Date de comptabilisation</label>
+                <input id="revenue-date" class="form-control" type="date" name="date" value="{{ revenue_date }}" required>
+                <div class="form-text">Cette date détermine le mois et l'année du CA.</div>
+            </div>
+            <button class="btn btn-success" type="submit">Valider et intégrer au CA</button>
+        </form>
+        <p class="text-muted small mt-3">Vous pouvez revenir à cette validation depuis la fiche du dossier. Le statut reste gagné.</p>
+        {% endif %}
+        <a class="btn btn-link mt-3" href="{{ url_for('client_detail', client_id=client.id) }}">Retour au dossier</a>
+    </div></div>
+</div>
+{% if current_user and current_user.role == 'admin' %}<script src="{{ url_for('static', filename='revenue_preview.js') }}"></script>{% endif %}
+{% endblock %}

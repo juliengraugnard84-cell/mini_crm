@@ -53,6 +53,9 @@
                class="{% if request.path.startswith('/chiffre-affaire') %}active{% endif %}">
                 Chiffre d'affaires
             </a>
+            {% if current_user and current_user.role in ['admin', 'commercial'] %}
+            <a href="{{ url_for('commissions') }}" class="{% if request.path in ['/commissions', '/admin/commissions'] %}active{% endif %}">Commissions</a>
+            {% endif %}
 
             {% if current_user and current_user.role == "commercial" %}
                 <a href="{{ url_for('my_commercial_statistics') }}"

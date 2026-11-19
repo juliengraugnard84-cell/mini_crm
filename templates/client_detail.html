@@ -37,6 +37,9 @@
 {% if current_user and (current_user.role == "admin" or current_user.id == client.owner_id) %}
 <div class="crm-page-header-actions mb-4">
     <a href="#client-edit-form" class="btn btn-primary">Modifier la fiche client</a>
+    {% if client_status == 'gagne' %}
+    <a href="{{ url_for('validate_client_revenue', client_id=client.id) }}" class="btn btn-success">Validation du CA</a>
+    {% endif %}
 </div>
 {% endif %}
 

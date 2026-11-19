@@ -8,6 +8,7 @@ from psycopg2 import sql
 from psycopg2.extras import Json, RealDictCursor
 from werkzeug.security import generate_password_hash
 from duplicate_detection import normalize_name, normalize_reference
+from commissions import ensure_commissions_schema
 
 TABLES = ('crm_clients', 'cotations', 'cotation_delivery_points', 'revenus',
           'cspe_dossiers', 'client_updates', 'calendar_events', 'client_hot_followups')
@@ -63,6 +64,8 @@ def columns(conn, table):
 
 
 def prepare(conn):
+    if columns(conn, 'revenus') and columns(conn, 'users'):
+        ensure_commissions_schema(conn)
     available = {}
     for table in TABLES:
         cols = columns(conn, table)

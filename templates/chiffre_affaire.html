@@ -5,6 +5,9 @@
 
 <div class="page-header mb-4">
     <h1>Chiffre d'affaires</h1>
+    <p class="text-muted">Pour les nouvelles validations : CA net après retenue ADE ou fournisseur, avant commission du commercial. Les anciens revenus sont conservés tels quels.</p>
+    <a href="{{ url_for('commissions') }}" class="btn btn-outline-primary">Voir les commissions</a>
+    {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('commission_settings') }}" class="btn btn-outline-secondary">Configurer les commissions</a>{% endif %}
     <p class="text-muted">Lecture claire des performances commerciales, du mois a l'annee.</p>
 </div>
 
@@ -95,11 +98,12 @@
                 </div>
 
                 <div class="col-md-2">
-                    <label class="form-label">Montant</label>
+                    <label class="form-label">Somme initiale (€)</label>
                     <input type="number" step="0.01" name="montant" class="form-control" required>
                 </div>
             </div>
 
+            {% include 'revenue_source_field.html' %}
             <div class="mt-3 text-end">
                 <button class="btn btn-success">Ajouter</button>
             </div>

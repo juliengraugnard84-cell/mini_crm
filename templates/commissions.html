@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Commissions{% endblock %}
+{% block content %}
+<div class="page-header mb-4">
+    <h1>{{ 'Commissions et part Aléo' if current_user.role == 'admin' else 'Mes commissions' }}</h1>
+    <p class="text-muted">Montants calculés à partir des CA enregistrés et des taux conservés à la date de saisie.</p>
+    {% if current_user.role == 'admin' %}<a class="btn btn-primary" href="{{ url_for('commission_settings') }}">Configurer les taux</a>{% endif %}
+</div>
+<form method="get" class="row g-3 mb-4 align-items-end">
+    <div class="col-md-3"><label class="form-label" for="year">Année</label><input class="form-control" id="year" type="number" name="year" min="1" max="9999" value="{{ year }}" required></div>
+    {% if current_user.role == 'admin' %}<div class="col-md-4"><label class="form-label" for="commercial">Commercial</label><input class="form-control" id="commercial" name="commercial" value="{{ commercial }}" placeholder="Tous les commerciaux"></div>{% endif %}
+    <div class="col-md-2"><button class="btn btn-outline-primary">Filtrer</button></div>
+</form>
+<section class="kpi-grid mb-4">
+    <div class="kpi-tile"><div class="kpi-label">CA après retenue fournisseur</div><div class="kpi-value">{{ '%.2f'|format(total_ca) }} €</div></div>
+    <div class="kpi-tile"><div class="kpi-label">Commissions calculées</div><div class="kpi-value">{{ '%.2f'|format(total_commercial) }} €</div></div>
+    {% if current_user.role == 'admin' %}<div class="kpi-tile"><div class="kpi-label">Part Aléo calculée</div><div class="kpi-value">{{ '%.2f'|format(total_aleo) }} €</div></div>{% endif %}
+</section>
+{% if pending %}<div class="alert alert-warning">{{ pending }} revenu(s) sans configuration complète : commissions non calculées, exclues des totaux de commissions.</div>{% endif %}
+<div class="card"><div class="table-responsive"><table class="table align-middle mb-0">
+    <thead><tr><th>Date</th><th>Dossier</th><th>Commercial</th><th>Origine</th>{% if current_user.role == 'admin' %}<th>Somme initiale</th><th>Retenue</th>{% endif %}<th>CA net</th>{% if current_user.role == 'admin' %}<th>Taux commercial</th>{% endif %}<th>Commission</th>{% if current_user.role == 'admin' %}<th>Solde Aléo</th>{% endif %}</tr></thead>
+    <tbody>{% for r in revenues %}<tr>
+        <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
+        <td>{% if r.client_id %}<a href="{{ url_for('client_detail', client_id=r.client_id) }}">{{ r.client_name or 'Dossier' }}</a>{% else %}{{ r.client_name or 'Sans dossier' }}{% endif %}</td>
+        <td>{{ r.commercial }}</td>
+        <td>{{ {'ade': 'ADE', 'direct': 'Fournisseur en direct'}.get(r.revenue_source, 'Ancien revenu') }}</td>
+        {% if current_user.role == 'admin' %}<td>{{ ('%.2f'|format(r.initial_amount) + ' €') if r.initial_amount is not none else '—' }}</td>
+        <td>{{ (r.supplier_rate|string + ' %') if r.supplier_rate is not none else '—' }}</td>{% endif %}
+        <td>{{ '%.2f'|format(r.montant) }} €</td>
+        {% if current_user.role == 'admin' %}<td>{{ r.commission_rate|string + ' %' if r.commission_rate is not none else 'Non configuré' }}</td>{% endif %}
+        <td>{{ ('%.2f'|format(r.commission_amount) + ' €') if r.commission_amount is not none else 'Non calculée' }}</td>
+        {% if current_user.role == 'admin' %}<td>{{ ('%.2f'|format(r.aleo_amount) + ' €') if r.aleo_amount is not none else 'Non calculée' }}</td>{% endif %}
+    </tr>{% else %}<tr><td colspan="10" class="text-muted p-4">Aucun CA pour cette période.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endblock %}

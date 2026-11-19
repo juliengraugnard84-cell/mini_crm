@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Configuration des commissions{% endblock %}
+{% block content %}
+<div class="page-header mb-4">
+    <h1>Configuration des commissions</h1>
+    <p class="text-muted">ADE : retenue de 35 %. Fournisseur en direct : retenue de 50 %. Chaque taux commercial s'applique au CA après cette retenue ; Aléo garde le solde.</p>
+    <a href="{{ url_for('commissions') }}" class="btn btn-outline-primary">Voir les commissions</a>
+</div>
+<div class="alert alert-info">Les changements s'appliquent aux prochains CA enregistrés. Les taux déjà appliqués restent conservés dans l'historique. Les revenus sans configuration sont signalés comme non calculés.</div>
+<div class="card mb-4"><div class="card-body">
+    <h2 class="h5">Taux par commercial</h2>
+    {% for commercial in commercials %}
+    <form method="post" class="row g-3 align-items-end border-bottom py-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="commercial_id" value="{{ commercial.id }}">
+        <div class="col-md-3"><strong>{{ commercial.username }}</strong>
+            {% if commercial.commission_rate is none %}<div class="text-warning">À configurer</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="rate-{{ commercial.id }}">Taux ADE (%)</label>
+            <input id="rate-{{ commercial.id }}" class="form-control" type="number" name="commission_rate" min="0" max="100" step="0.01" required value="{{ commercial.commission_rate if commercial.commission_rate is not none else '' }}">
+            {% if commercial.commission_rate is not none %}<div class="form-text">Part Aléo : {{ 100 - commercial.commission_rate }} %</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="direct-rate-{{ commercial.id }}">Taux fournisseur en direct (%)</label>
+            <input id="direct-rate-{{ commercial.id }}" class="form-control" type="number" name="direct_commission_rate" min="0" max="100" step="0.01" required value="{{ commercial.direct_commission_rate if commercial.direct_commission_rate is not none else '' }}">
+            {% if commercial.direct_commission_rate is not none %}<div class="form-text">Part Aléo : {{ 100 - commercial.direct_commission_rate }} %</div>{% else %}<div class="text-warning">À configurer</div>{% endif %}
+        </div>
+        <div class="col-md-3"><button class="btn btn-primary">Enregistrer</button></div>
+    </form>
+    {% else %}<p>Aucun commercial. Ajoutez un compte dans la gestion des utilisateurs.</p>{% endfor %}
+</div></div>
+{% endblock %}
