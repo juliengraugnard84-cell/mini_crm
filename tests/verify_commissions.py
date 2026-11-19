@@ -8,7 +8,7 @@ from datetime import date
 from unittest.mock import patch
 import psycopg2
 from psycopg2 import sql
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import DictCursor
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ['LOCAL_MODE'] = '1'
@@ -18,7 +18,7 @@ from commissions import ensure_commissions_schema, insert_revenue, commission_va
 
 config = local_crm.load_config()
 conn = psycopg2.connect(host='127.0.0.1', port=config['db_port'], dbname=config['db_name'],
-                        user=config['db_user'], password=config['db_password'], cursor_factory=RealDictCursor)
+                        user=config['db_user'], password=config['db_password'], cursor_factory=DictCursor)
 schema = 'commission_verification_' + uuid.uuid4().hex
 try:
     with conn.cursor() as cur:
@@ -54,13 +54,22 @@ try:
     with crm.app.test_request_context('/commissions?year=2026'):
         crm.session['user'] = dict(id=1, role='admin', username='admin')
         def render(name, **context):
-            context.update(current_user=crm.session['user'], csrf_token='test', available_endpoints=[])
+            context.update(current_user=crm.session['user'], csrf_token='test', available_endpoints=[],
+                           format_date=crm.format_date_safe)
             return crm.app.jinja_env.get_template(name).render(**context)
         with patch.object(crm, 'get_db', return_value=conn), patch.object(crm, 'render_template', side_effect=render):
             html = crm.commissions()
             assert '195.00' in html and '455.00' in html
             html = crm.commission_settings()
             assert '40.00' in html and 'Alice' in html
+            assert "Chiffre d'affaires" in crm.chiffre_affaire()
+            crm.session['user'] = dict(id=1, role='commercial', username='Alice')
+            html = crm.commissions()
+            assert '195.00' in html and 'Taux commercial' not in html
+            assert "Chiffre d'affaires" in crm.chiffre_affaire()
+            with patch.object(crm, 'can_access_client', return_value=True):
+                html, status = crm.validate_client_revenue(1)
+                assert status == 200 and 'data-ade' not in html
     print('OK: migration, snapshot preservation, commission totals and templates on local PostgreSQL')
 finally:
     conn.rollback()

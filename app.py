@@ -2651,6 +2651,8 @@ def chiffre_affaire():
 
         rows = cur.fetchall()
 
+    # DictCursor rows only accept existing SQL columns; calculations need a dict.
+    rows = [dict(row) for row in rows]
     for row in rows:
         values = commission_values(row)
         row['commission_amount'] = values[0] if values else None
@@ -2828,6 +2830,7 @@ def commissions():
     total_commercial = Decimal('0')
     total_aleo = Decimal('0')
     pending = 0
+    rows = [dict(row) for row in rows]
     for row in rows:
         total_ca += Decimal(str(row['montant']))
         values = commission_values(row)
@@ -6577,6 +6580,7 @@ def validate_client_revenue(client_id):
             flash("Ce dossier possède déjà du chiffre d'affaires. Aucun montant ajouté.", "info")
             return redirect(url_for("validate_client_revenue", client_id=client_id))
     conn.rollback()  # Release the row lock before displaying the form.
+    client = dict(client)
     if user.get('role') != 'admin':
         client.pop('commission_rate', None)
         client.pop('direct_commission_rate', None)
