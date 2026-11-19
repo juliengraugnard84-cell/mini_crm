@@ -7,7 +7,7 @@
 {% set client_status_label = {
     'en_cours': 'En cours',
     'en_attente': 'En attente',
-    'gagne': 'Gagne',
+    'gagne': 'Gagné',
     'perdu': 'Perdu'
 }.get(client_status, 'En cours') %}
 
@@ -36,7 +36,7 @@
 
 {% if current_user and (current_user.role == "admin" or current_user.id == client.owner_id) %}
 <div class="crm-page-header-actions mb-4">
-    <a href="#client-edit-form" class="btn btn-primary">Modifier la fiche client</a>
+    <a href="#client-edit-panel" data-open-details="client-edit-panel" class="btn btn-primary">Modifier la fiche client</a>
     {% if client_status == 'gagne' %}
     <a href="{{ url_for('validate_client_revenue', client_id=client.id) }}" class="btn btn-success">Validation du CA</a>
     {% endif %}
@@ -48,37 +48,16 @@
       and available_endpoints
       and 'delete_client' in available_endpoints %}
 <div class="crm-page-header-actions mb-4">
+    <details class="crm-disclosure"><summary>Actions avancées</summary>
     <form method="post"
           action="{{ url_for('delete_client', client_id=client.id) }}"
           onsubmit="return confirm('Supprimer definitivement ce dossier client ?');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit" class="btn btn-danger">Supprimer le dossier client</button>
     </form>
+    </details>
 </div>
 {% endif %}
-
-<!-- ================= PAGE HEADER ================= -->
-
-<div class="page-header mb-4 d-flex justify-content-between align-items-center crm-detail-legacy-header">
-    <div>
-        <h1>Dossier client</h1>
-        <p class="text-muted mb-0">{{ client.name }}</p>
-    </div>
-
-    {% if current_user
-          and current_user.role == 'admin'
-          and available_endpoints
-          and 'delete_client' in available_endpoints %}
-    <form method="post"
-          action="{{ url_for('delete_client', client_id=client.id) }}"
-          onsubmit="return confirm('SUPPRIMER DÉFINITIVEMENT ce dossier client ?');">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit" class="btn btn-danger">
-            Supprimer le dossier client
-        </button>
-    </form>
-    {% endif %}
-</div>
 
 <!-- ================= STATUT DOSSIER ================= -->
 
@@ -174,18 +153,10 @@ and 'update_client_status' in available_endpoints %}
             </div>
         </div>
 
-        <div class="row crm-detail-legacy-grid">
-            <div class="col-md-6 mb-2"><strong>Entreprise :</strong><br>{{ client.name }}</div>
-            <div class="col-md-6 mb-2"><strong>Nom du gérant :</strong><br>{{ client.gerant_nom or "—" }}</div>
-            <div class="col-md-6 mb-2"><strong>Email :</strong><br>{{ client.email or "—" }}</div>
-            <div class="col-md-6 mb-2"><strong>Téléphone :</strong><br>{{ client.phone or "—" }}</div>
-            <div class="col-md-6 mb-2"><strong>SIRET :</strong><br>{{ client.siret or "—" }}</div>
-            <div class="col-md-6 mb-2"><strong>Adresse :</strong><br>{{ client.address or "—" }}</div>
-        </div>
-
         {% if current_user and (current_user.role == "admin" or current_user.id == client.owner_id) %}
         <hr class="my-4">
 
+        <details id="client-edit-panel" class="crm-disclosure"><summary>Modifier les coordonnées et les informations du dossier</summary>
         <form id="client-edit-form" method="post" action="{{ url_for('edit_client', client_id=client.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
@@ -288,6 +259,7 @@ and 'update_client_status' in available_endpoints %}
                 </div>
             </div>
         </form>
+        </details>
         {% endif %}
     </div>
 </div>
@@ -298,7 +270,7 @@ and 'update_client_status' in available_endpoints %}
 
 <div class="card mb-4">
     <div class="card-header">
-        <strong>Timeline du dossier</strong>
+        <strong>Historique du dossier</strong>
     </div>
 
     <div class="card-body">
@@ -321,47 +293,6 @@ and 'update_client_status' in available_endpoints %}
             {% endfor %}
         </div>
 
-        <div class="crm-timeline-legacy" style="position:relative;padding-left:30px;">
-
-            <div style="position:absolute;left:10px;top:0;bottom:0;width:2px;background:#dee2e6;"></div>
-
-            {% for t in timeline %}
-            <div style="position:relative;margin-bottom:20px;">
-
-                <div style="
-                    position:absolute;
-                    left:-2px;
-                    top:5px;
-                    width:12px;
-                    height:12px;
-                    border-radius:50%;
-                    background:
-                        {% if t.type == 'client' %}#0d6efd
-                        {% elif t.type == 'cotation' %}#198754
-                        {% else %}#6c757d
-                        {% endif %};
-                "></div>
-
-                <div class="ms-3">
-                    <div class="fw-bold">
-                        {{ t.title }}
-                    </div>
-
-                    <div class="text-muted small">
-                        {{ format_datetime_fr(t.date) }}
-                    </div>
-
-                    {% if t.description %}
-                    <div class="mt-1">
-                        {{ t.description }}
-                    </div>
-                    {% endif %}
-                </div>
-
-            </div>
-            {% endfor %}
-
-        </div>
         {% else %}
             <p class="text-muted mb-0">Aucune activité.</p>
         {% endif %}
@@ -1263,13 +1194,15 @@ and 'update_client_status' in available_endpoints %}
                 <form method="post" action="{{ url_for('update_client', client_id=client.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-                    <input type="date" name="update_date" class="form-control mb-2" required>
+                    <label for="client-update-date" class="form-label">Date de la demande</label>
+                    <input id="client-update-date" type="date" name="update_date" class="form-control mb-2" required>
 
-                    <textarea name="update_commentaire"
+                    <label for="client-update-comment" class="form-label">Modification demandée</label>
+                    <textarea id="client-update-comment" name="update_commentaire"
                               class="form-control mb-2"
                               placeholder="Commentaire"></textarea>
 
-                    <button class="btn btn-warning">Envoyer</button>
+                    <button class="btn btn-warning">Envoyer la demande</button>
                 </form>
 
             </div>

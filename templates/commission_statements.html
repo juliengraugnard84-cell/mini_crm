@@ -1,34 +1,63 @@
 {% extends 'base.html' %}
 {% block title %}Relevés de commissions{% endblock %}
 {% block content %}
-<div class="page-header mb-4">
-    <h1>Relevés de commissions</h1>
-    <p class="text-muted">Consultez les signatures du mois ou les commissions à facturer à leur échéance.</p>
-</div>
-<form method="get" class="card card-body mb-4">
-    <div class="row g-3 align-items-end">
-        <div class="col-md-4"><label for="statement-mode" class="form-label">Type de relevé</label>
-            <select class="form-select" id="statement-mode" name="mode">
-                <option value="monthly" {% if statement.mode == 'monthly' %}selected{% endif %}>Mensuel — mois de signature</option>
-                <option value="billing" {% if statement.mode == 'billing' %}selected{% endif %}>Facturation — mois de paiement</option>
-            </select>
+<link rel="stylesheet" href="{{ url_for('static', filename='commission_statements.css') }}?v=1">
+{% set month_names = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'] %}
+{% set period_label = month_names[statement.month[5:7]|int - 1]|capitalize ~ ' ' ~ statement.month[:4] %}
+{% set counts = namespace(rows=0) %}
+{% for group in statement.groups %}{% set counts.rows = counts.rows + group.rows|length %}{% endfor %}
+<div class="statement-page">
+    <p class="statement-intro">Préparez votre relevé mensuel ou les commissions à joindre à votre facture.</p>
+    <section class="statement-panel" aria-labelledby="statement-filter-title">
+        <div class="statement-panel-title"><h2 id="statement-filter-title">Préparer un relevé</h2><span>Choisissez le type et la période</span></div>
+        <form method="get" class="statement-filters">
+            <div><label for="statement-mode">Type de relevé</label>
+                <select class="form-select" id="statement-mode" name="mode">
+                    <option value="monthly" {% if statement.mode == 'monthly' %}selected{% endif %}>Mensuel — signatures du mois</option>
+                    <option value="billing" {% if statement.mode == 'billing' %}selected{% endif %}>Facturation — paiements du mois</option>
+                </select>
+            </div>
+            <div><label for="statement-month">Mois du relevé</label><input class="form-control" id="statement-month" type="month" name="month" value="{{ statement.month }}" required></div>
+            {% if current_user.role == 'admin' %}<div><label for="statement-commercial">Commercial</label><input class="form-control" id="statement-commercial" name="commercial" value="{{ commercial }}" placeholder="Tous les commerciaux"></div>{% endif %}
+            <button class="btn btn-primary" type="submit">Afficher le relevé</button>
+        </form>
+    </section>
+
+    <section class="statement-panel statement-summary" aria-labelledby="statement-result-title">
+        <div class="statement-result-heading">
+            <div><span class="statement-eyebrow">{{ 'Signatures du mois' if statement.mode == 'monthly' else 'Commissions à facturer' }}</span><h2 id="statement-result-title">{{ period_label }}</h2><p>{{ statement.scope }}</p></div>
+            <div class="statement-exports" aria-label="Exporter le relevé affiché">
+                <a class="statement-export" href="{{ url_for('commission_statements', mode=statement.mode, month=statement.month, commercial=commercial, format='pdf') }}"><span aria-hidden="true">↓</span> Télécharger le PDF</a>
+                <a class="statement-export statement-export-excel" href="{{ url_for('commission_statements', mode=statement.mode, month=statement.month, commercial=commercial, format='xlsx') }}"><span aria-hidden="true">↓</span> Télécharger Excel</a>
+            </div>
         </div>
-        <div class="col-md-3"><label for="statement-month" class="form-label">Mois du relevé</label><input class="form-control" id="statement-month" type="month" name="month" value="{{ statement.month }}" required></div>
-        {% if current_user.role == 'admin' %}<div class="col-md-3"><label for="statement-commercial" class="form-label">Commercial</label><input class="form-control" id="statement-commercial" name="commercial" value="{{ commercial }}" placeholder="Tous les commerciaux"></div>{% endif %}
-        <div class="col-md-2"><button class="btn btn-primary">Afficher</button></div>
-    </div>
-</form>
-<div class="d-flex gap-2 mb-3">
-    <a class="btn btn-outline-primary" href="{{ url_for('commission_statements', mode=statement.mode, month=statement.month, commercial=commercial, format='pdf') }}">Télécharger le PDF</a>
-    <a class="btn btn-outline-success" href="{{ url_for('commission_statements', mode=statement.mode, month=statement.month, commercial=commercial, format='xlsx') }}">Télécharger Excel</a>
-</div>
-<div class="alert alert-info">{% for note in notes %}<p class="mb-1">{{ note }}</p>{% endfor %}</div>
-{% if current_user.role == 'admin' and (statement.missing_signature or statement.incomplete) %}<p><a href="{{ url_for('chiffre_affaire') }}">Compléter les dates de signature, énergies et fournisseurs dans l'historique CA</a></p>{% endif %}
-<h2 class="h4">{{ statement.title }} — {{ statement.month }}</h2>
-<p class="fw-bold">Total commissions calculées : {{ '%.2f'|format(statement.total) }} EUR</p>
+        <div class="statement-metrics">
+            <div><span>Commissions calculées</span><strong>{{ '{:,.2f}'.format(statement.total).replace(',', ' ').replace('.', ',') }} <small>€</small></strong></div>
+            <div><span>Dossiers dans le relevé</span><strong>{{ counts.rows }}</strong></div>
+            {% if current_user.role == 'admin' %}<div><span>Commerciaux concernés</span><strong>{{ statement.groups|length }}</strong></div>{% endif %}
+        </div>
+    </section>
+
+    {% if statement.missing_signature or statement.pending or statement.incomplete %}
+    <aside class="statement-warning" aria-labelledby="statement-warning-title">
+        <div><h2 id="statement-warning-title">Informations à compléter</h2>
+            {% if statement.missing_signature %}<p><strong>{{ statement.missing_signature }} revenu(s) sans date de signature</strong> ne peuvent pas être rattachés à une période. Ce nombre concerne l'ensemble du périmètre sélectionné.</p>{% endif %}
+            {% if statement.pending %}<p>{{ statement.pending }} commission(s) non calculée(s) sur la période, exclues du total à facturer.</p>{% endif %}
+            {% if statement.incomplete %}<p>{{ statement.incomplete }} ligne(s) avec fournisseur, énergie ou CA prestataire manquant : à compléter avant facturation.</p>{% endif %}
+        </div>
+        {% if current_user.role == 'admin' %}<a class="statement-warning-link" href="{{ url_for('chiffre_affaire') }}">Compléter dans le CA →</a>{% else %}<span class="statement-warning-help">Votre administrateur peut compléter ces informations.</span>{% endif %}
+    </aside>
+    {% endif %}
+
+    <details class="statement-help">
+        <summary>Comprendre le calendrier et les montants</summary>
+        <div>{% for note in notes[:3] %}<p>{{ note }}</p>{% endfor %}</div>
+    </details>
+
+    <div class="statement-detail-heading"><h2>Détail des commissions</h2><span>{{ counts.rows }} dossier(s) · {{ period_label }}</span></div>
 {% for group in statement.groups %}
-<div class="card mb-4"><div class="card-header"><strong>{{ group.name }}</strong> — {{ '%.2f'|format(group.commission) }} EUR de commissions</div>
-    <div class="table-responsive"><table class="table align-middle mb-0">
+<section class="statement-panel statement-group"><div class="statement-group-heading"><h3>{{ group.name }}</h3><strong>{{ '%.2f'|format(group.commission) }} € <span>de commissions</span></strong></div>
+    <div class="statement-table-scroll" tabindex="0" role="region" aria-label="Dossiers de {{ group.name }}"><table class="statement-table">
         <thead><tr><th>Dossier</th><th>Signature</th><th>Payable dès</th><th>Partenaire</th><th>Énergie</th><th>Fournisseur signé</th><th>CA prestataire</th><th>CA net</th><th>Commission</th></tr></thead>
         <tbody>{% for row in group.rows %}<tr>
             <td>{{ row.dossier }}</td><td>{{ row.signed_on.strftime('%d/%m/%Y') }}</td><td>{{ row.payable_on.strftime('%d/%m/%Y') }}</td>
@@ -37,6 +66,14 @@
             <td>{{ '%.2f'|format(row.net) }} EUR</td><td>{{ ('%.2f'|format(row.commission) + ' EUR') if row.commission is not none else 'Non calculée' }}</td>
         </tr>{% endfor %}</tbody>
     </table></div>
+</section>
+{% else %}
+<section class="statement-panel statement-empty">
+    <span class="statement-empty-icon" aria-hidden="true">≡</span>
+    <h3>Aucun dossier pour cette sélection</h3>
+    <p>Choisissez une autre période ou vérifiez les informations à compléter ci-dessus.</p>
+    <a href="#statement-mode">Modifier les filtres ↑</a>
+</section>
+{% endfor %}
 </div>
-{% else %}<div class="card card-body">Aucun dossier pour cette sélection. Les anciens revenus sans date de signature doivent être complétés par l'administrateur.</div>{% endfor %}
 {% endblock %}

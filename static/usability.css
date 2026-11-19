@@ -1,0 +1,43 @@
+/* Shared readability adjustments, kept separate from legacy page themes. */
+.crm-skip-link { position: fixed; left: 16px; top: -80px; z-index: 10000; background: #fff; color: #193750; padding: 12px 20px; border-radius: 10px; }
+.crm-skip-link:focus { top: 12px; }
+.crm-mobile-menu { display: none; }
+.topbar { padding-top: 14px; padding-bottom: 14px; }
+.topbar-title { font-size: 20px; }
+.sidebar-nav .crm-nav-group { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.crm-nav-heading { display: block; padding: 18px 14px 6px; color: #68758c; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+.sidebar-nav .crm-nav-group:first-child .crm-nav-heading { padding-top: 4px; }
+.sidebar-nav .crm-nav-group a { padding: 11px 14px; font-size: 13px; }
+.content .page-header { background: #fff; padding: 20px 24px; border-radius: 18px; margin-bottom: 22px; box-shadow: 0 6px 20px #25364e08; }
+.content .page-header h1 { font-size: clamp(22px, 2.1vw, 30px); }
+.content .page-header p, .content .page-header .text-muted, .content .page-header small,
+.content .crm-page-hero p, .content .crm-table-top p.crm-soft-note, .content .planning-hero p,
+.content .planning-panel-header small, .content .planning-calendar-side-note { display: block; color: #607087 !important; line-height: 1.6; font-size: 14px; margin-top: 8px; }
+.content form.card.card-body, .content .card.p-3 { padding: 22px !important; }
+.content .btn-outline-primary { border: 1px solid #9cb5d4; background: #f3f7fc; color: #285082; }
+.content .btn-outline-success { border: 1px solid #a1cbb4; background: #eff8f2; color: #246642; }
+.content a:focus-visible, .content button:focus-visible, .sidebar a:focus-visible, .content summary:focus-visible { outline: 3px solid #7193bd; outline-offset: 3px; }
+.crm-disclosure { border: 1px solid #e1e7ef; border-radius: 12px; padding: 16px; margin: 12px 0; }
+.crm-disclosure > summary { cursor: pointer; font-weight: 700; color: #304762; }
+.crm-disclosure[open] > summary { margin-bottom: 18px; }
+.crm-disclosure form { margin-bottom: 0; }
+.crm-board-name { font-weight: 750; color: #253a57; text-decoration: none; overflow-wrap: anywhere; }
+.crm-board-name:hover { text-decoration: underline; }
+.crm-dashboard-hero { grid-template-columns: 1fr; padding: 28px; }
+.crm-dashboard-hero-main h1 { font-size: clamp(24px, 2.5vw, 34px); }
+.crm-dashboard-action-row { flex-wrap: wrap; }
+.crm-finance-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.crm-metadata-summary { font-size: 13px; }
+@media (max-width: 900px) {
+    .crm-mobile-menu { display: block; border: 1px solid #b6c5da; border-radius: 10px; background: #fff; color: #304762; padding: 12px 16px; font-weight: 700; }
+    .sidebar-nav { display: none; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+    .navigation-open .sidebar-nav { display: grid; }
+    .crm-nav-heading { padding-top: 8px; }
+    .sidebar-header .brand-meta { display: none; }
+}
+@media (max-width: 560px) {
+    .content .page-header { padding: 18px; }
+    .content .page-header .crm-page-header-actions { margin-top: 14px; }
+    .crm-dashboard-hero { padding: 22px; }
+    .crm-finance-actions .btn { flex: 1 1 auto; }
+}

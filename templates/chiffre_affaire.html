@@ -5,11 +5,12 @@
 
 <div class="page-header mb-4">
     <h1>Chiffre d'affaires</h1>
-    <a href="{{ url_for('commission_statements') }}" class="btn btn-primary">Relevés PDF / Excel</a>
     <p class="text-muted">Pour les nouvelles validations : CA net après retenue ADE ou fournisseur, avant commission du commercial. Les anciens revenus sont conservés tels quels.</p>
+    <div class="crm-finance-actions">
+    <a href="{{ url_for('commission_statements') }}" class="btn btn-primary">Relevés PDF / Excel</a>
     <a href="{{ url_for('commissions') }}" class="btn btn-outline-primary">Voir les commissions</a>
     {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('commission_settings') }}" class="btn btn-outline-secondary">Configurer les commissions</a>{% endif %}
-    <p class="text-muted">Lecture claire des performances commerciales, du mois a l'annee.</p>
+    </div>
 </div>
 
 {% if current_user and current_user.role == 'admin' %}
@@ -68,7 +69,8 @@
 {% if current_user and current_user.role == 'admin' %}
 <div class="card mb-5">
     <div class="card-body">
-        <h5>Ajouter un chiffre d'affaires</h5>
+        <details class="crm-disclosure"><summary>Ajouter un CA manuellement</summary>
+        <p class="text-muted">Pour un dossier gagné, utilisez de préférence « Validation du CA » depuis sa fiche.</p>
 
         <form method="post" action="{{ url_for('add_revenu') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -109,6 +111,7 @@
                 <button class="btn btn-success">Ajouter</button>
             </div>
         </form>
+        </details>
     </div>
 </div>
 {% endif %}
@@ -200,6 +203,8 @@
                     <td>{{ {'ade': 'ADE', 'direct': 'Fournisseur en direct'}.get(r.revenue_source, 'Non renseigné') }}</td>
                     <td>
                         {% if current_user.role == 'admin' %}
+                        <div>{{ r.supplier_name or 'Non renseigné' }}</div>
+                        <details class="crm-disclosure crm-metadata-summary"><summary>Modifier le contrat</summary>
                         <form method="post" action="{{ url_for('update_revenue_supplier', revenu_id=r.id) }}" class="d-flex flex-column gap-2">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <input class="form-control form-control-sm" name="supplier_name" maxlength="160" value="{{ r.supplier_name or '' }}" placeholder="Fournisseur" aria-label="Fournisseur du dossier {{ r.client_name or r.dossier or r.id }}">
@@ -213,6 +218,7 @@
                             </select>
                             <button class="btn btn-sm btn-outline-primary">Enregistrer</button>
                         </form>
+                        </details>
                         {% else %}{{ r.supplier_name or 'Non renseigné' }}{% endif %}
                     </td>
                     <td><strong>{{ (r.montant|default(0))|round(2) }} EUR</strong></td>

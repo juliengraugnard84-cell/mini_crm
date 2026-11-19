@@ -1,0 +1,46 @@
+{% macro nav_link(endpoint, label, active, badge=0) %}
+<a href="{{ url_for(endpoint) }}" {% if active %}class="active" aria-current="page"{% endif %}>{{ label }}{% if badge %}<span class="nav-alert-badge danger">{{ badge }}</span>{% endif %}</a>
+{% endmacro %}
+{% set ep = request.endpoint or '' %}
+{% set admin = current_user and current_user.role == 'admin' %}
+<nav class="sidebar-nav" id="primary-navigation" aria-label="Navigation principale">
+    <div class="crm-nav-group">
+        <span class="crm-nav-heading">Au quotidien</span>
+        {{ nav_link('dashboard', 'Accueil', ep == 'dashboard') }}
+        {{ nav_link('clients', 'Dossiers clients', ep in ['clients', 'client_detail', 'client_group_detail', 'validate_client_revenue']) }}
+        {% if admin %}
+        {{ nav_link('admin_cotations', 'Cotations à traiter', ep.startswith('admin_cotation') or ep == 'admin_edit_cotation', unread_cotations|default(0)) }}
+        {{ nav_link('admin_planning', 'Agenda et relances', ep == 'admin_planning') }}
+        {% elif current_user and current_user.role == 'commercial' %}
+        {% if 'cotations' in available_endpoints %}{{ nav_link('cotations', 'Mes cotations', ep == 'cotations') }}{% endif %}
+        {{ nav_link('planning', 'Agenda et relances', ep == 'planning') }}
+        {{ nav_link('my_hot_followups', 'Dossiers à relancer', ep == 'my_hot_followups') }}
+        {% endif %}
+        {{ nav_link('cspe_index', 'Dossiers CSPE', ep.startswith('cspe') or ep in ['create_cspe_dossier', 'edit_cspe_dossier']) }}
+    </div>
+    <div class="crm-nav-group">
+        <span class="crm-nav-heading">Revenus</span>
+        {{ nav_link('chiffre_affaire', "Chiffre d'affaires", ep == 'chiffre_affaire') }}
+        {{ nav_link('commissions', 'Commissions', ep == 'commissions') }}
+        {{ nav_link('commission_statements', 'Relevés et facturation', ep == 'commission_statements') }}
+        {% if not admin and current_user and current_user.role == 'commercial' %}{{ nav_link('my_commercial_statistics', 'Mes statistiques', ep == 'my_commercial_statistics') }}{% endif %}
+    </div>
+    {% if admin %}
+    <div class="crm-nav-group">
+        <span class="crm-nav-heading">Équipe et suivi</span>
+        {{ nav_link('admin_dossiers', 'Dossiers par commercial', ep.startswith('admin_dossiers')) }}
+        {{ nav_link('admin_commercial_statistics', "Statistiques de l'équipe", ep.startswith('admin_commercial_statistics')) }}
+        {{ nav_link('admin_updates', 'Demandes de modification', ep in ['admin_updates', 'open_update'], unread_updates|default(0)) }}
+        <a href="{{ url_for('admin_duplicate_alerts') }}" id="duplicate-alert-nav" {% if ep in ['admin_duplicate_alerts', 'dossier_duplicate_alert'] %}class="active" aria-current="page"{% endif %}>Alertes de doublons <span id="duplicate-alert-count" class="nav-alert-badge danger" {% if not unread_duplicate_alerts %}hidden{% endif %}>{{ unread_duplicate_alerts }}</span></a>
+    </div>
+    {% endif %}
+    <div class="crm-nav-group">
+        <span class="crm-nav-heading">Ressources{% if admin %} et réglages{% endif %}</span>
+        {{ nav_link('shared_resources', 'Ressources partagées', ep == 'shared_resources') }}
+        {% if admin %}
+        {{ nav_link('documents', 'Bibliothèque de documents', ep == 'documents') }}
+        {{ nav_link('admin_users', 'Utilisateurs', ep in ['admin_users', 'admin_edit_user', 'admin_new_user']) }}
+        {{ nav_link('commission_settings', 'Taux de commission', ep == 'commission_settings') }}
+        {% endif %}
+    </div>
+</nav>

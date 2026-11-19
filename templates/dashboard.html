@@ -12,36 +12,15 @@
     <section class="crm-dashboard-hero crm-dashboard-hero--admin">
         <div class="crm-dashboard-hero-main">
             <span class="crm-page-kicker">Vue administration</span>
-            <h1>Le poste de pilotage du CRM Aleo Conseils.</h1>
+            <h1>Bonjour {{ current_user.username }}, voici votre activité.</h1>
 
             <div class="crm-dashboard-action-row">
-                <a href="{{ url_for('clients') }}" class="crm-dashboard-action">Ouvrir les clients</a>
+                <a href="{{ url_for('clients') }}" class="crm-dashboard-action">Voir les dossiers</a>
                 <a href="{{ url_for('admin_cotations') }}" class="crm-dashboard-action">Voir les cotations</a>
                 <a href="{{ url_for('admin_planning') }}" class="crm-dashboard-action">Ouvrir l'agenda</a>
             </div>
         </div>
 
-        <div class="crm-dashboard-glance-grid">
-            <article class="crm-dashboard-glance-card crm-dashboard-glance-card--blue">
-                <span>Clients</span>
-                <strong>{{ total_clients or 0 }}</strong>
-            </article>
-
-            <article class="crm-dashboard-glance-card crm-dashboard-glance-card--peach">
-                <span>Cotations neuves</span>
-                <strong>{{ unread_cotations or 0 }}</strong>
-            </article>
-
-            <article class="crm-dashboard-glance-card crm-dashboard-glance-card--mint">
-                <span>Pipeline actif</span>
-                <strong>{{ admin_focus_total }}</strong>
-            </article>
-
-            <article class="crm-dashboard-glance-card crm-dashboard-glance-card--lilac">
-                <span>Documents</span>
-                <strong>{{ total_docs or 0 }}</strong>
-            </article>
-        </div>
     </section>
 
     <section class="crm-metric-grid">
@@ -73,8 +52,8 @@
     <section class="crm-panel">
         <div class="crm-panel-heading">
             <div>
-                <span class="crm-panel-kicker">Pipeline global</span>
-                <h2>Vision d'ensemble de l'avancement commercial</h2>
+                <span class="crm-panel-kicker">Suivi commercial</span>
+                <h2>Avancement des dossiers</h2>
             </div>
         </div>
 
@@ -90,7 +69,7 @@
             </article>
 
             <article class="crm-pipeline-tile crm-pipeline-tile--mint">
-                <span>Gagnes</span>
+                <span>Gagnés</span>
                 <strong>{{ p.gagnes or 0 }}</strong>
             </article>
 
@@ -113,10 +92,10 @@
     <section class="crm-dashboard-hero crm-dashboard-hero--commercial">
         <div class="crm-dashboard-hero-main">
             <span class="crm-page-kicker">Vue commerciale</span>
-            <h1>Ton bureau de pilotage commercial.</h1>
+            <h1>Bonjour {{ current_user.username }}, voici votre activité.</h1>
 
             <div class="crm-dashboard-action-row">
-                <a href="{{ url_for('clients') }}" class="crm-dashboard-action">Mes clients</a>
+                <a href="{{ url_for('clients') }}" class="crm-dashboard-action">Mes dossiers</a>
                 <a href="{{ url_for('planning') }}" class="crm-dashboard-action">Mon agenda</a>
                 {% if available_endpoints and 'cotations' in available_endpoints %}
                     <a href="{{ url_for('cotations') }}" class="crm-dashboard-action">Mes cotations</a>
@@ -126,27 +105,6 @@
             </div>
         </div>
 
-        <div class="crm-dashboard-glance-grid">
-            <article class="crm-dashboard-glance-card crm-dashboard-glance-card--blue">
-                <span>Mes dossiers</span>
-                <strong>{{ commercial_stats.nb_clients or 0 }}</strong>
-            </article>
-
-            <article class="crm-dashboard-glance-card crm-dashboard-glance-card--peach">
-                <span>CA du mois</span>
-                <strong>{{ "%.0f"|format(commercial_stats.ca_mois or 0) }} EUR</strong>
-            </article>
-
-            <article class="crm-dashboard-glance-card crm-dashboard-glance-card--mint">
-                <span>En cours</span>
-                <strong>{{ commercial_en_cours }}</strong>
-            </article>
-
-            <article class="crm-dashboard-glance-card crm-dashboard-glance-card--lilac">
-                <span>Gagnes</span>
-                <strong>{{ commercial_gagnes }}</strong>
-            </article>
-        </div>
     </section>
 
     <section class="crm-metric-grid">
@@ -169,7 +127,7 @@
         </article>
 
         <article class="crm-metric-card crm-metric-card--peach">
-            <span class="crm-metric-label">Focus</span>
+            <span class="crm-metric-label">Dossiers en cours</span>
             <strong>{{ commercial_en_cours }}</strong>
             <small>Opportunites actuellement en cours</small>
         </article>
@@ -178,8 +136,8 @@
     <section class="crm-panel">
         <div class="crm-panel-heading">
             <div>
-                <span class="crm-panel-kicker">Pipeline personnel</span>
-                <h2>Mes dossiers a suivre</h2>
+                <span class="crm-panel-kicker">À suivre</span>
+                <h2>Mes dossiers à suivre</h2>
             </div>
         </div>
 
@@ -211,7 +169,7 @@
             </div>
 
             <div class="crm-stage-card crm-stage-card--mint">
-                <div class="crm-stage-title">Gagnes <span>{{ commercial_gagnes }}</span></div>
+                <div class="crm-stage-title">Gagnés <span>{{ commercial_gagnes }}</span></div>
                 <div class="crm-stage-list">
                     {% for c in pipeline_gagnes %}
                         <a href="{{ url_for('client_detail', client_id=c.id) }}" class="crm-stage-item">
