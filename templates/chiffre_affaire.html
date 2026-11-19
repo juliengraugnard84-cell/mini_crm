@@ -167,33 +167,48 @@
 </div>
 {% endif %}
 
-{% if current_user and current_user.role == 'admin' and historique_ca %}
+{% if current_user and current_user.role in ['admin', 'commercial'] and historique_ca %}
 <div class="card mb-4">
     <div class="crm-table-top">
         <div>
             <h5>Historique detaille</h5>
-            <p class="crm-soft-note">Suppression rapide des entrees en cas d'erreur.</p>
+            <p class="crm-soft-note">CA net, partenaire, fournisseur choisi et commission par dossier.</p>
         </div>
     </div>
 
     <div class="card-body">
-        <table class="table table-sm align-middle">
+        <div class="table-responsive"><table class="table table-sm align-middle">
             <thead>
                 <tr>
                     <th>Date</th>
                     <th>Dossier</th>
                     <th>Commercial</th>
-                    <th>Montant</th>
-                    <th class="text-end">Action</th>
+                    <th>Partenaire</th>
+                    <th>Fournisseur choisi</th>
+                    <th>CA net</th>
+                    <th>Commission commercial</th>
+                    {% if current_user.role == 'admin' %}<th class="text-end">Action</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
             {% for r in historique_ca %}
                 <tr>
                     <td>{{ format_date(r.date) }}</td>
-                    <td>{{ r.client_name }}</td>
+                    <td>{{ r.client_name or r.dossier or 'Sans dossier' }}</td>
                     <td>{{ r.commercial }}</td>
+                    <td>{{ {'ade': 'ADE', 'direct': 'Fournisseur en direct'}.get(r.revenue_source, 'Non renseigné') }}</td>
+                    <td>
+                        {% if current_user.role == 'admin' %}
+                        <form method="post" action="{{ url_for('update_revenue_supplier', revenu_id=r.id) }}" class="d-flex gap-2">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input class="form-control form-control-sm" name="supplier_name" maxlength="160" value="{{ r.supplier_name or '' }}" placeholder="Fournisseur" aria-label="Fournisseur du dossier {{ r.client_name or r.dossier or r.id }}">
+                            <button class="btn btn-sm btn-outline-primary">Enregistrer</button>
+                        </form>
+                        {% else %}{{ r.supplier_name or 'Non renseigné' }}{% endif %}
+                    </td>
                     <td><strong>{{ (r.montant|default(0))|round(2) }} EUR</strong></td>
+                    <td>{{ ('%.2f'|format(r.commission_amount) + ' EUR') if r.commission_amount is not none else 'Non calculée' }}</td>
+                    {% if current_user.role == 'admin' %}
                     <td class="text-end">
                         <form method="post"
                               action="{{ url_for('delete_revenu', revenu_id=r.id) }}"
@@ -203,10 +218,11 @@
                             <button class="btn btn-sm btn-danger">Supprimer</button>
                         </form>
                     </td>
+                    {% endif %}
                 </tr>
             {% endfor %}
             </tbody>
-        </table>
+        </table></div>
     </div>
 </div>
 {% endif %}

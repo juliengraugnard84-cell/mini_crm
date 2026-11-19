@@ -25,6 +25,7 @@ def ensure_commissions_schema(conn):
         cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS initial_amount NUMERIC(14,2)')
         cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS revenue_source TEXT')
         cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS supplier_rate NUMERIC(5,2)')
+        cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS supplier_name TEXT')
     conn.commit()
 
 
@@ -38,19 +39,19 @@ def parse_rate(value):
         raise ValueError('Le taux doit être compris entre 0 et 100, avec au maximum deux décimales.')
 
 
-def insert_revenue(cur, revenue_date, commercial, dossier, client_id, amount, source):
+def insert_revenue(cur, revenue_date, commercial, dossier, client_id, amount, source, supplier_name=None):
     initial, retained, net = revenue_breakdown(amount, source)
     # A single statement snapshots the configured rate alongside the CA.
     cur.execute('''
         INSERT INTO revenus (date, commercial, dossier, client_id, montant, commission_rate, aleo_rate,
-                             initial_amount, revenue_source, supplier_rate)
+                             initial_amount, revenue_source, supplier_rate, supplier_name)
         SELECT %s, %s, %s, %s, %s,
                CASE WHEN %s = 'ade' THEN u.commission_rate ELSE u.direct_commission_rate END,
                100 - CASE WHEN %s = 'ade' THEN u.commission_rate ELSE u.direct_commission_rate END,
-               %s, %s, %s
+               %s, %s, %s, %s
         FROM (SELECT 1) seed
         LEFT JOIN users u ON u.username = %s
-    ''', (revenue_date, commercial, dossier, client_id, net, source, source, initial, source, SOURCE_RATES[source], commercial))
+    ''', (revenue_date, commercial, dossier, client_id, net, source, source, initial, source, SOURCE_RATES[source], supplier_name, commercial))
 
 
 def commission_values(row):

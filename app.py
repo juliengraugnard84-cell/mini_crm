@@ -2641,6 +2641,9 @@ def chiffre_affaire():
                 r.client_id,
                 r.montant,
                 r.commission_rate,
+                r.revenue_source,
+                r.supplier_name,
+                r.dossier,
                 r.aleo_rate,
                 c.name AS client_name
             FROM revenus r
@@ -2868,6 +2871,7 @@ def add_revenu():
     client_id = request.form.get("client_id")
     montant = (request.form.get("montant") or "").strip()
     revenue_source = request.form.get('revenue_source', '')
+    supplier_name = (request.form.get('supplier_name') or '').strip()[:160] or None
 
     try:
         montant, _, _ = revenue_breakdown(montant, revenue_source)
@@ -2886,7 +2890,7 @@ def add_revenu():
 
         with conn.cursor() as cur:
             insert_revenue(cur, date_revenu, commercial, dossier,
-                           client_id if client_id else None, montant, revenue_source)
+                           client_id if client_id else None, montant, revenue_source, supplier_name)
 
         conn.commit()
         flash("Revenu ajouté avec succès.", "success")
@@ -2903,6 +2907,29 @@ def add_revenu():
 # =========================================================
 # SUPPRESSION REVENU
 # =========================================================
+@app.route('/revenus/<int:revenu_id>/supplier', methods=['POST'])
+@admin_required
+def update_revenue_supplier(revenu_id):
+    supplier_name = (request.form.get('supplier_name') or '').strip()
+    if len(supplier_name) > 160:
+        flash('Le nom du fournisseur ne doit pas dépasser 160 caractères.', 'danger')
+        return redirect(url_for('chiffre_affaire'))
+    conn = get_db()
+    ensure_commissions_schema(conn)
+    try:
+        with conn.cursor() as cur:
+            cur.execute('UPDATE revenus SET supplier_name = %s WHERE id = %s RETURNING id',
+                        (supplier_name or None, revenu_id))
+            updated = cur.fetchone()
+        conn.commit()
+        flash('Fournisseur enregistré.' if updated else 'Revenu introuvable.', 'success' if updated else 'warning')
+    except Exception:
+        conn.rollback()
+        logger.exception('Erreur mise à jour du fournisseur du revenu %s', revenu_id)
+        flash("Impossible d'enregistrer le fournisseur.", 'danger')
+    return redirect(url_for('chiffre_affaire'))
+
+
 @app.route("/revenus/<int:revenu_id>/delete", methods=["POST"], endpoint="delete_revenu")
 @admin_required
 def delete_revenu(revenu_id):
@@ -6546,6 +6573,7 @@ def validate_client_revenue(client_id):
         amount_text = request.form.get("montant", "").strip()
         revenue_date = request.form.get("date", date.today().isoformat()).strip()
         revenue_source = request.form.get('revenue_source', '')
+        supplier_name = (request.form.get('supplier_name') or '').strip()[:160]
         if request.method == "POST" and not revenues:
             try:
                 amount = Decimal(amount_text.replace("\u202f", "").replace("\u00a0", "").replace(" ", "").replace(",", "."))
@@ -6566,7 +6594,7 @@ def validate_client_revenue(client_id):
                 error = "Attribuez un commercial au dossier avant de valider son chiffre d'affaires."
             if not error:
                 try:
-                    insert_revenue(cur, parsed_date, client["commercial"], client["name"], client_id, amount, revenue_source)
+                    insert_revenue(cur, parsed_date, client["commercial"], client["name"], client_id, amount, revenue_source, supplier_name or None)
                     conn.commit()
                 except Exception:
                     conn.rollback()
@@ -6586,7 +6614,7 @@ def validate_client_revenue(client_id):
         client.pop('direct_commission_rate', None)
     return render_template("client_validation.html", client=client, revenues=revenues,
                            amount_text=amount_text, revenue_date=revenue_date, revenue_source=revenue_source,
-                           error=error), (400 if error else 200)
+                           supplier_name=supplier_name, error=error), (400 if error else 200)
 
 
 # =========================

@@ -10,6 +10,25 @@ from commissions import parse_rate, commission_values, revenue_breakdown
 
 
 class CommissionTests(unittest.TestCase):
+    def test_supplier_edit_requires_admin_and_csrf(self):
+        with patch.object(crm, 'get_db') as db:
+            response = self.client('commercial').post('/revenus/1/supplier', data=dict(
+                csrf_token='test', supplier_name='Fournisseur'))
+            self.assertEqual(response.status_code, 302)
+            db.assert_not_called()
+            self.assertEqual(self.client().post('/revenus/1/supplier').status_code, 403)
+
+    def test_supplier_edit_preserves_ca_and_commission(self):
+        conn = MagicMock()
+        cur = conn.cursor.return_value.__enter__.return_value
+        with patch.object(crm, 'get_db', return_value=conn), patch.object(crm, 'ensure_commissions_schema'):
+            response = self.client().post('/revenus/8/supplier', data=dict(
+                csrf_token='test', supplier_name='  Fournisseur choisi  '))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(cur.execute.call_args.args,
+                         ('UPDATE revenus SET supplier_name = %s WHERE id = %s RETURNING id', ('Fournisseur choisi', 8)))
+        conn.commit.assert_called_once()
+
     def test_supplier_retention_before_commission(self):
         for source, net, commission, aleo in [('ade', '650', '195', '455'), ('direct', '500', '150', '350')]:
             initial, retained, actual_net = revenue_breakdown('1 000,00', source)

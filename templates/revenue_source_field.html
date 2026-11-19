@@ -1,9 +1,13 @@
 <div class="mb-3">
-    <label class="form-label" for="revenue-source">Origine du dossier</label>
+    <label class="form-label" for="revenue-source">Partenaire / origine du dossier</label>
     <select class="form-select" id="revenue-source" name="revenue_source" required>
         <option value="">Choisir l'origine</option>
         <option value="ade" {% if revenue_source|default('') == 'ade' %}selected{% endif %}>ADE{% if current_user and current_user.role == 'admin' %} — retenue de 35 %{% endif %}</option>
         <option value="direct" {% if revenue_source|default('') == 'direct' %}selected{% endif %}>Fournisseur en direct{% if current_user and current_user.role == 'admin' %} — retenue de 50 %{% endif %}</option>
     </select>
     <div class="form-text">Le CA sera calculé automatiquement selon l'origine choisie.</div>
+</div>
+<div class="mb-3">
+    <label class="form-label" for="supplier-name">Fournisseur choisi</label>
+    <input class="form-control" id="supplier-name" name="supplier_name" maxlength="160" value="{{ supplier_name|default('', true) }}" placeholder="Nom du fournisseur du contrat signé">
 </div>

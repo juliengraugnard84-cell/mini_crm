@@ -39,7 +39,7 @@ class ClientValidationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn('/chiffre-affaire?year=2026', response.location)
         self.assertEqual(self.inserts()[0].args[1],
-                         (date(2026, 11, 19), 'Alice', 'Dossier test', 42, Decimal('812.82'), 'ade', 'ade', Decimal('1250.50'), 'ade', Decimal('35'), 'Alice'))
+                         (date(2026, 11, 19), 'Alice', 'Dossier test', 42, Decimal('812.82'), 'ade', 'ade', Decimal('1250.50'), 'ade', Decimal('35'), None, 'Alice'))
         self.conn.commit.assert_called_once()
 
     def test_existing_ca_prevents_duplicate_submission(self):

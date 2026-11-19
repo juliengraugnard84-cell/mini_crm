@@ -34,7 +34,7 @@ try:
     ensure_commissions_schema(conn)
     with conn.cursor() as cur:
         cur.execute('UPDATE users SET commission_rate=30, direct_commission_rate=20 WHERE id=1')
-        insert_revenue(cur, date(2026, 11, 19), 'Alice', 'Test', 1, Decimal('1000'), 'ade')
+        insert_revenue(cur, date(2026, 11, 19), 'Alice', 'Test', 1, Decimal('1000'), 'ade', 'Fournisseur test')
         cur.execute('UPDATE users SET commission_rate=40 WHERE id=1')
         cur.execute('SELECT * FROM revenus')
         revenue = cur.fetchone()
@@ -62,11 +62,13 @@ try:
             assert '195.00' in html and '455.00' in html
             html = crm.commission_settings()
             assert '40.00' in html and 'Alice' in html
-            assert "Chiffre d'affaires" in crm.chiffre_affaire()
+            assert "Fournisseur test" in crm.chiffre_affaire()
             crm.session['user'] = dict(id=1, role='commercial', username='Alice')
             html = crm.commissions()
             assert '195.00' in html and 'Taux commercial' not in html
-            assert "Chiffre d'affaires" in crm.chiffre_affaire()
+            ca_html = crm.chiffre_affaire()
+            assert 'Fournisseur test' in ca_html and '195.00 EUR' in ca_html and 'ADE' in ca_html
+            assert '/supplier' not in ca_html and '/delete' not in ca_html
             with patch.object(crm, 'can_access_client', return_value=True):
                 html, status = crm.validate_client_revenue(1)
                 assert status == 200 and 'data-ade' not in html
