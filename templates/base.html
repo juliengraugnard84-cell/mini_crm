@@ -9,7 +9,7 @@
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='design.css') }}?v=15">
     <link rel="stylesheet" href="{{ url_for('static', filename='duplicate_alerts.css') }}?v=1">
-    <link rel="stylesheet" href="{{ url_for('static', filename='usability.css') }}?v=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='usability.css') }}?v=2">
 </head>
 
 <body class="crm-body role-{{ current_user.role if current_user and current_user.role else 'guest' }}{% if request.path.startswith('/admin/planning') or request.path.startswith('/planning') %} planning-page{% endif %}">

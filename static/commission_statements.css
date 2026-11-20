@@ -1,16 +1,17 @@
 .statement-page { display: grid; gap: 22px; color: #24344e; }
+.statement-page [hidden] { display: none !important; }
 .statement-page .statement-intro { margin: 0; color: #59677e; font-size: 15px; }
 .statement-page .statement-panel { background: #fff; border: 1px solid #e0e5ef; border-radius: 20px; padding: 24px; box-shadow: 0 6px 22px #263b6210; min-width: 0; }
 .statement-page h2, .statement-page h3, .statement-page p { margin: 0; }
 .statement-page .statement-panel-title { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .statement-page .statement-panel-title h2, .statement-page .statement-detail-heading h2 { font-size: 18px; font-weight: 750; }
 .statement-page .statement-panel-title span, .statement-page .statement-detail-heading span { color: #65738a; font-size: 13px; }
-.statement-page .statement-filters { display: grid; grid-template-columns: minmax(240px, 1.4fr) minmax(175px, .8fr) minmax(190px, 1fr) auto; gap: 18px; align-items: end; }
+.statement-page .statement-filters { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 18px; align-items: end; }
 .statement-page .statement-filters > div { min-width: 0; }
 .statement-page label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 650; color: #43516a; }
 .statement-page .form-select, .statement-page .form-control { width: 100%; min-height: 46px; border-radius: 10px; font-size: 14px; }
 .statement-page .statement-filters button { white-space: nowrap; border-radius: 10px; padding: 12px 18px; }
-.role-commercial .statement-page .statement-filters { grid-template-columns: minmax(240px, 1.4fr) minmax(175px, 1fr) auto; }
+.role-commercial .statement-page .statement-filters { grid-template-columns: repeat(2, minmax(175px, 1fr)); }
 .statement-page .statement-result-heading { display: flex; justify-content: space-between; gap: 20px; align-items: center; }
 .statement-page .statement-eyebrow { display: block; color: #64738c; font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
 .statement-page .statement-result-heading h2 { font-size: 27px; font-weight: 750; }
@@ -43,8 +44,15 @@
 .statement-page .statement-table th { background: #f5f7fb; color: #65738a; font-size: 11px; font-weight: 700; text-align: left; padding: 14px 16px; }
 .statement-page .statement-table td { padding: 16px; border-top: 1px solid #edf0f5; vertical-align: top; line-height: 1.5; }
 .statement-page .statement-table td:first-child { min-width: 200px; font-weight: 600; }
-.statement-page .statement-table th:nth-last-child(-n+3), .statement-page .statement-table td:nth-last-child(-n+3) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.statement-page .statement-table td:last-child { font-weight: 700; }
+.statement-page .statement-table th:nth-child(n+7):nth-child(-n+9), .statement-page .statement-table td:nth-child(n+7):nth-child(-n+9) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.statement-page .statement-table td:nth-child(9) { font-weight: 700; }
+.statement-page .statement-selection-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.statement-page .statement-selection-actions button { padding: 6px 9px; font-size: 12px; }
+.statement-page .statement-tracking-note { margin-top: 18px; color: #65738a; font-size: 13px; line-height: 1.6; }
+.statement-page .statement-payment { min-width: 230px; }
+.statement-page .statement-payment summary { cursor: pointer; margin-top: 10px; color: #244d82; }
+.statement-page .statement-payment form { display: grid; gap: 8px; margin-top: 12px; }
+.statement-page .statement-payment label { margin: 0; }
 .statement-page .statement-empty { text-align: center; padding: 38px 24px; }
 .statement-page .statement-empty-icon { display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: #edf1f8; color: #7b8da7; font-size: 30px; margin-bottom: 16px; }
 .statement-page .statement-empty h3 { font-size: 18px; margin-bottom: 9px; }

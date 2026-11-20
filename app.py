@@ -17,7 +17,7 @@ import json
 import hashlib
 from decimal import Decimal, InvalidOperation
 from commissions import ensure_commissions_schema, parse_rate, insert_revenue, commission_values, revenue_breakdown, contract_details
-from commission_statements import build_statement, statement_notes, pdf_statement, xlsx_statement
+from commission_statements import build_statement, statement_notes, pdf_statement, xlsx_statement, parse_payment
 from markupsafe import Markup, escape
 from duplicate_detection import ACTIVE_STATUSES, match_reasons, is_blocking_match, normalize_name, normalize_reference
 from client_groups import ensure_client_groups_schema, attach_client_group, load_group_summaries, is_groupable
@@ -2813,33 +2813,84 @@ def commission_statements():
         abort(403)
     mode = request.args.get('mode', 'monthly')
     month = request.args.get('month', date.today().strftime('%Y-%m'))
+    end_month = request.args.get('end_month') or month
     export = request.args.get('format', '')
-    if export not in ('', 'pdf', 'xlsx'):
+    if export not in ('', 'pdf', 'xlsx', 'json'):
         abort(400)
-    commercial = (request.args.get('commercial') or '').strip() if user['role'] == 'admin' else user.get('username')
-    if user['role'] == 'commercial' and not commercial:
+    selected_commercials = list(dict.fromkeys(value.strip() for value in request.args.getlist('commercial') if value.strip())) if user['role'] == 'admin' else [user.get('username')]
+    if user['role'] == 'commercial' and not selected_commercials[0]:
         abort(403)
     try:
-        build_statement([], mode, month, '')
+        build_statement([], mode, month, '', end_month)
     except ValueError as error:
         return str(error), 400
     conn = get_db()
     ensure_commissions_schema(conn)
+    commercial_options = []
     with conn.cursor() as cur:
+        if user['role'] == 'admin' and not export:
+            cur.execute("""SELECT username AS name FROM users WHERE role = 'commercial'
+                           UNION SELECT commercial AS name FROM revenus WHERE commercial IS NOT NULL AND commercial <> ''
+                           ORDER BY name""")
+            commercial_options = [row['name'] for row in cur.fetchall()]
+        where = ''
+        if len(selected_commercials) == 1:
+            where = 'WHERE r.commercial = %s '
+        elif selected_commercials:
+            where = 'WHERE r.commercial IN (' + ', '.join(['%s'] * len(selected_commercials)) + ') '
         cur.execute('''SELECT r.*, COALESCE(c.name, r.dossier) AS client_name
                        FROM revenus r LEFT JOIN crm_clients c ON c.id = r.client_id
-                       ''' + ('WHERE r.commercial = %s ' if commercial else '') + 'ORDER BY r.commercial, r.id',
-                    (commercial,) if commercial else ())
+                       ''' + where + 'ORDER BY r.commercial, r.id', tuple(selected_commercials))
         rows = cur.fetchall()
-    statement = build_statement(rows, mode, month, commercial or 'Tous les commerciaux')
+    statement = build_statement(rows, mode, month, ', '.join(selected_commercials) or 'Tous les commerciaux', end_month)
+    if export == 'json':
+        response = jsonify({key: str(statement[key]) if isinstance(statement[key], Decimal) else statement[key]
+                            for key in ('gross_total', 'net_total', 'total', 'paid', 'outstanding',
+                                        'missing_signature', 'pending', 'incomplete', 'missing_gross_count', 'period_rows')})
+        response.headers['Cache-Control'] = 'private, no-store'
+        return response
     if export:
+        if (statement['missing_signature'] or statement['pending'] or statement['incomplete']) and request.args.get('acknowledge') != '1':
+            return render_template('statement_export_warning.html', statement=statement, notes=statement_notes(statement),
+                                   export=export, commercial=selected_commercials)
         stream = pdf_statement(statement) if export == 'pdf' else xlsx_statement(statement)
         mimetype = 'application/pdf' if export == 'pdf' else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        response = send_file(stream, as_attachment=True, download_name=f'releve-commissions-{mode}-{month}.{export}', mimetype=mimetype)
+        period_filename = month if month == end_month else f'{month}-{end_month}'
+        response = send_file(stream, as_attachment=True, download_name=f'releve-commissions-{mode}-{period_filename}.{export}', mimetype=mimetype)
         response.headers['Cache-Control'] = 'private, no-store'
         return response
     return render_template('commission_statements.html', statement=statement, notes=statement_notes(statement),
-                           commercial=commercial or '')
+                           commercial=selected_commercials, selected_commercials=selected_commercials,
+                           commercial_options=commercial_options)
+
+
+@app.route('/admin/commissions/revenus/<int:revenue_id>/reglement', methods=['POST'])
+@admin_required
+def update_commission_payment(revenue_id):
+    target = url_for('commission_statements', mode=request.form.get('mode', 'monthly'),
+                     month=request.form.get('month'), end_month=request.form.get('end_month'),
+                     commercial=request.form.getlist('commercial'))
+    try:
+        status, invoiced, paid = parse_payment(request.form)
+    except ValueError as error:
+        flash(str(error), 'danger')
+        return redirect(target)
+    conn = get_db()
+    ensure_commissions_schema(conn)
+    try:
+        with conn.cursor() as cur:
+            cur.execute('''UPDATE revenus SET payment_status = %s, invoiced_on = %s, paid_on = %s
+                           WHERE id = %s AND commission_rate IS NOT NULL AND aleo_rate IS NOT NULL RETURNING id''',
+                        (status, invoiced, paid, revenue_id))
+            updated = cur.fetchone()
+        conn.commit()
+        flash('Suivi du règlement enregistré.' if updated else 'Dossier introuvable ou commission non calculée.',
+              'success' if updated else 'danger')
+    except Exception:
+        conn.rollback()
+        logger.exception('Erreur de suivi du règlement')
+        flash("Impossible d'enregistrer le règlement. Réessayez.", 'danger')
+    return redirect(target)
 
 
 @app.route('/commissions')

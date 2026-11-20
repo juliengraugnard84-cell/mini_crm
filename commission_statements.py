@@ -5,11 +5,35 @@ from decimal import Decimal
 from io import BytesIO
 from xml.sax.saxutils import escape
 from zipfile import ZipFile, ZIP_DEFLATED
+import re
 
 from commissions import commission_values
 
 ENERGIES = {'electricite': 'Électricité', 'gaz': 'Gaz', 'electricite_gaz': 'Électricité et gaz'}
 PARTNERS = {'ade': 'ADE', 'direct': 'Fournisseur en direct'}
+PAYMENT_STATUSES = {'to_invoice': 'À facturer', 'invoiced': 'Facturé', 'paid': 'Payé'}
+
+
+def parse_payment(form):
+    status = form.get('payment_status')
+    if status not in PAYMENT_STATUSES:
+        raise ValueError('Choisissez un statut de règlement valide.')
+    try:
+        invoiced = date.fromisoformat(form['invoiced_on']) if form.get('invoiced_on') else None
+        paid = date.fromisoformat(form['paid_on']) if form.get('paid_on') else None
+    except ValueError:
+        raise ValueError('Date de facture ou de règlement invalide.')
+    if status == 'to_invoice' and (invoiced or paid):
+        raise ValueError('Effacez les dates pour remettre le dossier à facturer.')
+    if status in ('invoiced', 'paid') and not invoiced:
+        raise ValueError('Renseignez la date de facture.')
+    if status == 'invoiced' and paid:
+        raise ValueError('Choisissez Payé ou effacez la date de règlement.')
+    if status == 'paid' and (not paid or paid < invoiced):
+        raise ValueError('La date de règlement est obligatoire et doit suivre la date de facture.')
+    if any(value and value > date.today() for value in (invoiced, paid)):
+        raise ValueError('Les dates de facture et de règlement ne peuvent pas être futures.')
+    return status, invoiced, paid
 
 
 def payment_date(signed_on):
@@ -18,15 +42,23 @@ def payment_date(signed_on):
     return date(month_index // 12, month_index % 12 + 1, 1)
 
 
-def build_statement(rows, mode, month, scope):
+def build_statement(rows, mode, month, scope, end_month=None):
     if mode not in ('monthly', 'billing'):
         raise ValueError('Type de relevé invalide.')
+    end_month = end_month or month
     try:
+        if not all(re.fullmatch(r'\d{4}-\d{2}', value) for value in (month, end_month)):
+            raise ValueError()
         period = date.fromisoformat(month + '-01')
+        end_period = date.fromisoformat(end_month + '-01')
     except (ValueError, TypeError):
         raise ValueError('Choisissez un mois au format AAAA-MM.')
+    if end_period < period:
+        raise ValueError('Le mois de fin doit être égal ou postérieur au mois de début.')
     groups = OrderedDict()
     missing_signature = pending = incomplete = 0
+    gross_total = net_total = Decimal('0')
+    missing_gross_count = period_rows = 0
     for raw in rows:
         row = dict(raw)
         signed = row.get('signed_on')
@@ -35,38 +67,51 @@ def build_statement(rows, mode, month, scope):
             continue
         due = payment_date(signed)
         selected = signed if mode == 'monthly' else due
-        if (selected.year, selected.month) != (period.year, period.month):
+        if not (period.year, period.month) <= (selected.year, selected.month) <= (end_period.year, end_period.month):
             continue
+        period_rows += 1
+        net_total += Decimal(str(row['montant']))
+        if row.get('initial_amount') is None:
+            missing_gross_count += 1
+        else:
+            gross_total += Decimal(str(row['initial_amount']))
+        if not row.get('supplier_name') or not row.get('energy_type') or row.get('initial_amount') is None:
+            incomplete += 1
         values = commission_values(row)
         if values is None:
             pending += 1
             if mode == 'billing':
                 continue
-        if not row.get('supplier_name') or not row.get('energy_type') or row.get('initial_amount') is None:
-            incomplete += 1
         name = row.get('commercial') or 'Non attribué'
         group = groups.setdefault(name, dict(name=name, rows=[], gross=Decimal('0'), net=Decimal('0'),
-                                            commission=Decimal('0'), missing_gross=0))
+                                            commission=Decimal('0'), paid=Decimal('0'), outstanding=Decimal('0'), missing_gross=0))
         # Whitelist export fields: no configuration rates or admin-only balance.
         item = dict(id=row['id'], dossier=row.get('client_name') or row.get('dossier') or 'Sans dossier',
                     signed_on=signed, payable_on=due, supplier=row.get('supplier_name') or 'Non renseigné',
                     energy=ENERGIES.get(row.get('energy_type'), 'Non renseignée'),
                     partner=PARTNERS.get(row.get('revenue_source'), 'Non renseigné'),
                     gross=Decimal(str(row['initial_amount'])) if row.get('initial_amount') is not None else None,
-                    net=Decimal(str(row['montant'])), commission=values[0] if values else None)
+                    net=Decimal(str(row['montant'])), commission=values[0] if values else None,
+                    payment_status=row.get('payment_status') or 'to_invoice',
+                    invoiced_on=row.get('invoiced_on'), paid_on=row.get('paid_on'))
+        item['payment_label'] = PAYMENT_STATUSES[item['payment_status']]
         group['rows'].append(item)
         group['net'] += item['net']
         group['commission'] += item['commission'] or 0
+        group['paid' if item['payment_status'] == 'paid' else 'outstanding'] += item['commission'] or 0
         if item['gross'] is None:
             group['missing_gross'] += 1
         else:
             group['gross'] += item['gross']
     for group in groups.values():
         group['rows'].sort(key=lambda row: (row['signed_on'], row['id']))
-    return dict(mode=mode, month=month, scope=scope, groups=list(groups.values()),
-                title='Relevé mensuel de commissions' if mode == 'monthly' else 'Relevé de commissions à facturer',
+    return dict(mode=mode, month=month, end_month=end_month, period_label=month if month == end_month else f'{month} à {end_month}', scope=scope, groups=list(groups.values()),
+                title=('Relevé mensuel de commissions' if month == end_month else 'Relevé de commissions sur la période') if mode == 'monthly' else 'Relevé des échéances de commissions',
                 missing_signature=missing_signature, pending=pending, incomplete=incomplete,
-                total=sum((g['commission'] for g in groups.values()), Decimal('0')))
+                gross_total=gross_total, net_total=net_total, missing_gross_count=missing_gross_count, period_rows=period_rows,
+                total=sum((g['commission'] for g in groups.values()), Decimal('0')),
+                paid=sum((g['paid'] for g in groups.values()), Decimal('0')),
+                outstanding=sum((g['outstanding'] for g in groups.values()), Decimal('0')))
 
 
 def statement_notes(statement):
@@ -107,11 +152,27 @@ def pdf_statement(statement):
         return Paragraph(escape(str(text)), styles[style])
     def money(value):
         return 'Non calculée' if value is None else f'{value:,.2f} EUR'.replace(',', ' ')
+    story.extend([paragraph('ALÉO CONSEILS', 'Heading2'), paragraph('Récapitulatif des commissions', 'Title'),
+                  paragraph(f"Période : {statement['period_label']} | {statement['scope']}", 'Heading3')])
+    for note in statement_notes(statement):
+        story.append(paragraph(note))
+    story.append(Spacer(1, 14))
+    summary = [[paragraph(h, 'HeadSmall') for h in ['Commercial', 'Dossiers', 'Commissions', 'Payé', 'Reste à payer']]]
+    for group in statement['groups']:
+        summary.append([paragraph(group['name']), paragraph(len(group['rows'])), paragraph(money(group['commission'])),
+                        paragraph(money(group['paid'])), paragraph(money(group['outstanding']))])
+    summary.append([paragraph('TOTAL GÉNÉRAL'), paragraph(sum(len(g['rows']) for g in statement['groups'])),
+                    paragraph(money(statement['total'])), paragraph(money(statement['paid'])), paragraph(money(statement['outstanding']))])
+    recap = Table(summary, colWidths=[doc.width * ratio for ratio in (.30, .10, .20, .20, .20)], repeatRows=1)
+    recap.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#173750')),
+                              ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#DCEAEF')),
+                              ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                              ('TOPPADDING', (0, 0), (-1, -1), 9), ('BOTTOMPADDING', (0, 0), (-1, -1), 9)]))
+    story.extend([recap, Spacer(1, 12), paragraph('Le suivi des règlements est déclaratif. Les anciens dossiers sont à vérifier avant de considérer le reste à payer comme définitif.')])
     for index, group in enumerate(statement['groups'] or [None]):
-        if index:
-            story.append(PageBreak())
+        story.append(PageBreak())
         story.extend([paragraph('ALÉO CONSEILS', 'Heading2'), paragraph(statement['title'], 'Title'),
-                      paragraph(f"Période : {statement['month']} | Commercial : {group['name'] if group else statement['scope']}", 'Heading3')])
+                      paragraph(f"Période : {statement['period_label']} | Commercial : {group['name'] if group else statement['scope']}", 'Heading3')])
         for note in statement_notes(statement):
             story.append(paragraph(note))
         story.append(Spacer(1, 14))
@@ -121,10 +182,15 @@ def pdf_statement(statement):
         data = [[paragraph(h, 'HeadSmall') for h in HEADERS]]
         for row in group['rows']:
             values = detail_values(row)
+            values[0] += ' | ' + row['payment_label']
+            if row['invoiced_on']:
+                values[0] += ' | Facture : ' + row['invoiced_on'].strftime('%d/%m/%Y')
+            if row['paid_on']:
+                values[0] += ' | Règlement : ' + row['paid_on'].strftime('%d/%m/%Y')
             data.append([paragraph(money(v) if i >= 6 and v is not None else ('Non renseigné' if i == 6 and v is None else 'Non calculée' if v is None else v)) for i, v in enumerate(values)])
         data.append([paragraph('TOTAL'), '', '', '', '', '', paragraph(money(group['gross']) + (' *' if group['missing_gross'] else '')),
                      paragraph(money(group['net'])), paragraph(money(group['commission']))])
-        table = Table(data, colWidths=[153, 56, 56, 75, 66, 110, 92, 88, 89], repeatRows=1)
+        table = Table(data, colWidths=[doc.width * width / 685 for width in [121, 62, 62, 60, 60, 98, 76, 73, 73]], repeatRows=1)
         table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#173750')),
                                   ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F0F5F8')]),
                                   ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#DCEAEF')),
@@ -147,7 +213,7 @@ def xlsx_statement(statement):
     """Portable XLSX export for the deployed Flask server, with no desktop runtime dependency."""
     # Strings are inline cells (never formulas), including user-supplied dossier names.
     ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
-    rows = [[statement['title']], [f"Période : {statement['month']} | {statement['scope']}"]]
+    rows = [[statement['title']], [f"Période : {statement['period_label']} | {statement['scope']}"]]
     rows += [[note] for note in statement_notes(statement)]
     rows += [[], ['Commercial'] + HEADERS]
     header_row = len(rows)

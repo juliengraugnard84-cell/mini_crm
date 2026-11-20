@@ -29,6 +29,9 @@ def ensure_commissions_schema(conn):
         cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS supplier_name TEXT')
         cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS signed_on DATE')
         cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS energy_type TEXT')
+        cur.execute("ALTER TABLE revenus ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'to_invoice' CHECK (payment_status IN ('to_invoice', 'invoiced', 'paid'))")
+        cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS invoiced_on DATE')
+        cur.execute('ALTER TABLE revenus ADD COLUMN IF NOT EXISTS paid_on DATE')
     conn.commit()
 
 

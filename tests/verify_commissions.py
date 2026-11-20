@@ -78,7 +78,26 @@ try:
             html = crm.commission_statements()
             assert '195.00 EUR' in html and '17/11/2026' in html and '01/01/2027' in html
             assert 'Fournisseur test' in html and 'Gaz' in html and 'Bob' not in html
-    print('OK: migration, snapshot preservation, commission totals and templates on local PostgreSQL')
+    with crm.app.test_request_context('/admin/commissions/revenus/1/reglement', method='POST', data={
+            'payment_status': 'paid', 'invoiced_on': '2020-01-01', 'paid_on': '2020-01-02',
+            'month': '2026-11', 'end_month': '2026-12'}):
+        crm.session['user'] = dict(id=1, role='admin', username='admin')
+        with patch.object(crm, 'get_db', return_value=conn):
+            assert crm.update_commission_payment(1).status_code == 302
+    with conn.cursor() as cur:
+        cur.execute('SELECT * FROM revenus WHERE id=1')
+        saved = cur.fetchone()
+        assert saved['payment_status'] == 'paid'
+        assert saved['invoiced_on'] == date(2020, 1, 1) and saved['paid_on'] == date(2020, 1, 2)
+        assert commission_values(saved) == (Decimal('195'), Decimal('455'))
+    with crm.app.test_request_context('/commissions/releves?month=2026-11&end_month=2026-12&commercial=Alice&commercial=Bob'):
+        crm.session['user'] = dict(id=1, role='admin', username='admin')
+        with patch.object(crm, 'get_db', return_value=conn), patch.object(crm, 'render_template', side_effect=render):
+            html = crm.commission_statements()
+            assert 'Tout sélectionner' in html and 'Tout décocher' in html
+            assert 'Modifier le suivi' in html and '02/01/2020' in html
+            assert 'end_month=2026-12' in html
+    print('OK: migrations, preserved amounts, persisted payments, multi-month selection and templates on local PostgreSQL')
 finally:
     conn.rollback()
     with conn.cursor() as cur:

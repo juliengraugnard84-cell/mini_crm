@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Vérifier le relevé avant export{% endblock %}
+{% block content %}
+<section class="card card-body">
+    <h1>Vérifier le relevé avant export</h1>
+    <p>{{ statement.period_label }} · {{ statement.scope }}</p>
+    <div class="alert alert-warning">
+        <p>Ce relevé contient des informations manquantes. Les commissions non calculées sont exclues du total et les revenus sans signature sont exclus du relevé.</p>
+        <ul>{% for note in notes[3:] %}<li>{{ note }}</li>{% endfor %}</ul>
+    </div>
+    <div class="d-flex flex-wrap gap-3">
+        <a class="btn btn-outline-primary" href="{{ url_for('commission_statements', mode=statement.mode, month=statement.month, end_month=statement.end_month, commercial=commercial) }}">Revenir au relevé</a>
+        {% if current_user.role == 'admin' %}<a class="btn btn-outline-primary" href="{{ url_for('chiffre_affaire') }}">Compléter les informations</a>{% endif %}
+        <a class="btn btn-primary" href="{{ url_for('commission_statements', mode=statement.mode, month=statement.month, end_month=statement.end_month, commercial=commercial, format=export, acknowledge='1') }}">Exporter malgré les informations manquantes ({{ export|upper }})</a>
+    </div>
+</section>
+{% endblock %}
