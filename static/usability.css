@@ -21,7 +21,12 @@
 .crm-disclosure > summary { cursor: pointer; font-weight: 700; color: #304762; }
 .crm-disclosure[open] > summary { margin-bottom: 18px; }
 .crm-disclosure form { margin-bottom: 0; }
+.crm-board-item { position: relative; }
 .crm-board-name { font-weight: 750; color: #253a57; text-decoration: none; overflow-wrap: anywhere; }
+/* Extend the native link over the card, keeping status controls above it. */
+.crm-board-name::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: 18px; }
+.crm-board-name:focus-visible::after { outline: 3px solid #253a57; outline-offset: 3px; }
+.crm-board-form { position: relative; z-index: 2; }
 .crm-board-name:hover { text-decoration: underline; }
 .crm-dashboard-hero { grid-template-columns: 1fr; padding: 28px; }
 .crm-dashboard-hero-main h1 { font-size: clamp(24px, 2.5vw, 34px); }
