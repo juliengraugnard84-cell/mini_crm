@@ -135,8 +135,8 @@ PLANNING_SOURCE_STYLES = {
     "update": {"label": "Suivi client", "color": "#08133f"},
 }
 
-# Max upload (MB) — configurable via Config.MAX_UPLOAD_MB sinon 10MB
-MAX_UPLOAD_MB = getattr(Config, "MAX_UPLOAD_MB", 10)
+# Taille totale par envoi, configurable via MAX_UPLOAD_MB.
+MAX_UPLOAD_MB = Config.MAX_UPLOAD_MB
 
 # Debug pilotable (évite debug=True “par erreur” en prod)
 DEBUG = getattr(Config, "DEBUG", False)
@@ -186,6 +186,20 @@ if is_production:
 
 # Limite upload (évite DOS)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+
+
+@app.errorhandler(413)
+def upload_too_large(error):
+    limit_mb = app.config["MAX_CONTENT_LENGTH"] / (1024 * 1024)
+    message = (
+        f"L’envoi dépasse la limite de {limit_mb:g} Mo au total. "
+        "Envoyez moins de documents à la fois ou réduisez leur taille, puis réessayez."
+    )
+    if request.is_json or request.accept_mimetypes.best == "application/json":
+        return jsonify(error="upload_too_large", message=message), 413
+    # Évite les context processors : ils peuvent relire le formulaire rejeté.
+    template = app.jinja_env.get_template("upload_too_large.html")
+    return template.render(message=message), 413
 
 ###########################################################
 # 3. BASE DE DONNÉES (POSTGRESQL – PROD SAFE)

@@ -105,4 +105,5 @@ class Config:
     # =========================
     # Upload
     # =========================
-    MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 10))
+    # Limite totale par requête (tous les documents d'un même envoi).
+    MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 50))
