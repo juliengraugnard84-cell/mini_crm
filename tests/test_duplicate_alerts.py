@@ -8,6 +8,11 @@ import app as crm
 
 
 class DuplicateTests(unittest.TestCase):
+    def setUp(self):
+        active_session = patch.object(crm, 'session_user_is_active', return_value=True)
+        active_session.start()
+        self.addCleanup(active_session.stop)
+
     def test_extended_name_warns_without_counting_as_identical_name(self):
         candidate = dict(names=['Societe Energie - Site Paris'], sirets=['123'], references=['001'])
         existing = dict(names=['Societe Energie'], sirets=['123'], references=['001'])

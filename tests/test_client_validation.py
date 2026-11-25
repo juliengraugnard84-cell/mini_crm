@@ -10,6 +10,9 @@ import app as crm
 
 class ClientValidationTests(unittest.TestCase):
     def setUp(self):
+        active_session = patch.object(crm, 'session_user_is_active', return_value=True)
+        active_session.start()
+        self.addCleanup(active_session.stop)
         self.conn = MagicMock()
         self.cur = self.conn.cursor.return_value.__enter__.return_value
         self.cur.fetchone.return_value = dict(id=42, name='Dossier test', status='gagne',

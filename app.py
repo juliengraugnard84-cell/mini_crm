@@ -1136,7 +1136,8 @@ def can_access_client(client_id: int) -> bool:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT owner_id FROM crm_clients WHERE id = %s",
+                """SELECT c.owner_id FROM crm_clients c JOIN users u ON u.id = c.owner_id
+                   WHERE c.id = %s AND u.role IN ('admin', 'commercial')""",
                 (client_id_int,),
             )
             row = cur.fetchone()
@@ -1838,7 +1839,7 @@ def planning_event_can_edit(event_row, user) -> bool:
     if role == "admin":
         return True
 
-    return bool(user_id and event_row.get("created_by") == user_id)
+    return bool(event_row.get('visibility') != 'admin' and user_id and event_row.get("created_by") == user_id)
 
 
 def planning_event_can_view(event_row, user) -> bool:
@@ -1855,6 +1856,8 @@ def planning_event_can_view(event_row, user) -> bool:
         return False
 
     visibility = event_row.get("visibility") or "private"
+    if visibility == 'admin':
+        return False
 
     return (
         event_row.get("created_by") == user_id
@@ -2222,6 +2225,13 @@ def planning_required(func):
 # CSRF — VERSION SAFE (sans casser l’existant)
 ############################################################
 
+def session_user_is_active(user_id):
+    """Check persisted account state so old signed cookies cannot restore access."""
+    with get_db().cursor() as cur:
+        cur.execute("SELECT 1 FROM users WHERE id = %s AND role <> 'inactive'", (user_id,))
+        return cur.fetchone() is not None
+
+
 @app.before_request
 def csrf_protect():
     """
@@ -2233,6 +2243,12 @@ def csrf_protect():
 
     if session.get("user") and not session.permanent:
         session.permanent = True
+
+    # A departed commercial must also lose access through existing sessions.
+    if session.get('user') and request.endpoint != 'static':
+        if not session_user_is_active(session['user'].get('id')):
+            session.clear()
+            return redirect(url_for('login'))
 
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
@@ -2359,7 +2375,7 @@ def login():
             user = cur.fetchone()
 
         # Sécurité : aucun crash possible ici
-        if not user:
+        if not user or user['role'] == 'inactive':
             flash("Identifiants incorrects.", "danger")
             return render_template("login.html")
 
@@ -3171,26 +3187,39 @@ def admin_delete_user(user_id):
         return redirect(url_for("admin_users"))
 
     conn = get_db()
+    ensure_hot_followups_schema()
+    ensure_planning_schema()
+    ensure_cspe_schema()
 
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id FROM users WHERE id=%s",
+            "SELECT id, username, role FROM users WHERE id=%s FOR UPDATE",
             (user_id,)
         )
-        if not cur.fetchone():
+        departing_user = cur.fetchone()
+        if not departing_user:
             flash("Utilisateur introuvable.", "danger")
             return redirect(url_for("admin_users"))
 
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM users WHERE id=%s",
-                (user_id,)
-            )
+            if departing_user['role'] in ('commercial', 'inactive'):
+                # Retain the user row: deleting it cascades historical follow-ups.
+                cur.execute("""UPDATE calendar_events SET visibility = 'admin'
+                               WHERE id IN (SELECT f.calendar_event_id FROM client_hot_followups f
+                                            JOIN crm_clients c ON c.id = f.client_id
+                                            WHERE c.owner_id = %s)""", (user_id,))
+                # Ownership references retain the former commercial's identity.
+                # The Commun view includes owners whose account is inactive;
+                # assigning an active owner removes the dossier from that view.
+                cur.execute("UPDATE users SET role = 'inactive' WHERE id = %s", (user_id,))
+            else:
+                cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
 
         conn.commit()
 
-        flash("Utilisateur supprimé.", "success")
+        flash("Commercial désactivé. Ses dossiers sont dans Commun et leurs historiques sont conservés."
+              if departing_user['role'] in ('commercial', 'inactive') else "Utilisateur supprimé.", "success")
 
     except Exception as e:
         conn.rollback()
@@ -3198,6 +3227,25 @@ def admin_delete_user(user_id):
         flash("Erreur lors de la suppression.", "danger")
 
     return redirect(url_for("admin_users"))
+
+
+@app.route('/admin/dossiers-communs')
+@admin_required
+def admin_common_dossiers():
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute("""SELECT c.*, COALESCE(u.username, c.commercial) AS former_commercial
+                       FROM crm_clients c LEFT JOIN users u ON u.id = c.owner_id
+                       WHERE c.owner_id IS NULL OR u.id IS NULL OR u.role = 'inactive'
+                       ORDER BY c.created_at DESC, c.id DESC""")
+        dossiers = cur.fetchall()
+        cur.execute("""SELECT c.*, u.username AS former_commercial
+                       FROM cspe_dossiers c LEFT JOIN users u ON u.id = c.owner_id
+                       WHERE c.owner_id IS NULL OR u.id IS NULL OR u.role = 'inactive'
+                       ORDER BY c.created_at DESC, c.id DESC""")
+        cspe_dossiers = cur.fetchall()
+    return render_template('admin_common_dossiers.html', dossiers=dossiers,
+                           cspe_dossiers=cspe_dossiers)
 
 
 # =========================================================
@@ -3434,6 +3482,91 @@ def admin_dossiers():
         stats=stats,
         hot_followups_by_commercial=hot_followups_by_commercial,
     )
+
+
+@app.route('/dossiers-perdus/export.pdf')
+@login_required
+def export_lost_dossiers_pdf():
+    """Global admin export, or an owner-scoped archive for a commercial."""
+    from lost_dossiers import pdf_lost_dossiers
+
+    user = session.get('user') or {}
+    if user.get('role') not in {'admin', 'commercial'}:
+        abort(403)
+    selected = request.args.get('commercial_id', '').strip()
+    if selected and (not selected.isdecimal() or int(selected) <= 0):
+        abort(400)
+    owner_id = int(selected) if selected else None
+    if user['role'] == 'commercial':
+        if owner_id is not None and owner_id != int(user['id']):
+            abort(403)
+        owner_id = int(user['id'])
+
+    conn = get_db()
+    scope = 'Tous les commerciaux (y compris les dossiers non attribués)'
+    with conn.cursor() as cur:
+        if owner_id is not None:
+            cur.execute('SELECT username FROM users WHERE id = %s', (owner_id,))
+            owner = cur.fetchone()
+            if not owner:
+                abort(404)
+            scope = owner['username']
+        condition = "LOWER(TRIM(COALESCE(c.status, ''))) = 'perdu'"
+        params = ()
+        if owner_id is not None:
+            condition += ' AND c.owner_id = %s'
+            params = (owner_id,)
+        cur.execute(f'''SELECT c.*, u.username AS owner_name FROM crm_clients c
+                        LEFT JOIN users u ON u.id = c.owner_id
+                        WHERE {condition}
+                        ORDER BY COALESCE(u.username, c.commercial, ''), c.created_at, c.id''', params)
+        clients_rows = cur.fetchall()
+
+    dossiers = {row['id']: dict(client=dict(row), documents=[], cotations=[],
+                               updates=[], followups=[], revenues=[]) for row in clients_rows}
+    if dossiers:
+        ensure_hot_followups_schema()
+        with conn.cursor() as cur:
+            for table, section, ordering in [
+                ('cotations', 'cotations', 'date_creation, id'),
+                ('client_updates', 'updates', 'update_date, id'),
+                ('client_hot_followups', 'followups', 'follow_up_date, id'),
+                ('revenus', 'revenues', 'date, id'),
+            ]:
+                cur.execute(f'SELECT * FROM {table} WHERE client_id = ANY(%s) ORDER BY {ordering}',
+                            (list(dossiers),))
+                rows = cur.fetchall()
+                if section == 'cotations':
+                    rows = enrich_cotations_with_delivery_points(conn, rows)
+                for row in rows:
+                    dossiers[row['client_id']][section].append(dict(row))
+        # One paginated inventory for the entire export; do not turn storage errors
+        # into a misleading "no documents" assertion.
+        try:
+            if not LOCAL_MODE and (not s3 or not AWS_BUCKET):
+                raise RuntimeError('Document storage is unavailable')
+            items = (list_local_storage_objects('clients/') if LOCAL_MODE
+                     else s3_list_all_objects(AWS_BUCKET, prefix='clients/'))
+            for item in items:
+                key = item.get('Key') or ''
+                client_id = extract_client_id_from_s3_key(key)
+                if key.endswith('/') or client_id not in dossiers:
+                    continue
+                dossiers[client_id]['documents'].append(dict(
+                    name=key.rsplit('/', 1)[-1], key=key, size=item.get('Size', 0),
+                    modified=item.get('LastModified')))
+            for dossier in dossiers.values():
+                dossier['documents'].sort(key=lambda document: document['key'].casefold())
+        except Exception:
+            logger.exception('Inventaire des documents indisponible pour export dossiers perdus')
+            for dossier in dossiers.values():
+                dossier['documents'] = None
+
+    response = send_file(pdf_lost_dossiers(list(dossiers.values()), scope),
+                         mimetype='application/pdf', as_attachment=True,
+                         download_name=f'dossiers-perdus-{owner_id or "global"}-{date.today().isoformat()}.pdf')
+    response.headers['Cache-Control'] = 'private, no-store'
+    return response
 
 
 ############################################################
@@ -4495,7 +4628,7 @@ def api_planning_events():
                     WHERE cotations.date_negociation IS NOT NULL
                       AND cotations.date_negociation >= %s
                       AND cotations.date_negociation < %s
-                      AND COALESCE(crm_clients.owner_id, cotations.created_by) = %s
+                      AND crm_clients.owner_id = %s
                 """, (start_date, end_date, user_id))
 
             cotations = cur.fetchall()
@@ -4534,6 +4667,9 @@ def api_planning_events():
                       AND update_date >= %s
                       AND update_date < %s
                       AND commercial_id = %s
+                      AND EXISTS (SELECT 1 FROM crm_clients c
+                                  WHERE c.id = client_updates.client_id
+                                    AND c.owner_id = client_updates.commercial_id)
                 """, (start_date, end_date, user_id))
 
             updates = cur.fetchall()

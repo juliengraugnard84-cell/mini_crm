@@ -10,6 +10,11 @@ from commissions import parse_rate, commission_values, revenue_breakdown
 
 
 class CommissionTests(unittest.TestCase):
+    def setUp(self):
+        active_session = patch.object(crm, 'session_user_is_active', return_value=True)
+        active_session.start()
+        self.addCleanup(active_session.stop)
+
     def test_supplier_edit_requires_admin_and_csrf(self):
         with patch.object(crm, 'get_db') as db:
             response = self.client('commercial').post('/revenus/1/supplier', data=dict(

@@ -14,6 +14,11 @@ from commissions import contract_details
 
 
 class StatementTests(unittest.TestCase):
+    def setUp(self):
+        active_session = patch.object(crm, 'session_user_is_active', return_value=True)
+        active_session.start()
+        self.addCleanup(active_session.stop)
+
     def row(self, **changes):
         row = dict(id=1, commercial='Alice', signed_on=date(2026, 11, 30), montant=650,
                    initial_amount=1000, commission_rate=30, aleo_rate=70, revenue_source='ade',

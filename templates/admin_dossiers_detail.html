@@ -20,6 +20,7 @@
     </div>
 
     <div class="row g-3">
+        <p><a class="btn btn-outline-danger" href="{{ url_for('export_lost_dossiers_pdf', commercial_id=commercial.id) }}">Exporter les dossiers perdus de {{ commercial.username }} en PDF</a></p>
 
         <!-- ================= EN COURS ================= -->
         <div class="col-12 col-lg-4">

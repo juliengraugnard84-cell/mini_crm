@@ -9,6 +9,11 @@ from client_groups import build_group_summaries, attach_client_group, suggested_
 
 
 class ClientGroupTests(unittest.TestCase):
+    def setUp(self):
+        active_session = patch.object(crm, 'session_user_is_active', return_value=True)
+        active_session.start()
+        self.addCleanup(active_session.stop)
+
     def clients(self):
         return [dict(id=1, client_group_id=10, common_name='Foncia', name='Foncia Paris',
                      siret='123', commercial='Alice', owner_id=1, address='Paris',

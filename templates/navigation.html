@@ -29,6 +29,7 @@
     <div class="crm-nav-group">
         <span class="crm-nav-heading">Équipe et suivi</span>
         {{ nav_link('admin_dossiers', 'Dossiers par commercial', ep.startswith('admin_dossiers')) }}
+        {{ nav_link('admin_common_dossiers', 'Commun', ep == 'admin_common_dossiers') }}
         {{ nav_link('admin_commercial_statistics', "Statistiques de l'équipe", ep.startswith('admin_commercial_statistics')) }}
         {{ nav_link('admin_updates', 'Demandes de modification', ep in ['admin_updates', 'open_update'], unread_updates|default(0)) }}
         <a href="{{ url_for('admin_duplicate_alerts') }}" id="duplicate-alert-nav" {% if ep in ['admin_duplicate_alerts', 'dossier_duplicate_alert'] %}class="active" aria-current="page"{% endif %}>Alertes de doublons <span id="duplicate-alert-count" class="nav-alert-badge danger" {% if not unread_duplicate_alerts %}hidden{% endif %}>{{ unread_duplicate_alerts }}</span></a>

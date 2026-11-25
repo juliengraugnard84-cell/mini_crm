@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Commun{% endblock %}
+{% block content %}
+<h1>Commun</h1>
+<p class="text-muted">Espace réservé à l’administrateur. Dossiers sans commercial, ou dont le commercial a quitté l’entreprise. Les informations, documents et historiques sont conservés.</p>
+<p>Pour reprendre un dossier, ouvrez sa fiche et choisissez un nouveau commercial dans « Modifier la fiche ». Il quittera alors cet espace.</p>
+{% set statuses = {'nouveau': 'Nouveau', 'en_cours': 'En cours', 'en_attente': 'En attente', 'gagne': 'Gagné', 'perdu': 'Perdu'} %}
+<h2 class="h4">Dossiers clients — {{ dossiers|length }}</h2>
+<div class="table-responsive">
+<table class="table table-striped align-middle">
+    <thead><tr><th>Dossier</th><th>Ancien commercial</th><th>Statut</th><th>Création</th></tr></thead>
+    <tbody>
+    {% for dossier in dossiers %}
+    <tr>
+        <td><a href="{{ url_for('client_detail', client_id=dossier.id) }}">N°{{ dossier.id }} — {{ dossier.name }}</a></td>
+        <td>{{ dossier.former_commercial or 'Non renseigné' }}</td>
+        <td>{{ statuses.get(dossier.status, dossier.status or 'En cours') }}</td>
+        <td>{{ format_date(dossier.created_at) }}</td>
+    </tr>
+    {% else %}<tr><td colspan="4">Aucun dossier client dans Commun.</td></tr>{% endfor %}
+    </tbody>
+</table>
+</div>
+<h2 class="h4 mt-4">Dossiers CSPE — {{ cspe_dossiers|length }}</h2>
+<div class="table-responsive">
+<table class="table table-striped align-middle">
+    <thead><tr><th>Dossier</th><th>Ancien commercial</th><th>Création</th></tr></thead>
+    <tbody>
+    {% for dossier in cspe_dossiers %}
+    <tr><td><a href="{{ url_for('cspe_detail', dossier_id=dossier.id) }}">N°{{ dossier.id }} — {{ dossier.name }}</a></td><td>{{ dossier.former_commercial or 'Non renseigné' }}</td><td>{{ format_date(dossier.created_at) }}</td></tr>
+    {% else %}<tr><td colspan="3">Aucun dossier CSPE dans Commun.</td></tr>{% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

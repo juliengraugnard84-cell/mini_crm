@@ -9,6 +9,9 @@ import app as crm
 
 class UploadLimitTests(unittest.TestCase):
     def setUp(self):
+        active_session = patch.object(crm, 'session_user_is_active', return_value=True)
+        active_session.start()
+        self.addCleanup(active_session.stop)
         self.client = crm.app.test_client()
         with self.client.session_transaction() as session:
             session['user'] = dict(id=7, username='Test', role='commercial')

@@ -58,6 +58,9 @@
     </div>
 
     <div class="crm-page-header-actions">
+        {% if current_user and current_user.role in ['admin', 'commercial'] %}
+        <a class="btn btn-outline-danger" href="{{ url_for('export_lost_dossiers_pdf') }}">Exporter {{ 'tous les' if current_user.role == 'admin' else 'mes' }} dossiers perdus (PDF)</a>
+        {% endif %}
         <button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#newClientForm">
             Nouveau dossier
         </button>

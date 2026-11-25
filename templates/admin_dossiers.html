@@ -3,6 +3,8 @@
 {% block content %}
 
 <h1 class="mb-4">📊 Récapitulatif des dossiers par commercial</h1>
+<p><a class="btn btn-outline-secondary" href="{{ url_for('admin_common_dossiers') }}">Commun — dossiers à réattribuer</a></p>
+<p><a class="btn btn-outline-danger" href="{{ url_for('export_lost_dossiers_pdf') }}">Exporter tous les dossiers perdus en PDF</a></p>
 <p class="text-muted mb-3">
     Cliquez sur un commercial pour voir le détail de ses dossiers
     (en cours / en attente / gagnés / perdus).
@@ -63,6 +65,7 @@
 
                 <td class="text-center" style="color: #dc2626; font-weight: 600;">
                     {{ s.perdus }}
+                    <a class="d-block small" href="{{ url_for('export_lost_dossiers_pdf', commercial_id=s.commercial_id) }}">Exporter en PDF</a>
                 </td>
 
                 <td class="text-center">
